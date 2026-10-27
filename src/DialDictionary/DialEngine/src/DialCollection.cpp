@@ -28,6 +28,7 @@
 
 #include "Logger.h"
 
+#include <algorithm>
 #include <sstream>
 
 void DialCollection::prepareConfig(ConfigReader &config_){
@@ -65,12 +66,70 @@ void DialCollection::prepareConfig(ConfigReader &config_){
     });
   config_.checkConfiguration();
 }
+void DialCollection::prepareCompositeInputs(ConfigReader& config_){
+  prepareConfig(config_);
+  LogThrowIf(config_.hasField("dialInputList"),
+             "Composite: declare parameterName or parameterIndex in nodes, without an outer dialInputList");
+  auto options = config_.fetchValue<ConfigReader>("options");
+  options.defineFields({{"nodes"}, {"output"}});
+  options.checkConfiguration();
+  auto nodes = options.fetchValue<ConfigReader>("nodes");
+  JsonType normalizedNodes = JsonType::array();
+  JsonType parameters = JsonType::array();
+  // Infer a stable, deduplicated buffer layout for cache invalidation. Nested
+  // graphs expose their inferred dependencies to their enclosing graph.
+  for( auto node : nodes.loop() ){
+    prepareConfig(node);
+    if( node.fetchValue<DialType>("dialType") == DialType::Composite ){
+      prepareCompositeInputs(node);
+    }
+    auto inputs = node.fetchValue<JsonType>("dialInputList");
+    LogThrowIf(not inputs.is_array(), "Composite node dialInputList must be a list");
+    for( auto& input : inputs ){
+      LogThrowIf(input.contains("inputIndex"),
+                 "Composite: inputIndex has been removed; use parameterName or parameterIndex");
+      const int sources = int(input.contains("parameterName")) + int(input.contains("parameterIndex"))
+                          + int(input.contains("dialResponse")) + int(input.contains("eventVariable"));
+      LogThrowIf(sources != 1,
+                 "Composite input: specify exactly one of parameterName, parameterIndex, dialResponse and eventVariable");
+      if( not input.contains("parameterName") and not input.contains("parameterIndex") ){ continue; }
+      auto* parameterSet = getSupervisedParameterSet();
+      std::string name;
+      if( input.contains("parameterIndex") ){
+        const auto& index = input.at("parameterIndex");
+        LogThrowIf(not index.is_number_integer() or index < 0 or index >= parameterSet->getParameterList().size(),
+                   "Composite: parameterIndex outside the supervised parameter set");
+        name = parameterSet->getParameterList().at(index.get<int>()).getName();
+        input.erase("parameterIndex");
+      }
+      else{
+        name = input.at("parameterName").get<std::string>();
+        LogThrowIf(parameterSet->getParameterPtr(name) == nullptr, "Could not find parameter: " << name);
+      }
+      input["parameterName"] = name;
+      const JsonType reference = {{"parameterName", name}};
+      if( std::find(parameters.begin(), parameters.end(), reference) == parameters.end() ){
+        parameters.emplace_back(reference);
+      }
+    }
+    node.getConfig()["dialInputList"] = std::move(inputs);
+    normalizedNodes.emplace_back(node.getConfig());
+  }
+  options.getConfig()["nodes"] = std::move(normalizedNodes);
+  config_.getConfig()[config_.getConfigEntry("options").first] = options.getConfig();
+  config_.getConfig()["dialInputList"] = std::move(parameters);
+}
+
 void DialCollection::configureImpl() {
   prepareConfig(_config_);
 
   _config_.fillValue(_dataSetNameList_, "applyOnDataSets");
   _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ){ return; }
+
+  if( not _isCompositeNode_ and _config_.fetchValue<DialType>("dialType", DialType::Unset) == DialType::Composite ){
+    prepareCompositeInputs(_config_);
+  }
 
   readVariableResponseConfig(_config_);
 
@@ -962,15 +1021,14 @@ bool DialCollection::initializeDialsWithDefinition() {
   if( _dialType_ == DialType::Composite ){
     LogThrowIf(dialsDefinition.hasField("binning") or hasDialBranchData(),
                "Composite: put binning and dialBranchData on individual nodes");
-    const int inputCount = _config_.hasField("dialInputList")
-        ? int(_config_.fetchValue<JsonType>("dialInputList").size()) : 1;
-    LogThrowIf(inputCount == 0, "Composite requires at least one input");
-    LogThrowIf(not _config_.hasField("dialInputList") and _supervisedParameterIndex_ < 0,
-               "Composite at parameter-set level requires an explicit dialInputList");
+    std::vector<std::string> parameterNames;
+    for( const auto& input : _config_.fetchValue<JsonType>("dialInputList") ){
+      parameterNames.emplace_back(input.at("parameterName").get<std::string>());
+    }
     _isEventByEvent_ = false;
     _dialInterfaceList_.emplace_back();
     _dialInterfaceList_.back().setDial(DialBaseObject(std::make_unique<CompositeDial>(
-        dialsDefinition.fetchValue<ConfigReader>("options"), inputCount)));
+        dialsDefinition.fetchValue<ConfigReader>("options"), parameterNames)));
   }
   else if( _dialType_ == DialType::Norm ) {
     // This dial collection is a normalization, so there is a single dial.

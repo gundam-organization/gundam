@@ -200,6 +200,7 @@ protected:
   void configureImpl() override;
   void initializeImpl() override;
 
+  void prepareCompositeInputs(ConfigReader& config_);
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
   bool initializeDialsWithBinningFile(const ConfigReader& dialsDefinition);

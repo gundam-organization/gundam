@@ -82,7 +82,7 @@ def formula(name, expression, *inputs, **options):
 
 
 def composite(nodes, output, **options):
-    return dict(name='graph', dialType='Composite', dialInputList=[{'name': 'p'}, {'name': 'q'}],
+    return dict(name='graph', dialType='Composite',
                 options=dict(nodes=nodes, output=output), **options)
 
 
@@ -176,8 +176,8 @@ def main():
     GUNDAM.setLightOutputMode(True)
     path = Path.cwd() / '230CompositeDials.root'
     write_input(path)
-    first = {'inputIndex': 0}
-    second = {'inputIndex': 1}
+    first = {'parameterName': 'p'}
+    second = {'parameterIndex': 1}
     upstream = {'dialResponse': 'source'}
     binning = {'binningDefinition': [{'name': 'X', 'edges': [0, 1, 2, 3]}]}
     for threads in (1, 2):
@@ -192,11 +192,11 @@ def main():
         if threads == 1:
             exercise(path, legacy_options(dag), lambda p, q, i: max(0., 2 + 2*p + p*p + q))
 
-        # A nested composite consumes an intermediate and a direct parameter.
-        nested = composite([formula('sum', '2+[arg0]+[arg1]', first, second)], 'sum')
-        nested.update(name='nested', dialInputList=[upstream, second])
-        exercise(path, composite([formula('source', '[arg0]*[arg0]', first), nested], 'nested'),
-                 lambda p, q, i: 2 + p*p + q)
+        # Nested composites infer their own dependencies from direct references.
+        nested = composite([formula('sum', '2+[arg0]+[arg1]', upstream, second),
+                            formula('source', '[arg0]*[arg0]', first)], 'sum')
+        nested['name'] = 'nested'
+        exercise(path, composite([nested], 'nested'), lambda p, q, i: 2 + p*p + q)
 
         # Use ordinary branch dials, including the constant-one shortcut.
         for dial_type in ('Spline', 'Graph'):
@@ -238,6 +238,10 @@ def main():
         exercise(path, composite([formula('eventOnly', '1+.001*[arg0]', {'eventVariable': 'q3'})], 'eventOnly'),
                  lambda p, q, i: 1+.25*i)
 
+        event_only_nested = composite([formula('eventOnly', '1+.001*[arg0]', {'eventVariable': 'q3'})], 'eventOnly')
+        event_only_nested['name'] = 'nested'
+        exercise(path, composite([event_only_nested], 'nested'), lambda p, q, i: 1+.25*i)
+
         # The requested delta/alpha/q3 abscissa, followed by a discretely selected spline.
         source_node = formula('source', '[arg0]+[arg1]*(.056*[arg2]-41.6)', first, second,
                               {'eventVariable': 'q3'}, minDialResponse=-40., maxDialResponse=40.)
@@ -251,7 +255,7 @@ def main():
                  lambda p, q, i: 5+.001*(i//2+1)*abscissa(p, q, i)**2, points=points)
         named_source = dict(name='source', dialType='Formula', dialInputList=[
             {'name': 'momentum', 'eventVariable': 'q3'},
-            {'name': 'slope', 'inputIndex': 1}, {'name': 'offset', 'inputIndex': 0}],
+            {'name': 'slope', 'parameterIndex': 1}, {'name': 'offset', 'parameterName': 'p'}],
             options={'formulaStr': '[offset]+[slope]*(.056*[momentum]-41.6)'},
             minDialResponse=-40., maxDialResponse=40.)
         exercise(path, composite([named_source, spline_node], 'spline'),
@@ -260,9 +264,10 @@ def main():
                  abscissa, observable=True, points=points)
 
         # Event inputs can also accompany upstream dial responses, inside a nested graph.
-        nested = composite([formula('sum', '2+[arg0]+.001*[arg1]', first, {'eventVariable': 'q3'})], 'sum')
-        nested.update(name='nested', dialInputList=[upstream, second])
-        exercise(path, composite([formula('source', '[arg0]*[arg0]', first), nested], 'nested'),
+        nested = composite([formula('sum', '2+[arg0]+.001*[arg1]', upstream, {'eventVariable': 'q3'}),
+                            formula('source', '[arg0]*[arg0]', first)], 'sum')
+        nested['name'] = 'nested'
+        exercise(path, composite([nested], 'nested'),
                  lambda p, q, i: 2+p*p+.25*i)
 
         # Reading an observable captures its loaded value; repeated migrations do not accumulate.
@@ -319,9 +324,8 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
     exercise(path, composite([external, formula('output', '[arg0]*[arg0]', upstream)], 'output'),
              lambda p, q, i: (1+p+2*q)**2)
 
-    # Parameter-attached composites expose the owning parameter as input 0.
+    # Direct references also work for parameter-attached composites.
     implicit = composite([formula('output', '1+[arg0]', first)], 'output')
-    implicit.pop('dialInputList')
     config = make_config(path, implicit)
     parameter_set = config['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]
     parameter_set.pop('dialSetDefinitions')
@@ -343,9 +347,23 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
             'parameterSetList'][0]['dialSetDefinitions'][0]['options']
         return result, graph
 
+    config = copy.deepcopy(good)
+    root = config['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig'][
+        'parameterSetList'][0]['dialSetDefinitions'][0]
+    root['dialInputList'] = [{'name': 'p'}]
+    reject(config, 'without an outer dialInputList')
+
     config, graph = changed_graph()
     graph['nodes'][0]['dialInputList'] = [{'name': 'arg0', 'dialResponse': 'output'}]
     reject(config, 'cycle')
+    for bad_source, message in [({'parameterName': 'missing'}, 'Could not find parameter'),
+                                ({'parameterIndex': 2}, 'parameterIndex'),
+                                ({'parameterIndex': -1}, 'parameterIndex'),
+                                ({'parameterIndex': .5}, 'parameterIndex'),
+                                ({'parameterName': 'p', 'parameterIndex': 0}, 'exactly one of')]:
+        config, graph = changed_graph()
+        graph['nodes'][0]['dialInputList'] = [dict(bad_source, name='arg0')]
+        reject(config, message)
     config, graph = changed_graph()
     graph['nodes'][0]['name'] = 'output'
     reject(config, 'duplicate')
@@ -359,9 +377,9 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
     graph['nodes'][0]['dialInputList'] = [{'name': 'arg0', 'inputIndex': .5}]
     reject(config, 'inputIndex')
     config, graph = changed_graph()
-    graph['nodes'][0]['dialInputList'] = [{'inputIndex': 0, 'dialResponse': 'output'}]
+    graph['nodes'][0]['dialInputList'] = [{'parameterName': 'p', 'dialResponse': 'output'}]
     reject(config, 'exactly one of')
-    for bad_input in ({'eventVariable': ''}, {'eventVariable': 'q3', 'inputIndex': 0}):
+    for bad_input in ({'eventVariable': ''}, {'eventVariable': 'q3', 'parameterName': 'p'}):
         config, graph = changed_graph()
         graph['nodes'][0]['dialInputList'] = [dict(bad_input, name='arg0')]
         reject(config, 'eventVariable')
@@ -389,8 +407,11 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
         reject(config, 'requires parameter inputs')
         config, graph = changed_graph()
         child = composite([dict(name='prepared', dialType=dial_type, dialInputList=[first])], 'prepared')
-        child.update(name='output', dialInputList=[upstream, second])
-        graph['nodes'][1] = child
+        child['name'] = 'output'
+        graph['nodes'] = [child]
+        root = config['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig'][
+            'parameterSetList'][0]['dialSetDefinitions'][0]
+        root.update(useMirrorDial=True, mirrorLowEdge=0., mirrorHighEdge=1.)
         reject(config, 'requires parameter inputs')
     print('SUCCESS: composite dial graphs, event/bin binding, observables and validation.')
 
