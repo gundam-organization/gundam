@@ -38,6 +38,7 @@ external libraries to calculate weights.
 | dialsTreePath          | string       | ROOT tree path, optionally followed by `:branch` for binned dials       |         |
 | dialsBranch            | string       | Explicit object branch in the binned dial tree                         |         |
 | binnedDialsPath        | string       | Binned dial source as `file:tree:branch`                                |         |
+| dialsBinningDefinition | list(object) | Explicit bin dimensions read from the dial TTree; exclusive with `binning` |       |
 
 ### Binned dials stored in a ROOT tree
 
@@ -61,19 +62,50 @@ dialsBranch: "Graph"
 binning: "binning.txt"
 ```
 
-The selected branch must contain `TGraph` (including subclasses) or `TSpline3`
-objects. `dialType` still selects the interpolation method. The tree retains its
-`kinematicBin` integer branch and any integer split-variable branches; other
-object branches are ignored when the dial branch is explicit.
+The selected curve branch must contain `TGraph` (including subclasses) or
+`TSpline3` objects. `dialType` still selects the interpolation method.
 
-Redundant file, tree or branch declarations must agree. For example,
+Choose exactly one bin source:
+
+- `binning`: supply an external bin definition (file or inline configuration).
+  Entry `i` of the TTree corresponds to bin `i`. Their counts must match.
+- `dialsBinningDefinition`: create one bin per TTree entry using only the
+  explicitly declared scalar branches. For example:
+
+```yaml
+dialsFilePath: "binnedDials.root"
+dialsTreePath: "EB_bin_C_nu"
+dialsBranch: "Graph"
+dialsBinningDefinition:
+  - {name: Enu, minValueBranch: minEnu, maxBranchValue: maxEnu}
+  - {name: theta_mu, minValueBranch: minThetaMu, maxBranchValue: maxThetaMu}
+  - {name: NeutrinoCode, valueBranch: NeutrinoCode}
+```
+
+`name` identifies the event variable. `minValueBranch` and `maxBranchValue`
+supply a continuous interval `[min, max)`; both branches are required and
+`min < max`. `valueBranch` supplies an equality selection. These two forms
+cannot be mixed within a dimension. Numeric scalar branches (including integer,
+float and double) are read as numbers, without forcing integer conversion.
+Bounds may be infinite, but not NaN; equality values must be finite. Variable
+names must be non-empty and unique within the definition.
+
+`binning` and `dialsBinningDefinition` cannot be combined. The latter requires a
+TTree source and cannot be used with `dialsList`.
+
+Only declared branches participate in the bin selection. Other metadata,
+including `kinematicBin`, is ignored. The former automatic interpretation of
+scalar leaves as integer selections has been removed. Bins and curves retain
+tree entry order; when a curve needs no dial, its bin is removed with it.
+
+Redundant file, tree or curve-branch declarations must agree. For example,
 `dialsTreePath: "EB_bin_C_nu"` may accompany the full `binnedDialsPath`.
 Explicit tree branches cannot be combined with `dialsList`.
 
-For backward compatibility, omitting the branch keeps the historical choice:
-`Spline` for `dialType: Spline`, `Graph` for `dialType: Graph`. This implicit
-selection emits a deprecation warning with instructions to specify the branch.
-The existing `dialsFilePath` plus `dialsList` object-array syntax is unchanged.
+For backward compatibility, omitting the curve branch keeps the historical
+choice: `Spline` for `dialType: Spline`, `Graph` for `dialType: Graph`. This
+implicit curve-branch selection emits a deprecation warning. The existing
+`dialsFilePath` plus `dialsList` object-array syntax is unchanged.
 
 ### Config options that apply to specific types of dials
 
