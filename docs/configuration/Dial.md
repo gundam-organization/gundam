@@ -204,6 +204,10 @@ Each input has a unique, non-empty `name`, which is the local alias used as
 - `parameterIndex`: its zero-based index in that set;
 - `eventVariable`: a loaded event variable, including `variableDict` aliases.
 
+Explicit `parameterName` and `parameterIndex` references are also accepted by
+other dial types. For these dials, the order in `dialInputList` determines the
+argument order; `name`, when provided, does not select the source parameter.
+
 For example, `{name: offset, parameterName: delta}` binds `[offset]` to `delta`.
 Input declaration order does not determine ROOT parameter order: names are
 resolved once when configuring the dial. Positional `x[i]` expressions and
