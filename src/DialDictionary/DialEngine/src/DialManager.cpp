@@ -86,11 +86,18 @@ void DialManager::configureImpl(){
       JsonType inputs = JsonType::array();
       std::vector<bool> dynamicInputs;
       for( const auto& input : node.inputs ){
-        const bool dynamic = input.nodeIndex >= 0 or mirroredInputs or parentResponseInputs.at(input.inputIndex);
+        const bool dynamic = not input.eventVariable.empty() or input.nodeIndex >= 0
+                             or mirroredInputs or parentResponseInputs.at(input.inputIndex);
         LogThrowIf(prepared and dynamic,
                    "Composite node " << node.name << ": " << type
-                   << " requires parameter inputs; dialResponse inputs need per-event factory updates");
+                   << " requires parameter inputs; response/event inputs and composite mirroring need per-event factory updates");
         dynamicInputs.push_back(dynamic);
+        if( not input.eventVariable.empty() ){
+          LogThrowIf(type != DialCollection::DialType::Formula,
+                     "Composite node " << node.name << ": eventVariable inputs are only supported by Formula dials");
+          inputs.emplace_back(JsonType{{"eventVariable", input.eventVariable}});
+          continue;
+        }
         // Intermediate inputs are evaluated by CompositeDial, not by this
         // buffer. A real parameter placeholder keeps normal loaders usable.
         inputs.emplace_back(parameterInputs.at(input.inputIndex >= 0 ? input.inputIndex : 0));

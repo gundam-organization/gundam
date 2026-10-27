@@ -7,6 +7,7 @@
 #include "Logger.h"
 
 #include <cmath>
+#include <algorithm>
 #include <map>
 #include <sstream>
 
@@ -36,10 +37,12 @@ CompositeDial::CompositeDial(ConfigReader config_, int inputCount_): _inputCount
     LogThrowIf(not inputs.getConfig().is_array() or inputs.getConfig().empty(),
                "Composite node " << node.name << ": dialInputList must be a non-empty list");
     for( auto source : inputs.loop() ){
-      source.defineFields({{"inputIndex"}, {"dialResponse"}});
+      source.defineFields({{"inputIndex"}, {"dialResponse"}, {"eventVariable"}});
       source.checkConfiguration();
-      LogThrowIf(source.hasField("inputIndex") == source.hasField("dialResponse"),
-                 "Composite node " << node.name << ": specify exactly one of inputIndex and dialResponse");
+      const int sourceCount = int(source.hasField("inputIndex")) + int(source.hasField("dialResponse"))
+                              + int(source.hasField("eventVariable"));
+      LogThrowIf(sourceCount != 1,
+                 "Composite node " << node.name << ": specify exactly one of inputIndex, dialResponse and eventVariable");
       Input input;
       if( source.hasField("inputIndex") ){
         const auto index = source.fetchValue<JsonType>("inputIndex");
@@ -47,11 +50,19 @@ CompositeDial::CompositeDial(ConfigReader config_, int inputCount_): _inputCount
                    "Composite node " << node.name << ": inputIndex outside composite inputs");
         input.inputIndex = index.get<int>();
       }
-      else{
+      else if( source.hasField("dialResponse") ){
         const auto dependency = source.fetchValue<std::string>("dialResponse");
         LogThrowIf(not nodeIndices.count(dependency),
                    "Composite node " << node.name << ": unknown dialResponse: " << dependency);
         input.nodeIndex = nodeIndices.at(dependency);
+      }
+      else{
+        input.eventVariable = source.fetchValue<std::string>("eventVariable");
+        input.eventVariable = GenericToolbox::trimString(input.eventVariable, " ");
+        if( input.eventVariable.size() >= 2 and input.eventVariable.front() == '[' and input.eventVariable.back() == ']' ){
+          input.eventVariable = input.eventVariable.substr(1, input.eventVariable.size() - 2);
+        }
+        LogThrowIf(input.eventVariable.empty(), "Composite node " << node.name << ": eventVariable must not be empty");
       }
       node.inputs.emplace_back(input);
     }
@@ -77,7 +88,8 @@ void CompositeDial::bind(const std::function<const DialInterface*(int)>& findInt
     const auto* interface = findInterface_(node.collectionIndex);
     LogThrowIf(interface == nullptr or interface->getDialBaseRef() == nullptr,
                "Composite: node " << node.name << " has no dial for this event (dataset, condition, bin or empty dial)");
-    if( const auto* composite = dynamic_cast<const CompositeDial*>(interface->getDialBaseRef()) ){
+    if( const auto* composite = dynamic_cast<const CompositeDial*>(interface->getDialBaseRef());
+        composite != nullptr and not composite->isBound() ){
       auto bound = std::make_shared<CompositeDial>(*composite);
       bound->bind(findInterface_);
       node.dial = std::move(bound);
@@ -88,7 +100,9 @@ void CompositeDial::bind(const std::function<const DialInterface*(int)>& findInt
     for( const auto& ref : interface->getInputBufferRef()->getInputParameterIndicesList() ){
       node.mirrorEdges.emplace_back(ref.mirrorEdges);
     }
-    LogThrowIf(node.mirrorEdges.size() != node.inputs.size(),
+    const auto parameterInputCount = std::count_if(node.inputs.begin(), node.inputs.end(),
+        [](const Input& input_){ return input_.eventVariable.empty(); });
+    LogThrowIf(node.mirrorEdges.size() != parameterInputCount,
                "Composite node " << node.name << ": input buffer size mismatch");
     const auto type = node.config->fetchValue<std::string>("dialType");
     const bool surface = dynamic_cast<const Bilinear*>(node.dial.get()) != nullptr
@@ -117,10 +131,13 @@ double CompositeDial::evalResponse(const DialInputBuffer& input_) const {
     const auto& node = _nodes_[index];
     std::vector<double> values;
     values.reserve(node.inputs.size());
-    for( size_t iInput = 0 ; iInput < node.inputs.size() ; ++iInput ){
-      const auto& source = node.inputs[iInput];
+    size_t iParameter = 0;
+    for( const auto& source : node.inputs ){
+      // EventFormula supplies its own event inputs; this buffer contains
+      // only the parameter/response inputs, in their original relative order.
+      if( not source.eventVariable.empty() ){ continue; }
       double value = source.inputIndex >= 0 ? input_.getInputBuffer()[source.inputIndex] : responses[source.nodeIndex];
-      const auto& edges = node.mirrorEdges[iInput];
+      const auto& edges = node.mirrorEdges[iParameter++];
       if( not std::isnan(edges.minValue) ){
         value = std::abs(std::fmod(value - edges.minValue, 2 * edges.range));
         if( value > edges.range ){ value = 2 * edges.range - value; }

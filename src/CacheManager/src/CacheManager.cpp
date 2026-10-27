@@ -296,7 +296,7 @@ bool Cache::Manager::Build(SampleSet& sampleSet,
                 // with the offset to the table when the weighting is built.
                 config.krigs[krigDial->getTable()] = 0;
             }
-            else if (dialType.find("ExternalWeight") == 0 or dialType == "Composite") {
+            else if (dialType.find("ExternalWeight") == 0 or dialType == "Composite" or dialType == "EventFormula") {
                 LogWarning << dialType << " dials are not supported by Cache::Manager yet. "
                            << "Disabling Cache::Manager for this run." << std::endl;
                 SetIsEnabled(false);
