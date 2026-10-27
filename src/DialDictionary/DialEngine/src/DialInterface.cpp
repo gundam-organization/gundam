@@ -31,7 +31,7 @@ std::string DialInterface::getSummary(bool shallow_) const {
   const auto* formula = dynamic_cast<const RootFormula*>(_dial_.get());
   if( _inputBufferPtr_ != nullptr and _responseSupervisorPtr_ != nullptr
       and (composite == nullptr or composite->isBound())
-      and (formula == nullptr or formula->getFormula().GetNdim() <= _inputBufferPtr_->getInputBuffer().size()) ){
+      and (formula == nullptr or formula->getInputCount() == _inputBufferPtr_->getInputBuffer().size()) ){
     ss << " response=" << this->evalResponse();
   }
 

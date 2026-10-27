@@ -37,13 +37,17 @@ CompositeDial::CompositeDial(ConfigReader config_, int inputCount_): _inputCount
     LogThrowIf(not inputs.getConfig().is_array() or inputs.getConfig().empty(),
                "Composite node " << node.name << ": dialInputList must be a non-empty list");
     for( auto source : inputs.loop() ){
-      source.defineFields({{"inputIndex"}, {"dialResponse"}, {"eventVariable"}});
+      source.defineFields({{"name"}, {"inputIndex"}, {"dialResponse"}, {"eventVariable"}});
       source.checkConfiguration();
       const int sourceCount = int(source.hasField("inputIndex")) + int(source.hasField("dialResponse"))
                               + int(source.hasField("eventVariable"));
       LogThrowIf(sourceCount != 1,
                  "Composite node " << node.name << ": specify exactly one of inputIndex, dialResponse and eventVariable");
       Input input;
+      if( node.config->fetchValue<DialCollection::DialType>("dialType") == DialCollection::DialType::Formula ){
+        input.name = source.fetchValue("name", std::string());
+        LogThrowIf(input.name.empty(), "Composite Formula input requires a name");
+      }
       if( source.hasField("inputIndex") ){
         const auto index = source.fetchValue<JsonType>("inputIndex");
         LogThrowIf(not index.is_number_integer() or index < 0 or index >= _inputCount_,
@@ -113,8 +117,8 @@ void CompositeDial::bind(const std::function<const DialInterface*(int)>& findInt
                and node.inputs.size() != 1,
                "Composite node " << node.name << ": " << type << " requires exactly one input");
     if( const auto* formula = dynamic_cast<const RootFormula*>(node.dial.get()) ){
-      LogThrowIf(formula->getFormula().GetNdim() > node.inputs.size(),
-                 "Composite node " << node.name << ": too few inputs for Formula");
+      LogThrowIf(formula->getInputCount() != node.inputs.size(),
+                 "Composite node " << node.name << ": named input count mismatch");
     }
   }
   _isBound_ = true;

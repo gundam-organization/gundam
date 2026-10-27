@@ -125,29 +125,30 @@ dialSetDefinitions:
       nodes:
         - name: first
           dialType: Formula
-          dialInputList: [{inputIndex: 0}]
+          dialInputList: [{name: value, inputIndex: 0}]
           options:
-            formulaStr: "x[0] * x[0]"
+            formulaStr: "[value] * [value]"
         - name: second
           dialType: Formula
-          dialInputList: [{inputIndex: 1}]
+          dialInputList: [{name: value, inputIndex: 1}]
           options:
-            formulaStr: "exp(x[0])"
+            formulaStr: "exp([value])"
         - name: combine
           dialType: Formula
           dialInputList:
-            - {dialResponse: first}
-            - {dialResponse: second}
+            - {name: x, dialResponse: first}
+            - {name: y, dialResponse: second}
           options:
-            formulaStr: "x[0] + x[1]"
+            formulaStr: "[x] + [y]"
       output: combine
 ```
 
 `inputIndex` is a zero-based index into the composite's own `dialInputList`.
 `dialResponse` names another node in the same graph. Formula nodes also accept
 `eventVariable`, naming a loaded event variable. Exactly one of these three
-keys is required for each node input. Inputs may mix these sources and
-their list order defines the dial's argument order. Node declaration order
+keys is required for each node input. Inputs may mix these sources.
+Formula inputs require a unique `name`, used as `[name]` in the expression.
+Other dial types retain positional argument order. Node declaration order
 does not matter; shared dependencies are evaluated once per graph evaluation.
 Node names must be non-empty and unique, dependencies must exist, and every
 node must contribute to `output`. Cycles are rejected.
@@ -312,23 +313,43 @@ Formula inputs can mix fit parameters with loaded event variables:
 ```yaml
 dialType: Formula
 dialInputList:
-  - {name: delta}
-  - {name: alpha}
-  - {eventVariable: q3}
+  - {name: delta, parameterName: delta}
+  - {name: alpha, parameterName: alpha}
+  - {name: q3, eventVariable: q3}
 options:
-  formulaStr: "x[0] + x[1] * (0.056 * x[2] - 41.6)"
-minDialResponse: -40.
-maxDialResponse: 40.
+  formulaStr: "[delta] + [alpha] * (0.056 * [q3] - 41.6)"
+dialResponseLimits: [-40., 40.]
 ```
 
-Inside a composite, use `{inputIndex: 0}` and `{inputIndex: 1}` for the
-parameter entries; `{eventVariable: q3}` is unchanged. A downstream spline
-consumes the formula response with `{dialResponse: nodeName}`.
+Each input has a unique, non-empty `name`, which is the local alias used as
+`[name]` in the expression. It must select exactly one source:
 
-Input order defines the `x[i]` positions. Event variables are automatically
-requested from the dataset, including expressions defined in `variableDict`.
-Bracketed names such as `{eventVariable: "[q3]"}` are accepted. Repeated inputs
-share the captured value. Event-only and binned formulas are supported.
+- `parameterName`: the fit parameter name in the supervised parameter set;
+- `parameterIndex`: its zero-based index in that set;
+- `eventVariable`: a loaded event variable, including `variableDict` aliases.
+
+For example, `{name: offset, parameterName: delta}` binds `[offset]` to `delta`.
+Input declaration order does not determine ROOT parameter order: names are
+resolved once when configuring the dial. Positional `x[i]` expressions and
+parameter references using only `{name: delta}` are unsupported for Formula.
+
+Inside a composite, use `{name: delta, inputIndex: 0}` and
+`{name: alpha, inputIndex: 1}` for its parameter inputs. Event references remain
+`{name: q3, eventVariable: q3}`; responses from other nodes use
+`{name: shift, dialResponse: nodeName}`.
+
+Event variables are requested automatically. Bracketed source names such as
+`{name: momentum, eventVariable: "[q3]"}` are accepted. Different input aliases
+may reference the same event variable and share its captured value. Event-only
+and binned formulas are supported. Binned formulas retain constants named
+after their binning axes, for example `[X]` for the center of the selected X
+bin. A declared input with the same name overrides that constant. Undeclared
+references are rejected instead of silently evaluating as zero.
+
+Evaluation supplies a call-local parameter array to `TFormula::EvalPar`,
+without modifying the shared TFormula parameters. When declaration order
+already matches ROOT's parameter order and there are no bin constants, the
+existing input buffer is passed directly.
 
 The values are captured for each event when building the dial cache, after
 sorting events. They remain fixed until the cache is rebuilt. Parameter

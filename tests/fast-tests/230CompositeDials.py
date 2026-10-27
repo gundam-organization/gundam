@@ -77,7 +77,7 @@ def write_input(path):
 
 
 def formula(name, expression, *inputs, **options):
-    return dict(name=name, dialType='Formula', dialInputList=list(inputs),
+    return dict(name=name, dialType='Formula', dialInputList=[dict(source, name=f'arg{i}') for i, source in enumerate(inputs)],
                 options={'formulaStr': expression}, **options)
 
 
@@ -184,31 +184,31 @@ def main():
         GUNDAM.setNumberOfThreads(threads)
         # Forward references, shared subgraph, signed intermediates, mixed inputs.
         dag = composite([
-            formula('output', '2+x[0]+x[1]+x[2]', {'dialResponse': 'left'}, {'dialResponse': 'right'}, second),
-            formula('right', 'x[0]*x[0]', upstream),
-            formula('source', 'x[0]', first),
-            formula('left', '2*x[0]', upstream)], 'output')
+            formula('output', '2+[arg0]+[arg1]+[arg2]', {'dialResponse': 'left'}, {'dialResponse': 'right'}, second),
+            formula('right', '[arg0]*[arg0]', upstream),
+            formula('source', '[arg0]', first),
+            formula('left', '2*[arg0]', upstream)], 'output')
         exercise(path, dag, lambda p, q, i: max(0., 2 + 2*p + p*p + q))
         if threads == 1:
             exercise(path, legacy_options(dag), lambda p, q, i: max(0., 2 + 2*p + p*p + q))
 
         # A nested composite consumes an intermediate and a direct parameter.
-        nested = composite([formula('sum', '2+x[0]+x[1]', first, second)], 'sum')
+        nested = composite([formula('sum', '2+[arg0]+[arg1]', first, second)], 'sum')
         nested.update(name='nested', dialInputList=[upstream, second])
-        exercise(path, composite([formula('source', 'x[0]*x[0]', first), nested], 'nested'),
+        exercise(path, composite([formula('source', '[arg0]*[arg0]', first), nested], 'nested'),
                  lambda p, q, i: 2 + p*p + q)
 
         # Use ordinary branch dials, including the constant-one shortcut.
         for dial_type in ('Spline', 'Graph'):
             node = dict(name='curve', dialType=dial_type, dialBranchData='graph', dialInputList=[upstream])
-            curve_dial = composite([formula('source', 'x[0]', first), node], 'curve')
+            curve_dial = composite([formula('source', '[arg0]', first), node], 'curve')
             if dial_type == 'Spline':
                 reference = lambda p, q, i: 1 + .1*(i + 1)*p*p
             else:
                 reference = lambda p, q, i: 1 + .1*(i + 1)*(abs(p) if abs(p) <= 1 else 3*abs(p)-2)
             exercise(path, curve_dial, reference)
         exercise(path, composite([dict(name='one', dialType='Spline', dialBranchData='flat',
-                                      dialInputList=[first]), formula('output', '2*x[0]', {'dialResponse': 'one'})],
+                                      dialInputList=[first]), formula('output', '2*[arg0]', {'dialResponse': 'one'})],
                                  'output'), lambda p, q, i: 2.)
 
         # Per-bin selection is delegated to the existing collection loader.
@@ -221,33 +221,33 @@ def main():
                 reference = lambda p, q, i: 2 + .1*(i//2 + 1)*p + .2*q
             else:
                 reference = lambda p, q, i: 1 + .2*(i//2 + 1)*p
-            exercise(path, composite([formula('source', 'x[0]', first), node], 'curve'), reference)
+            exercise(path, composite([formula('source', '[arg0]', first), node], 'curve'), reference)
 
         # Limits act at each node, then separately at the graph output.
-        limited = composite([formula('source', 'x[0]', first, dialResponseLimits=[-.2, .8]),
-                             formula('output', '1+x[0]', upstream)], 'output', dialResponseLimits=[0., 1.5])
+        limited = composite([formula('source', '[arg0]', first, dialResponseLimits=[-.2, .8]),
+                             formula('output', '1+[arg0]', upstream)], 'output', dialResponseLimits=[0., 1.5])
         exercise(path, limited, lambda p, q, i: min(1.5, 1 + min(.8, max(-.2, p))))
         mirrored = composite([dict(name='source', dialType='Normalization', dialInputList=[first],
                                    useMirrorDial=True, mirrorLowEdge=0., mirrorHighEdge=1.),
-                              formula('output', '1+x[0]', upstream)], 'output')
+                              formula('output', '1+[arg0]', upstream)], 'output')
         exercise(path, mirrored, lambda p, q, i: 1 + (abs(p) if abs(p) <= 1 else 2-abs(p)))
         smoothed = composite([dict(name='source', dialType='Normalization', dialInputList=[first],
                                    dialResponseLimits={'min': 0.}, enableResponseSmoothing=True,
                                    dialResponseSmoothingWidth=.2),
-                              formula('output', '1+x[0]', upstream)], 'output')
+                              formula('output', '1+[arg0]', upstream)], 'output')
         def smooth_reference(p, q, i):
             t = (p + .2)/.4
             return 1 + (0. if p <= -.2 else p if p >= .2 else .2*(2*t**3-t**4))
         exercise(path, smoothed, smooth_reference, points=[(.5, .25), (0., .25), (-.1, .25), (.1, .25)])
-        observable = composite([formula('source', 'x[0]+x[1]', first, second)], 'source',
+        observable = composite([formula('source', '[arg0]+[arg1]', first, second)], 'source',
                                applyToVariable='X', variableResponseMode='Override')
         exercise(path, observable, lambda p, q, i: p + q, observable=True)
 
-        exercise(path, composite([formula('eventOnly', '1+.001*x[0]', {'eventVariable': 'q3'})], 'eventOnly'),
+        exercise(path, composite([formula('eventOnly', '1+.001*[arg0]', {'eventVariable': 'q3'})], 'eventOnly'),
                  lambda p, q, i: 1+.25*i)
 
         # The requested delta/alpha/q3 abscissa, followed by a discretely selected spline.
-        source_node = formula('source', 'x[0]+x[1]*(.056*x[2]-41.6)', first, second,
+        source_node = formula('source', '[arg0]+[arg1]*(.056*[arg2]-41.6)', first, second,
                               {'eventVariable': 'q3'}, minDialResponse=-40., maxDialResponse=40.)
         spline_node = dict(name='spline', dialType='Spline', binning=binning,
                            dialsFilePath=str(path), dialsList='wideCurves', dialInputList=[upstream])
@@ -257,17 +257,24 @@ def main():
             return max(-40., min(40., p+q*(.056*250*i-41.6)))
         exercise(path, composite([source_node, spline_node], 'spline'),
                  lambda p, q, i: 5+.001*(i//2+1)*abscissa(p, q, i)**2, points=points)
+        named_source = dict(name='source', dialType='Formula', dialInputList=[
+            {'name': 'momentum', 'eventVariable': 'q3'},
+            {'name': 'slope', 'inputIndex': 1}, {'name': 'offset', 'inputIndex': 0}],
+            options={'formulaStr': '[offset]+[slope]*(.056*[momentum]-41.6)'},
+            minDialResponse=-40., maxDialResponse=40.)
+        exercise(path, composite([named_source, spline_node], 'spline'),
+                 lambda p, q, i: 5+.001*(i//2+1)*abscissa(p, q, i)**2, points=points)
         exercise(path, composite([source_node], 'source', applyToVariable='X', variableResponseMode='Override'),
                  abscissa, observable=True, points=points)
 
         # Event inputs can also accompany upstream dial responses, inside a nested graph.
-        nested = composite([formula('sum', '2+x[0]+.001*x[1]', first, {'eventVariable': 'q3'})], 'sum')
+        nested = composite([formula('sum', '2+[arg0]+.001*[arg1]', first, {'eventVariable': 'q3'})], 'sum')
         nested.update(name='nested', dialInputList=[upstream, second])
-        exercise(path, composite([formula('source', 'x[0]*x[0]', first), nested], 'nested'),
+        exercise(path, composite([formula('source', '[arg0]*[arg0]', first), nested], 'nested'),
                  lambda p, q, i: 2+p*p+.25*i)
 
         # Reading an observable captures its loaded value; repeated migrations do not accumulate.
-        snapshot = formula('loadedX', 'x[0]+x[1]', {'eventVariable': 'X'}, {'name': 'p'},
+        snapshot = formula('loadedX', '[arg0]+[arg1]', {'eventVariable': 'X'}, {'parameterName': 'p'},
                            applyToVariable='X', variableResponseMode='Override')
         exercise(path, snapshot, lambda p, q, i: .25+.5*i+p, observable=True)
 
@@ -278,9 +285,9 @@ def main():
     subprocess.run(['c++', '-shared', '-fPIC', str(source), '-o', str(library)], check=True)
     compiled = dict(name='compiled', dialType='CompiledLibDial', dialInputList=[upstream, second],
                     options={'libraryFile': str(library)})
-    exercise(path, composite([formula('source', 'x[0]*x[0]', first), compiled], 'compiled'),
+    exercise(path, composite([formula('source', '[arg0]*[arg0]', first), compiled], 'compiled'),
              lambda p, q, i: 2 + p*p + 3*q)
-    exercise(path, legacy_options(composite([formula('source', 'x[0]*x[0]', first), compiled], 'compiled')),
+    exercise(path, legacy_options(composite([formula('source', '[arg0]*[arg0]', first), compiled], 'compiled')),
              lambda p, q, i: 2 + p*p + 3*q)
 
     # Prepared factories remain usable as sources driven by graph parameters.
@@ -305,7 +312,7 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
         else:
             table_config.update(weightFunction='weights', weightVariables=['X'], weightNormalization=0.)
         table = dict(name='source', dialType=dial_type, dialInputList=[first, second], tableConfig=table_config)
-        exercise(path, composite([table, formula('output', 'x[0]*x[0]', upstream)], 'output'),
+        exercise(path, composite([table, formula('output', '[arg0]*[arg0]', upstream)], 'output'),
                  lambda p, q, i: (1+p+2*q)**2)
 
     worker = Path.cwd() / '230CompositeDials-worker.py'
@@ -317,11 +324,11 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
     external = dict(name='source', dialType='ExternalWeight', dialInputList=[first, second], options={
         'type': 'PythonWorker', 'inputEventVarList': ['X'],
         'workerConfig': {'pythonExecutable': sys.executable, 'evalScript': str(worker)}})
-    exercise(path, composite([external, formula('output', 'x[0]*x[0]', upstream)], 'output'),
+    exercise(path, composite([external, formula('output', '[arg0]*[arg0]', upstream)], 'output'),
              lambda p, q, i: (1+p+2*q)**2)
 
     # Parameter-attached composites expose the owning parameter as input 0.
-    implicit = composite([formula('output', '1+x[0]', first)], 'output')
+    implicit = composite([formula('output', '1+[arg0]', first)], 'output')
     implicit.pop('dialInputList')
     config = make_config(path, implicit)
     parameter_set = config['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]
@@ -336,8 +343,8 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
     for event in model.getSampleSet().getSampleList()[0].getEventList():
         close(event.getEventWeight(), 2.2)
 
-    good = make_config(path, composite([formula('source', 'x[0]', first),
-                                       formula('output', '1+x[0]', upstream)], 'output'))
+    good = make_config(path, composite([formula('source', '[arg0]', first),
+                                       formula('output', '1+[arg0]', upstream)], 'output'))
     def changed_graph():
         result = copy.deepcopy(good)
         graph = result['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig'][
@@ -345,7 +352,7 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
         return result, graph
 
     config, graph = changed_graph()
-    graph['nodes'][0]['dialInputList'] = [{'dialResponse': 'output'}]
+    graph['nodes'][0]['dialInputList'] = [{'name': 'arg0', 'dialResponse': 'output'}]
     reject(config, 'cycle')
     config, graph = changed_graph()
     graph['nodes'][0]['name'] = 'output'
@@ -354,23 +361,23 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
     graph['output'] = 'missing'
     reject(config, 'unknown output')
     config, graph = changed_graph()
-    graph['nodes'][0]['dialInputList'] = [{'inputIndex': 2}]
+    graph['nodes'][0]['dialInputList'] = [{'name': 'arg0', 'inputIndex': 2}]
     reject(config, 'inputIndex')
     config, graph = changed_graph()
-    graph['nodes'][0]['dialInputList'] = [{'inputIndex': .5}]
+    graph['nodes'][0]['dialInputList'] = [{'name': 'arg0', 'inputIndex': .5}]
     reject(config, 'inputIndex')
     config, graph = changed_graph()
     graph['nodes'][0]['dialInputList'] = [{'inputIndex': 0, 'dialResponse': 'output'}]
     reject(config, 'exactly one of')
     for bad_input in ({'eventVariable': ''}, {'eventVariable': 'q3', 'inputIndex': 0}):
         config, graph = changed_graph()
-        graph['nodes'][0]['dialInputList'] = [bad_input]
+        graph['nodes'][0]['dialInputList'] = [dict(bad_input, name='arg0')]
         reject(config, 'eventVariable')
     config, graph = changed_graph()
     graph['nodes'][0] = dict(name='source', dialType='Normalization', dialInputList=[{'eventVariable': 'q3'}])
     reject(config, 'only supported by Formula')
     config, graph = changed_graph()
-    graph['nodes'][1]['dialInputList'] = [{'dialResponse': 'missing'}]
+    graph['nodes'][1]['dialInputList'] = [{'name': 'arg0', 'dialResponse': 'missing'}]
     reject(config, 'unknown dialResponse')
     config, graph = changed_graph()
     graph['nodes'][1]['applyCondition'] = 'X < 1'
@@ -379,10 +386,10 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
     graph['nodes'][1] = dict(name='output', dialType='Normalization', dialInputList=[upstream, second])
     reject(config, 'exactly one input')
     config, graph = changed_graph()
-    graph['nodes'][1]['options']['formulaStr'] = 'x[2]'
-    reject(config, 'too few inputs')
+    graph['nodes'][1]['options']['formulaStr'] = '[missing]'
+    reject(config, 'undeclared input')
     config, graph = changed_graph()
-    graph['nodes'].append(formula('unused', 'x[0]', first))
+    graph['nodes'].append(formula('unused', '[arg0]', first))
     reject(config, 'every node')
     for dial_type in ('Tabulated', 'Kriged', 'ExternalWeight'):
         config, graph = changed_graph()

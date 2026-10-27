@@ -23,6 +23,8 @@ public:
   [[nodiscard]] std::string getSummary() const override;
 
   void setFormulaStr(const std::string& formulaStr_);
+  void setInputNames(const std::vector<std::string>& names_, const std::vector<std::string>& constantNames_ = {});
+  [[nodiscard]] int getInputCount() const{ return _inputCount_; }
 
   TFormula& getFormula(){ return _formula_; }
   const TFormula& getFormula() const{ return _formula_; }
@@ -30,6 +32,10 @@ public:
 
 private:
   TFormula _formula_{};
+  int _inputCount_{-1};
+  bool _isInputOrderMatching_{false};
+  // One entry per ROOT parameter, resolved at configuration. -1 keeps a bin constant.
+  std::vector<int> _parameterInputIndices_;
 
 };
 

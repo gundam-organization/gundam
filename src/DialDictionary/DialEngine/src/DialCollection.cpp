@@ -100,9 +100,14 @@ void DialCollection::configureImpl() {
     // add the ref of each selected parameter
     for( auto& dialInput : dialInputList.getConfig() ){
       EventFormula::Input source;
+      if( _dialType_ == DialType::Formula ){
+        const int sourceCount = int(dialInput.contains("parameterName")) + int(dialInput.contains("parameterIndex"))
+                                + int(dialInput.contains("eventVariable"));
+        LogThrowIf(sourceCount != 1,
+                   "Formula input must specify exactly one of parameterName, parameterIndex and eventVariable");
+      }
       if( GenericToolbox::Json::doKeyExist(dialInput, "eventVariable") ){
         LogThrowIf(_dialType_ != DialType::Formula, "eventVariable inputs are only supported by Formula dials");
-        LogThrowIf(dialInput.size() != 1, "Formula input must specify exactly one of name and eventVariable");
         auto name = GenericToolbox::Json::fetchValue<std::string>(dialInput, "eventVariable");
         name = GenericToolbox::trimString(name, " ");
         if( name.size() >= 2 and name.front() == '[' and name.back() == ']' ){
@@ -119,8 +124,16 @@ void DialCollection::configureImpl() {
       DialInputBuffer::ParameterReference p;
       p.parSetIndex = _supervisedParameterSetIndex_;
 
-      if( GenericToolbox::Json::doKeyExist(dialInput, "name") ){
-        auto parName = GenericToolbox::Json::fetchValue<std::string>(dialInput, "name");
+      const std::string parameterKey = _dialType_ == DialType::Formula ? "parameterName" : "name";
+      if( _dialType_ == DialType::Formula and dialInput.contains("parameterIndex") ){
+        const auto& index = dialInput.at("parameterIndex");
+        LogThrowIf(not index.is_number_integer() or index < 0
+                   or index >= _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
+                   "Formula: parameterIndex outside the supervised parameter set");
+        p.parIndex = index.get<int>();
+      }
+      else if( GenericToolbox::Json::doKeyExist(dialInput, parameterKey) ){
+        auto parName = GenericToolbox::Json::fetchValue<std::string>(dialInput, parameterKey);
         auto* parPtr{_parameterSetListPtr_->at( _supervisedParameterSetIndex_ ).getParameterPtr( parName )};
         LogThrowIf(parPtr == nullptr, "Could not find parameter: " << parName);
         p.parIndex = parPtr->getParameterIndex();
@@ -1183,12 +1196,13 @@ bool DialCollection::initializeDialsWithDefinition() {
       for( auto& bin : _dialBinSet_.getBinList() ){
 
         _dialInterfaceList_.emplace_back();
-        _dialInterfaceList_.back().setDial( DialBaseObject(makeDial( dialsDefinition )) );
+        _dialInterfaceList_.back().setDial( DialBaseObject(makeDial( dialsDefinition, &bin )) );
 
         for( auto& var : bin.getEdgesList() ){
-          ((RootFormula*) _dialInterfaceList_.back().getDialBaseRef())->getFormula().SetParameter(
-              var.varName.c_str(), var.getCenterValue()
-          );
+          auto& formula = ((RootFormula*) _dialInterfaceList_.back().getDialBaseRef())->getFormula();
+          if( formula.GetParNumber(var.varName.c_str()) >= 0 ){
+            formula.SetParameter(var.varName.c_str(), var.getCenterValue());
+          }
         }
       }
 
@@ -1312,7 +1326,7 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
 
   return out;
 }
-std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_) const{
+std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_, const Bin* bin_) const{
   std::unique_ptr<DialBase> dialBase{nullptr};
   std::string dialType{};
 
@@ -1323,6 +1337,21 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_) 
     auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
     auto formulaConfig = config_.fetchValue("options", JsonType());
     rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
+    LogThrowIf(not config_.hasField("dialInputList") and not _config_.hasField("dialInputList"),
+               "Formula requires an explicit named dialInputList");
+    const auto inputs = config_.hasField("dialInputList") ? config_.fetchValue<JsonType>("dialInputList")
+                                                        : _config_.fetchValue<JsonType>("dialInputList");
+    LogThrowIf(not inputs.is_array(), "Formula dialInputList must be a list");
+    std::vector<std::string> inputNames;
+    for( const auto& input : inputs ){
+      LogThrowIf(not input.is_object() or not input.contains("name"), "Formula input requires a name");
+      inputNames.emplace_back(GenericToolbox::Json::fetchValue<std::string>(input, "name"));
+    }
+    std::vector<std::string> constantNames;
+    if( bin_ != nullptr ){
+      for( const auto& edge : bin_->getEdgesList() ){ constantNames.emplace_back(edge.varName); }
+    }
+    rootFormulaPtr->setInputNames(inputNames, constantNames);
   }
   else if( dialType == "CompiledLibDial" ){
     dialBase = std::make_unique<CompiledLibDial>();
