@@ -95,12 +95,17 @@ void DialManager::configureImpl(){
         if( not input.eventVariable.empty() ){
           LogThrowIf(type != DialCollection::DialType::Formula,
                      "Composite node " << node.name << ": eventVariable inputs are only supported by Formula dials");
-          inputs.emplace_back(JsonType{{"eventVariable", input.eventVariable}});
+          inputs.emplace_back(JsonType{{"name", input.name}, {"eventVariable", input.eventVariable}});
           continue;
         }
         // Intermediate inputs are evaluated by CompositeDial, not by this
         // buffer. A real parameter placeholder keeps normal loaders usable.
-        inputs.emplace_back(parameterInputs.at(input.inputIndex >= 0 ? input.inputIndex : 0));
+        auto parameter = parameterInputs.at(input.inputIndex >= 0 ? input.inputIndex : 0);
+        if( type == DialCollection::DialType::Formula ){
+          const auto parameterName = parameter.at("name");
+          parameter = JsonType{{"name", input.name}, {"parameterName", parameterName}};
+        }
+        inputs.emplace_back(std::move(parameter));
       }
       config.getConfig()["dialInputList"] = inputs;
       node.collectionIndex = int(_dialCollectionList_.size());

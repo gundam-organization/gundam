@@ -15,6 +15,7 @@
 class CompositeDial : public DialBase {
 public:
   struct Input {
+    std::string name;
     int inputIndex{-1};
     int nodeIndex{-1};
     std::string eventVariable;

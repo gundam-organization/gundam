@@ -13,8 +13,8 @@ EventFormula::EventFormula(const DialBase* formula_, std::shared_ptr<const Defin
     : _formula_(formula_), _definition_(std::move(definition_)) {
   const auto* formula = dynamic_cast<const RootFormula*>(_formula_);
   LogThrowIf(formula == nullptr or _definition_ == nullptr, "EventFormula requires a Formula and an input definition");
-  LogThrowIf(formula->getFormula().GetNdim() > _definition_->inputs.size(),
-             "EventFormula: too few inputs for Formula");
+  LogThrowIf(formula->getInputCount() != _definition_->inputs.size(),
+             "EventFormula: named input count mismatch");
   _eventValues_.reserve(_definition_->eventVariables.size());
   for( const auto& name : _definition_->eventVariables ){
     const auto& variables = event_.getVariables();
