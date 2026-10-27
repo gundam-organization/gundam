@@ -982,6 +982,13 @@ void DataDispenser::fetchRequestedLeaves(){
   if( not _cache_.dialCollectionsRefList.empty() ) {
     std::vector<std::string> indexRequests;
     for( auto& dialCollection : _cache_.dialCollectionsRefList ) {
+      if( const auto& definition = dialCollection->getEventFormulaDefinition() ){
+        for( const auto& name : definition->eventVariables ){
+          std::set<std::string> variableDictStack;
+          addVariableDictRequestedByName(_cache_, name, _parameters_.variableDict, _parameters_.variableDictTransform, variableDictStack);
+          GenericToolbox::addIfNotInVector(name, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
+        }
+      }
       auto applyConditionFormulaStr = dialCollection->getApplyConditionStr();
       if( not applyConditionFormulaStr.empty() ) {
         addVariablesRequestedByFormula(_cache_, applyConditionFormulaStr, _parameters_.variableDict, _parameters_.variableDictTransform, false);

@@ -6,6 +6,7 @@
 #define GUNDAM_DIALCOLLECTION_H
 
 #include "DialBase.h"
+#include "EventFormula.h"
 #include "DialUtils.h"
 #include "DialInterface.h"
 #include "DialInputBuffer.h"
@@ -81,6 +82,10 @@ public:
 
   // Check if the dial is enabled during this run
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] const auto& getEventFormulaDefinition() const{ return _eventFormulaDefinition_; }
+  [[nodiscard]] DialInputBuffer::ParameterReference::MirrorEdges getEventInputMirrorEdges() const{
+    return {_useMirrorDial_ ? _mirrorLowEdge_ : std::nan("unset"), _mirrorRange_};
+  }
   [[nodiscard]] bool isCompositeNode() const{ return _isCompositeNode_; }
   [[nodiscard]] int getCompositeParentIndex() const{ return _compositeParentIndex_; }
 
@@ -263,6 +268,7 @@ private:
   // set of parameters for each DialBase (i.e. the number of DialInputBuffer
   // objects is 1, or _dialBaseList_.size()).  set, but for
   std::vector<DialInputBuffer> _dialInputBufferList_{};
+  std::shared_ptr<const EventFormula::Definition> _eventFormulaDefinition_{};
 
   // The response supervisors (which apply an upper and lower clamp).  There
   // is a single supervisor for all the interfaces, or one for each

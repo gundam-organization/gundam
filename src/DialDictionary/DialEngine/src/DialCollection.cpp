@@ -91,8 +91,27 @@ void DialCollection::configureImpl() {
     _dialInputBufferList_.emplace_back();
     _dialInputBufferList_.back().setParSetRef( _parameterSetListPtr_ );
 
+    auto formulaDefinition = std::make_shared<EventFormula::Definition>();
+
     // add the ref of each selected parameter
     for( auto& dialInput : dialInputList.getConfig() ){
+      EventFormula::Input source;
+      if( GenericToolbox::Json::doKeyExist(dialInput, "eventVariable") ){
+        LogThrowIf(_dialType_ != DialType::Formula, "eventVariable inputs are only supported by Formula dials");
+        LogThrowIf(dialInput.size() != 1, "Formula input must specify exactly one of name and eventVariable");
+        auto name = GenericToolbox::Json::fetchValue<std::string>(dialInput, "eventVariable");
+        name = GenericToolbox::trimString(name, " ");
+        if( name.size() >= 2 and name.front() == '[' and name.back() == ']' ){
+          name = name.substr(1, name.size() - 2);
+        }
+        LogThrowIf(name.empty(), "Formula eventVariable must not be empty");
+        GenericToolbox::addIfNotInVector(name, formulaDefinition->eventVariables);
+        source.eventIndex = GenericToolbox::findElementIndex(name, formulaDefinition->eventVariables);
+        formulaDefinition->inputs.emplace_back(source);
+        continue;
+      }
+      source.parameterIndex = int(_dialInputBufferList_.back().getInputSize());
+      formulaDefinition->inputs.emplace_back(source);
       DialInputBuffer::ParameterReference p;
       p.parSetIndex = _supervisedParameterSetIndex_;
 
@@ -105,6 +124,7 @@ void DialCollection::configureImpl() {
 
       _dialInputBufferList_.back().addParameterReference( p );
     }
+    if( not formulaDefinition->eventVariables.empty() ){ _eventFormulaDefinition_ = std::move(formulaDefinition); }
 
   }
 

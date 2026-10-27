@@ -6,7 +6,8 @@
 
 
 double RootFormula::evalResponse(const DialInputBuffer& input_) const {
-  return _formula_.EvalPar(&input_.getInputBuffer()[0]);
+  LogThrowIf(_formula_.GetNdim() > input_.getInputBuffer().size(), "Formula: too few inputs for evaluation");
+  return _formula_.EvalPar(input_.getInputBuffer().data());
 }
 
 
