@@ -120,12 +120,12 @@ void DialCollection::configureImpl() {
       DialInputBuffer::ParameterReference p;
       p.parSetIndex = _supervisedParameterSetIndex_;
 
-      const std::string parameterKey = _dialType_ == DialType::Formula ? "parameterName" : "name";
-      if( _dialType_ == DialType::Formula and dialInput.contains("parameterIndex") ){
+      const std::string parameterKey = dialInput.contains("parameterName") ? "parameterName" : "name";
+      if( dialInput.contains("parameterIndex") ){
         const auto& index = dialInput.at("parameterIndex");
         LogThrowIf(not index.is_number_integer() or index < 0
                    or index >= _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
-                   "Formula: parameterIndex outside the supervised parameter set");
+                   "Dial input: parameterIndex outside the supervised parameter set");
         p.parIndex = index.get<int>();
       }
       else if( GenericToolbox::Json::doKeyExist(dialInput, parameterKey) ){

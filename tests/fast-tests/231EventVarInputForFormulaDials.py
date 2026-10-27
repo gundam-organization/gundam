@@ -94,6 +94,10 @@ def main():
     q3 = {'name': 'momentum', 'eventVariable': 'q3'}
     for threads in (1, 2):
         GUNDAM.setNumberOfThreads(threads)
+        # Explicit fit references also drive ordinary dials, independently of aliases.
+        for source, expected in [(delta, lambda d, a, i: max(0., d)),
+                                 (alpha, lambda d, a, i: a)]:
+            exercise(path, dict(name='normalization', dialType='Normalization', dialInputList=[source]), expected)
         mixed = formula('2+[offset]*[offset]+[slope]*[slope]+.001*([left]+[momentum])',
                         [{'name': 'left', 'eventVariable': '[q3]'}, delta, alpha, q3], printDialSummary=True)
         exercise(path, mixed, lambda d, a, i: 2+d*d+a*a+.5*i)
