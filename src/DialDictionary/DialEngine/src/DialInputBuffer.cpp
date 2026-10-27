@@ -87,6 +87,14 @@ void DialInputBuffer::update(){
     }
   }
 }
+void DialInputBuffer::setInputValues(std::vector<double> values_){
+  LogThrowIf(not _inputParameterReferenceList_.empty(), "Cannot replace parameter-backed dial inputs");
+  _inputBuffer_ = std::move(values_);
+  _inputArraySize_ = int(_inputBuffer_.size());
+  _isInitialized_ = true;
+  _isDialUpdateRequested_ = true;
+}
+
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
   LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");
   auto& parRef = _inputParameterReferenceList_.emplace_back(parReference_);

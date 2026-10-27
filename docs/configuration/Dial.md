@@ -19,7 +19,7 @@ external libraries to calculate weights.
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
 | dialType               | string       | See below                                                              |         |
-| dialSubType            | string       | See below                                                              | empty   |
+| options                | string or object | Interpolation subtype or structured dial configuration | empty |
 | isEnabled              | bool         | Dial is not used if this is false                                      | true    |
 | applyOnDataSets        | list(string) | list (regex) of datasets the corresponding dials will apply to         | `["*"]` |
 | applyCondition         | string       | Only apply this dial with formula evaluates to non-zero                | empty   |
@@ -36,6 +36,10 @@ external libraries to calculate weights.
 | mirrorDefinitionRange  | pair(double) |                                                                        |         |
 | dialInputList          | list(json)   | List of parameters for this dial                                       | empty   |
 | dialsTreePath          | string       | Deprecated: tree name where the dials are stored                       |         |
+
+`options` is the common key for type-specific settings. `dialSubType` and
+`dialConfig` remain readable aliases with a rename warning. If multiple names
+are supplied, their values must agree.
 
 ### Config options that apply to specific types of dials
 
@@ -178,6 +182,82 @@ as a lightweight control protocol. See [ExternalWeightDials](ExternalWeightDials
 
 Apply a weight using a ROOT formula.  This is not fully supported since it
 cannot be efficiently applied with GPU acceleration.
+
+Formula inputs can mix fit parameters with loaded event variables:
+
+```yaml
+dialType: Formula
+dialInputList:
+  - {name: delta, parameterName: delta}
+  - {name: alpha, parameterName: alpha}
+  - {name: q3, eventVariable: q3}
+options:
+  formulaStr: "[delta] + [alpha] * (0.056 * [q3] - 41.6)"
+minDialResponse: -40.
+maxDialResponse: 40.
+```
+
+Each input has a unique, non-empty `name`, which is the local alias used as
+`[name]` in the expression. It must select exactly one source:
+
+- `parameterName`: the fit parameter name in the supervised parameter set;
+- `parameterIndex`: its zero-based index in that set;
+- `eventVariable`: a loaded event variable, including `variableDict` aliases.
+
+Explicit `parameterName` and `parameterIndex` references are also accepted by
+other dial types. For these dials, the order in `dialInputList` determines the
+argument order; `name`, when provided, does not select the source parameter.
+
+For example, `{name: offset, parameterName: delta}` binds `[offset]` to `delta`.
+Input declaration order does not determine ROOT parameter order: names are
+resolved once when configuring the dial. Positional `x[i]` expressions and
+parameter references using only `{name: delta}` are unsupported for Formula.
+
+Event variables are requested automatically. Bracketed source names such as
+`{name: momentum, eventVariable: "[q3]"}` are accepted. Different input aliases
+may reference the same event variable and share its captured value. Event-only
+and binned formulas are supported. Binned formulas retain constants named
+after their binning axes, for example `[X]` for the center of the selected X
+bin. A declared input with the same name overrides that constant. Undeclared
+references are rejected instead of silently evaluating as zero.
+
+Evaluation supplies a call-local parameter array to `TFormula::EvalPar`,
+without modifying the shared TFormula parameters. When declaration order
+already matches ROOT's parameter order and there are no bin constants, the
+existing input buffer is passed directly.
+
+The values are captured for each event when building the dial cache, after
+sorting events. They remain fixed until the cache is rebuilt. Parameter
+changes trigger reevaluation through the normal input buffer. The source
+`TFormula` and parameter buffer remain shared across events; each event owns
+its captured values and response cache. Asimov copies retain their responses.
+
+`eventVariable` inputs are supported only for `Formula` dials. `CacheManager`
+automatically disables itself for event formulas, using the original engine.
+
+##### Example: bin constants
+
+`constantNames_` is an internal evaluator argument, not a YAML field. For a
+binned Formula dial, GUNDAM fills it from the names of the binning axes and
+sets their values to the centers of the selected bin:
+
+```yaml
+dialSetDefinitions:
+  - name: energyBinResponse
+    dialType: Formula
+    dialInputList:
+      - {name: scale, parameterName: scale}
+    options:
+      formulaStr: "[scale] * [Enu]"
+    binning:
+      binningDefinition:
+        - name: Enu
+          edges: [0., 1., 2., 4.]
+```
+
+Here `[scale]` is supplied from the fit parameter. `[Enu]` is a bin constant:
+an event with `Enu` in `[1, 2)` uses `[Enu] = 1.5`. The supervised parameter
+set must define `scale`, and the dataset must provide `Enu` for bin selection.
 
 ### applyConditions options
 

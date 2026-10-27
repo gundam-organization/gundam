@@ -27,7 +27,7 @@ public:
   DialInterface() = default;
 
   void setDial(const DialBaseObject& dial_){ _dial_ = dial_; }
-  void setInputBufferRef(DialInputBuffer *inputBufferRef){ _inputBufferPtr_ = inputBufferRef; }
+  void setInputBufferRef(const DialInputBuffer *inputBufferRef){ _inputBufferPtr_ = inputBufferRef; }
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef){ _responseSupervisorPtr_ = responseSupervisorRef; }
   void setDialBinRef(const Bin *dialBinRef){ _dialBinRef_ = dialBinRef; }
 

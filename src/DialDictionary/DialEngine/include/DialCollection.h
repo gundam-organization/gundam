@@ -6,6 +6,7 @@
 #define GUNDAM_DIALCOLLECTION_H
 
 #include "DialBase.h"
+#include "EventFormula.h"
 #include "DialUtils.h"
 #include "DialInterface.h"
 #include "DialInputBuffer.h"
@@ -70,6 +71,10 @@ public:
 
   // Check if the dial is enabled during this run
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] const auto& getEventFormulaDefinition() const{ return _eventFormulaDefinition_; }
+  [[nodiscard]] DialInputBuffer::ParameterReference::MirrorEdges getEventInputMirrorEdges() const{
+    return {_useMirrorDial_ ? _mirrorLowEdge_ : std::nan("unset"), _mirrorRange_};
+  }
 
   // Check if the DialBase should be allowed to calculate an extrapolation out
   // outside of the defined parameter bounds.
@@ -173,7 +178,7 @@ public:
   // methods to generate dials with factory
   std::unique_ptr<DialBase> makeDial() const;
   std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_) const;
+  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_, const Bin* bin_ = nullptr) const;
 
 protected:
   void configureImpl() override;
@@ -241,6 +246,7 @@ private:
   // set of parameters for each DialBase (i.e. the number of DialInputBuffer
   // objects is 1, or _dialBaseList_.size()).  set, but for
   std::vector<DialInputBuffer> _dialInputBufferList_{};
+  std::shared_ptr<const EventFormula::Definition> _eventFormulaDefinition_{};
 
   // The response supervisors (which apply an upper and lower clamp).  There
   // is a single supervisor for all the interfaces, or one for each
