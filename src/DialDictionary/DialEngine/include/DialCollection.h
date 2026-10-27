@@ -178,7 +178,7 @@ public:
   // methods to generate dials with factory
   std::unique_ptr<DialBase> makeDial() const;
   std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_) const;
+  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_, const Bin* bin_ = nullptr) const;
 
 protected:
   void configureImpl() override;

@@ -89,36 +89,50 @@ def main():
     with uproot.recreate(path) as output:
         tree = output.mktree('events', {'X': 'float64', 'rawQ3': 'float64'})
         tree.extend({'X': .25+.5*np.arange(6), 'rawQ3': 250.*np.arange(6)})
-    delta = {'name': 'delta'}
-    alpha = {'name': 'alpha'}
-    q3 = {'eventVariable': 'q3'}
+    delta = {'name': 'offset', 'parameterName': 'delta'}
+    alpha = {'name': 'slope', 'parameterIndex': 1}
+    q3 = {'name': 'momentum', 'eventVariable': 'q3'}
     for threads in (1, 2):
         GUNDAM.setNumberOfThreads(threads)
-        mixed = formula('2+x[1]*x[1]+x[2]*x[2]+.001*(x[0]+x[3])',
-                        [{'eventVariable': '[q3]'}, delta, alpha, q3], printDialSummary=True)
+        mixed = formula('2+[offset]*[offset]+[slope]*[slope]+.001*([left]+[momentum])',
+                        [{'name': 'left', 'eventVariable': '[q3]'}, delta, alpha, q3], printDialSummary=True)
         exercise(path, mixed, lambda d, a, i: 2+d*d+a*a+.5*i)
         legacy = copy.deepcopy(mixed)
         legacy['dialConfig'] = legacy.pop('options')
         exercise(path, legacy, lambda d, a, i: 2+d*d+a*a+.5*i)
-        exercise(path, formula('1+.001*x[0]', [q3]), lambda d, a, i: 1+.25*i)
-        exercise(path, formula('1+x[0]*x[0]', [delta]), lambda d, a, i: 1+d*d)
+        exercise(path, formula('1+.001*[momentum]', [q3]), lambda d, a, i: 1+.25*i)
+        exercise(path, formula('1+[offset]*[offset]', [delta]), lambda d, a, i: 1+d*d)
+        exercise(path, formula('2.', []), lambda d, a, i: 2.)
         # Shift the signed abscissa by 50 so this standalone dial is a positive weight.
-        bounded = formula('50+x[0]+x[1]*(.056*x[2]-41.6)', [delta, alpha, q3],
+        bounded = formula('50+[offset]+[slope]*(.056*[momentum]-41.6)', [delta, alpha, q3],
                           minDialResponse=10., maxDialResponse=90.)
         exercise(path, bounded, lambda d, a, i: 50+max(-40., min(40., d+a*(.056*250*i-41.6))))
-        binned = formula('[X]+.001*x[0]*x[1]*x[1]', [q3, delta], binning={
+        binned = formula('[X]+.001*[momentum]*[offset]*[offset]', [q3, delta], binning={
             'binningDefinition': [{'name': 'X', 'edges': [0, 1, 2, 3]}]})
         exercise(path, binned, lambda d, a, i: i//2+.5+.25*i*d*d)
-        mirrored = formula('1+.001*x[0]', [q3], useMirrorDial=True, mirrorLowEdge=0., mirrorHighEdge=1000.)
+        exercise(path, formula('[X]', [], binning=binned['binning']), lambda d, a, i: i//2+.5)
+        exercise(path, formula('[X]', [{'name': 'X', 'eventVariable': 'X'}], binning=binned['binning']),
+                 lambda d, a, i: .25+.5*i)
+        mirrored = formula('1+.001*[momentum]', [q3], useMirrorDial=True, mirrorLowEdge=0., mirrorHighEdge=1000.)
         exercise(path, mirrored, lambda d, a, i: 1+.001*(250*i if i <= 4 else 2000-250*i))
-        conditioned = formula('1+.001*x[0]', [q3], applyCondition='X < 2')
+        conditioned = formula('1+.001*[momentum]', [q3], applyCondition='X < 2')
         exercise(path, conditioned, lambda d, a, i: 1+.25*i if i < 4 else 1.)
-    reject(config(path, formula('x[0]', [{'name': 'delta', 'eventVariable': 'q3'}])), 'exactly one of')
-    reject(config(path, formula('x[0]', [{'eventVariable': ''}])), 'must not be empty')
+    # Names are independent of declaration order and ROOT's parameter order.
+    reordered = formula('[offset]+2*[slope]+.001*[momentum]+10', [q3, alpha, delta])
+    exercise(path, reordered, lambda d, a, i: d+2*a+.25*i+10)
+    reject(config(path, formula('[offset]', [{'name': 'offset', 'parameterName': 'delta', 'eventVariable': 'q3'}])), 'exactly one of')
+    reject(config(path, formula('[offset]', [{'name': 'offset'}])), 'exactly one of')
+    reject(config(path, formula('[momentum]', [{'name': 'momentum', 'eventVariable': ''}])), 'must not be empty')
+    reject(config(path, formula('[q3]', [{'eventVariable': 'q3'}])), 'requires a name')
+    reject(config(path, formula('[q3]', [{'name': '', 'eventVariable': 'q3'}])), 'must not be empty')
+    reject(config(path, formula('[offset]', [delta, delta])), 'duplicate input name')
+    reject(config(path, formula('[unknown]', [q3])), 'undeclared input')
+    reject(config(path, formula('x[0]', [q3])), 'positional')
+    for index in (-1, 2, .5):
+        reject(config(path, formula('[p]', [{'name': 'p', 'parameterIndex': index}])), 'parameterIndex')
     reject(config(path, dict(dialType='Normalization', dialInputList=[q3])), 'only supported by Formula')
-    reject(config(path, formula('x[2]', [q3])), 'too few inputs')
     missing = Path.cwd()/'231EventVarInputForFormulaDials-missing.json'
-    missing.write_text(json.dumps(config(path, formula('x[0]', [{'eventVariable': 'missingQ3'}]))))
+    missing.write_text(json.dumps(config(path, formula('[q3]', [{'name': 'q3', 'eventVariable': 'missingQ3'}]))))
     result = subprocess.run([sys.executable, __file__, '--load-config', str(missing)], capture_output=True, text=True)
     assert result.returncode != 0 and 'missingQ3' in result.stdout+result.stderr, result
     print('SUCCESS: native event Formula inputs, caches, bins, mirroring, aliases and Asimov copies.')

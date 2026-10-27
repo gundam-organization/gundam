@@ -188,19 +188,39 @@ Formula inputs can mix fit parameters with loaded event variables:
 ```yaml
 dialType: Formula
 dialInputList:
-  - {name: delta}
-  - {name: alpha}
-  - {eventVariable: q3}
+  - {name: delta, parameterName: delta}
+  - {name: alpha, parameterName: alpha}
+  - {name: q3, eventVariable: q3}
 options:
-  formulaStr: "x[0] + x[1] * (0.056 * x[2] - 41.6)"
+  formulaStr: "[delta] + [alpha] * (0.056 * [q3] - 41.6)"
 minDialResponse: -40.
 maxDialResponse: 40.
 ```
 
-Input order defines the `x[i]` positions. Event variables are automatically
-requested from the dataset, including expressions defined in `variableDict`.
-Bracketed names such as `{eventVariable: "[q3]"}` are accepted. Repeated inputs
-share the captured value. Event-only and binned formulas are supported.
+Each input has a unique, non-empty `name`, which is the local alias used as
+`[name]` in the expression. It must select exactly one source:
+
+- `parameterName`: the fit parameter name in the supervised parameter set;
+- `parameterIndex`: its zero-based index in that set;
+- `eventVariable`: a loaded event variable, including `variableDict` aliases.
+
+For example, `{name: offset, parameterName: delta}` binds `[offset]` to `delta`.
+Input declaration order does not determine ROOT parameter order: names are
+resolved once when configuring the dial. Positional `x[i]` expressions and
+parameter references using only `{name: delta}` are unsupported for Formula.
+
+Event variables are requested automatically. Bracketed source names such as
+`{name: momentum, eventVariable: "[q3]"}` are accepted. Different input aliases
+may reference the same event variable and share its captured value. Event-only
+and binned formulas are supported. Binned formulas retain constants named
+after their binning axes, for example `[X]` for the center of the selected X
+bin. A declared input with the same name overrides that constant. Undeclared
+references are rejected instead of silently evaluating as zero.
+
+Evaluation supplies a call-local parameter array to `TFormula::EvalPar`,
+without modifying the shared TFormula parameters. When declaration order
+already matches ROOT's parameter order and there are no bin constants, the
+existing input buffer is passed directly.
 
 The values are captured for each event when building the dial cache, after
 sorting events. They remain fixed until the cache is rebuilt. Parameter
