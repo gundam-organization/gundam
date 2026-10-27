@@ -109,6 +109,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemanticsCore.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemantics.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendHostPropagation.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuCompositeProgram.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuWeightKernels.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuCacheAlignment.h

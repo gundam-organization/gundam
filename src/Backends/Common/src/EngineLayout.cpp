@@ -24,12 +24,121 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <functional>
+#include <stdexcept>
 #include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
 namespace {
+  using CompositePayloadMap = std::unordered_map<const DialBase*, std::pair<std::size_t, std::size_t>>;
+
+  void packSupervisor(Backends::BackendDialDescriptor& dial_, const DialResponseSupervisor& supervisor_) {
+    dial_.hasMinResponse = not std::isnan(supervisor_.getMinResponse());
+    dial_.hasMaxResponse = not std::isnan(supervisor_.getMaxResponse());
+    auto& smoothing = dial_.smoothing;
+    smoothing.minResponse = supervisor_.getMinResponse();
+    smoothing.maxResponse = supervisor_.getMaxResponse();
+    smoothing.minWidth = supervisor_.getMinSmoothingWidth();
+    smoothing.maxWidth = supervisor_.getMaxSmoothingWidth();
+    smoothing.minInverseWidth = smoothing.minWidth > 0. ? 0.5 / smoothing.minWidth : 0.;
+    smoothing.maxInverseWidth = smoothing.maxWidth > 0. ? 0.5 / smoothing.maxWidth : 0.;
+    dial_.minResponse = smoothing.minResponse + smoothing.minWidth;
+    dial_.maxResponse = smoothing.maxResponse - smoothing.maxWidth;
+  }
+
+  std::size_t compileComposite(Backends::PropagationView& model_, const CompositeDial& composite_,
+                               CompositePayloadMap& payloads_) {
+    using namespace Backends;
+    CompositeProgram program;
+    program.firstInstruction = model_.compositeInstructions.size();
+    program.inputCount = composite_.getInputCount();
+    auto emit = [&](CompositeInstruction instruction_, const std::vector<BackendDialInputDescriptor>& inputs_) {
+      instruction_.dial.firstInput = model_.compositeInputs.size();
+      instruction_.dial.inputCount = inputs_.size();
+      model_.compositeInputs.insert(model_.compositeInputs.end(), inputs_.begin(), inputs_.end());
+      model_.compositeInstructions.push_back(instruction_);
+      return program.inputCount + model_.compositeInstructions.size() - program.firstInstruction - 1;
+    };
+    std::function<std::size_t(const CompositeDial&, const std::vector<std::size_t>&, const std::string&)> flatten;
+    flatten = [&](const CompositeDial& graph_, const std::vector<std::size_t>& arguments_, const std::string& path_) {
+      LogThrowIf(not graph_.isBound(), "Unbound composite at " << path_);
+      LogThrowIf(arguments_.size() != std::size_t(graph_.getInputCount()), "Composite input count mismatch at " << path_);
+      std::vector<std::size_t> results(graph_.getNodes().size());
+      for( auto index : graph_.getEvaluationOrder() ){
+        const auto& node = graph_.getNodes().at(index);
+        const auto path = path_ + "/" + node.name;
+        LogThrowIf(node.dial == nullptr, "Missing composite dial at " << path);
+        std::vector<BackendDialInputDescriptor> inputs;
+        for( const auto& input : node.inputs ){
+          LogThrowIf(not input.eventVariable.empty(), "Unsupported event-variable input in CPU composite at " << path);
+          const auto slot = input.bufferIndex >= 0 ? arguments_.at(input.bufferIndex) : results.at(input.nodeIndex);
+          const auto& mirror = node.mirrorEdges.at(inputs.size());
+          inputs.emplace_back(slot, not std::isnan(mirror.minValue), mirror.minValue, mirror.range);
+        }
+        CompositeInstruction instruction;
+        auto& dial = instruction.dial;
+        packSupervisor(dial, node.supervisor);
+        if( const auto* nested = dynamic_cast<const CompositeDial*>(node.dial.get()) ){
+          // Materialize the outer node's mirrored arguments before entering its
+          // graph. Retain its supervisor as a distinct instruction on exit.
+          std::vector<std::size_t> arguments;
+          for( const auto& input : inputs ){ arguments.push_back(emit(CompositeInstruction{}, {input})); }
+          const auto output = flatten(*nested, arguments, path);
+          results[index] = emit(instruction, {BackendDialInputDescriptor(output)});
+          continue;
+        }
+        const auto* base = node.dial.get();
+        const GenericToolbox::Range* bounds = nullptr;
+        if( dynamic_cast<const Norm*>(base) ){ dial.type = BackendDialType::Norm; }
+        else if( dynamic_cast<const Shift*>(base) ){ dial.type = BackendDialType::Shift; }
+        else if( const auto* spline = dynamic_cast<const CompactSpline*>(base) ){
+          dial.type = BackendDialType::CompactSpline; bounds = &spline->getSplineBounds();
+        }
+        else if( const auto* spline = dynamic_cast<const UniformSpline*>(base) ){
+          dial.type = BackendDialType::UniformSpline; bounds = &spline->getSplineBounds();
+        }
+        else if( const auto* spline = dynamic_cast<const MonotonicSpline*>(base) ){
+          dial.type = BackendDialType::MonotonicSpline; bounds = &spline->getSplineBounds();
+        }
+        else if( const auto* spline = dynamic_cast<const GeneralSpline*>(base) ){
+          dial.type = BackendDialType::GeneralSpline; bounds = &spline->getSplineBounds();
+        }
+        else if( dynamic_cast<const Graph*>(base) ){ dial.type = BackendDialType::Graph; }
+        else if( dynamic_cast<const Bilinear*>(base) ){ dial.type = BackendDialType::Bilinear; }
+        else if( dynamic_cast<const Bicubic*>(base) ){ dial.type = BackendDialType::Bicubic; }
+        else{ throw std::runtime_error("Unsupported dial type in CPU composite at " + path + ": " + base->getDialTypeName()); }
+        const bool surface = dial.type == BackendDialType::Bilinear or dial.type == BackendDialType::Bicubic;
+        LogThrowIf(dial.type != BackendDialType::Shift and inputs.size() != (surface ? 2u : 1u),
+                   "Invalid input count in CPU composite at " << path);
+        dial.allowExtrapolation = base->getAllowExtrapolation();
+        if( bounds ){ instruction.inputMin = bounds->min; instruction.inputMax = bounds->max; }
+        if( dial.type != BackendDialType::Norm ){
+          auto inserted = payloads_.emplace(base, std::make_pair(model_.dialPayloads.size(), 0));
+          if( inserted.second ){
+            if( const auto* shift = dynamic_cast<const Shift*>(base) ){ model_.dialPayloads.push_back(shift->getShiftValue()); }
+            else{
+              const auto& data = base->getDialData();
+              model_.dialPayloads.insert(model_.dialPayloads.end(), data.begin(), data.end());
+            }
+            inserted.first->second.second = model_.dialPayloads.size() - inserted.first->second.first;
+          }
+          dial.payloadOffset = inserted.first->second.first;
+          dial.payloadSize = inserted.first->second.second;
+        }
+        results[index] = emit(instruction, inputs);
+      }
+      return results.at(graph_.getOutputIndex());
+    };
+    std::vector<std::size_t> arguments(program.inputCount);
+    for( std::size_t i = 0; i < arguments.size(); ++i ){ arguments[i] = i; }
+    program.outputSlot = flatten(composite_, arguments, "Composite");
+    program.instructionCount = model_.compositeInstructions.size() - program.firstInstruction;
+    model_.compositePrograms.push_back(program);
+    return model_.compositePrograms.size() - 1;
+  }
+
   void buildEngineView(Backends::EngineView& view_, Backends::EngineBindings& bindings_, LikelihoodInterface& likelihoodInterface_) {
     auto& propagation = view_.propagation;
     auto& likelihood = view_.likelihood;
@@ -96,8 +205,7 @@ namespace {
         if( not dialIndexMap.emplace(interface, uncompiledDial).second ){ continue; }
         const auto* dial = interface->getDialBaseRef();
         LogThrowIf(dial == nullptr, "Null DialBase while building EngineView.");
-        LogThrowIf(dynamic_cast<const CompositeDial*>(dial) != nullptr,
-                   "Composite dials currently require the standard propagation engine; disable backendManagerConfig.isEnabled");
+        if( dynamic_cast<const CompositeDial*>(dial) != nullptr ){ continue; }
         if( dynamic_cast<const Shift*>(dial) != nullptr ){ ++payloadCount; }
         else if( dynamic_cast<const Norm*>(dial) == nullptr
                  and dynamic_cast<const ExternalWeightDispatcher*>(dial) == nullptr
@@ -116,6 +224,7 @@ namespace {
     std::unordered_map<const DialInputBuffer*, std::size_t> inputOffsetMap{};
     std::unordered_map<const ExternalWeightBuffer*, std::size_t> externalSourceIndices{};
     std::unordered_map<const std::vector<double>*, std::size_t> tableSourceIndices{};
+    CompositePayloadMap compositePayloads;
     std::size_t externalWeightCount{0};
     std::unordered_set<const DialInputBuffer*> variableInputBuffers;
 
@@ -173,7 +282,11 @@ namespace {
           dialRef.maxResponse = smoothing.maxResponse - smoothing.maxWidth;
         }
 
-        if( auto* external = dynamic_cast<const ExternalWeightDispatcher*>(dialBase) ){
+        if( const auto* composite = dynamic_cast<const CompositeDial*>(dialBase) ){
+          dialRef.type = Backends::BackendDialType::Composite;
+          dialRef.compositeProgram = compileComposite(propagation, *composite, compositePayloads);
+        }
+        else if( auto* external = dynamic_cast<const ExternalWeightDispatcher*>(dialBase) ){
           const auto& source = external->getWeightSource();
           LogThrowIf(source == nullptr or external->getWeightIndex() >= source->size(),
                      "Invalid external weight source while building EngineView.");

@@ -50,6 +50,7 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
   _impl_->useEventPropagation = _impl_->propagationMode == MpsPropagationMode::cachedResponses
       or engineView_.propagation.requiresEventBinning() or engineView_.propagation.hasReweightCap;
   for( const auto& dial : engineView_.propagation.dials ){
+    LogThrowIf(dial.type == BackendDialType::Composite, "Composite dials are only supported by the CPU backend.");
     LogThrowIf(isTableDial(dial.type), "Tabulated and Kriged dials are not supported by the MPS backend.");
     Semantics::validateSurfaceDial(engineView_.propagation, dial);
     if( dial.type == BackendDialType::ExternalWeight ){ continue; }

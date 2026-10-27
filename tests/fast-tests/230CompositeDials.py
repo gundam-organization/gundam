@@ -424,7 +424,7 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
     if hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
         config = copy.deepcopy(good)
         config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'type': 'CPU'}
-        reject(config, 'standard propagation engine')
+        reject(config, 'CPU composite')
     print('SUCCESS: composite dial graphs, event/bin binding, observables and validation.')
 
 

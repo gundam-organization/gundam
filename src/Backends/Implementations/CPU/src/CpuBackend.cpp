@@ -1,5 +1,6 @@
 #include "CpuBackend.h"
 #include "CpuWeightKernels.h"
+#include "CpuCompositeProgram.h"
 #include "DialDependencies.h"
 
 #include "Semantics/BackendHostPropagation.h"
@@ -65,6 +66,12 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
              "CpuBackend event weight layout size mismatch.");
   _lastResult_ = Result();
   initializeThreads();
+  validateCompositePrograms(_engineView_->propagation);
+  std::size_t compositeScratchSize{0};
+  for( const auto& program : _engineView_->propagation.compositePrograms ){
+    compositeScratchSize = std::max(compositeScratchSize, program.scratchSize());
+  }
+  _compositeScratch_.assign(_threadPool_.getNbThreads(), std::vector<double>(compositeScratchSize));
   initializeDialResponseCache();
   initializeWeightExecution();
   _timingTotals_ = BackendTimingTotals();
@@ -309,7 +316,7 @@ void Backends::CpuBackend::initializeDialResponseCache() {
                  "Event-variable dial inputs require an event-context evaluator.");
       LogThrowIf(input_.parameterIndex >= propagation.parameterCount, "Dial parameter input is out of range.");
     }, [](std::size_t){});
-    if( dial.inputCount > 1 ){
+    if( dial.inputCount > 1 or dial.type == BackendDialType::Composite ){
       _isCachedDial_[iDial] = true;
       _multiInputCachedDials_.push_back(iDial);
       ++_parameterDependentCachedDialCount_;
@@ -361,7 +368,8 @@ void Backends::CpuBackend::initializeCachedInputGroups() {
   _cachedDialInputGroups_.assign(model.dials.size(), std::numeric_limits<std::uint32_t>::max());
   _cachedInputGroupsByParameter_.resize(model.parameterCount);
   for( std::size_t dial = 0; dial < model.dials.size(); ++dial ){
-    if( not _isCachedDial_[dial] or model.dials[dial].type == BackendDialType::Shift or model.dials[dial].inputCount != 1 ){ continue; }
+    if( not _isCachedDial_[dial] or model.dials[dial].type == BackendDialType::Shift or model.dials[dial].inputCount != 1
+        or model.dials[dial].type == BackendDialType::Composite ){ continue; }
     const auto firstInput = model.dials[dial].firstInput;
     const auto& input = model.dialInputs[firstInput];
     const Key key{std::uint64_t(input.parameterIndex), std::uint64_t(input.useMirror),
@@ -572,13 +580,15 @@ void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
       }
       const auto& dial = propagation.dials[dialIndex];
       if constexpr( decltype(multi_)::value ){
-        if( dial.inputCount > 1 ){
+        if( dial.inputCount > 1 or dial.type == BackendDialType::Composite ){
           bool changed = not _isCachedDialResponseValid_[dialIndex];
           for( std::size_t i = 0; i < dial.inputCount and not changed; ++i ){
             changed = _changedCacheParameters_[propagation.dialInputs[dial.firstInput + i].parameterIndex];
           }
           if( not changed ){ continue; }
-          _cachedDialResponses_[dialIndex] = Semantics::evalDialResponse(propagation, dial, *_activeInputs_);
+          _cachedDialResponses_[dialIndex] = dial.type == BackendDialType::Composite
+              ? evaluateComposite(propagation, dial, parameterValues, _compositeScratch_[iThread_].data())
+              : Semantics::evalDialResponse(propagation, dial, *_activeInputs_);
           _isCachedDialResponseValid_[dialIndex] = true;
           if constexpr( decltype(sampled_)::value ){
             ++probe.get()->evaluatedDials;

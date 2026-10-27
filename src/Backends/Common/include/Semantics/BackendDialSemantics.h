@@ -10,10 +10,12 @@
 
 namespace Backends::Semantics {
   // Validate once while preparing the model, never in the evaluation loop.
-  inline void validateSurfaceDial(const PropagationView& model_, const BackendDialDescriptor& dial_) {
+  inline void validateSurfaceDial(const PropagationView& model_, const BackendDialDescriptor& dial_,
+                                  std::size_t availableInputs_ = std::size_t(-1)) {
+    if( availableInputs_ == std::size_t(-1) ){ availableInputs_ = model_.dialInputs.size(); }
     if( dial_.type != BackendDialType::Bilinear and dial_.type != BackendDialType::Bicubic ){ return; }
-    if( dial_.inputCount != 2 or dial_.firstInput > model_.dialInputs.size()
-        or dial_.inputCount > model_.dialInputs.size() - dial_.firstInput ){
+    if( dial_.inputCount != 2 or dial_.firstInput > availableInputs_
+        or dial_.inputCount > availableInputs_ - dial_.firstInput ){
       throw std::runtime_error("Surface dials require exactly two valid inputs.");
     }
     if( dial_.payloadOffset > model_.dialPayloads.size()

@@ -45,6 +45,7 @@ ENUM_FIELD( EventVariable )
     std::size_t payloadSize{0};
     std::size_t externalBlockIndex{0};
     std::size_t externalWeightIndex{0};
+    std::size_t compositeProgram{0};
     std::size_t firstTableTerm{0};
     std::size_t tableTermCount{0};
     bool allowExtrapolation{false};
@@ -54,6 +55,19 @@ ENUM_FIELD( EventVariable )
     double maxResponse{0};
     bool hasMinResponse{false};
     bool hasMaxResponse{false};
+  };
+
+  // Instructions read earlier scratch slots; the result occupies the next slot.
+  // Input mirrors belong to edges, including edges entering nested composites.
+  struct CompositeInstruction {
+    BackendDialDescriptor dial{};
+    double inputMin{0.}, inputMax{0.}; // Original spline bounds, without reconstruction.
+  };
+
+  struct CompositeProgram {
+    std::size_t firstInstruction{0}, instructionCount{0};
+    std::size_t inputCount{0}, outputSlot{0};
+    [[nodiscard]] std::size_t scratchSize() const { return inputCount + instructionCount; }
   };
 
   struct BackendTableTerm {

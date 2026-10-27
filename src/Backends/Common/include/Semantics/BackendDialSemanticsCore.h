@@ -70,6 +70,7 @@ namespace Backends::Semantics {
                                    double inputValue_,
                                    const double* payload_) {
     switch( dialRef_.type ){
+      case BackendDialType::Composite:
       case BackendDialType::Bilinear:
       case BackendDialType::Bicubic:
       case BackendDialType::Tabulated:

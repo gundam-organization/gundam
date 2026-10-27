@@ -38,6 +38,9 @@ public:
   [[nodiscard]] std::string getSummary() const override;
 
   auto& getNodes(){ return _nodes_; }
+  [[nodiscard]] const auto& getNodes() const { return _nodes_; }
+  [[nodiscard]] const auto& getEvaluationOrder() const { return _evaluationOrder_; }
+  [[nodiscard]] int getOutputIndex() const { return _outputIndex_; }
   [[nodiscard]] bool isBound() const { return _isBound_; }
   [[nodiscard]] int getInputCount() const { return _inputCount_; }
   void bind(const std::function<const DialInterface*(int)>& findInterface_);
