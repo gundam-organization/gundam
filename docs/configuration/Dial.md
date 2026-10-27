@@ -19,7 +19,7 @@ external libraries to calculate weights.
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
 | dialType               | string       | See below                                                              |         |
-| dialSubType            | string       | See below                                                              | empty   |
+| options                | string or object | Type-specific settings: interpolation subtype or structured dial configuration | empty |
 | isEnabled              | bool         | Dial is not used if this is false                                      | true    |
 | applyOnDataSets        | list(string) | list (regex) of datasets the corresponding dials will apply to         | `["*"]` |
 | applyCondition         | string       | Only apply this dial with formula evaluates to non-zero                | empty   |
@@ -36,6 +36,12 @@ external libraries to calculate weights.
 | mirrorDefinitionRange  | pair(double) |                                                                        |         |
 | dialInputList          | list(json)   | List of parameters for this dial                                       | empty   |
 | dialsTreePath          | string       | Deprecated: tree name where the dials are stored                       |         |
+
+`options` is the common key for type-specific settings. `Spline`, `Graph` and
+`Surface` retain their string options (for example, `options: Bilinear`).
+`Formula`, `CompiledLibDial`, `Composite` and `ExternalWeight` use an object.
+The old keys `dialSubType` and `dialConfig` remain readable aliases, with a
+rename warning. If multiple aliases are supplied, their values must agree.
 
 ### Config options that apply to specific types of dials
 
@@ -64,6 +70,90 @@ can still exceed these bounds between or beyond knots; `minDialResponse` and
 leaves the input knots unchanged.
 
 ### Configuration for different dial types
+
+#### `dialType: Composite`
+
+A composite evaluates a directed acyclic graph of ordinary dials and exposes
+one output. Only this output multiplies the event weight or updates the
+observable selected by `applyToVariable` / `variableResponseMode`.
+
+```yaml
+dialSetDefinitions:
+  - name: combinedResponse
+    dialType: Composite
+    options:
+      nodes:
+        - name: first
+          dialType: Formula
+          dialInputList: [{name: value, parameterName: par0}]
+          options:
+            formulaStr: "[value] * [value]"
+        - name: second
+          dialType: Formula
+          dialInputList: [{name: value, parameterName: par1}]
+          options:
+            formulaStr: "exp([value])"
+        - name: combine
+          dialType: Formula
+          dialInputList:
+            - {name: x, dialResponse: first}
+            - {name: y, dialResponse: second}
+          options:
+            formulaStr: "[x] + [y]"
+      output: combine
+```
+
+`parameterName` references a fit parameter in the owning parameter set;
+`parameterIndex` references its zero-based index in that set. `dialResponse`
+names another node in the same graph. Formula nodes also accept `eventVariable`,
+naming a loaded event variable. Exactly one of these four keys is required
+for each node input. Inputs may mix these sources. `inputIndex` is unsupported.
+Formula inputs require a unique `name`, used as `[name]` in the expression.
+Other dial types retain positional argument order. Node declaration order
+does not matter; shared dependencies are evaluated once per graph evaluation.
+Node names must be non-empty and unique, dependencies must exist, and every
+node must contribute to `output`. Cycles are rejected.
+
+Omit `dialInputList` on Composite definitions, including nested composites.
+Their parameter dependencies are inferred from all their nodes, so a change
+in any referenced fit parameter invalidates the final response cache. This
+also applies to composites attached to a single parameter. Other nodes need
+an explicit, non-empty `dialInputList`.
+
+Nodes use the ordinary dial configuration, including interpolation options,
+response limits, extrapolation and input mirroring. Intermediate
+responses are unbounded by default so signed quantities can pass between
+nodes. Explicit node limits are applied before downstream evaluation. The
+composite's final response retains the usual weight/observable response limits.
+
+| Node type | Supported inputs / loading |
+|-----------|----------------------------|
+| `Normalization` | One input of either source kind |
+| `Formula` | Multiple parameter/response inputs, plus `eventVariable` inputs |
+| `CompiledLibDial` | Multiple parameter/response inputs |
+| `Graph`, `Spline` | One input; ordinary binned-file or event-branch loading, including paired TArray branches |
+| `Surface` | Two inputs; ordinary binned-file or event-branch loading |
+| `Composite` | Another graph; its parameter dependencies are inferred recursively |
+| `Tabulated`, `Kriged`, `ExternalWeight` | Parameter inputs only; their prepared tables/buffers can feed downstream nodes |
+
+Prepared factories cannot consume `dialResponse` inputs, including through a
+nested composite, or inputs mirrored by an enclosing composite. Their updates
+run before per-event graph evaluation. These cases are rejected explicitly.
+`CompiledLibDial` exposes no arity metadata: its implementation must agree
+with the configured input list.
+
+Put the final `applyToVariable` and `variableResponseMode` on the composite.
+Put `binning` and `dialBranchData` on individual nodes. Node dataset filters,
+conditions and bin selections use the normal loading rules and select a dial
+for the **same event**. If the composite applies but a required node has no
+dial (including an empty branch curve), cache construction fails. Constant
+unit responses are preserved as valid node values. Disabled nodes and the
+indirect selectors `dialsDefinitions` / `parametersBinningPath` are unsupported
+inside a composite; use direct node definitions with explicit inputs.
+
+This first implementation uses the standard propagation engine, with its
+normal multithreaded event evaluation and response caching. `CacheManager`
+automatically disables itself when composites are present.
 
 #### `dialType: Normalization`
 
@@ -179,6 +269,87 @@ as a lightweight control protocol. See [ExternalWeightDials](ExternalWeightDials
 Apply a weight using a ROOT formula.  This is not fully supported since it
 cannot be efficiently applied with GPU acceleration.
 
+Formula inputs can mix fit parameters with loaded event variables:
+
+```yaml
+dialType: Formula
+dialInputList:
+  - {name: delta, parameterName: delta}
+  - {name: alpha, parameterName: alpha}
+  - {name: q3, eventVariable: q3}
+options:
+  formulaStr: "[delta] + [alpha] * (0.056 * [q3] - 41.6)"
+minDialResponse: -40.
+maxDialResponse: 40.
+```
+
+Each input has a unique, non-empty `name`, which is the local alias used as
+`[name]` in the expression. It must select exactly one source:
+
+- `parameterName`: the fit parameter name in the supervised parameter set;
+- `parameterIndex`: its zero-based index in that set;
+- `eventVariable`: a loaded event variable, including `variableDict` aliases.
+
+Explicit `parameterName` and `parameterIndex` references are also accepted by
+other dial types. For these dials, the order in `dialInputList` determines the
+argument order; `name`, when provided, does not select the source parameter.
+
+For example, `{name: offset, parameterName: delta}` binds `[offset]` to `delta`.
+Input declaration order does not determine ROOT parameter order: names are
+resolved once when configuring the dial. Positional `x[i]` expressions and
+parameter references using only `{name: delta}` are unsupported for Formula.
+
+Inside a composite, use the same `{name: delta, parameterName: delta}` or
+`{name: alpha, parameterIndex: 1}` syntax for fit parameter inputs. Event references remain
+`{name: q3, eventVariable: q3}`; responses from other nodes use
+`{name: shift, dialResponse: nodeName}`.
+
+Event variables are requested automatically. Bracketed source names such as
+`{name: momentum, eventVariable: "[q3]"}` are accepted. Different input aliases
+may reference the same event variable and share its captured value. Event-only
+and binned formulas are supported. Binned formulas retain constants named
+after their binning axes, for example `[X]` for the center of the selected X
+bin. A declared input with the same name overrides that constant. Undeclared
+references are rejected instead of silently evaluating as zero.
+
+Evaluation supplies a call-local parameter array to `TFormula::EvalPar`,
+without modifying the shared TFormula parameters. When declaration order
+already matches ROOT's parameter order and there are no bin constants, the
+existing input buffer is passed directly.
+
+The values are captured for each event when building the dial cache, after
+sorting events. They remain fixed until the cache is rebuilt. Parameter
+changes trigger reevaluation through the normal input buffer. The source
+`TFormula` and parameter buffer remain shared across events; each event owns
+its captured values and response cache. Asimov copies retain their responses.
+
+`eventVariable` inputs are supported only for `Formula` dials. `CacheManager`
+automatically disables itself for event formulas, using the original engine.
+
+##### Example: bin constants
+
+`constantNames_` is an internal evaluator argument, not a YAML field. For a
+binned Formula dial, GUNDAM fills it from the names of the binning axes and
+sets their values to the centers of the selected bin:
+
+```yaml
+dialSetDefinitions:
+  - name: energyBinResponse
+    dialType: Formula
+    dialInputList:
+      - {name: scale, parameterName: scale}
+    options:
+      formulaStr: "[scale] * [Enu]"
+    binning:
+      binningDefinition:
+        - name: Enu
+          edges: [0., 1., 2., 4.]
+```
+
+Here `[scale]` is supplied from the fit parameter. `[Enu]` is a bin constant:
+an event with `Enu` in `[1, 2)` uses `[Enu] = 1.5`. The supervised parameter
+set must define `scale`, and the dataset must provide `Enu` for bin selection.
+
 ### applyConditions options
 
 | Option                            | Type               | Description                                                      | Default |
@@ -218,3 +389,43 @@ dialBranchData: spline_graph
 Existing configurations using `dialLeafName: spline_graph` or
 `treeExpression: spline_graph` remain supported. The array-pair form is limited
 to `Spline` and `Graph` dials; it does not use the TClonesArray dial index.
+
+### Applying a dial to an event variable
+
+Any dial can target a stored event variable instead of the event weight:
+
+```yaml
+dialType: Normalization
+applyToVariable: recoEnergy
+variableResponseMode: Multiply
+```
+
+`variableResponseMode` accepts `Multiply` (the default), `Add`, or `Override`.
+For each event and target variable, responses are composed as:
+
+```text
+value = (Override response, or loaded value) * product(Multiply responses) + sum(Add responses)
+```
+
+Multiple `Override` dials targeting the same variable of the same event are an
+error. Disjoint application conditions may select different override dials.
+Every propagation starts from the loaded reference value, so shifts do not
+accumulate. Target variables hold double precision responses; other variables
+retain their stored types. The reference is captured when the dial cache is built,
+before the first propagation.
+
+The loader stores target variables automatically and retains out-of-bin events
+in samples binned with those variables by enabling `useDynamicBinning`. Initial
+loading assigns bins using the loaded values. Propagation updates variables,
+rebuilds bin contributions, computes event weights, and fills histograms.
+Smoothing is enabled only through an explicit `binningResponse` configuration;
+its fractions are recomputed using the updated variables.
+
+`Add` and `Override` allow negative responses by default. Explicit
+`minDialResponse` and `maxDialResponse` limits still apply. Variable responses
+are excluded from the event weight and its global reweight cap. Sample selections
+and event-to-dial associations remain those established at loading; derived
+variables are not automatically recalculated after a target variable changes.
+This feature currently requires the CPU propagation path. Leave CacheManager
+disabled (`--cache-manager off` with `gundamFitter`); its support is outside this
+implementation.
