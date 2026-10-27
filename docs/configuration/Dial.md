@@ -107,8 +107,9 @@ dialSetDefinitions:
 ```
 
 `inputIndex` is a zero-based index into the composite's own `dialInputList`.
-`dialResponse` names another node in the same graph. Exactly one of these
-keys is required for each node input. Inputs may mix these two sources and
+`dialResponse` names another node in the same graph. Formula nodes also accept
+`eventVariable`, naming a loaded event variable. Exactly one of these three
+keys is required for each node input. Inputs may mix these sources and
 their list order defines the dial's argument order. Node declaration order
 does not matter; shared dependencies are evaluated once per graph evaluation.
 Node names must be non-empty and unique, dependencies must exist, and every
@@ -127,7 +128,8 @@ composite's final response retains the usual weight/observable response limits.
 | Node type | Supported inputs / loading |
 |-----------|----------------------------|
 | `Normalization` | One input of either source kind |
-| `Formula`, `CompiledLibDial` | Multiple inputs of either source kind |
+| `Formula` | Multiple parameter/response inputs, plus `eventVariable` inputs |
+| `CompiledLibDial` | Multiple parameter/response inputs |
 | `Graph`, `Spline` | One input; ordinary binned-file or event-branch loading, including paired TArray branches |
 | `Surface` | Two inputs; ordinary binned-file or event-branch loading |
 | `Composite` | Another graph; its input indices refer to this node's input list |
@@ -279,6 +281,10 @@ options:
 minDialResponse: -40.
 maxDialResponse: 40.
 ```
+
+Inside a composite, use `{inputIndex: 0}` and `{inputIndex: 1}` for the
+parameter entries; `{eventVariable: q3}` is unchanged. A downstream spline
+consumes the formula response with `{dialResponse: nodeName}`.
 
 Input order defines the `x[i]` positions. Event variables are automatically
 requested from the dataset, including expressions defined in `variableDict`.

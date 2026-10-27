@@ -17,6 +17,7 @@ public:
   struct Input {
     int inputIndex{-1};
     int nodeIndex{-1};
+    std::string eventVariable;
   };
   struct Node {
     std::string name;

@@ -25,14 +25,16 @@ def write_input(path):
  {
   TFile output(OUTPUT_PATH, "RECREATE");
   TTree tree("events", "events");
-  double coordinate = 0.;
+  double coordinate = 0., rawQ3 = 0.;
   TGraph curve, flatCurve;
   TGraph *graph = &curve, *flat = &flatCurve;
   tree.Branch("X", &coordinate, "X/D");
+  tree.Branch("rawQ3", &rawQ3, "rawQ3/D");
   tree.Branch("graph", "TGraph", &graph, 32000, 0);
   tree.Branch("flat", "TGraph", &flat, 32000, 0);
   for (int event = 0; event < 6; ++event) {
     coordinate = .25 + .5*event;
+    rawQ3 = 250.*event;
     for (int knot = 0; knot < 5; ++knot) {
       double x = knot - 2.;
       graph->SetPoint(knot, x, 1. + .1*(event + 1)*x*x);
@@ -41,8 +43,8 @@ def write_input(path):
     tree.Fill();
   }
   tree.Write();
-  TObjArray curves, surfaces;
-  curves.SetOwner(true); surfaces.SetOwner(true);
+  TObjArray curves, surfaces, wideCurves;
+  curves.SetOwner(true); surfaces.SetOwner(true); wideCurves.SetOwner(true);
   for (int bin = 0; bin < 3; ++bin) {
     auto* curve = new TGraph(5);
     for (int knot = 0; knot < 5; ++knot) {
@@ -50,6 +52,12 @@ def write_input(path):
       curve->SetPoint(knot, x, 1. + .2*(bin + 1)*x);
     }
     curves.Add(curve);
+    auto* wideCurve = new TGraph(5);
+    for (int knot = 0; knot < 5; ++knot) {
+      double x = -40. + 20.*knot;
+      wideCurve->SetPoint(knot, x, 5. + .001*(bin + 1)*x*x);
+    }
+    wideCurves.Add(wideCurve);
     auto* surface = new TH2D(("surface" + std::to_string(bin)).c_str(), "", 5, -2.5, 2.5, 5, -2.5, 2.5);
     surface->SetDirectory(nullptr);
     for (int ix = 1; ix <= 5; ++ix) for (int iy = 1; iy <= 5; ++iy) {
@@ -59,6 +67,7 @@ def write_input(path):
     surfaces.Add(surface);
   }
   curves.Write("curves", TObject::kSingleKey);
+  wideCurves.Write("wideCurves", TObject::kSingleKey);
   surfaces.Write("surfaces", TObject::kSingleKey);
  }
  gSystem->Exit(0);
@@ -92,7 +101,8 @@ def make_config(path, dial):
             'generateSamplePlots': False, 'generateOneSigmaPlots': False,
             'likelihoodInterfaceConfig': {
                 'jointProbabilityConfig': {'type': 'LeastSquares', 'lsqPoissonianApproximation': True},
-                'dataSetList': [{'name': 'input', 'model': {'tree': 'events', 'filePathList': [str(path)]}}],
+                'dataSetList': [{'name': 'input', 'model': {'tree': 'events', 'filePathList': [str(path)],
+                    'variableDict': [{'name': 'q3', 'expr': 'rawQ3 + 0.'}]}}],
                 'propagatorConfig': {'sampleSetConfig': {'sampleList': [{'name': 'sample', 'binning': binning}]},
                     'parametersManagerConfig': {'parameterSetList': [{
                         'name': 'parameters', 'isEnabled': True, 'nominalStepSize': .1,
@@ -225,6 +235,34 @@ def main():
                                applyToVariable='X', variableResponseMode='Override')
         exercise(path, observable, lambda p, q, i: p + q, observable=True)
 
+        exercise(path, composite([formula('eventOnly', '1+.001*x[0]', {'eventVariable': 'q3'})], 'eventOnly'),
+                 lambda p, q, i: 1+.25*i)
+
+        # The requested delta/alpha/q3 abscissa, followed by a discretely selected spline.
+        source_node = formula('source', 'x[0]+x[1]*(.056*x[2]-41.6)', first, second,
+                              {'eventVariable': 'q3'}, minDialResponse=-40., maxDialResponse=40.)
+        spline_node = dict(name='spline', dialType='Spline', binning=binning,
+                           dialsFilePath=str(path), dialsList='wideCurves', dialInputList=[upstream])
+        points = [(.5, .25), (.5, .25), (-.5, .25), (-.5, .75), (0., 1.), (30., 2.),
+                  (-40., 0.), (40., 0.), (.5, .25)]
+        def abscissa(p, q, i):
+            return max(-40., min(40., p+q*(.056*250*i-41.6)))
+        exercise(path, composite([source_node, spline_node], 'spline'),
+                 lambda p, q, i: 5+.001*(i//2+1)*abscissa(p, q, i)**2, points=points)
+        exercise(path, composite([source_node], 'source', applyToVariable='X', variableResponseMode='Override'),
+                 abscissa, observable=True, points=points)
+
+        # Event inputs can also accompany upstream dial responses, inside a nested graph.
+        nested = composite([formula('sum', '2+x[0]+.001*x[1]', first, {'eventVariable': 'q3'})], 'sum')
+        nested.update(name='nested', dialInputList=[upstream, second])
+        exercise(path, composite([formula('source', 'x[0]*x[0]', first), nested], 'nested'),
+                 lambda p, q, i: 2+p*p+.25*i)
+
+        # Reading an observable captures its loaded value; repeated migrations do not accumulate.
+        snapshot = formula('loadedX', 'x[0]+x[1]', {'eventVariable': 'X'}, {'name': 'p'},
+                           applyToVariable='X', variableResponseMode='Override')
+        exercise(path, snapshot, lambda p, q, i: .25+.5*i+p, observable=True)
+
     # Compiled functions can consume intermediate responses through DialInputBuffer.
     source = Path.cwd() / '230CompositeDials-library.cpp'
     library = source.with_suffix('.so')
@@ -316,6 +354,13 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
     config, graph = changed_graph()
     graph['nodes'][0]['dialInputList'] = [{'inputIndex': 0, 'dialResponse': 'output'}]
     reject(config, 'exactly one of')
+    for bad_input in ({'eventVariable': ''}, {'eventVariable': 'q3', 'inputIndex': 0}):
+        config, graph = changed_graph()
+        graph['nodes'][0]['dialInputList'] = [bad_input]
+        reject(config, 'eventVariable')
+    config, graph = changed_graph()
+    graph['nodes'][0] = dict(name='source', dialType='Normalization', dialInputList=[{'eventVariable': 'q3'}])
+    reject(config, 'only supported by Formula')
     config, graph = changed_graph()
     graph['nodes'][1]['dialInputList'] = [{'dialResponse': 'missing'}]
     reject(config, 'unknown dialResponse')
