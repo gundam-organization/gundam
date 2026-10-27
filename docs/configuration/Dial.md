@@ -38,11 +38,49 @@ external libraries to calculate weights.
 | definitionRange        | pair(double) |                                                                        |         |
 | mirrorDefinitionRange  | pair(double) |                                                                        |         |
 | dialInputList          | list(json)   | List of parameters for this dial                                       | empty   |
-| dialsTreePath          | string       | Deprecated: tree name where the dials are stored                       |         |
+| dialsTreePath          | string       | ROOT tree path, optionally followed by `:branch` for binned dials       |         |
+| dialsBranch            | string       | Explicit object branch in the binned dial tree                         |         |
+| binnedDialsPath        | string       | Binned dial source as `file:tree:branch`                                |         |
 
 `options` is the common key for type-specific settings. `Spline`, `Graph` and
 `Surface` retain their string options (for example, `options: Bilinear`).
 `Formula`, `CompiledLibDial`, `Composite` and `ExternalWeight` use an object.
+
+### Binned dials stored in a ROOT tree
+
+Select the object branch explicitly using any of these equivalent forms:
+
+```yaml
+binnedDialsPath: "splines.root:EB_bin_C_nu:Graph"
+binning: "binning.txt"
+```
+
+```yaml
+dialsFilePath: "splines.root"
+dialsTreePath: "EB_bin_C_nu:Graph"
+binning: "binning.txt"
+```
+
+```yaml
+dialsFilePath: "splines.root"
+dialsTreePath: "EB_bin_C_nu"
+dialsBranch: "Graph"
+binning: "binning.txt"
+```
+
+The selected branch must contain `TGraph` (including subclasses) or `TSpline3`
+objects. `dialType` still selects the interpolation method. The tree retains its
+`kinematicBin` integer branch and any integer split-variable branches; other
+object branches are ignored when the dial branch is explicit.
+
+Redundant file, tree or branch declarations must agree. For example,
+`dialsTreePath: "EB_bin_C_nu"` may accompany the full `binnedDialsPath`.
+Explicit tree branches cannot be combined with `dialsList`.
+
+For backward compatibility, omitting the branch keeps the historical choice:
+`Spline` for `dialType: Spline`, `Graph` for `dialType: Graph`. This implicit
+selection emits a deprecation warning with instructions to specify the branch.
+The existing `dialsFilePath` plus `dialsList` object-array syntax is unchanged.
 
 ### Smooth response limits
 

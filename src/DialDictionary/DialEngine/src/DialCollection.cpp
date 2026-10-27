@@ -28,6 +28,10 @@
 
 #include "Logger.h"
 
+#include <TBranch.h>
+#include <TClass.h>
+#include <TLeaf.h>
+
 #include <algorithm>
 #include <sstream>
 #include <typeinfo>
@@ -61,9 +65,11 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"applyConditions"},
       {"parametersBinningPath"},
       {"binning", {"binningFilePath"}},
+      {"binnedDialsPath"},
       {"dialsFilePath"},
       {"dialsList"},
       {"dialsTreePath"},
+      {"dialsBranch"},
       {"dialsDefinitions"},
       {"tableConfig"},
       {FieldFlag::DEPRECATED, "parameterLimits", "\"parameterLimits\" should be set in the parameter definition section. Not the dial definition. Support has been removed."},
@@ -1075,7 +1081,37 @@ bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDef
 
   // Get the filename for a file with the object array of dials (graphs)
   // that will be applied based on the binning.
-  auto filePath = dialsDefinition.fetchValue<std::string>("dialsFilePath");
+  auto filePath = dialsDefinition.fetchValue<std::string>("dialsFilePath", "");
+  auto objPath = dialsDefinition.fetchValue<std::string>("dialsTreePath", "");
+  auto branchName = dialsDefinition.fetchValue<std::string>("dialsBranch", "");
+  LogThrowIf(dialsDefinition.hasField("dialsBranch") and branchName.empty(), "dialsBranch must not be empty");
+
+  // Merge redundant declarations only when they identify the same source.
+  auto mergePath = [](std::string& target_, const std::string& value_, const char* field_){
+    LogThrowIf(value_.empty(), "Empty " << field_ << " in binned dial path");
+    LogThrowIf(not target_.empty() and target_ != value_, "Conflicting " << field_ << " in binned dial definition");
+    target_ = value_;
+  };
+  const auto branchSeparator = objPath.rfind(':');
+  if( branchSeparator != std::string::npos ){
+    mergePath(branchName, objPath.substr(branchSeparator + 1), "dialsBranch");
+    objPath.resize(branchSeparator);
+    LogThrowIf(objPath.empty(), "Empty dialsTreePath in binned dial path");
+  }
+  if( dialsDefinition.hasField("binnedDialsPath") ){
+    const auto path = dialsDefinition.fetchValue<std::string>("binnedDialsPath");
+    const auto lastSeparator = path.rfind(':');
+    const auto treeSeparator = lastSeparator == std::string::npos or lastSeparator == 0
+                               ? std::string::npos : path.rfind(':', lastSeparator - 1);
+    LogThrowIf(treeSeparator == std::string::npos,
+               "binnedDialsPath must use file:tree:branch syntax: " << path);
+    mergePath(filePath, path.substr(0, treeSeparator), "dialsFilePath");
+    mergePath(objPath, path.substr(treeSeparator + 1, lastSeparator - treeSeparator - 1), "dialsTreePath");
+    mergePath(branchName, path.substr(lastSeparator + 1), "dialsBranch");
+  }
+  LogThrowIf(not branchName.empty() and (objPath.empty() or dialsDefinition.hasField("dialsList")),
+             "An explicit binned dial branch requires a tree and cannot be combined with dialsList");
+  LogThrowIf(filePath.empty(), "Missing dialsFilePath or binnedDialsPath for binned dials");
   filePath = GenericToolbox::expandEnvironmentVariables(filePath);
 
   LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath);
@@ -1129,13 +1165,30 @@ bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDef
   }
 
     ///////////////////////////////////////////////////////////////////////
-  else if ( dialsDefinition.hasField("dialsTreePath") ) {
-    // Deprecated: A tree with event binning has been provided, so this is
-    // a binned dial.  Create the dials for each bin here.  The dials will
-    // be assigned to the events in DataDispenser.
-    auto objPath = dialsDefinition.fetchValue<std::string>("dialsTreePath");
-    auto* dialsTTree = (TTree*) dialsTFile->Get(objPath.c_str());
+  else if ( not objPath.empty() ) {
+    auto* dialsTTree = dialsTFile->Get<TTree>(objPath.c_str());
     LogThrowIf(dialsTTree== nullptr, objPath << " within " << filePath << " could not be opened.")
+
+    const bool explicitBranch = not branchName.empty();
+    if( not explicitBranch ){
+      // Preserve the historical choice based on dialType.
+      if( _dialType_ == DialType::Spline ){ branchName = "Spline"; }
+      if( _dialType_ == DialType::Graph ){ branchName = "Graph"; }
+      LogWarning << "Implicit binned dial branch selection is deprecated for " << getTitle()
+                 << ". Set dialsBranch explicitly (legacy branch: " << branchName
+                 << "), or use file:tree:branch in binnedDialsPath." << std::endl;
+    }
+    auto* branch = dialsTTree->GetBranch(branchName.c_str());
+    LogThrowIf(branch == nullptr, "Could not find binned dial branch " << branchName << " in " << objPath);
+    auto* branchClass = TClass::GetClass(branch->GetClassName());
+    const bool graphBranch = explicitBranch
+                             ? branchClass != nullptr and branchClass->InheritsFrom(TGraph::Class())
+                             : _dialType_ == DialType::Graph;
+    const bool splineBranch = explicitBranch
+                              ? branchClass != nullptr and branchClass->InheritsFrom(TSpline3::Class())
+                              : _dialType_ == DialType::Spline;
+    LogThrowIf(not graphBranch and not splineBranch,
+               "Binned dial branch " << branchName << " must contain TGraph or TSpline3 objects");
 
     Int_t kinematicBin;
     TSpline3* splinePtr = nullptr;
@@ -1144,8 +1197,11 @@ bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDef
     // searching for additional split var
     std::vector<std::string> splitVarNameList;
     for( int iKey = 0 ; iKey < dialsTTree->GetListOfLeaves()->GetEntries() ; iKey++ ){
-      std::string leafName = dialsTTree->GetListOfLeaves()->At(iKey)->GetName();
-      if(leafName != "kinematicBin" and leafName != "Spline" and leafName != "Graph"){
+      auto* leaf = static_cast<TLeaf*>(dialsTTree->GetListOfLeaves()->At(iKey));
+      std::string leafName = leaf->GetName();
+      // Other object branches are alternative curves, not integer split variables.
+      if( explicitBranch and not std::string(leaf->GetBranch()->GetClassName()).empty() ){ continue; }
+      if(leafName != "kinematicBin" and leafName != "Spline" and leafName != "Graph" and leafName != branchName){
         splitVarNameList.emplace_back(leafName);
       }
     }
@@ -1154,9 +1210,11 @@ bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDef
     std::vector<Int_t> splitVarValueList(splitVarNameList.size(), 0);
     std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
     std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
-    dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin);
-    if( _dialType_ == DialType::Spline ) dialsTTree->SetBranchAddress("Spline", &splinePtr);
-    if( _dialType_ == DialType::Graph ) dialsTTree->SetBranchAddress("Graph", &graphPtr);
+    LogThrowIf(dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin) < 0,
+               "Could not bind kinematicBin in " << objPath);
+    const int branchStatus = graphBranch ? dialsTTree->SetBranchAddress(branchName.c_str(), &graphPtr)
+                                         : dialsTTree->SetBranchAddress(branchName.c_str(), &splinePtr);
+    LogThrowIf(branchStatus < 0, "Could not bind binned dial branch " << branchName << " in " << objPath);
     for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
       dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
     }
@@ -1181,8 +1239,8 @@ bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDef
       }
 
       TObject* dialInitializer{nullptr};
-      if( _dialType_ == DialType::Spline ){ dialInitializer = splinePtr;}
-      if( _dialType_ == DialType::Graph ){ dialInitializer = graphPtr;}
+      if( splineBranch ){ dialInitializer = splinePtr; }
+      if( graphBranch ){ dialInitializer = graphPtr; }
 
       auto dial = makeDial(dialInitializer);
       if( dial != nullptr ){
@@ -1194,7 +1252,7 @@ bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDef
     } // iSpline (in TTree)
   } // Splines in TTree
   else{
-    LogError << "Neither dialsTreePath nor dialsList are provided..." << std::endl;
+    LogError << "Neither binnedDialsPath, dialsTreePath nor dialsList are provided..." << std::endl;
     return false;
   }
   return true;
