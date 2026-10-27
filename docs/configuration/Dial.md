@@ -118,19 +118,16 @@ observable selected by `applyToVariable` / `variableResponseMode`.
 dialSetDefinitions:
   - name: combinedResponse
     dialType: Composite
-    dialInputList:
-      - {name: par0}
-      - {name: par1}
     options:
       nodes:
         - name: first
           dialType: Formula
-          dialInputList: [{name: value, inputIndex: 0}]
+          dialInputList: [{name: value, parameterName: par0}]
           options:
             formulaStr: "[value] * [value]"
         - name: second
           dialType: Formula
-          dialInputList: [{name: value, inputIndex: 1}]
+          dialInputList: [{name: value, parameterName: par1}]
           options:
             formulaStr: "exp([value])"
         - name: combine
@@ -143,19 +140,22 @@ dialSetDefinitions:
       output: combine
 ```
 
-`inputIndex` is a zero-based index into the composite's own `dialInputList`.
-`dialResponse` names another node in the same graph. Formula nodes also accept
-`eventVariable`, naming a loaded event variable. Exactly one of these three
-keys is required for each node input. Inputs may mix these sources.
+`parameterName` references a fit parameter in the owning parameter set;
+`parameterIndex` references its zero-based index in that set. `dialResponse`
+names another node in the same graph. Formula nodes also accept `eventVariable`,
+naming a loaded event variable. Exactly one of these four keys is required
+for each node input. Inputs may mix these sources. `inputIndex` is unsupported.
 Formula inputs require a unique `name`, used as `[name]` in the expression.
 Other dial types retain positional argument order. Node declaration order
 does not matter; shared dependencies are evaluated once per graph evaluation.
 Node names must be non-empty and unique, dependencies must exist, and every
 node must contribute to `output`. Cycles are rejected.
 
-At parameter-set level, give the composite an explicit `dialInputList`. When
-attached to a single parameter, omitting this list exposes that parameter as
-input 0. Each node needs an explicit, non-empty `dialInputList`.
+Omit `dialInputList` on Composite definitions, including nested composites.
+Their parameter dependencies are inferred from all their nodes, so a change
+in any referenced fit parameter invalidates the final response cache. This
+also applies to composites attached to a single parameter. Other nodes need
+an explicit, non-empty `dialInputList`.
 
 Nodes use the ordinary dial configuration, including interpolation options,
 response limits and smoothing, extrapolation and input mirroring. Intermediate
@@ -170,7 +170,7 @@ composite's final response retains the usual weight/observable response limits.
 | `CompiledLibDial` | Multiple parameter/response inputs |
 | `Graph`, `Spline` | One input; ordinary binned-file or event-branch loading, including paired TArray branches |
 | `Surface` | Two inputs; ordinary binned-file or event-branch loading |
-| `Composite` | Another graph; its input indices refer to this node's input list |
+| `Composite` | Another graph; its parameter dependencies are inferred recursively |
 | `Tabulated`, `Kriged`, `ExternalWeight` | Parameter inputs only; their prepared tables/buffers can feed downstream nodes |
 
 Prepared factories cannot consume `dialResponse` inputs, including through a
@@ -328,13 +328,17 @@ Each input has a unique, non-empty `name`, which is the local alias used as
 - `parameterIndex`: its zero-based index in that set;
 - `eventVariable`: a loaded event variable, including `variableDict` aliases.
 
+Explicit `parameterName` and `parameterIndex` references are also accepted by
+other dial types. For these dials, the order in `dialInputList` determines the
+argument order; `name`, when provided, does not select the source parameter.
+
 For example, `{name: offset, parameterName: delta}` binds `[offset]` to `delta`.
 Input declaration order does not determine ROOT parameter order: names are
 resolved once when configuring the dial. Positional `x[i]` expressions and
 parameter references using only `{name: delta}` are unsupported for Formula.
 
-Inside a composite, use `{name: delta, inputIndex: 0}` and
-`{name: alpha, inputIndex: 1}` for its parameter inputs. Event references remain
+Inside a composite, use the same `{name: delta, parameterName: delta}` or
+`{name: alpha, parameterIndex: 1}` syntax for fit parameter inputs. Event references remain
 `{name: q3, eventVariable: q3}`; responses from other nodes use
 `{name: shift, dialResponse: nodeName}`.
 

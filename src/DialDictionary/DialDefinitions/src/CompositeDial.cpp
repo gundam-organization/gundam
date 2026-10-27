@@ -11,7 +11,7 @@
 #include <map>
 #include <sstream>
 
-CompositeDial::CompositeDial(ConfigReader config_, int inputCount_): _inputCount_(inputCount_){
+CompositeDial::CompositeDial(ConfigReader config_, const std::vector<std::string>& parameterNames_): _inputCount_(int(parameterNames_.size())){
   config_.clearFields();
   config_.defineFields({{"nodes"}, {"output"}});
   config_.checkConfiguration();
@@ -34,25 +34,26 @@ CompositeDial::CompositeDial(ConfigReader config_, int inputCount_): _inputCount
   _outputIndex_ = nodeIndices.at(output);
   for( auto& node : _nodes_ ){
     const auto inputs = node.config->fetchValue<ConfigReader>("dialInputList");
-    LogThrowIf(not inputs.getConfig().is_array() or inputs.getConfig().empty(),
+    const bool nested = node.config->fetchValue<DialCollection::DialType>("dialType") == DialCollection::DialType::Composite;
+    LogThrowIf(not inputs.getConfig().is_array() or (inputs.getConfig().empty() and not nested),
                "Composite node " << node.name << ": dialInputList must be a non-empty list");
     for( auto source : inputs.loop() ){
-      source.defineFields({{"name"}, {"inputIndex"}, {"dialResponse"}, {"eventVariable"}});
+      source.defineFields({{"name"}, {"parameterName"}, {"dialResponse"}, {"eventVariable"}});
       source.checkConfiguration();
-      const int sourceCount = int(source.hasField("inputIndex")) + int(source.hasField("dialResponse"))
+      const int sourceCount = int(source.hasField("parameterName")) + int(source.hasField("dialResponse"))
                               + int(source.hasField("eventVariable"));
       LogThrowIf(sourceCount != 1,
-                 "Composite node " << node.name << ": specify exactly one of inputIndex, dialResponse and eventVariable");
+                 "Composite node " << node.name << ": specify exactly one of parameterName, dialResponse and eventVariable");
       Input input;
       if( node.config->fetchValue<DialCollection::DialType>("dialType") == DialCollection::DialType::Formula ){
         input.name = source.fetchValue("name", std::string());
         LogThrowIf(input.name.empty(), "Composite Formula input requires a name");
       }
-      if( source.hasField("inputIndex") ){
-        const auto index = source.fetchValue<JsonType>("inputIndex");
-        LogThrowIf(not index.is_number_integer() or index < 0 or index >= _inputCount_,
-                   "Composite node " << node.name << ": inputIndex outside composite inputs");
-        input.inputIndex = index.get<int>();
+      if( source.hasField("parameterName") ){
+        input.parameterName = source.fetchValue<std::string>("parameterName");
+        const auto position = std::find(parameterNames_.begin(), parameterNames_.end(), input.parameterName);
+        LogThrowIf(position == parameterNames_.end(), "Composite: unresolved parameter: " << input.parameterName);
+        input.bufferIndex = int(std::distance(parameterNames_.begin(), position));
       }
       else if( source.hasField("dialResponse") ){
         const auto dependency = source.fetchValue<std::string>("dialResponse");
@@ -140,7 +141,7 @@ double CompositeDial::evalResponse(const DialInputBuffer& input_) const {
       // EventFormula supplies its own event inputs; this buffer contains
       // only the parameter/response inputs, in their original relative order.
       if( not source.eventVariable.empty() ){ continue; }
-      double value = source.inputIndex >= 0 ? input_.getInputBuffer()[source.inputIndex] : responses[source.nodeIndex];
+      double value = source.bufferIndex >= 0 ? input_.getInputBuffer()[source.bufferIndex] : responses[source.nodeIndex];
       const auto& edges = node.mirrorEdges[iParameter++];
       if( not std::isnan(edges.minValue) ){
         value = std::abs(std::fmod(value - edges.minValue, 2 * edges.range));

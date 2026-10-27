@@ -45,20 +45,14 @@ void DialManager::configureImpl(){
   }
   // Keep node collections in the normal loading/update pipeline. They are
   // consumed only when EventDialCache binds their parent composite.
-  std::vector<std::vector<bool>> responseInputs(_dialCollectionList_.size());
+  std::vector<bool> inheritedMirroring(_dialCollectionList_.size(), false);
   for( size_t iCollection = 0 ; iCollection < _dialCollectionList_.size() ; ++iCollection ){
     auto& collection = _dialCollectionList_[iCollection];
     if( not collection.isEnabled() or collection.getDialType() != DialCollection::DialType::Composite ){ continue; }
     auto* composite = dynamic_cast<CompositeDial*>(collection.getDialInterfaceList().at(0).getDialBaseRef());
     const int parSetIndex = collection.getSupervisedParameterSetIndex();
-    JsonType parameterInputs;
-    if( collection.getConfig().hasField("dialInputList") ){
-      parameterInputs = collection.getConfig().fetchValue<JsonType>("dialInputList");
-    }
-    else{ parameterInputs = JsonType::array({{{"name", collection.getSupervisedParameter()->getName()}}}); }
-    auto parentResponseInputs = responseInputs[iCollection];
-    if( parentResponseInputs.empty() ){ parentResponseInputs.resize(parameterInputs.size(), false); }
-    const bool mirroredInputs = collection.getConfig().fetchValue("useMirrorDial", false);
+    const bool mirroredInputs = inheritedMirroring[iCollection]
+                                or collection.getConfig().fetchValue("useMirrorDial", false);
     const size_t nodeCount = composite->getNodes().size();
     for( size_t iNode = 0 ; iNode < nodeCount ; ++iNode ){
       // Growing the collection vector can deep-copy DialBaseObject. Resolve
@@ -84,14 +78,12 @@ void DialManager::configureImpl(){
                             or type == DialCollection::DialType::Kriged
                             or type == DialCollection::DialType::ExternalWeight;
       JsonType inputs = JsonType::array();
-      std::vector<bool> dynamicInputs;
       for( const auto& input : node.inputs ){
         const bool dynamic = not input.eventVariable.empty() or input.nodeIndex >= 0
-                             or mirroredInputs or parentResponseInputs.at(input.inputIndex);
+                             or mirroredInputs;
         LogThrowIf(prepared and dynamic,
                    "Composite node " << node.name << ": " << type
                    << " requires parameter inputs; response/event inputs and composite mirroring need per-event factory updates");
-        dynamicInputs.push_back(dynamic);
         if( not input.eventVariable.empty() ){
           LogThrowIf(type != DialCollection::DialType::Formula,
                      "Composite node " << node.name << ": eventVariable inputs are only supported by Formula dials");
@@ -100,14 +92,13 @@ void DialManager::configureImpl(){
         }
         // Intermediate inputs are evaluated by CompositeDial, not by this
         // buffer. A real parameter placeholder keeps normal loaders usable.
-        auto parameter = parameterInputs.at(input.inputIndex >= 0 ? input.inputIndex : 0);
-        if( type == DialCollection::DialType::Formula ){
-          const auto parameterName = parameter.at("name");
-          parameter = JsonType{{"name", input.name}, {"parameterName", parameterName}};
-        }
+        JsonType parameter = input.parameterName.empty()
+            ? JsonType{{"parameterIndex", 0}} : JsonType{{"parameterName", input.parameterName}};
+        if( type == DialCollection::DialType::Formula ){ parameter["name"] = input.name; }
         inputs.emplace_back(std::move(parameter));
       }
-      config.getConfig()["dialInputList"] = inputs;
+      // Nested graphs already carry their inferred parameter inputs.
+      if( type != DialCollection::DialType::Composite ){ config.getConfig()["dialInputList"] = inputs; }
       node.collectionIndex = int(_dialCollectionList_.size());
       const int childIndex = node.collectionIndex;
       _dialCollectionList_.emplace_back(&_parametersManagerPtr_->getParameterSetsList());
@@ -118,7 +109,7 @@ void DialManager::configureImpl(){
       child.setIsCompositeNode(true);
       child.configure(config);
       LogThrowIf(not child.isEnabled(), "Composite: could not configure node " << nodeName);
-      responseInputs.emplace_back(std::move(dynamicInputs));
+      inheritedMirroring.emplace_back(mirroredInputs);
     }
   }
 }

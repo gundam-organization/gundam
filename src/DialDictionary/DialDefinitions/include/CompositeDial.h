@@ -16,7 +16,8 @@ class CompositeDial : public DialBase {
 public:
   struct Input {
     std::string name;
-    int inputIndex{-1};
+    int bufferIndex{-1};
+    std::string parameterName;
     int nodeIndex{-1};
     std::string eventVariable;
   };
@@ -30,7 +31,7 @@ public:
     std::vector<DialInputBuffer::ParameterReference::MirrorEdges> mirrorEdges;
   };
 
-  CompositeDial(ConfigReader config_, int inputCount_);
+  CompositeDial(ConfigReader config_, const std::vector<std::string>& parameterNames_);
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<CompositeDial>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return "Composite"; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
