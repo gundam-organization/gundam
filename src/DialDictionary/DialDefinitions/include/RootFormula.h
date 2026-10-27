@@ -6,8 +6,7 @@
 #define GUNDAM_ROOTFORMULA_H
 
 #include "DialBase.h"
-
-#include "TFormula.h"
+#include "FormulaEvaluator.h"
 
 #include <string>
 
@@ -24,18 +23,14 @@ public:
 
   void setFormulaStr(const std::string& formulaStr_);
   void setInputNames(const std::vector<std::string>& names_, const std::vector<std::string>& constantNames_ = {});
-  [[nodiscard]] int getInputCount() const{ return _inputCount_; }
+  [[nodiscard]] int getInputCount() const{ return _evaluator_.getInputCount(); }
 
-  TFormula& getFormula(){ return _formula_; }
-  const TFormula& getFormula() const{ return _formula_; }
+  TFormula& getFormula(){ return _evaluator_.getFormula(); }
+  const TFormula& getFormula() const{ return _evaluator_.getFormula(); }
 
 
 private:
-  TFormula _formula_{};
-  int _inputCount_{-1};
-  bool _isInputOrderMatching_{false};
-  // One entry per ROOT parameter, resolved at configuration. -1 keeps a bin constant.
-  std::vector<int> _parameterInputIndices_;
+  FormulaEvaluator _evaluator_{};
 
 };
 

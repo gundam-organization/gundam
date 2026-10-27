@@ -62,6 +62,7 @@ if( WITH_GOOGLE_TEST )
   list(APPEND FAST_TESTS GTests/unitTest_CalculateBicubicSpline.cpp)
   list(APPEND FAST_TESTS GTests/unitTest_ApplyMonotonicCondition.cpp)
   list(APPEND FAST_TESTS GTests/unitTest_DialUtils.cpp)
+  list(APPEND FAST_TESTS GTests/unitTest_FormulaEvaluator.cpp)
   list(APPEND FAST_TESTS GTests/unitTest_DialDefinitions.cpp)
   list(APPEND FAST_TESTS GTests/unitTest_RootMinimizerSimplex.cpp)
 

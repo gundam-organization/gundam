@@ -322,6 +322,30 @@ its captured values and response cache. Asimov copies retain their responses.
 `eventVariable` inputs are supported only for `Formula` dials. `CacheManager`
 automatically disables itself for event formulas, using the original engine.
 
+##### Example: bin constants
+
+`constantNames_` is an internal evaluator argument, not a YAML field. For a
+binned Formula dial, GUNDAM fills it from the names of the binning axes and
+sets their values to the centers of the selected bin:
+
+```yaml
+dialSetDefinitions:
+  - name: energyBinResponse
+    dialType: Formula
+    dialInputList:
+      - {name: scale, parameterName: scale}
+    options:
+      formulaStr: "[scale] * [Enu]"
+    binning:
+      binningDefinition:
+        - name: Enu
+          edges: [0., 1., 2., 4.]
+```
+
+Here `[scale]` is supplied from the fit parameter. `[Enu]` is a bin constant:
+an event with `Enu` in `[1, 2)` uses `[Enu] = 1.5`. The supervised parameter
+set must define `scale`, and the dataset must provide `Enu` for bin selection.
+
 ### applyConditions options
 
 | Option                            | Type               | Description                                                      | Default |
