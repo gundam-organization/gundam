@@ -33,6 +33,7 @@
 #include <TLeaf.h>
 
 #include <algorithm>
+#include <cmath>
 #include <sstream>
 #include <typeinfo>
 
@@ -70,6 +71,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"dialsList"},
       {"dialsTreePath"},
       {"dialsBranch"},
+      {"dialsBinningDefinition"},
       {"dialsDefinitions"},
       {"tableConfig"},
       {FieldFlag::DEPRECATED, "parameterLimits", "\"parameterLimits\" should be set in the parameter definition section. Not the dial definition. Support has been removed."},
@@ -1065,19 +1067,19 @@ bool DialCollection::initializeDialsWithExternalWeight(const ConfigReader& dials
   return true;
 }
 
-bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDefinition) {
-  if( not dialsDefinition.hasField("binning") ){ return false; }
-
-  // A binning file has been provided, so this is a binned dial.  Create
-  // the dials for each bin here.  The dials will be assigned to the
-  // events in DataDispenser.
-  auto binningFilePath = dialsDefinition.fetchValue("binning", ConfigReader());
+bool DialCollection::initializeBinnedDials(const ConfigReader& dialsDefinition) {
+  const bool treeBinning = dialsDefinition.hasField("dialsBinningDefinition");
+  LogThrowIf(treeBinning and dialsDefinition.hasField("binning"),
+             "Specify either binning or dialsBinningDefinition, not both");
+  if( not treeBinning and not dialsDefinition.hasField("binning") ){ return false; }
 
   LogInfo << "Defining binned dials for " << getTitle() << std::endl;
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName("dial binning");
-  _dialBinSet_.configure(binningFilePath);
-  // NOTE: DON'T SORT THE DIALS AS THE ORDERING IS MATCHING THE SPLINE FILE!
+  if( not treeBinning ){
+    _dialBinSet_.configure(dialsDefinition.fetchValue<ConfigReader>("binning"));
+  }
+  // Keep bins and dials in source order.
 
   // Get the filename for a file with the object array of dials (graphs)
   // that will be applied based on the binning.
@@ -1111,6 +1113,8 @@ bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDef
   }
   LogThrowIf(not branchName.empty() and (objPath.empty() or dialsDefinition.hasField("dialsList")),
              "An explicit binned dial branch requires a tree and cannot be combined with dialsList");
+  LogThrowIf(treeBinning and (objPath.empty() or dialsDefinition.hasField("dialsList")),
+             "dialsBinningDefinition requires a TTree source and cannot be combined with dialsList");
   LogThrowIf(filePath.empty(), "Missing dialsFilePath or binnedDialsPath for binned dials");
   filePath = GenericToolbox::expandEnvironmentVariables(filePath);
 
@@ -1190,66 +1194,103 @@ bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDef
     LogThrowIf(not graphBranch and not splineBranch,
                "Binned dial branch " << branchName << " must contain TGraph or TSpline3 objects");
 
-    Int_t kinematicBin;
     TSpline3* splinePtr = nullptr;
     TGraph* graphPtr = nullptr;
-
-    // searching for additional split var
-    std::vector<std::string> splitVarNameList;
-    for( int iKey = 0 ; iKey < dialsTTree->GetListOfLeaves()->GetEntries() ; iKey++ ){
-      auto* leaf = static_cast<TLeaf*>(dialsTTree->GetListOfLeaves()->At(iKey));
-      std::string leafName = leaf->GetName();
-      // Other object branches are alternative curves, not integer split variables.
-      if( explicitBranch and not std::string(leaf->GetBranch()->GetClassName()).empty() ){ continue; }
-      if(leafName != "kinematicBin" and leafName != "Spline" and leafName != "Graph" and leafName != branchName){
-        splitVarNameList.emplace_back(leafName);
-      }
+    // Read only the curve and the explicitly declared binning branches.
+    dialsTTree->SetBranchStatus("*", false);
+    dialsTTree->SetBranchStatus(branchName.c_str(), true);
+    if( branch->GetListOfBranches()->GetEntries() != 0 ){
+      dialsTTree->SetBranchStatus((branchName + ".*").c_str(), true);
     }
-
-    // Hooking to the tree
-    std::vector<Int_t> splitVarValueList(splitVarNameList.size(), 0);
-    std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
-    std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
-    LogThrowIf(dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin) < 0,
-               "Could not bind kinematicBin in " << objPath);
     const int branchStatus = graphBranch ? dialsTTree->SetBranchAddress(branchName.c_str(), &graphPtr)
                                          : dialsTTree->SetBranchAddress(branchName.c_str(), &splinePtr);
     LogThrowIf(branchStatus < 0, "Could not bind binned dial branch " << branchName << " in " << objPath);
-    for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
-      dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
+
+    struct BinningDimension {
+      std::string name;
+      TLeaf* minLeaf{nullptr};
+      TLeaf* maxLeaf{nullptr};
+      bool isValue{false};
+    };
+    std::vector<BinningDimension> dimensions;
+    if( treeBinning ){
+      auto definition = dialsDefinition.fetchValue<ConfigReader>("dialsBinningDefinition");
+      LogThrowIf(not definition.getConfig().is_array() or definition.getConfig().empty(),
+                 "dialsBinningDefinition must be a non-empty list");
+      auto getScalarLeaf = [&](const std::string& name_) -> TLeaf* {
+        auto* scalarBranch = dialsTTree->GetBranch(name_.c_str());
+        LogThrowIf(name_.empty() or scalarBranch == nullptr,
+                   "Could not find binning branch " << name_ << " in " << objPath);
+        LogThrowIf(scalarBranch->GetListOfLeaves()->GetEntries() != 1,
+                   "Binning branch " << name_ << " must contain one numeric scalar");
+        auto* leaf = static_cast<TLeaf*>(scalarBranch->GetListOfLeaves()->At(0));
+        const std::vector<std::string> numericTypes{
+            "Bool_t", "Char_t", "UChar_t", "Short_t", "UShort_t", "Int_t", "UInt_t",
+            "Long_t", "ULong_t", "Long64_t", "ULong64_t", "Float_t", "Double_t", "Float16_t", "Double32_t"};
+        LogThrowIf(leaf->GetLeafCount() != nullptr or leaf->GetLenStatic() != 1
+                   or leaf->InheritsFrom("TLeafC")
+                   or std::find(numericTypes.begin(), numericTypes.end(), leaf->GetTypeName()) == numericTypes.end(),
+                   "Binning branch " << name_ << " must contain one numeric scalar");
+        dialsTTree->SetBranchStatus(name_.c_str(), true);
+        return leaf;
+      };
+      for( auto entry : definition.loop() ){
+        entry.clearFields();
+        entry.defineFields({{"name"}, {"valueBranch"}, {"minValueBranch"}, {"maxBranchValue"}});
+        entry.checkConfiguration();
+        BinningDimension dimension;
+        entry.fillValue(dimension.name, "name");
+        LogThrowIf(dimension.name.empty(), "dialsBinningDefinition requires a non-empty name");
+        LogThrowIf(std::any_of(dimensions.begin(), dimensions.end(), [&](const BinningDimension& other_){
+          return other_.name == dimension.name;
+        }), "Duplicate binning variable " << dimension.name);
+        dimension.isValue = entry.hasField("valueBranch");
+        LogThrowIf(dimension.isValue ? (entry.hasField("minValueBranch") or entry.hasField("maxBranchValue"))
+                                     : (not entry.hasField("minValueBranch") or not entry.hasField("maxBranchValue")),
+                   "Binning variable " << dimension.name
+                   << " requires either valueBranch or both minValueBranch and maxBranchValue");
+        dimension.minLeaf = getScalarLeaf(entry.fetchValue<std::string>(dimension.isValue ? "valueBranch" : "minValueBranch"));
+        dimension.maxLeaf = dimension.isValue ? dimension.minLeaf
+                                             : getScalarLeaf(entry.fetchValue<std::string>("maxBranchValue"));
+        dimensions.emplace_back(dimension);
+      }
     }
 
-    Long64_t nSplines = dialsTTree->GetEntries();
-    LogWarning << "Reading dials in \"" << dialsTFile->GetName() << "\"" << std::endl;
-    for( Long64_t iSpline = 0 ; iSpline < nSplines ; iSpline++ ){
-      dialsTTree->GetEntry(iSpline);
-      auto* dialBin = &_dialBinSet_.getBinList()[kinematicBin];
-      dialBin->setIsZeroWideRangesTolerated(true);
-      for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
-        if( splitVarBoundariesList.at(iSplitVar).second < splitVarValueList.at(iSplitVar) or iSpline == 0 ){
-          splitVarBoundariesList.at(iSplitVar).second = splitVarValueList.at(iSplitVar);
+    const Long64_t nEntries = dialsTTree->GetEntries();
+    LogThrowIf(not treeBinning and nEntries != _dialBinSet_.getBinList().size(),
+               getTitle() << ": Number of tree entries (" << nEntries
+               << ") does not match the number of bins " << _dialBinSet_.getBinList().size());
+    std::vector<Bin> activeBins;
+    activeBins.reserve(nEntries);
+    _dialInterfaceList_.reserve(nEntries);
+    LogInfo << "Reading binned dials from " << filePath << ":" << objPath << ":" << branchName << std::endl;
+    for( Long64_t iEntry = 0 ; iEntry < nEntries ; ++iEntry ){
+      LogThrowIf(dialsTTree->GetEntry(iEntry) <= 0, "Could not read binned dial entry " << iEntry);
+      Bin bin;
+      if( treeBinning ){
+        bin.setIndex(int(iEntry));
+        bin.setIsZeroWideRangesTolerated(true);
+        for( const auto& dimension : dimensions ){
+          const double min = dimension.minLeaf->GetValue();
+          const double max = dimension.maxLeaf->GetValue();
+          LogThrowIf(dimension.isValue ? not std::isfinite(min)
+                                      : (std::isnan(min) or std::isnan(max) or min >= max),
+                     "Invalid bin bounds for " << dimension.name << " at tree entry " << iEntry
+                     << ": [" << min << ", " << max << "]");
+          bin.addBinEdge(dimension.name, min, max);
         }
-        if( splitVarBoundariesList.at(iSplitVar).first > splitVarValueList.at(iSplitVar) or iSpline == 0 ){
-          splitVarBoundariesList.at(iSplitVar).first = splitVarValueList.at(iSplitVar);
-        }
-        if( not GenericToolbox::doesElementIsInVector(splitVarValueList.at(iSplitVar), splitVarValuesList.at(iSplitVar)) ){
-          splitVarValuesList.at(iSplitVar).emplace_back(splitVarValueList.at(iSplitVar));
-        }
-        dialBin->addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
       }
+      else{ bin = _dialBinSet_.getBinList().at(iEntry); }
 
-      TObject* dialInitializer{nullptr};
-      if( splineBranch ){ dialInitializer = splinePtr; }
-      if( graphBranch ){ dialInitializer = graphPtr; }
-
-      auto dial = makeDial(dialInitializer);
-      if( dial != nullptr ){
-        _dialInterfaceList_.emplace_back();
-        DialBaseObject obj;
-        obj.dialPtr = std::move(dial);
-        _dialInterfaceList_.back().setDial( obj );
-      }
-    } // iSpline (in TTree)
+      const TObject* initializer = graphBranch ? static_cast<TObject*>(graphPtr) : static_cast<TObject*>(splinePtr);
+      auto dial = makeDial(initializer);
+      if( dial == nullptr ){ continue; }
+      activeBins.emplace_back(std::move(bin));
+      _dialInterfaceList_.emplace_back();
+      _dialInterfaceList_.back().setDial(DialBaseObject(std::move(dial)));
+    }
+    _dialBinSet_.getBinList() = std::move(activeBins);
+    if( treeBinning ){ _dialBinSet_.checkBinning(); }
   } // Splines in TTree
   else{
     LogError << "Neither binnedDialsPath, dialsTreePath nor dialsList are provided..." << std::endl;
@@ -1276,8 +1317,14 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   this->readParametersFromConfig( ConfigReader(dialsDefinition) );
 
+  LogThrowIf(dialsDefinition.hasField("binning") and dialsDefinition.hasField("dialsBinningDefinition"),
+             "Specify either binning or dialsBinningDefinition, not both");
+  LogThrowIf(dialsDefinition.hasField("dialsBinningDefinition")
+             and _dialType_ != DialType::Graph and _dialType_ != DialType::Spline,
+             "dialsBinningDefinition requires Graph or Spline dials");
+
   if( _dialType_ == DialType::Composite ){
-    LogThrowIf(dialsDefinition.hasField("binning") or hasDialBranchData(),
+    LogThrowIf(dialsDefinition.hasField("binning") or dialsDefinition.hasField("dialsBinningDefinition") or hasDialBranchData(),
                "Composite: put binning and dialBranchData on individual nodes");
     std::vector<std::string> parameterNames;
     for( const auto& input : _config_.fetchValue<JsonType>("dialInputList") ){
@@ -1359,14 +1406,13 @@ bool DialCollection::initializeDialsWithDefinition() {
     auto* externalWeight = getCollectionData<ExternalWeightDialFactory>(_dialCollectionData_.size() - 1);
     _isEventByEvent_ = not externalWeight->useBinnedWeights();
   }
-  else if( dialsDefinition.hasField("binning") ) {
+  else if( dialsDefinition.hasField("binning") or dialsDefinition.hasField("dialsBinningDefinition") ) {
     // This dial collection is binned with different weights for each bin.
     // Create the dials here.
     _isEventByEvent_ = false;
 
-      LogThrowIf(not initializeDialsWithBinningFile(dialsDefinition),
-               "Error initializing dials with binning file");
-    }
+    LogThrowIf(not initializeBinnedDials(dialsDefinition), "Error initializing binned dials");
+  }
   else if (hasDialBranchData()) {
     // Branch data defines an event-by-event dial from a ROOT object
     // or a pair of TArray branches.  The generation of the dials will be handled in

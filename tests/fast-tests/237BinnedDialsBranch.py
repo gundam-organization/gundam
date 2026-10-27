@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Explicit ROOT tree branches and the historical binned dial defaults."""
+"""Explicit bin sources, ROOT curve branches and historical curve defaults."""
 import json
 import math
 import subprocess
@@ -19,32 +19,45 @@ def write_input(path):
  {
   TFile output(OUTPUT_PATH, "RECREATE");
   TTree events("events", "events");
-  double x;
+  double x, theta = .5;
   int category;
   events.Branch("X", &x, "X/D");
   events.Branch("category", &category, "category/I");
+  events.Branch("theta_mu", &theta, "theta_mu/D");
   for (double coordinate : {.25, .75, 1.25, 1.75}) {
     x = coordinate;
     category = (coordinate == .25 || coordinate == 1.25) ? 7 : 8;
     events.Fill();
   }
   events.Write();
-  for (bool legacy : {true, false}) {
-    TTree curves(legacy ? "legacy" : "curves", "curves");
-    int kinematicBin, split = 7;
+  for (int mode : {0, 1, 2, 3}) {
+    const bool legacy = mode == 0;
+    TTree curves(legacy ? "legacy" : mode == 1 ? "curves" : mode == 2 ? "noIndex" : "flat", "curves");
+    int kinematicBin = 999, split = 7;
+    double minEnu, maxEnu, minThetaMu = -.25, maxThetaMu = .75;
+    float numericFloat = .5;
+    double array[2] = {0., 1.};
     TGraph* graph = nullptr;
     TSpline3* spline = nullptr;
-    curves.Branch("kinematicBin", &kinematicBin, "kinematicBin/I");
+    if (mode != 2) curves.Branch("kinematicBin", &kinematicBin, "kinematicBin/I");
+    curves.Branch("minEnu", &minEnu, "minEnu/D");
+    curves.Branch("maxEnu", &maxEnu, "maxEnu/D");
+    curves.Branch("minThetaMu", &minThetaMu, "minThetaMu/D");
+    curves.Branch("maxThetaMu", &maxThetaMu, "maxThetaMu/D");
+    curves.Branch("numericFloat", &numericFloat, "numericFloat/F");
+    curves.Branch("array", array, "array[2]/D");
     curves.Branch("category", &split, "category/I");
     curves.Branch(legacy ? "Graph" : "response", "TGraph", &graph, 32000, 0);
     curves.Branch(legacy ? "Spline" : "otherResponse", "TSpline3", &spline, 32000, 0);
-    for (kinematicBin = 0; kinematicBin < 2; ++kinematicBin) {
+    for (int bin = 0; bin < 2; ++bin) {
+      minEnu = bin + .125;
+      maxEnu = bin + .875;
       graph = new TGraph(4);
       TGraph splineKnots(4);
       for (int knot = 0; knot < 4; ++knot) {
         double p = knot - 1.;
-        graph->SetPoint(knot, p, 1. + .1*(kinematicBin + 1)*p);
-        splineKnots.SetPoint(knot, p, 1. + .2*(kinematicBin + 1)*p);
+        graph->SetPoint(knot, p, 1. + (mode == 3 && bin == 0 ? 0. : .1*(bin + 1)*p));
+        splineKnots.SetPoint(knot, p, 1. + (mode == 3 && bin == 0 ? 0. : .2*(bin + 1)*p));
       }
       spline = new TSpline3("spline", &splineKnots);
       curves.Fill();
@@ -60,13 +73,20 @@ def write_input(path):
     subprocess.run(['root', '-n', '-l', '-b', '-q', str(macro)], check=True)
 
 
+def binning_definition():
+    return {'binningDefinition': [{'name': 'X', 'edges': [0, 1, 2]}]}
+
+
 def exercise(path, cases):
     import GUNDAM
     GUNDAM.setLightOutputMode(True)
-    binning = {'binningDefinition': [{'name': 'X', 'edges': [0, 1, 2]}]}
-    for dial_type, source, scale, error in cases:
-        dial = dict(dialType=dial_type, binning=binning,
-                    dialInputList=[{'name': 'p'}], **source)
+    binning = binning_definition()
+    for case_index, (dial_type, source, scale, error) in enumerate(cases):
+        GUNDAM.flushOutput()
+        print(f'BEGIN_CASE {case_index}\n', flush=True)
+        dial = dict(dialType=dial_type, dialInputList=[{'name': 'p'}], **source)
+        if 'dialsBinningDefinition' not in dial and 'binning' not in dial:
+            dial['binning'] = binning
         config = {'enablePca': False, 'scaleParStepWithChi2Response': False,
                   'generateSamplePlots': False, 'generateOneSigmaPlots': False,
                   'likelihoodInterfaceConfig': {
@@ -85,6 +105,7 @@ def exercise(path, cases):
             engine.initialize()
         except RuntimeError:
             if error:
+                GUNDAM.flushOutput()
                 continue
             raise
         assert error is None, f'Expected error: {error}'
@@ -96,7 +117,10 @@ def exercise(path, cases):
             likelihood.propagateAndEvalLikelihood()
             actual = [b.sumWeights for b in propagator.getSampleSet().getSampleList()[0]
                       .getHistogram().getBinContentList()]
-            expected = [2 + scale*(i + 1)*value for i in range(2)]
+            selected = 1 if 'dialsBinningDefinition' in source else 2
+            expected = [2 + selected*scale*(i + 1)*value for i in range(2)]
+            if ':flat:' in source.get('binnedDialsPath', ''):
+                expected[0] = 2.
             assert len(actual) == len(expected) and all(
                 math.isclose(a, b, rel_tol=1e-12, abs_tol=1e-12)
                 for a, b in zip(actual, expected)), (source, actual, expected)
@@ -118,7 +142,44 @@ def main():
                 {'dialsFilePath': str(path), 'dialsTreePath': 'curves', 'dialsBranch': branch},
             ):
                 explicit.append((dial_type, source, scale, None))
+    tree_binning = [
+        {'name': 'X', 'minValueBranch': 'minEnu', 'maxBranchValue': 'maxEnu'},
+        {'name': 'theta_mu', 'minValueBranch': 'minThetaMu', 'maxBranchValue': 'maxThetaMu'},
+        {'name': 'category', 'valueBranch': 'category'},
+    ]
+    for kind in ('Graph', 'Spline'):
+        for branch, scale in (('response', .1), ('otherResponse', .2)):
+            for tree in ('curves', 'noIndex', 'flat'):
+                explicit.append((kind, {'binnedDialsPath': f'{path}:{tree}:{branch}',
+                                       'dialsBinningDefinition': tree_binning}, scale, None))
+            explicit.append((kind, {'binnedDialsPath': f'{path}:noIndex:{branch}'}, scale, None))
+            explicit.append((kind, {'binnedDialsPath': f'{path}:flat:{branch}'}, scale, None))
+        # Floating point equality selections also use the branch's numeric value.
+        explicit.append((kind, {'binnedDialsPath': f'{path}:curves:response',
+                               'dialsBinningDefinition': [tree_binning[0], tree_binning[2],
+                                   {'name': 'theta_mu', 'valueBranch': 'numericFloat'}]}, .1, None))
     for source, error in (
+        ({'binnedDialsPath': f'{path}:curves:response', 'binning': binning_definition(),
+          'dialsBinningDefinition': tree_binning}, 'Specify either binning or dialsBinningDefinition'),
+        ({'binnedDialsPath': f'{path}:curves:response', 'dialsBinningDefinition': []}, 'must be a non-empty list'),
+        ({'binnedDialsPath': f'{path}:curves:response', 'dialsBinningDefinition': {}}, 'must be a non-empty list'),
+        ({'binnedDialsPath': f'{path}:curves:response', 'dialsBinningDefinition': [tree_binning[0]]*2}, 'Duplicate binning variable'),
+        ({'binnedDialsPath': f'{path}:curves:response', 'dialsBinningDefinition': [
+            {'name': 'X', 'minValueBranch': 'minEnu'}]}, 'requires either valueBranch or both'),
+        ({'binnedDialsPath': f'{path}:curves:response', 'dialsBinningDefinition': [
+            dict(tree_binning[0], valueBranch='category')]}, 'requires either valueBranch or both'),
+        ({'binnedDialsPath': f'{path}:curves:response', 'dialsBinningDefinition': [
+            {'name': 'X', 'valueBranch': 'missing'}]}, 'Could not find binning branch'),
+        ({'binnedDialsPath': f'{path}:curves:response', 'dialsBinningDefinition': [
+            {'name': 'X', 'valueBranch': 'array'}]}, 'must contain one numeric scalar'),
+        ({'binnedDialsPath': f'{path}:curves:response', 'dialsBinningDefinition': [
+            {'name': 'X', 'valueBranch': 'otherResponse'}]}, 'must contain one numeric scalar'),
+        ({'dialsFilePath': str(path), 'dialsList': 'dials',
+          'dialsBinningDefinition': tree_binning}, 'dialsBinningDefinition requires a TTree'),
+        ({'binnedDialsPath': f'{path}:curves:response', 'binning': {
+            'binningDefinition': [{'name': 'X', 'edges': [0, 1]}]}}, 'does not match the number of bins'),
+        ({'binnedDialsPath': f'{path}:curves:response', 'dialsBinningDefinition': [
+            {'name': 'X', 'minValueBranch': 'maxEnu', 'maxBranchValue': 'minEnu'}]}, 'Invalid bin bounds'),
         ({'binnedDialsPath': f'{path}:curves'}, 'file:tree:branch'),
         ({'binnedDialsPath': f'{path}:curves:'}, 'Empty dialsBranch'),
         ({'binnedDialsPath': f'{path}:curves:response', 'dialsBranch': 'otherResponse'}, 'Conflicting dialsBranch'),
@@ -140,10 +201,13 @@ def main():
         assert result.returncode == 0, result.stdout
         occurrences = result.stdout.count(warning)
         assert (occurrences == 0 if count == 0 else occurrences >= count), result.stdout
-        for _, _, _, error in cases:
+        outputs = result.stdout.split('BEGIN_CASE ')[1:]
+        assert len(outputs) == len(cases), result.stdout
+        for case, output in zip(cases, outputs):
+            error = case[3]
             if error:
-                assert error in result.stdout, (error, result.stdout)
-    print('SUCCESS: explicit binned branches, split selection and legacy warnings.')
+                assert error in output, (error, output)
+    print('SUCCESS: explicit binning sources, ignored metadata and legacy curve warnings.')
 
 
 if __name__ == '__main__':

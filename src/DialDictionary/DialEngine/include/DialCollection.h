@@ -211,7 +211,7 @@ protected:
   void prepareCompositeInputs(ConfigReader& config_);
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
-  bool initializeDialsWithBinningFile(const ConfigReader& dialsDefinition);
+  bool initializeBinnedDials(const ConfigReader& dialsDefinition);
   bool initializeDialsWithTabulation(const ConfigReader& dialsDefinition);
   bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
   bool initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition);
