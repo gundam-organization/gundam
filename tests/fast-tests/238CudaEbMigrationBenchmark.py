@@ -53,20 +53,49 @@ def main():
         else:
             raise AssertionError('Empty sample selection was accepted')
         (folder / 'config.json').write_text(json.dumps(config))
-        arguments = ['--work-dir', str(folder), '--config', 'config.json',
-                     '--variable', 'X', '--smoothing-width', '.05']
+        arguments = ['--work-dir', str(folder), '--config', 'config.json']
+        configured, inferred = bench.prepare_config(smooth, 'configured', None, None, 'sample')
+        assert configured == smooth  # No binning settings are rewritten by default.
+        assert inferred['variable'] == 'X' and inferred['hasSmoothedBinning']
+        original_response = samples(smooth)[0]['binningResponse']
+        original_response['variables'] = [{'name': 'X', 'widthFraction': .05}]
+        configured, inferred = bench.prepare_config(smooth, 'configured', None, None, 'sample')
+        assert configured == smooth  # Relative widths are preserved too.
+        original_response['variables'] = [{'name': 'X', 'width': .05}]
+        (folder / 'bin-response.json').write_text(json.dumps({'fitterEngineConfig': {
+            'likelihoodInterfaceConfig': {'propagatorConfig': {'sampleSetConfig': {
+                'sampleList': [{'name': 'sample', 'binningResponse': original_response}]}}}}}))
         parsed = bench.parse_args(arguments)
         assert parsed.override == []
         assert parsed.parameter_match == '.*'
+        assert parsed.variants == ['configured'] and parsed.variable is None and parsed.smoothing_width is None
         assert bench.parse_args(arguments + ['--override', 'first.yaml', 'second.yaml']).override == ['first.yaml', 'second.yaml']
         # Hard binning needs no smoothing width; inputs have no dataset defaults.
-        hard_args = arguments[:-2] + ['--variants', 'hard']
+        hard_args = arguments + ['--variants', 'hard']
         assert bench.parse_args(hard_args).smoothing_width is None
+        default_output = folder / 'configured-results'
+        with (folder / 'configured-run.log').open('w') as log:
+            completed = subprocess.run([sys.executable, str(path), '--work-dir', str(folder),
+                '--config', 'config.json', '--override', 'bin-response.json', '--cases', 'CPU',
+                '--calls', '5', '--global-calls', '3', '--trials', '1', '--warmup', '1',
+                '--output', str(default_output)], stdout=log, stderr=subprocess.STDOUT)
+        if completed.returncode:
+            print((folder / 'configured-run.log').read_text())
+            raise RuntimeError('Configured benchmark smoke run failed')
+        default_summary = json.loads((default_output / 'summary.json').read_text())
+        assert default_summary['complete'] and set(default_summary['variants']) == {'configured'}
+        configured_dir = default_output / 'configured' / 'CPU'
+        effective = json.loads((configured_dir / 'input-config.json').read_text())
+        assert samples(effective)[0]['binningResponse'] == original_response
+        assert 'useDynamicBinning' not in samples(effective)[0]
+        configured_coverage = json.loads((configured_dir / 'coverage.json').read_text())
+        assert configured_coverage['variable'] == 'X'
+        assert configured_coverage['samples'][0]['smoothed']
         output = folder / 'results'
         with (folder / 'run.log').open('w') as log:
             completed = subprocess.run([sys.executable, str(path), '--work-dir', str(folder),
-                '--config', 'config.json', '--cases', 'CPU', '--variable', 'X',
-                '--smoothing-width', '.05', '--calls', '5',
+                '--config', 'config.json', '--override', 'bin-response.json', '--cases', 'CPU',
+                '--variants', 'configured', 'hard', 'smooth', '--calls', '5',
                 '--global-calls', '3', '--trials', '1', '--warmup', '1', '--output', str(output)],
                 stdout=log, stderr=subprocess.STDOUT)
         if completed.returncode:
@@ -76,15 +105,15 @@ def main():
             raise RuntimeError('CPU benchmark smoke run failed')
         summary = json.loads((output / 'summary.json').read_text())
         assert summary['complete'] and summary['gpuComparisonPerformed'] is False
-        assert json.loads((output / 'settings.json').read_text())['override'] == []
-        assert set(summary['variants']) == {'hard', 'smooth'}
-        for variant in ('hard', 'smooth'):
+        assert json.loads((output / 'settings.json').read_text())['override'] == ['bin-response.json']
+        assert set(summary['variants']) == {'configured', 'hard', 'smooth'}
+        for variant in ('configured', 'hard', 'smooth'):
             assert json.loads((output / variant / 'comparison.json').read_text())['passed']
             directory = output / variant / 'CPU'
             loaded = json.loads((directory / 'coverage.json').read_text())
             assert loaded['samples'][0]['events'] == 6
-            assert loaded['samples'][0]['smoothed'] == (variant == 'smooth')
-            if variant == 'smooth':
+            assert loaded['samples'][0]['smoothed'] == (variant != 'hard')
+            if variant != 'hard':
                 assert loaded['hostFractionalProbe']['fractionalEvents'] > 0
             movement = json.loads((directory / 'migration.json').read_text())
             assert movement['global'][0]['eventsWithChangedObservable'] > 0

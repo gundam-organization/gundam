@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Compare CPU/CUDA composite/formula migration with hard and smoothed binning.
 
-Input configuration, optional overrides, migrated variable and smoothing width are
-supplied explicitly. Workers load independent Asimov engines. No fit/Hesse is run.
+The supplied configuration and overrides define observable migration and binning.
+Optional hard/smooth comparisons must be requested explicitly. Workers load independent Asimov engines. No fit/Hesse is run.
 """
 from array import array
 import argparse
@@ -37,23 +37,11 @@ def prepare_config(config, variant, variable, width, sample_match):
         'propagatorConfig']['sampleSetConfig']['sampleList']
     if not isinstance(samples, list):
         raise RuntimeError('Expected an unfolded sampleList')
-    selected = []
-    for sample in samples:
-        # Both variants start without pre-existing smoothing on other axes/samples.
-        sample['binningResponse'] = {'isEnabled': False, 'variables': []}
-        if not sample.get('isEnabled', True) or not re.search(sample_match, sample['name']):
-            continue
-        selected.append(sample['name'])
-        # Let variable dials enable dynamic binning. Explicitly requesting it
-        # marks samples as externally editable and forces host-variable polling,
-        # defeating the dependency cache this benchmark is supposed to measure.
-        sample['useDynamicBinning'] = False
-        if variant == 'smooth':
-            sample['binningResponse'] = {'isEnabled': True,
-                'variables': [{'name': variable, 'width': width}]}
+    selected = [sample['name'] for sample in samples
+                if sample.get('isEnabled', True) and re.search(sample_match, sample['name'])]
     if not selected:
         raise RuntimeError('No enabled sample matches --sample-match')
-    counts = {'Composite': 0, 'Formula': 0}
+    counts, targets = {'Composite': 0, 'Formula': 0}, set()
 
     def visit(value):
         if isinstance(value, dict):
@@ -61,6 +49,8 @@ def prepare_config(config, variant, variable, width, sample_match):
                 return
             if value.get('dialType') in counts:
                 counts[value['dialType']] += 1
+            if value.get('applyToVariable'):
+                targets.add(value['applyToVariable'])
             for child in value.values():
                 visit(child)
         elif isinstance(value, list):
@@ -69,9 +59,34 @@ def prepare_config(config, variant, variable, width, sample_match):
     visit(config['fitterEngineConfig']['likelihoodInterfaceConfig']['propagatorConfig'])
     if not all(counts.values()):
         raise RuntimeError(f'The selected configuration needs Composite and Formula definitions: {counts}')
-    return config, {'variant': variant, 'variable': variable, 'width': width if variant == 'smooth' else 0.,
-                    'selectedSamples': selected, 'configuredDialDefinitions': counts,
-                    'dynamicBinningSource': 'automatic variable-dial activation'}
+    if variable is None:
+        if len(targets) != 1:
+            raise RuntimeError(f'Cannot infer one migrated variable from {sorted(targets)}; use --variable')
+        variable = next(iter(targets))
+    for sample in samples:
+        if variant == 'configured':
+            continue  # Preserve all user settings, including widths/fractions and dynamic flags.
+        response = copy.deepcopy(sample.get('binningResponse', {}))
+        sample['binningResponse'] = {'isEnabled': False, 'variables': []}
+        if sample['name'] not in selected:
+            continue
+        # Explicit comparison variants let dials enable rebinning automatically,
+        # avoiding the external-edit polling contract of explicit dynamic binning.
+        sample['useDynamicBinning'] = False
+        if variant == 'smooth':
+            if width is not None:
+                response = {'variables': [{'name': variable, 'width': width}]}
+            if not response.get('variables'):
+                raise RuntimeError('Smooth comparison needs binningResponse in the config or --smoothing-width')
+            response['isEnabled'] = True
+            sample['binningResponse'] = response
+    binning = {sample['name']: copy.deepcopy(sample.get('binningResponse', {}))
+               for sample in samples if sample['name'] in selected}
+    has_smoothing = any(sample.get('isEnabled', True) and sample.get('binningResponse', {}).get('isEnabled', False)
+                        for sample in samples)
+    return config, {'variant': variant, 'variable': variable, 'binningResponse': binning,
+                    'hasSmoothedBinning': has_smoothing,
+                    'selectedSamples': selected, 'configuredDialDefinitions': counts}
 
 
 def check_loaded_model(engine, coverage, case, probe_events):
@@ -82,7 +97,7 @@ def check_loaded_model(engine, coverage, case, probe_events):
             continue
         histogram, events = sample.getHistogram(), sample.getEventList()
         smooth = histogram.isBinningResponseEnabled()
-        if smooth != (coverage['variant'] == 'smooth') or not sample.isUseDynamicBinning():
+        if smooth != coverage['binningResponse'][sample.getName()].get('isEnabled', False) or not sample.isUseDynamicBinning():
             raise RuntimeError(f'{sample.getName()}: requested binning mode was not activated')
         contexts = histogram.getBinContextList()
         if not contexts or not all(ctx.getBin().isVariableSet(coverage['variable']) for ctx in contexts):
@@ -102,8 +117,8 @@ def check_loaded_model(engine, coverage, case, probe_events):
                 probed += 1
     if sum(s['events'] for s in actual) == 0:
         raise RuntimeError('No selected sample contains events')
-    if coverage['variant'] == 'smooth' and fractional == 0:
-        raise RuntimeError('No fractional bin response in the host probe; increase --probe-events or check --smoothing-width')
+    if any(s['smoothed'] for s in actual) and fractional == 0:
+        raise RuntimeError('No fractional bin response in the host probe; increase --probe-events or check binningResponse')
     coverage.update(samples=actual, hostFractionalProbe={'events': probed, 'fractionalEvents': fractional})
     if case != 'CPU':
         model = json.loads(engine.getBackendsManager().getDiagnosticCuda())
@@ -111,7 +126,7 @@ def check_loaded_model(engine, coverage, case, probe_events):
             raise RuntimeError('CUDA event/observable propagation is not active')
         if not model.get('compositePrograms') or not model.get('formulaPrograms'):
             raise RuntimeError('CUDA Composite/Formula programs are absent; rebuild/select the current Python module')
-        if model.get('hasSmoothedBinning') != (coverage['variant'] == 'smooth'):
+        if model.get('hasSmoothedBinning') != coverage['hasSmoothedBinning']:
             raise RuntimeError('CUDA packed binning does not match the requested variant')
         coverage['cudaModel'] = model
 
@@ -164,7 +179,7 @@ def worker(args):
     replay = argparse.Namespace(**vars(args))
     replay.config, replay.override = args.output / 'input-config.json', []
     replay.worker, replay.execution_mode = args.worker_case, 'isolated'
-    replay.event_variables, replay.require_rebinning = [args.variable], True
+    replay.event_variables, replay.require_rebinning = [coverage['variable']], True
     engine = profiling.load_engine(replay)
     sequence = profiling.parameter_sequence(replay, engine)
     center = profiling.snapshot_events(replay, engine, 'center', args.seed)
@@ -297,9 +312,9 @@ def parse_args(argv=None):
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--override', nargs='*', default=[], help='Optional overrides, applied in the supplied order')
     parser.add_argument('--cases', nargs='+', choices=profiling.CASES, default=DEFAULT_CASES)
-    parser.add_argument('--variants', nargs='+', choices=['hard', 'smooth'], default=['hard', 'smooth'])
-    parser.add_argument('--variable', required=True, help='Migrated binning variable, recorded in every event snapshot')
-    parser.add_argument('--smoothing-width', type=float, help='Required for the smooth variant; absolute width in input variable units')
+    parser.add_argument('--variants', nargs='+', choices=['configured', 'hard', 'smooth'], default=['configured'])
+    parser.add_argument('--variable', help='Optional override of the observable inferred from applyToVariable')
+    parser.add_argument('--smoothing-width', type=float, help='Optional width override for an explicitly requested smooth comparison')
     parser.add_argument('--sample-match', default='.*', help='Regex for samples receiving dynamic/smoothed binning')
     parser.add_argument('--parameter-match', default='.*', help='Regex selecting effective fit coordinates by full title')
     parser.add_argument('--threads', type=int, default=4)
@@ -317,19 +332,19 @@ def parse_args(argv=None):
     parser.add_argument('--absolute-tolerance', type=float, default=1e-7)
     parser.add_argument('--output', type=Path, default=Path(time.strftime('cuda-migration-%Y%m%d-%H%M%S-') + str(os.getpid())))
     parser.add_argument('--worker-case', choices=profiling.CASES, help=argparse.SUPPRESS)
-    parser.add_argument('--worker-variant', choices=['hard', 'smooth'], help=argparse.SUPPRESS)
+    parser.add_argument('--worker-variant', choices=['configured', 'hard', 'smooth'], help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if min(args.threads, args.calls, args.global_calls, args.trials, args.probe_events) <= 0 or min(args.warmup, args.device_index) < 0:
         parser.error('Counts must be positive; warmup and device-index may be zero')
     for key in ('step_scale', 'relative_tolerance', 'absolute_tolerance'):
         if not math.isfinite(getattr(args, key)) or getattr(args, key) <= 0:
             parser.error(f'{key} must be finite and positive')
-    if 'smooth' in args.variants and args.smoothing_width is None:
-        parser.error('--smoothing-width is required when selecting the smooth variant')
     if args.smoothing_width is not None and (not math.isfinite(args.smoothing_width) or args.smoothing_width <= 0):
         parser.error('--smoothing-width must be finite and positive')
-    if not args.variable:
+    if args.variable == '':
         parser.error('--variable must not be empty')
+    if args.smoothing_width is not None and 'smooth' not in args.variants:
+        parser.error('--smoothing-width applies only to an explicit --variants smooth comparison')
     for pattern in (args.parameter_match, args.sample_match):
         try:
             re.compile(pattern)
