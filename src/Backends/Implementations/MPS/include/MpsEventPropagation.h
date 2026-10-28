@@ -40,12 +40,13 @@ namespace Backends {
       Variables, HostValues, HostEdits, DirtyEvents, HardBins, EventCounts, Contributions, ChangedSamples, Control,
       EventWeights, BinCounts, BinPositions, BinContributions, ChunkOffsets, Chunks,
       PartialSums, PartialSquares, HistogramSums, HistogramSquares, ReadbackSums, ReadbackSquares,
-      ReadbackVariables, ReadbackBins, ReadbackCounts, ReadbackContributions, ReadbackWeights, Count
+      ReadbackVariables, ReadbackBins, ReadbackCounts, ReadbackContributions, ReadbackWeights, FormulaPrograms, FormulaInstructions, FormulaConstants,
+      ProgramInputs, CompositePrograms, CompositeInstructions, ProgramScratch, Count
     };
     enum class Kernel { Dials, Events, Binning, ClearCounts, CountContributions, IndexChunks, Scatter, Reduce, Finish, ReduceParallel, Count };
     id<MTLBuffer> buffer(Buffer buffer_) const { return _buffers_[std::size_t(buffer_)]; }
     struct DialGroup { std::size_t dependency, first, count; bool external; };
-    struct MultiDialGroup { std::array<std::size_t, 2> parameters; std::size_t first, count; };
+    struct MultiDialGroup { std::vector<std::size_t> parameters; std::size_t first, count; };
     std::vector<MultiDialGroup> _multiDialGroups_{};
     void buildDialCache();
     std::size_t prepareDialCache(const PropagationInputs& inputs_, bool& updateWeights_);

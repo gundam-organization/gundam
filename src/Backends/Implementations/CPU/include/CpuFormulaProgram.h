@@ -2,6 +2,7 @@
 #define GUNDAM_CPU_FORMULA_PROGRAM_H
 
 #include "EngineView.h"
+#include "DialProgramValidation.h"
 #include "Semantics/BackendDialSemantics.h"
 
 #include <cmath>
@@ -68,28 +69,6 @@ namespace Backends {
     auto* values = scratch_ + program_.stackSize;
     for( std::size_t i = 0; i < program_.inputCount; ++i ){ values[i] = readInput_(i); }
     return evaluateFormula(program_, [values](std::size_t index_){ return values[index_]; }, scratch_);
-  }
-
-  inline void validateFormulaDial(const PropagationView& model_, const BackendDialDescriptor& dial_,
-                                   std::size_t availableInputs_ = std::size_t(-1)) {
-    if( dial_.type != BackendDialType::Formula ){ return; }
-    if( availableInputs_ == std::size_t(-1) ){ availableInputs_ = model_.dialInputs.size(); }
-    if( dial_.formulaProgramIndex >= model_.formulaPrograms.size()
-        or dial_.firstInput > availableInputs_
-        or dial_.inputCount > availableInputs_ - dial_.firstInput ){
-      throw std::runtime_error("Invalid CPU formula dial descriptor");
-    }
-    const auto count = model_.formulaPrograms[dial_.formulaProgramIndex].inputCount;
-    if( dial_.firstFormulaInput > model_.formulaInputs.size()
-        or count > model_.formulaInputs.size() - dial_.firstFormulaInput ){
-      throw std::runtime_error("Invalid CPU formula input range");
-    }
-    for( std::size_t i = 0; i < count; ++i ){
-      const auto index = model_.formulaInputs[dial_.firstFormulaInput + i].parameterIndex;
-      if( index < -1 or (index >= 0 and std::size_t(index) >= dial_.inputCount) ){
-        throw std::runtime_error("Invalid CPU formula input binding");
-      }
-    }
   }
 
   inline double evaluateFormulaDial(const PropagationView& model_, const BackendDialDescriptor& dial_,

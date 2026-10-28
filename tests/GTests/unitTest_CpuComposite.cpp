@@ -1,4 +1,7 @@
 #include "CpuBackend.h"
+#ifdef __APPLE__
+#include "MpsBackend.h"
+#endif
 #include "EngineLayout.h"
 #include "LikelihoodInterface.h"
 #include "CompositeDial.h"
@@ -138,6 +141,10 @@ TEST_P(CpuCompositeTest, MatchesOriginalBitsThroughNestedGraphAndCacheUpdates) {
       for( auto traversal : {Backends::CpuCacheTraversal::Auto, Backends::CpuCacheTraversal::Indexed} ){
         Backends::CpuBackend backend;
         backend.build(layout.view);
+#ifdef __APPLE__
+        Backends::MpsBackend metal;
+        metal.build(layout.view);
+#endif
         backend.setDiagnosticCacheTraversal(traversal);
         for( const auto& point : {std::array<double, 2>{.5, .25}, {.5, .25}, {-3., .25}, {-3., 1.8}, {0., 0.}, {1.7, -2.}, {.5, .25}} ){
           for( int i = 0; i < 2; ++i ){ parameters[0].getParameterList()[i].setParameterValue(point[i]); }
@@ -150,6 +157,13 @@ TEST_P(CpuCompositeTest, MatchesOriginalBitsThroughNestedGraphAndCacheUpdates) {
           const double expected = events[0].getWeights().base * product;
           const auto token = backend.requestPropagation(inputs);
           for( auto weight : backend.getEventWeightsHostView(token) ){ EXPECT_EQ(bits(weight), bits(expected)); }
+#ifdef __APPLE__
+          const auto gpuToken = metal.requestPropagation(inputs);
+          metal.materialize(gpuToken, Backends::OutputRequest::EventWeights);
+          for( auto weight : metal.getEventWeightsHostView(gpuToken) ){
+            EXPECT_NEAR(weight, expected, 2e-11 * std::max(1., std::abs(expected)));
+          }
+#endif
           EXPECT_EQ(backend.getLastTimingSummary().cachedDialCount, 2);
           const auto repeated = backend.requestPropagation(inputs);
           EXPECT_EQ(backend.getLastTimingSummary().cacheCandidateCount, 0);

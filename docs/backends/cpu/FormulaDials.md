@@ -53,6 +53,7 @@ be bit-identical.
 
 The compiler limits expressions to 4096 instructions and 128 nested unary/parser
 levels. Bytecode validation checks opcodes, operand bounds, stack underflow,
-required stack size and a single final result before execution. GPU execution
-is not implemented; fixed-width instructions contain no host pointers and can
-be packed for a future device interpreter.
+required stack size and a single final result before execution. Metal executes
+the same bytecode and flattened composites on its event propagation path; see
+[MPS formula and composite dials](../mps/FormulaCompositeDials.md). CUDA program
+execution is not implemented.

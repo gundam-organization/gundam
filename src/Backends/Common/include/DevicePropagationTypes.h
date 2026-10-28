@@ -3,6 +3,7 @@
 #ifndef __METAL_VERSION__
 #include "Semantics/BackendResponseSmoothing.h"
 #include "DeviceMath/DoubleFloat.h"
+#include "FormulaTypes.h"
 #include <cstdint>
 #endif
 namespace Backends {
@@ -61,6 +62,7 @@ namespace Backends {
   struct DevicePropagationDial {
     DeviceIndex type, parameterIndex, payloadOffset, payloadSize, externalIndex;
     DeviceIndex allowExtrapolation, useMirror;
+    DeviceIndex programIndex, firstProgramInput, scratchOffset, stackOffset;
     ObservableScalar mirrorMin, mirrorRange, minResponse, maxResponse;
     ResponseSmoothing<ObservableScalar> smoothing{};
   };
@@ -69,6 +71,24 @@ namespace Backends {
     ObservableScalar mirrorMin, mirrorRange;
   };
   struct DeviceDialInputRange { DeviceIndex first, count; };
+  enum class ProgramInputSource : DeviceIndex { Parameter, Scratch, Constant };
+  // Program inputs are resolved during packing; mirrors belong to graph edges.
+  struct DeviceProgramInput {
+    ProgramInputSource source;
+    DeviceIndex index, useMirror;
+    ObservableScalar value, mirrorMin, mirrorRange;
+  };
+  struct DeviceFormulaProgram {
+    DeviceIndex firstInstruction, instructionCount, firstConstant, inputCount, stackSize;
+  };
+  struct DeviceCompositeInstruction {
+    DevicePropagationDial dial;
+    DeviceIndex firstInput, inputCount;
+    ObservableScalar inputMin, inputMax;
+  };
+  struct DeviceCompositeProgram {
+    DeviceIndex firstInstruction, instructionCount, inputCount, outputSlot;
+  };
   struct DeviceVariableResponse {
     DeviceIndex variableIndex;
     ObservableScalar referenceValue;

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """CPU composite programs preserve the standard engine's event weights exactly."""
 import copy
+import json
 import math
 import struct
 import sys
@@ -13,12 +14,16 @@ import_module('005PythonSetup-utils').requireVenv(__file__)
 helpers = import_module('230CompositeDials')
 
 
-def compare(path, dial, exact=True):
+def compare(path, dial, exact=True, backendType='CPU', backendConfig=None):
     engines = []
     for backend in (False, True):
         config = helpers.make_config(path, copy.deepcopy(dial))
-        config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': backend, 'type': 'CPU'}
-        engines.append(helpers.build(config))
+        config['likelihoodInterfaceConfig']['backendManagerConfig'] = {
+            'isEnabled': backend, 'type': backendType, 'backendConfig': backendConfig or {}}
+        engine = helpers.build(config)
+        if backend and backendType == 'MPS':
+            assert json.loads(engine.getBackendsManager().getDiagnosticMps())['path'] == 'eventPropagation'
+        engines.append(engine)
     for p, q in [(.5, .25), (.5, .25), (-.5, .25), (-.5, .75), (1.2, -.25), (4., 2.), (.5, .25)]:
         states = []
         for engine in engines:

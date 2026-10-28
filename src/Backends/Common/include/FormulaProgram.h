@@ -1,24 +1,13 @@
 #ifndef GUNDAM_FORMULA_PROGRAM_H
 #define GUNDAM_FORMULA_PROGRAM_H
 
+#include "FormulaTypes.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 
 namespace Backends {
-  // Fixed-width instructions contain no host pointers. Only the owning
-  // containers need packing when transferring a program to a device.
-  enum class FormulaOpcode : std::uint32_t {
-    LoadInput, LoadConstant, Add, Subtract, Multiply, Divide, Negate, Pow,
-    Exp, Log, Log10, Sqrt, Abs, Sin, Cos, Tan, Asin, Acos, Atan, Atan2,
-    Sinh, Cosh, Tanh, Erf, Erfc, Floor, Ceil, Min, Max
-  };
-
-  struct FormulaInstruction {
-    FormulaOpcode opcode{FormulaOpcode::LoadConstant};
-    std::uint32_t operand{0};
-  };
-
   struct FormulaProgram {
     std::vector<FormulaInstruction> instructions;
     std::vector<double> constants;

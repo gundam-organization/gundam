@@ -81,6 +81,13 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_) {
   upload(Buffer::VariableDialIndices, _packed_.variableDialIndices);
   upload(Buffer::Payloads, _packed_.payloads);
   upload(Buffer::Variables, _packed_.variables);
+  upload(Buffer::FormulaPrograms, _packed_.formulaPrograms);
+  upload(Buffer::FormulaInstructions, _packed_.formulaInstructions);
+  upload(Buffer::FormulaConstants, _packed_.formulaConstants);
+  upload(Buffer::ProgramInputs, _packed_.programInputs);
+  upload(Buffer::CompositePrograms, _packed_.compositePrograms);
+  upload(Buffer::CompositeInstructions, _packed_.compositeInstructions);
+  allocate(Buffer::ProgramScratch, _packed_.programScratchSize * sizeof(ObservableScalar));
   allocate(Buffer::Parameters, std::max(std::size_t(1), model_.parameterCount) * sizeof(ObservableScalar), true);
   std::size_t externalCount{0};
   for( const auto& block : model_.externalWeightBlocks ){ externalCount = std::max(externalCount, block.offset + block.count); }
@@ -125,6 +132,11 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_) {
   releaseHostStorage(_packed_.variableDialIndices);
   releaseHostStorage(_packed_.variables);
   releaseHostStorage(_packed_.payloads);
+  releaseHostStorage(_packed_.formulaInstructions);
+  releaseHostStorage(_packed_.formulaConstants);
+  releaseHostStorage(_packed_.programInputs);
+  releaseHostStorage(_packed_.compositePrograms);
+  releaseHostStorage(_packed_.compositeInstructions);
 }
 
 void Backends::MpsEventPropagation::buildDialCache() {
@@ -277,7 +289,9 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   auto encodeStart = std::chrono::steady_clock::now();
   auto command = [_queue_ commandBuffer];
   auto encoder = [command computeCommandEncoder];
-  dispatch(encoder, Kernel::Dials, dialCount, {Buffer::Dials, Buffer::Parameters, Buffer::Payloads, Buffer::ExternalWeights, Buffer::Responses, Buffer::Control, Buffer::DialIndices, Buffer::DialRanges, Buffer::DialInputs, Buffer::DialInputRanges});
+  dispatch(encoder, Kernel::Dials, dialCount, {Buffer::Dials, Buffer::Parameters, Buffer::Payloads, Buffer::ExternalWeights, Buffer::Responses, Buffer::Control, Buffer::DialIndices, Buffer::DialRanges, Buffer::DialInputs, Buffer::DialInputRanges,
+      Buffer::FormulaPrograms, Buffer::FormulaInstructions, Buffer::FormulaConstants, Buffer::ProgramInputs,
+      Buffer::CompositePrograms, Buffer::CompositeInstructions, Buffer::ProgramScratch});
   if( updateWeights or _cache_.needsUpdate(inputs_) or not _valid_ ){
     dispatch(encoder, Kernel::Events, model.events.size(), {Buffer::Events, Buffer::Samples, Buffer::Targets, Buffer::WeightDialIndices,
     Buffer::VariableDialIndices, Buffer::Responses, Buffer::HostValues, Buffer::HostEdits, Buffer::Variables, Buffer::DirtyEvents, Buffer::EventWeights, Buffer::Control});
@@ -438,7 +452,7 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   out["contributionCapacity"] = _packed_.contributionCapacity;
   out["histogramChunkCapacity"] = _packed_.histogramChunkCapacity;
   out["buffers"] = JsonType::array();
-  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights"};
+  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights", "FormulaPrograms", "FormulaInstructions", "FormulaConstants", "ProgramInputs", "CompositePrograms", "CompositeInstructions", "ProgramScratch"};
   static_assert(sizeof(names) / sizeof(*names) == std::size_t(Buffer::Count));
   for( std::size_t i = 0; i < _buffers_.size(); ++i ){
     auto value = _buffers_[i];

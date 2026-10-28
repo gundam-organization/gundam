@@ -50,8 +50,7 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
   _impl_->useEventPropagation = _impl_->propagationMode == MpsPropagationMode::cachedResponses
       or engineView_.propagation.requiresEventBinning() or engineView_.propagation.hasReweightCap;
   for( const auto& dial : engineView_.propagation.dials ){
-    LogThrowIf(dial.type == BackendDialType::Formula, "Formula bytecode is only supported by the CPU backend.");
-    LogThrowIf(dial.type == BackendDialType::Composite, "Composite dials are only supported by the CPU backend.");
+    if( dial.type == BackendDialType::Formula or dial.type == BackendDialType::Composite ){ _impl_->useEventPropagation = true; }
     LogThrowIf(isTableDial(dial.type), "Tabulated and Kriged dials are not supported by the MPS backend.");
     Semantics::validateSurfaceDial(engineView_.propagation, dial);
     if( dial.type == BackendDialType::ExternalWeight ){ continue; }
@@ -292,7 +291,8 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["lastStageGpuSeconds"] = impl.diagnosticStageGpuSeconds;
   std::map<std::string, std::size_t> dialCounts, types;
   for( const auto& event : impl.model.eventWeights ){ ++dialCounts[std::to_string(event.dialCount)]; }
-  const char* dialTypeNames[]{"Norm", "Shift", "CompactSpline", "UniformSpline", "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight", "Bilinear", "Bicubic"};
+  const char* dialTypeNames[]{"Norm", "Shift", "CompactSpline", "UniformSpline", "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight", "Bilinear", "Bicubic", "Tabulated", "Kriged", "Composite", "Formula"};
+  static_assert(sizeof(dialTypeNames) / sizeof(*dialTypeNames) == std::size_t(BackendDialType::Formula) + 1);
   for( const auto& dial : impl.model.dials ){ ++types[dialTypeNames[std::size_t(dial.type)]]; }
   out["eventsByWeightDialCount"] = dialCounts;
   out["uniqueDialsByType"] = types;

@@ -155,10 +155,10 @@ namespace {
         else if( dynamic_cast<const Graph*>(base) ){ dial.type = BackendDialType::Graph; }
         else if( dynamic_cast<const Bilinear*>(base) ){ dial.type = BackendDialType::Bilinear; }
         else if( dynamic_cast<const Bicubic*>(base) ){ dial.type = BackendDialType::Bicubic; }
-        else{ throw std::runtime_error("Unsupported dial type in CPU composite at " + path + ": " + base->getDialTypeName()); }
+        else{ throw std::runtime_error("Unsupported dial type in backend composite at " + path + ": " + base->getDialTypeName()); }
         const bool surface = dial.type == BackendDialType::Bilinear or dial.type == BackendDialType::Bicubic;
         LogThrowIf(dial.type != BackendDialType::Shift and dial.type != BackendDialType::Formula and inputs.size() != (surface ? 2u : 1u),
-                   "Invalid input count in CPU composite at " << path);
+                   "Invalid input count in backend composite at " << path);
         dial.allowExtrapolation = base->getAllowExtrapolation();
         if( bounds ){ instruction.inputMin = bounds->min; instruction.inputMax = bounds->max; }
         if( dial.type != BackendDialType::Norm and dial.type != BackendDialType::Formula ){

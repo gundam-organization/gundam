@@ -18,6 +18,13 @@ namespace Backends {
     std::vector<DeviceBinningBounds> bounds;
     std::vector<DeviceIndex> nodeBins, reusableBins, weightDialIndices, variableDialIndices;
     std::vector<ObservableScalar> variables, payloads;
+    std::vector<DeviceFormulaProgram> formulaPrograms;
+    std::vector<FormulaInstruction> formulaInstructions;
+    std::vector<ObservableScalar> formulaConstants;
+    std::vector<DeviceProgramInput> programInputs;
+    std::vector<DeviceCompositeProgram> compositePrograms;
+    std::vector<DeviceCompositeInstruction> compositeInstructions;
+    std::size_t programScratchSize{0};
     DeviceIndex contributionCapacity{0};
     DeviceIndex histogramBins{0};
     DeviceIndex histogramChunkCapacity{0};

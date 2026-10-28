@@ -10,61 +10,6 @@
 #include <cmath>
 
 namespace Backends {
-  inline void validateCompositePrograms(const PropagationView& model_) {
-    for( const auto& program : model_.compositePrograms ){
-      if( program.firstInstruction > model_.compositeInstructions.size()
-          or program.instructionCount > model_.compositeInstructions.size() - program.firstInstruction
-          or program.instructionCount > std::size_t(-1) - program.inputCount
-          or program.outputSlot >= program.scratchSize() ){
-        throw std::runtime_error("Invalid CPU composite program range.");
-      }
-      for( std::size_t i = 0; i < program.instructionCount; ++i ){
-        const auto& dial = model_.compositeInstructions[program.firstInstruction + i].dial;
-        const bool surface = dial.type == BackendDialType::Bilinear or dial.type == BackendDialType::Bicubic;
-        std::size_t minimumPayload{0};
-        switch( dial.type ){
-          case BackendDialType::Norm: break;
-          case BackendDialType::Formula: break;
-          case BackendDialType::Shift: minimumPayload = 1; break;
-          case BackendDialType::Graph: minimumPayload = 2; break;
-          case BackendDialType::CompactSpline:
-          case BackendDialType::MonotonicSpline: minimumPayload = 3; break;
-          case BackendDialType::UniformSpline: minimumPayload = 4; break;
-          case BackendDialType::GeneralSpline: minimumPayload = 5; break;
-          case BackendDialType::Bilinear:
-          case BackendDialType::Bicubic: minimumPayload = 10; break;
-          default: throw std::runtime_error("Unsupported CPU composite instruction type.");
-        }
-        if( dial.firstInput > model_.compositeInputs.size()
-            or dial.inputCount > model_.compositeInputs.size() - dial.firstInput
-            or (dial.type != BackendDialType::Shift and dial.type != BackendDialType::Formula
-                and dial.inputCount != (surface ? 2u : 1u))
-            or dial.payloadOffset > model_.dialPayloads.size()
-            or dial.payloadSize > model_.dialPayloads.size() - dial.payloadOffset
-            or dial.payloadSize < minimumPayload ){
-          throw std::runtime_error("Invalid CPU composite instruction layout.");
-        }
-        for( std::size_t j = 0; j < dial.inputCount; ++j ){
-          const auto& input = model_.compositeInputs[dial.firstInput + j];
-          if( input.source != DialInputSource::Parameter or input.parameterIndex >= program.inputCount + i ){
-            throw std::runtime_error("CPU composite inputs must reference earlier scratch slots.");
-          }
-        }
-        Semantics::validateSurfaceDial(model_, dial, model_.compositeInputs.size());
-        validateFormulaDial(model_, dial, model_.compositeInputs.size());
-      }
-    }
-    for( const auto& dial : model_.dials ){
-      if( dial.type != BackendDialType::Composite ){ continue; }
-      if( dial.compositeProgram >= model_.compositePrograms.size()
-          or dial.inputCount != model_.compositePrograms[dial.compositeProgram].inputCount
-          or dial.firstInput > model_.dialInputs.size()
-          or dial.inputCount > model_.dialInputs.size() - dial.firstInput ){
-        throw std::runtime_error("Invalid CPU composite root.");
-      }
-    }
-  }
-
   // The caller owns scratch (one preallocated buffer per worker). Instruction
   // inputs refer only to graph arguments or previously computed results.
   inline double evaluateComposite(const PropagationView& model_, const BackendDialDescriptor& root_,

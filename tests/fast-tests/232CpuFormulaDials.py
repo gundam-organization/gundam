@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """CPU formula bytecode matches ROOT through configuration, binding and caching."""
 import copy
+import json
 import sys
 from importlib import import_module
 from pathlib import Path
@@ -11,13 +12,16 @@ import_module('005PythonSetup-utils').requireVenv(__file__)
 helpers = import_module('231EventVarInputForFormulaDials')
 
 
-def compare(path, dial):
+def compare(path, dial, backendType='CPU', backendConfig=None):
     engines = []
     for enabled in (False, True):
         configuration = helpers.config(path, copy.deepcopy(dial))
         configuration['likelihoodInterfaceConfig']['backendManagerConfig'] = {
-            'isEnabled': enabled, 'type': 'CPU'}
-        engines.append(helpers.build(configuration))
+            'isEnabled': enabled, 'type': backendType, 'backendConfig': backendConfig or {}}
+        engine = helpers.build(configuration)
+        if enabled and backendType == 'MPS':
+            assert json.loads(engine.getBackendsManager().getDiagnosticMps())['path'] == 'eventPropagation'
+        engines.append(engine)
     for delta, alpha in [(.5, .25), (.5, .25), (-.5, .25), (-.5, .75), (0., 1.), (3., 2.), (.5, .25)]:
         states = []
         for engine in engines:

@@ -15,6 +15,13 @@ kernel void evaluate_propagation_dials(
     device const DevicePropagationDialRange* ranges [[buffer(7)]],
     device const DeviceDialInput* dialInputs [[buffer(8)]],
     device const DeviceDialInputRange* inputRanges [[buffer(9)]],
+    device const DeviceFormulaProgram* formulas [[buffer(10)]],
+    device const FormulaInstruction* formulaInstructions [[buffer(11)]],
+    device const ObservableScalar* formulaConstants [[buffer(12)]],
+    device const DeviceProgramInput* programInputs [[buffer(13)]],
+    device const DeviceCompositeProgram* compositePrograms [[buffer(14)]],
+    device const DeviceCompositeInstruction* compositeInstructions [[buffer(15)]],
+    device ObservableScalar* programScratch [[buffer(16)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= control.dialCount ){ return; }
   uint dialIndex = gid;
@@ -30,58 +37,29 @@ kernel void evaluate_propagation_dials(
   }
   auto dial = dials[dialIndex];
   auto kind = BackendDialType(dial.type);
-  const bool surface = kind == BackendDialType::Bilinear || kind == BackendDialType::Bicubic;
-  ObservableScalar value(0.f);
-  if( !surface && kind != BackendDialType::Shift && kind != BackendDialType::ExternalWeight ){
-    value = parameters[dial.parameterIndex];
-    if( dial.useMirror ){
-      value = GundamDeviceMath::remainder(value - dial.mirrorMin, ObservableScalar(2.f) * dial.mirrorRange);
-      if( value < ObservableScalar(0.f) ){ value = -value; }
-      if( value > dial.mirrorRange ){ value = ObservableScalar(2.f) * dial.mirrorRange - value; }
-      value += dial.mirrorMin;
-    }
+  ObservableScalar value(0), second(0);
+  if( kind == BackendDialType::Formula ){
+    device ObservableScalar* stack = programScratch + dial.scratchOffset;
+    value = evaluate_formula_program(formulas[dial.programIndex], dial.firstProgramInput,
+                formulaInstructions, formulaConstants, programInputs, parameters, stack, stack);
   }
-  device const ObservableScalar* data = payloads + dial.payloadOffset;
-  if( !surface && !dial.allowExtrapolation && kind != BackendDialType::Norm && kind != BackendDialType::Shift && kind != BackendDialType::ExternalWeight ){
-    auto lower = kind == BackendDialType::Graph ? data[1] : data[0];
-    ObservableScalar upper;
-    if( kind == BackendDialType::Graph || kind == BackendDialType::GeneralSpline ){ upper = data[dial.payloadSize - 1]; }
-    else{
-      uint knots = kind == BackendDialType::UniformSpline ? (dial.payloadSize - 2) / 2 : dial.payloadSize - 2;
-      upper = data[0] + data[1] * ObservableScalar(float(knots - 1));
-    }
-    if( value < lower ){ value = lower; }
-    if( value > upper ){ value = upper; }
+  else if( kind == BackendDialType::Composite ){
+    value = evaluate_composite_program(dial, inputRanges[dialIndex], compositePrograms,
+                compositeInstructions, formulas, formulaInstructions, formulaConstants,
+                programInputs, dialInputs, parameters, payloads, programScratch);
   }
-  ObservableScalar lower(-INFINITY), upper(INFINITY);
-  switch( kind ){
-    case BackendDialType::Bilinear:
-    case BackendDialType::Bicubic: {
+  else if( kind == BackendDialType::ExternalWeight ){ value = externalWeights[dial.externalIndex]; }
+  else{
+    if( kind == BackendDialType::Bilinear || kind == BackendDialType::Bicubic ){
       auto range = inputRanges[dialIndex];
-      ObservableScalar values[2];
-      for( uint i = 0; i < 2; ++i ){
-        auto input = dialInputs[range.first + i];
-        auto raw = parameters[input.index];
-        if( input.useMirror ){
-          raw = GundamDeviceMath::remainder(raw - input.mirrorMin, ObservableScalar(2.f) * input.mirrorRange);
-          if( raw < ObservableScalar(0.f) ){ raw = -raw; }
-          if( raw > input.mirrorRange ){ raw = ObservableScalar(2.f) * input.mirrorRange - raw; }
-          raw += input.mirrorMin;
-        }
-        values[i] = raw;
-      }
-      value = GundamObservableMath::EvaluateSurface(values[0], values[1], data,
-                  kind == BackendDialType::Bicubic, dial.allowExtrapolation != 0);
-      break;
+      auto first = dialInputs[range.first], next = dialInputs[range.first + 1];
+      value = mirror_program_input(parameters[first.index], first.useMirror, first.mirrorMin, first.mirrorRange);
+      second = mirror_program_input(parameters[next.index], next.useMirror, next.mirrorMin, next.mirrorRange);
     }
-    case BackendDialType::Norm: break;
-    case BackendDialType::Shift: value = data[0]; break;
-    case BackendDialType::CompactSpline: value = GundamObservableMath::EvaluateCompactSpline(value, lower, upper, data, dial.payloadSize - 2); break;
-    case BackendDialType::UniformSpline: value = GundamObservableMath::EvaluateUniformSpline(value, lower, upper, data, dial.payloadSize); break;
-    case BackendDialType::MonotonicSpline: value = GundamObservableMath::EvaluateMonotonicSpline(value, lower, upper, data, dial.payloadSize - 2); break;
-    case BackendDialType::GeneralSpline: value = GundamObservableMath::EvaluateGeneralSpline(value, lower, upper, data, dial.payloadSize); break;
-    case BackendDialType::Graph: value = GundamObservableMath::EvaluateGraph(value, lower, upper, data, dial.payloadSize); break;
-    case BackendDialType::ExternalWeight: value = externalWeights[dial.externalIndex]; break;
+    else if( kind != BackendDialType::Shift ){
+      value = mirror_program_input(parameters[dial.parameterIndex], dial.useMirror, dial.mirrorMin, dial.mirrorRange);
+    }
+    value = evaluate_program_leaf(dial, value, second, payloads, false, ObservableScalar(0), ObservableScalar(0));
   }
   responses[dialIndex] = Backends::Semantics::processResponse(value, dial);
 }

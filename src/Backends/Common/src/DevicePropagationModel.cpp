@@ -1,4 +1,5 @@
 #include "DevicePropagationModel.h"
+#include "DialProgramValidation.h"
 #include "ResponseSmoothingPacking.h"
 #include "Semantics/BackendDialSemantics.h"
 
@@ -56,16 +57,77 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
   reusableBins.assign(histogramBins, DeviceIndex(-1));
   for( double value : model_.variableValues ){ variables.push_back(scalar(value)); }
   for( double value : model_.dialPayloads ){ payloads.push_back(scalar(value)); }
+  validateCompositePrograms(model_);
+  for( const auto& program : model_.formulaPrograms ){
+    program.validate();
+    formulaPrograms.push_back({index(formulaInstructions.size()), index(program.instructions.size()),
+                               index(formulaConstants.size()), index(program.inputCount), index(program.stackSize)});
+    formulaInstructions.insert(formulaInstructions.end(), program.instructions.begin(), program.instructions.end());
+    for( double value : program.constants ){ formulaConstants.push_back(scalar(value)); }
+  }
+  auto packDial = [&](const BackendDialDescriptor& dial_) {
+    DevicePropagationDial packed{};
+    packed.type = DeviceIndex(dial_.type);
+    packed.payloadOffset = index(dial_.payloadOffset);
+    packed.payloadSize = index(dial_.payloadSize);
+    packed.allowExtrapolation = dial_.allowExtrapolation;
+    packResponseLimits(dial_, packed, scalar);
+    return packed;
+  };
+  auto packInput = [&](const BackendDialInputDescriptor& input_, bool scratch_) {
+    return DeviceProgramInput{scratch_ ? ProgramInputSource::Scratch : ProgramInputSource::Parameter, index(input_.parameterIndex),
+                              DeviceIndex(input_.useMirror), {}, scalar(input_.mirrorMin), scalar(input_.mirrorRange)};
+  };
+  auto packFormula = [&](const BackendDialDescriptor& dial_, DevicePropagationDial& packed_, bool composite_) {
+    packed_.programIndex = index(dial_.formulaProgramIndex);
+    packed_.firstProgramInput = index(programInputs.size());
+    const auto& inputs = composite_ ? model_.compositeInputs : model_.dialInputs;
+    for( std::size_t i = 0; i < model_.formulaPrograms.at(dial_.formulaProgramIndex).inputCount; ++i ){
+      const auto& binding = model_.formulaInputs.at(dial_.firstFormulaInput + i);
+      if( binding.parameterIndex < 0 ){ programInputs.push_back({ProgramInputSource::Constant, 0, 0, scalar(binding.constant), {}, {}}); }
+      else{ programInputs.push_back(packInput(inputs.at(dial_.firstInput + binding.parameterIndex), composite_)); }
+    }
+  };
+  std::vector<std::size_t> compositeStackSizes;
+  for( const auto& program : model_.compositePrograms ){
+    compositePrograms.push_back({index(compositeInstructions.size()), index(program.instructionCount),
+                                 index(program.inputCount), index(program.outputSlot)});
+    std::size_t stackSize{0};
+    for( std::size_t i = 0; i < program.instructionCount; ++i ){
+      const auto& source = model_.compositeInstructions[program.firstInstruction + i];
+      DeviceCompositeInstruction packed{};
+      packed.dial = packDial(source.dial);
+      packed.firstInput = index(programInputs.size());
+      packed.inputCount = index(source.dial.inputCount);
+      packed.inputMin = scalar(source.inputMin);
+      packed.inputMax = scalar(source.inputMax);
+      if( source.dial.type == BackendDialType::Formula ){
+        packFormula(source.dial, packed.dial, true);
+        stackSize = std::max(stackSize, model_.formulaPrograms[source.dial.formulaProgramIndex].stackSize);
+      }
+      else{
+        for( std::size_t j = 0; j < source.dial.inputCount; ++j ){
+          programInputs.push_back(packInput(model_.compositeInputs[source.dial.firstInput + j], true));
+        }
+      }
+      compositeInstructions.push_back(packed);
+    }
+    compositeStackSizes.push_back(stackSize);
+  }
   weightDialIndices = model_.eventDialIndices;
   variableDialIndices = model_.variableDialIndices;
-  const bool hasSurface = std::any_of(model_.dials.begin(), model_.dials.end(), [](const auto& dial_){
-    return dial_.type == BackendDialType::Bilinear or dial_.type == BackendDialType::Bicubic;
+  const bool hasInputRanges = std::any_of(model_.dials.begin(), model_.dials.end(), [](const auto& dial_){
+    return dial_.type == BackendDialType::Bilinear or dial_.type == BackendDialType::Bicubic
+        or dial_.type == BackendDialType::Composite;
   });
-  if( hasSurface ){ dialInputRanges.reserve(model_.dials.size()); }
+  if( hasInputRanges ){ dialInputRanges.reserve(model_.dials.size()); }
   for( const auto& dial : model_.dials ){
     Semantics::validateSurfaceDial(model_, dial);
-    DevicePropagationDial packed{};
+    validateFormulaDial(model_, dial);
+    DevicePropagationDial packed = packDial(dial);
     const bool surface = dial.type == BackendDialType::Bilinear or dial.type == BackendDialType::Bicubic;
+    const bool composite = dial.type == BackendDialType::Composite;
+    const bool formula = dial.type == BackendDialType::Formula;
     DeviceDialInputRange range{index(dialInputs.size()), index(dial.inputCount)};
     for( std::size_t i = 0; i < dial.inputCount and dial.type != BackendDialType::ExternalWeight; ++i ){
       const auto& input = model_.dialInputs.at(dial.firstInput + i);
@@ -73,18 +135,28 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
         throw std::runtime_error("Event-variable dial inputs require an event-context evaluator.");
       }
       if( input.parameterIndex >= model_.parameterCount ){ throw std::runtime_error("Dial parameter input is out of range."); }
-      if( surface ){
+      if( surface or composite ){
         dialInputs.push_back({DeviceIndex(DialInputSource::Parameter), index(input.parameterIndex), DeviceIndex(input.useMirror),
                               scalar(input.mirrorMin), scalar(input.mirrorRange)});
       }
     }
-    if( hasSurface ){ dialInputRanges.push_back(surface ? range : DeviceDialInputRange{0, 0}); }
-    packed.type = DeviceIndex(dial.type);
-    packed.payloadOffset = index(dial.payloadOffset);
-    packed.payloadSize = index(dial.payloadSize);
-    packed.allowExtrapolation = dial.allowExtrapolation;
-    packResponseLimits(dial, packed, scalar);
-    if( dial.type == BackendDialType::ExternalWeight ){
+    if( hasInputRanges ){ dialInputRanges.push_back((surface or composite) ? range : DeviceDialInputRange{0, 0}); }
+    if( formula or composite ){
+      std::size_t scratchSize{0};
+      packed.scratchOffset = index(programScratchSize);
+      if( formula ){
+        packFormula(dial, packed, false);
+        scratchSize = model_.formulaPrograms[dial.formulaProgramIndex].stackSize;
+      }
+      else{
+        packed.programIndex = index(dial.compositeProgram);
+        const auto& program = model_.compositePrograms[dial.compositeProgram];
+        packed.stackOffset = index(program.scratchSize());
+        scratchSize = program.scratchSize() + compositeStackSizes[dial.compositeProgram];
+      }
+      programScratchSize = index(programScratchSize + scratchSize);
+    }
+    else if( dial.type == BackendDialType::ExternalWeight ){
       const auto& block = model_.externalWeightBlocks.at(dial.externalBlockIndex);
       if( dial.externalWeightIndex >= block.count ){ throw std::runtime_error("Invalid external observable dial index."); }
       packed.externalIndex = index(block.offset + dial.externalWeightIndex);

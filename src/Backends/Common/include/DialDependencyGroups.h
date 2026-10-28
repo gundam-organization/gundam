@@ -4,7 +4,6 @@
 #include "DialDependencies.h"
 
 #include <algorithm>
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -15,29 +14,29 @@ namespace Backends {
   // flattening order and sparse/dense dispatch policies. Scalar groups use
   // offsets to avoid allocating a separate vector for every parameter.
   template<typename Index> struct DialDependencyGroups {
-    using MultiParameters = std::array<std::size_t, 2>;
+    using MultiParameters = std::vector<std::size_t>;
     std::vector<std::size_t> parameterOffsets;
     std::vector<Index> parameterDialIndices;
     std::map<MultiParameters, std::vector<Index>> multiParameterDials;
     std::map<std::size_t, std::vector<Index>> externalDials;
   };
 
-  // Both executors use sorted input pairs without deduplication. Fixed keys
-  // avoid per-surface temporary allocations. Multi-input dials must have two
-  // inputs, as required by the existing surface validation.
+  // Sorted input lists preserve repeated references, support arbitrary arity,
+  // and keep each dial in exactly one group even when several inputs change.
   // Call after the executor's model validation and any dial remapping.
   template<typename Index = std::uint32_t, typename Dials>
   DialDependencyGroups<Index> buildDialDependencyGroups(const PropagationView& model_, const Dials& dials_) {
     DialDependencyGroups<Index> out;
     out.parameterOffsets.assign(model_.parameterCount + 1, 0);
+    typename DialDependencyGroups<Index>::MultiParameters parameters;
     for( std::size_t i = 0; i < dials_.size(); ++i ){
       const auto& dial = dials_[i];
       if( dial.type == BackendDialType::Shift ){ continue; }
-      typename DialDependencyGroups<Index>::MultiParameters parameters{};
+      parameters.clear();
       std::size_t parameterCount = 0;
       visitDialDependencies(model_, dial, [&](const auto& input_){
         if( dial.inputCount > 1 ){
-          parameters.at(parameterCount) = input_.parameterIndex;
+          parameters.push_back(input_.parameterIndex);
           ++parameterCount;
         }
         else{ ++out.parameterOffsets.at(input_.parameterIndex + 1); }
