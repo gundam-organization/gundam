@@ -139,6 +139,22 @@ namespace Backends::FormulaMath {
     Scalar value = Scalar(1) - erfcPositive(abs(x_));
     return x_ < Scalar(0) ? -value : value;
   }
+  // Opcode adapters preserve Metal's compensated arithmetic and domain behavior.
+  inline Scalar negate(Scalar value_) { return -value_; }
+  inline Scalar subtract(Scalar left_, Scalar right_) { return add(left_, -right_); }
+  inline Scalar min(Scalar left_, Scalar right_) { return left_ <= right_ ? left_ : right_; }
+  inline Scalar max(Scalar left_, Scalar right_) { return left_ >= right_ ? left_ : right_; }
+  inline Scalar log10(Scalar value_) { return divide(log(value_), log(Scalar(10))); }
+  inline Scalar tan(Scalar value_) { return divide(sin(value_), cos(value_)); }
+  inline Scalar asin(Scalar value_) { return atan2(value_, sqrt(Scalar(1) - value_*value_)); }
+  inline Scalar acos(Scalar value_) { return atan2(sqrt(Scalar(1) - value_*value_), value_); }
+  inline Scalar atan(Scalar value_) { return atan2(value_, Scalar(1)); }
+  inline Scalar tanh(Scalar value_) {
+    if( abs(value_) > Scalar(20) ){ return value_ < Scalar(0) ? Scalar(-1) : Scalar(1); }
+    auto positive = exp(value_), negative = exp(-value_);
+    return (positive-negative)/(positive+negative);
+  }
+
 }
 #undef GUNDAM_FORMULA_MATH
 #endif

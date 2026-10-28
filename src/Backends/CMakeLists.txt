@@ -33,6 +33,7 @@ if(APPLE)
   )
   set_property(
       DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/SharedFormulaOperations.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/FormulaTypes.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/FormulaMath.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsDialPrograms.metal
@@ -61,6 +62,8 @@ if(APPLE)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/FormulaTypes.h MPS_FORMULA_TYPES)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/FormulaMath.h MPS_FORMULA_MATH)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsDialPrograms.metal MPS_DIAL_PROGRAMS)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/SharedFormulaOperations.h MPS_FORMULA_OPERATIONS)
+  string(REPLACE "#include \"DeviceMath/SharedFormulaOperations.h\"" "${MPS_FORMULA_OPERATIONS}" MPS_DIAL_PROGRAMS "${MPS_DIAL_PROGRAMS}")
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationTypes.h MPS_PROPAGATION_TYPES)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEventPropagationKernels.metal MPS_EVENT_PROPAGATION_KERNELS)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCommon.h MPS_SHARED_SPLINE_COMMON)
@@ -85,6 +88,9 @@ if(APPLE)
 endif()
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/SharedFormulaOperations.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/NativeCompositeProgram.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/NativeFormulaProgram.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/FormulaTypes.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DialProgramValidation.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/FormulaMath.h

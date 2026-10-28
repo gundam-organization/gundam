@@ -31,43 +31,17 @@ ObservableScalar evaluate_formula_program(DeviceFormulaProgram program, uint fir
     if( op == FormulaOpcode::LoadConstant ){ stack[top++] = constants[program.firstConstant + instruction.operand]; continue; }
     auto value = stack[top - 1];
     switch( op ){
-      case FormulaOpcode::Negate: value = -value; break;
-      case FormulaOpcode::Exp: value = FormulaMath::exp(value); break;
-      case FormulaOpcode::Log: value = FormulaMath::log(value); break;
-      case FormulaOpcode::Log10: value = FormulaMath::divide(FormulaMath::log(value), FormulaMath::log(ObservableScalar(10))); break;
-      case FormulaOpcode::Sqrt: value = FormulaMath::sqrt(value); break;
-      case FormulaOpcode::Abs: value = FormulaMath::abs(value); break;
-      case FormulaOpcode::Sin: value = FormulaMath::sin(value); break;
-      case FormulaOpcode::Cos: value = FormulaMath::cos(value); break;
-      case FormulaOpcode::Tan: value = FormulaMath::divide(FormulaMath::sin(value), FormulaMath::cos(value)); break;
-      case FormulaOpcode::Asin: value = FormulaMath::atan2(value, FormulaMath::sqrt(ObservableScalar(1) - value*value)); break;
-      case FormulaOpcode::Acos: value = FormulaMath::atan2(FormulaMath::sqrt(ObservableScalar(1) - value*value), value); break;
-      case FormulaOpcode::Atan: value = FormulaMath::atan2(value, ObservableScalar(1)); break;
-      case FormulaOpcode::Sinh: value = FormulaMath::sinh(value); break;
-      case FormulaOpcode::Cosh: value = FormulaMath::cosh(value); break;
-      case FormulaOpcode::Tanh: {
-        if( FormulaMath::abs(value) > ObservableScalar(20) ){ value = value < ObservableScalar(0) ? ObservableScalar(-1) : ObservableScalar(1); }
-        else{
-          auto positive = FormulaMath::exp(value), negative = FormulaMath::exp(-value);
-          value = (positive-negative)/(positive+negative);
-        }
-        break;
-      }
-      case FormulaOpcode::Erf: value = FormulaMath::erf(value); break;
-      case FormulaOpcode::Erfc: value = FormulaMath::erfc(value); break;
-      case FormulaOpcode::Floor: value = FormulaMath::floor(value); break;
-      case FormulaOpcode::Ceil: value = FormulaMath::ceil(value); break;
+#define GUNDAM_FORMULA_UNARY(opcode, operation) \
+      case FormulaOpcode::opcode: value = FormulaMath::operation(value); break;
+#include "DeviceMath/SharedFormulaOperations.h"
+#undef GUNDAM_FORMULA_UNARY
       default: {
         auto left = stack[top - 2];
         switch( op ){
-          case FormulaOpcode::Add: value = FormulaMath::add(left, value); break;
-          case FormulaOpcode::Subtract: value = FormulaMath::add(left, -value); break;
-          case FormulaOpcode::Multiply: value = FormulaMath::multiply(left, value); break;
-          case FormulaOpcode::Divide: value = FormulaMath::divide(left, value); break;
-          case FormulaOpcode::Pow: value = FormulaMath::pow(left, value); break;
-          case FormulaOpcode::Atan2: value = FormulaMath::atan2(left, value); break;
-          case FormulaOpcode::Min: value = left <= value ? left : value; break;
-          case FormulaOpcode::Max: value = left >= value ? left : value; break;
+#define GUNDAM_FORMULA_BINARY(opcode, operation) \
+          case FormulaOpcode::opcode: value = FormulaMath::operation(left, value); break;
+#include "DeviceMath/SharedFormulaOperations.h"
+#undef GUNDAM_FORMULA_BINARY
           default: value = ObservableScalar(NAN); break; // Rejected by host validation.
         }
         --top;
