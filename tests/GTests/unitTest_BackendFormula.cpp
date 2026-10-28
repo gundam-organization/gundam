@@ -200,3 +200,48 @@ TEST(BackendFormula, EngineLayoutPreservesNamedOrderAndBinningConstants) {
     }
   }
 }
+
+TEST(BackendFormula, CompositeUsesScratchInputsAndValidatesFormulaBindings) {
+  using namespace Backends;
+  EngineView view;
+  auto& model = view.propagation;
+  model.parameterCount = 1;
+  model.totalBins = 1;
+  model.dialInputs.emplace_back(0);
+  model.compositeInputs.emplace_back(0);
+  model.formulaPrograms.push_back(FormulaCompiler::compile("[parameter]+[event]", {"parameter", "event"}));
+  model.formulaInputs = {{0, 0.}, {-1, 3.}};
+  CompositeInstruction instruction;
+  instruction.dial.type = BackendDialType::Formula;
+  instruction.dial.inputCount = 1;
+  model.compositeInstructions.push_back(instruction);
+  model.compositePrograms.push_back({0, 1, 1, 1});
+  BackendDialDescriptor root;
+  root.type = BackendDialType::Composite;
+  root.inputCount = 1;
+  model.dials.push_back(root);
+  EventView event;
+  event.resultIndex = 0;
+  event.globalBinIndex = 0;
+  model.events.push_back(event);
+  model.eventWeights.push_back({1., 0, 1});
+  model.eventDialIndices.push_back(0);
+  CpuBackend backend;
+  backend.build(view);
+  PropagationInputs inputs;
+  for( double parameter : {1., 1., 2., -1.} ){
+    inputs.parameters.values = {parameter};
+    const auto token = backend.requestPropagation(inputs);
+    EXPECT_DOUBLE_EQ(backend.getEventWeightsHostView(token)[0], parameter + 3.);
+  }
+  // The instruction's inputs live in compositeInputs, not dialInputs.
+  model.dialInputs.emplace_back(0);
+  model.compositeInstructions[0].dial.firstInput = 1;
+  EXPECT_THROW(backend.build(view), std::runtime_error);
+  model.compositeInstructions[0].dial.firstInput = 0;
+  model.formulaInputs[0].parameterIndex = 1;
+  EXPECT_THROW(backend.build(view), std::runtime_error);
+  model.formulaInputs[0].parameterIndex = 0;
+  model.compositeInstructions[0].dial.formulaProgramIndex = 1;
+  EXPECT_THROW(backend.build(view), std::runtime_error);
+}

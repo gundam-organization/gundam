@@ -37,6 +37,43 @@
 namespace {
   using CompositePayloadMap = std::unordered_map<const DialBase*, std::pair<std::size_t, std::size_t>>;
 
+  using FormulaProgramMap = std::unordered_map<const RootFormula*, std::size_t>;
+
+  bool compileFormula(Backends::PropagationView& model_, Backends::BackendDialDescriptor& dial_,
+                      const DialBase* base_, FormulaProgramMap& programs_, const std::string& path_) {
+    const auto* eventFormula = dynamic_cast<const EventFormula*>(base_);
+    const auto* formula = dynamic_cast<const RootFormula*>(eventFormula == nullptr ? base_ : eventFormula->getFormula());
+    if( formula == nullptr ){ return false; }
+    dial_.type = Backends::BackendDialType::Formula;
+    const auto inserted = programs_.emplace(formula, model_.formulaPrograms.size());
+    if( inserted.second ){
+      if( formula->getInputCount() < 0 ){
+        throw std::runtime_error("Formula inputs have not been bound at " + path_);
+      }
+      const auto& root = formula->getFormula();
+      const auto& indices = formula->getParameterInputIndices();
+      std::vector<std::string> names(formula->getInputCount());
+      std::map<std::string, double> constants;
+      for( int i = 0; i < root.GetNpar(); ++i ){
+        if( indices.at(i) >= 0 ){ names.at(indices[i]) = root.GetParName(i); }
+        else{ constants.emplace(root.GetParName(i), root.GetParameter(i)); }
+      }
+      model_.formulaPrograms.push_back(Backends::FormulaCompiler::compile(
+          formula->getFormulaStr(), names, constants));
+    }
+    dial_.formulaProgramIndex = inserted.first->second;
+    dial_.firstFormulaInput = model_.formulaInputs.size();
+    for( int i = 0; i < formula->getInputCount(); ++i ){
+      if( eventFormula == nullptr ){ model_.formulaInputs.push_back({i, 0.}); }
+      else{
+        const auto& source = eventFormula->getDefinition().inputs.at(i);
+        model_.formulaInputs.push_back({source.parameterIndex,
+            source.eventIndex < 0 ? 0. : eventFormula->getEventValues().at(source.eventIndex)});
+      }
+    }
+    return true;
+  }
+
   void packSupervisor(Backends::BackendDialDescriptor& dial_, const DialResponseSupervisor& supervisor_) {
     dial_.hasMinResponse = not std::isnan(supervisor_.getMinResponse());
     dial_.hasMaxResponse = not std::isnan(supervisor_.getMaxResponse());
@@ -52,7 +89,7 @@ namespace {
   }
 
   std::size_t compileComposite(Backends::PropagationView& model_, const CompositeDial& composite_,
-                               CompositePayloadMap& payloads_) {
+                               CompositePayloadMap& payloads_, FormulaProgramMap& formulas_) {
     using namespace Backends;
     CompositeProgram program;
     program.firstInstruction = model_.compositeInstructions.size();
@@ -75,7 +112,13 @@ namespace {
         LogThrowIf(node.dial == nullptr, "Missing composite dial at " << path);
         std::vector<BackendDialInputDescriptor> inputs;
         for( const auto& input : node.inputs ){
-          LogThrowIf(not input.eventVariable.empty(), "Unsupported event-variable input in CPU composite at " << path);
+          // EventFormula already owns the loaded (and mirrored) event values.
+          // Its ordinary buffer contains only parameter/response inputs.
+          if( not input.eventVariable.empty() ){
+            LogThrowIf(dynamic_cast<const EventFormula*>(node.dial.get()) == nullptr,
+                       "Missing bound event formula at " << path);
+            continue;
+          }
           const auto slot = input.bufferIndex >= 0 ? arguments_.at(input.bufferIndex) : results.at(input.nodeIndex);
           const auto& mirror = node.mirrorEdges.at(inputs.size());
           inputs.emplace_back(slot, not std::isnan(mirror.minValue), mirror.minValue, mirror.range);
@@ -94,7 +137,8 @@ namespace {
         }
         const auto* base = node.dial.get();
         const GenericToolbox::Range* bounds = nullptr;
-        if( dynamic_cast<const Norm*>(base) ){ dial.type = BackendDialType::Norm; }
+        if( compileFormula(model_, dial, base, formulas_, path) ){}
+        else if( dynamic_cast<const Norm*>(base) ){ dial.type = BackendDialType::Norm; }
         else if( dynamic_cast<const Shift*>(base) ){ dial.type = BackendDialType::Shift; }
         else if( const auto* spline = dynamic_cast<const CompactSpline*>(base) ){
           dial.type = BackendDialType::CompactSpline; bounds = &spline->getSplineBounds();
@@ -113,11 +157,11 @@ namespace {
         else if( dynamic_cast<const Bicubic*>(base) ){ dial.type = BackendDialType::Bicubic; }
         else{ throw std::runtime_error("Unsupported dial type in CPU composite at " + path + ": " + base->getDialTypeName()); }
         const bool surface = dial.type == BackendDialType::Bilinear or dial.type == BackendDialType::Bicubic;
-        LogThrowIf(dial.type != BackendDialType::Shift and inputs.size() != (surface ? 2u : 1u),
+        LogThrowIf(dial.type != BackendDialType::Shift and dial.type != BackendDialType::Formula and inputs.size() != (surface ? 2u : 1u),
                    "Invalid input count in CPU composite at " << path);
         dial.allowExtrapolation = base->getAllowExtrapolation();
         if( bounds ){ instruction.inputMin = bounds->min; instruction.inputMax = bounds->max; }
-        if( dial.type != BackendDialType::Norm ){
+        if( dial.type != BackendDialType::Norm and dial.type != BackendDialType::Formula ){
           auto inserted = payloads_.emplace(base, std::make_pair(model_.dialPayloads.size(), 0));
           if( inserted.second ){
             if( const auto* shift = dynamic_cast<const Shift*>(base) ){ model_.dialPayloads.push_back(shift->getShiftValue()); }
@@ -230,7 +274,7 @@ namespace {
     std::unordered_map<const ExternalWeightBuffer*, std::size_t> externalSourceIndices{};
     std::unordered_map<const std::vector<double>*, std::size_t> tableSourceIndices{};
     CompositePayloadMap compositePayloads;
-    std::unordered_map<const RootFormula*, std::size_t> formulaPrograms;
+    FormulaProgramMap formulaPrograms;
     std::size_t externalWeightCount{0};
     std::unordered_set<const DialInputBuffer*> variableInputBuffers;
 
@@ -288,38 +332,10 @@ namespace {
           dialRef.maxResponse = smoothing.maxResponse - smoothing.maxWidth;
         }
 
-        const auto* eventFormula = dynamic_cast<const EventFormula*>(dialBase);
-        const auto* formula = dynamic_cast<const RootFormula*>(eventFormula == nullptr ? dialBase : eventFormula->getFormula());
-        if( formula != nullptr ){
-          dialRef.type = Backends::BackendDialType::Formula;
-          const auto inserted = formulaPrograms.emplace(formula, propagation.formulaPrograms.size());
-          if( inserted.second ){
-            LogThrowIf(formula->getInputCount() < 0, "Formula inputs have not been bound.");
-            const auto& root = formula->getFormula();
-            const auto& indices = formula->getParameterInputIndices();
-            std::vector<std::string> names(formula->getInputCount());
-            std::map<std::string, double> constants;
-            for( int i = 0; i < root.GetNpar(); ++i ){
-              if( indices.at(i) >= 0 ){ names.at(indices[i]) = root.GetParName(i); }
-              else{ constants.emplace(root.GetParName(i), root.GetParameter(i)); }
-            }
-            propagation.formulaPrograms.push_back(Backends::FormulaCompiler::compile(
-                formula->getFormulaStr(), names, constants));
-          }
-          dialRef.formulaProgramIndex = inserted.first->second;
-          dialRef.firstFormulaInput = propagation.formulaInputs.size();
-          for( int i = 0; i < formula->getInputCount(); ++i ){
-            if( eventFormula == nullptr ){ propagation.formulaInputs.push_back({i, 0.}); }
-            else{
-              const auto& source = eventFormula->getDefinition().inputs.at(i);
-              propagation.formulaInputs.push_back({source.parameterIndex,
-                  source.eventIndex < 0 ? 0. : eventFormula->getEventValues().at(source.eventIndex)});
-            }
-          }
-        }
+        if( compileFormula(propagation, dialRef, dialBase, formulaPrograms, "Formula") ){}
         else if( const auto* composite = dynamic_cast<const CompositeDial*>(dialBase) ){
           dialRef.type = Backends::BackendDialType::Composite;
-          dialRef.compositeProgram = compileComposite(propagation, *composite, compositePayloads);
+          dialRef.compositeProgram = compileComposite(propagation, *composite, compositePayloads, formulaPrograms);
         }
         else if( auto* external = dynamic_cast<const ExternalWeightDispatcher*>(dialBase) ){
           const auto& source = external->getWeightSource();

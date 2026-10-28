@@ -60,11 +60,13 @@ namespace Backends {
     return stack_[0];
   }
 
-  inline void validateFormulaDial(const PropagationView& model_, const BackendDialDescriptor& dial_) {
+  inline void validateFormulaDial(const PropagationView& model_, const BackendDialDescriptor& dial_,
+                                   std::size_t availableInputs_ = std::size_t(-1)) {
     if( dial_.type != BackendDialType::Formula ){ return; }
+    if( availableInputs_ == std::size_t(-1) ){ availableInputs_ = model_.dialInputs.size(); }
     if( dial_.formulaProgramIndex >= model_.formulaPrograms.size()
-        or dial_.firstInput > model_.dialInputs.size()
-        or dial_.inputCount > model_.dialInputs.size() - dial_.firstInput ){
+        or dial_.firstInput > availableInputs_
+        or dial_.inputCount > availableInputs_ - dial_.firstInput ){
       throw std::runtime_error("Invalid CPU formula dial descriptor");
     }
     const auto count = model_.formulaPrograms[dial_.formulaProgramIndex].inputCount;

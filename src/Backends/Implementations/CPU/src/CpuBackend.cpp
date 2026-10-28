@@ -604,7 +604,8 @@ void Backends::CpuBackend::updateCachedDialResponsesThread(int iThread_) {
           }
           if( not changed ){ continue; }
           _cachedDialResponses_[dialIndex] = dial.type == BackendDialType::Composite
-              ? evaluateComposite(propagation, dial, parameterValues, _compositeScratch_[iThread_].data())
+              ? evaluateComposite(propagation, dial, parameterValues, _compositeScratch_[iThread_].data(),
+                                  _formulaScratch_[iThread_].data())
               : dial.type == BackendDialType::Formula
                   ? evaluateFormulaDial(propagation, dial, parameterValues, _formulaScratch_[iThread_].data())
                   : Semantics::evalDialResponse(propagation, dial, *_activeInputs_);

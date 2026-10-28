@@ -2,6 +2,7 @@
 #define GUNDAM_CPU_COMPOSITE_PROGRAM_H
 
 #include "EngineView.h"
+#include "CpuFormulaProgram.h"
 #include "Semantics/BackendDialSemantics.h"
 #include "CalculateBilinearInterpolation.h"
 #include "CalculateBicubicSpline.h"
@@ -23,6 +24,7 @@ namespace Backends {
         std::size_t minimumPayload{0};
         switch( dial.type ){
           case BackendDialType::Norm: break;
+          case BackendDialType::Formula: break;
           case BackendDialType::Shift: minimumPayload = 1; break;
           case BackendDialType::Graph: minimumPayload = 2; break;
           case BackendDialType::CompactSpline:
@@ -35,7 +37,8 @@ namespace Backends {
         }
         if( dial.firstInput > model_.compositeInputs.size()
             or dial.inputCount > model_.compositeInputs.size() - dial.firstInput
-            or (dial.type != BackendDialType::Shift and dial.inputCount != (surface ? 2u : 1u))
+            or (dial.type != BackendDialType::Shift and dial.type != BackendDialType::Formula
+                and dial.inputCount != (surface ? 2u : 1u))
             or dial.payloadOffset > model_.dialPayloads.size()
             or dial.payloadSize > model_.dialPayloads.size() - dial.payloadOffset
             or dial.payloadSize < minimumPayload ){
@@ -48,6 +51,7 @@ namespace Backends {
           }
         }
         Semantics::validateSurfaceDial(model_, dial, model_.compositeInputs.size());
+        validateFormulaDial(model_, dial, model_.compositeInputs.size());
       }
     }
     for( const auto& dial : model_.dials ){
@@ -64,7 +68,7 @@ namespace Backends {
   // The caller owns scratch (one preallocated buffer per worker). Instruction
   // inputs refer only to graph arguments or previously computed results.
   inline double evaluateComposite(const PropagationView& model_, const BackendDialDescriptor& root_,
-                                  const double* parameters_, double* scratch_) {
+                                  const double* parameters_, double* scratch_, double* formulaScratch_) {
     const auto& program = model_.compositePrograms[root_.compositeProgram];
     for( std::size_t i = 0; i < program.inputCount; ++i ){
       const auto& input = model_.dialInputs[root_.firstInput + i];
@@ -87,6 +91,13 @@ namespace Backends {
       const auto* data = dial.payloadSize ? model_.dialPayloads.data() + dial.payloadOffset : nullptr;
       double response;
       if( dial.type == BackendDialType::Shift ){ response = data[0]; }
+      else if( dial.type == BackendDialType::Formula ){
+        const auto read = [&](std::size_t index_) {
+          const auto& binding = model_.formulaInputs[dial.firstFormulaInput + index_];
+          return binding.parameterIndex < 0 ? binding.constant : load(binding.parameterIndex);
+        };
+        response = evaluateFormula(model_.formulaPrograms[dial.formulaProgramIndex], read, formulaScratch_);
+      }
       else{
         double x = load(0);
         if( dial.type == BackendDialType::Norm ){ response = x; }

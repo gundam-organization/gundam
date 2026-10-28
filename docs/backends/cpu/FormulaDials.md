@@ -1,10 +1,12 @@
 # CPU formula dials
 
-Standalone `Formula` dials are compiled into backend bytecode when the engine
-layout is built. The CPU interpreter uses immutable programs and preallocated
+Standalone `Formula` dials and formula nodes in composites are compiled into
+backend bytecode when the engine layout is built. The CPU interpreter uses immutable programs and preallocated
 scratch per worker; propagation does not call `TFormula`. Existing dial
 construction still uses ROOT to validate formulas and bind their named inputs.
-Formula nodes inside composites are not supported by this implementation.
+Composite formulas can mix parameters, upstream dial responses and loaded event
+variables, including inside nested composites. Event values retain their loaded
+snapshot semantics; they are not read back from an observable modified by propagation.
 
 The configuration syntax is unchanged:
 
