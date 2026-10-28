@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Compare CPU/CUDA Eb composite/formula migration with hard and smoothed binning.
+"""Compare CPU/CUDA composite/formula migration with hard and smoothed binning.
 
-Only v13Prod, onlyEb and ebMigrationDial are applied by default. The benchmark
-selects backends and configures hard/smooth binning itself; no backend or binResponse
-override is needed. Workers load independent Asimov engines. No fit/Hesse is run.
+Input configuration, optional overrides, migrated variable and smoothing width are
+supplied explicitly. Workers load independent Asimov engines. No fit/Hesse is run.
 """
 from array import array
 import argparse
@@ -27,13 +26,12 @@ _spec = importlib.util.spec_from_file_location(
 profiling = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(profiling)
 write_json, progress = profiling.write_json, profiling.progress
-DEFAULT_OVERRIDES = ['override/v13Prod.yaml', 'override/onlyEb.yaml', 'override/ebMigrationDial.yaml']
 DEFAULT_CASES = ['CPU', 'CUDA-cachedResponses', 'CUDA-cachedResponses-interleaved',
                  'CUDA-recomputeResponses', 'CUDA-recomputeResponses-interleaved']
 
 
 def prepare_config(config, variant, variable, width, sample_match):
-    """Change explicit benchmark controls after resolving the three user overrides."""
+    """Change explicit benchmark controls after resolving user-supplied inputs."""
     config = copy.deepcopy(config)
     samples = config['fitterEngineConfig']['likelihoodInterfaceConfig'][
         'propagatorConfig']['sampleSetConfig']['sampleList']
@@ -146,7 +144,7 @@ def migration_summary(directory, center, scenarios, trials):
         results[scenario] = entries
     if not any(e['eventsWithChangedObservable'] for scenario, entries in results.items()
                if scenario != 'constant' for e in entries):
-        raise RuntimeError('No observable moved at the measured trial endpoints; check Eb coordinates/dials')
+        raise RuntimeError('No observable moved at the measured trial endpoints; check selected coordinates/dials')
     return results
 
 
@@ -241,7 +239,7 @@ def verify_variant_replay(args):
 def write_report(args):
     summaries = {variant: {case: json.loads((args.output / variant / case / 'summary.json').read_text())
                            for case in args.cases} for variant in args.variants}
-    lines = ['# Eb migration: CPU / CUDA', '',
+    lines = ['# Observable migration: CPU / CUDA', '',
              'Same seeded coordinates across cases and variants; independent Asimov engines.',
              'Times are medians; input loading, event readback, snapshots and numerical checks are excluded.', '',
              '| Binning | Case | Scenario | Eval ms | Responses ms | Variables/search ms | Binning/index ms | Histogram ms | GPU total ms | CPU speedup |',
@@ -293,17 +291,17 @@ def write_report(args):
     return summaries
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--work-dir', type=Path, required=True)
-    parser.add_argument('--config', type=Path, default=Path('configOA2024.yaml'))
-    parser.add_argument('--override', nargs='*', default=DEFAULT_OVERRIDES)
+    parser.add_argument('--config', type=Path, required=True)
+    parser.add_argument('--override', nargs='*', default=[], help='Optional overrides, applied in the supplied order')
     parser.add_argument('--cases', nargs='+', choices=profiling.CASES, default=DEFAULT_CASES)
     parser.add_argument('--variants', nargs='+', choices=['hard', 'smooth'], default=['hard', 'smooth'])
-    parser.add_argument('--variable', default='Pmu', help='Migrated binning variable, recorded in every event snapshot')
-    parser.add_argument('--smoothing-width', type=float, default=1., help='Absolute width in variable units (Pmu: MeV)')
+    parser.add_argument('--variable', required=True, help='Migrated binning variable, recorded in every event snapshot')
+    parser.add_argument('--smoothing-width', type=float, help='Required for the smooth variant; absolute width in input variable units')
     parser.add_argument('--sample-match', default='.*', help='Regex for samples receiving dynamic/smoothed binning')
-    parser.add_argument('--parameter-match', default='EB_', help='Regex selecting effective fit coordinates by full title')
+    parser.add_argument('--parameter-match', default='.*', help='Regex selecting effective fit coordinates by full title')
     parser.add_argument('--threads', type=int, default=4)
     parser.add_argument('--device-index', type=int, default=0)
     parser.add_argument('--calls', type=int, default=100)
@@ -317,15 +315,21 @@ def parse_args():
                         default=['constant', 'local1', 'local2', 'global'])
     parser.add_argument('--relative-tolerance', type=float, default=1e-9)
     parser.add_argument('--absolute-tolerance', type=float, default=1e-7)
-    parser.add_argument('--output', type=Path, default=Path(time.strftime('cuda-eb-migration-%Y%m%d-%H%M%S-') + str(os.getpid())))
+    parser.add_argument('--output', type=Path, default=Path(time.strftime('cuda-migration-%Y%m%d-%H%M%S-') + str(os.getpid())))
     parser.add_argument('--worker-case', choices=profiling.CASES, help=argparse.SUPPRESS)
     parser.add_argument('--worker-variant', choices=['hard', 'smooth'], help=argparse.SUPPRESS)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     if min(args.threads, args.calls, args.global_calls, args.trials, args.probe_events) <= 0 or min(args.warmup, args.device_index) < 0:
         parser.error('Counts must be positive; warmup and device-index may be zero')
-    for key in ('smoothing_width', 'step_scale', 'relative_tolerance', 'absolute_tolerance'):
+    for key in ('step_scale', 'relative_tolerance', 'absolute_tolerance'):
         if not math.isfinite(getattr(args, key)) or getattr(args, key) <= 0:
             parser.error(f'{key} must be finite and positive')
+    if 'smooth' in args.variants and args.smoothing_width is None:
+        parser.error('--smoothing-width is required when selecting the smooth variant')
+    if args.smoothing_width is not None and (not math.isfinite(args.smoothing_width) or args.smoothing_width <= 0):
+        parser.error('--smoothing-width must be finite and positive')
+    if not args.variable:
+        parser.error('--variable must not be empty')
     for pattern in (args.parameter_match, args.sample_match):
         try:
             re.compile(pattern)
