@@ -76,7 +76,9 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
   std::size_t formulaScratchSize{0};
   for( const auto& program : _engineView_->propagation.formulaPrograms ){
     program.validate();
-    formulaScratchSize = std::max(formulaScratchSize, program.stackSize);
+    LogThrowIf(program.inputCount > std::numeric_limits<std::size_t>::max() - program.stackSize,
+               "CPU formula scratch size overflow.");
+    formulaScratchSize = std::max(formulaScratchSize, program.stackSize + program.inputCount);
   }
   _formulaScratch_.assign(_threadPool_.getNbThreads(), std::vector<double>(formulaScratchSize));
   initializeDialResponseCache();
@@ -292,6 +294,8 @@ void Backends::CpuBackend::initializeDialResponseCache() {
   const auto& propagation = _engineView_->propagation;
   _parameterDependentCachedDialCount_ = 0;
   _multiInputCachedDials_.clear();
+  _multiInputDialsByParameter_.assign(propagation.parameterCount, {});
+  _cacheUpdateGeneration_ = 0;
   _changedCacheParameters_.assign(propagation.parameterCount, false);
   _cachedDialsByParameter_.assign(propagation.parameterCount, {});
   _cachedDialResponses_.assign(propagation.dials.size(), 1.);
@@ -332,7 +336,16 @@ void Backends::CpuBackend::initializeDialResponseCache() {
     }, [](std::size_t){});
     if( dial.inputCount > 1 or dial.type == BackendDialType::Composite or dial.type == BackendDialType::Formula ){
       _isCachedDial_[iDial] = true;
-      _multiInputCachedDials_.push_back(iDial);
+      const auto position = std::uint32_t(_multiInputCachedDials_.size());
+      _multiInputCachedDials_.push_back({iDial, 0, dial.inputCount});
+      // Repeated input references must create only one dependency edge.
+      std::vector<std::size_t> parameters;
+      for( std::size_t i = 0; i < dial.inputCount; ++i ){
+        parameters.push_back(propagation.dialInputs[dial.firstInput + i].parameterIndex);
+      }
+      std::sort(parameters.begin(), parameters.end());
+      parameters.erase(std::unique(parameters.begin(), parameters.end()), parameters.end());
+      for( auto parameter : parameters ){ _multiInputDialsByParameter_[parameter].push_back(position); }
       ++_parameterDependentCachedDialCount_;
       continue;
     }
@@ -489,23 +502,28 @@ void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& in
     }
   }
   std::size_t multiInputTransforms{0}, dirtyMultiInputDials{0};
+  if( ++_cacheUpdateGeneration_ == 0 ){
+    // A generation avoids clearing one flag per composite at every call.
+    for( auto& dial : _multiInputCachedDials_ ){ dial.generation = 0; }
+    ++_cacheUpdateGeneration_;
+  }
   if( initial ){
-    for( auto index : _multiInputCachedDials_ ){
-      multiInputTransforms += propagation.dials[index].inputCount;
+    for( const auto& dial : _multiInputCachedDials_ ){
+      multiInputTransforms += dial.inputCount;
       ++dirtyMultiInputDials;
     }
   }
   else{
-    for( auto index : _multiInputCachedDials_ ){
-      const auto& dial = propagation.dials[index];
-      for( std::size_t i = 0; i < dial.inputCount; ++i ){
-        if( _changedCacheParameters_[propagation.dialInputs[dial.firstInput + i].parameterIndex] ){
-          _dirtyCachedDialIndices_.push_back(index);
-          ++_dirtyCachedDialCount_;
-          ++dirtyMultiInputDials;
-          multiInputTransforms += dial.inputCount;
-          break;
-        }
+    for( std::size_t parameter = 0; parameter < values.size(); ++parameter ){
+      if( not _changedCacheParameters_[parameter] ){ continue; }
+      for( auto index : _multiInputDialsByParameter_[parameter] ){
+        auto& dial = _multiInputCachedDials_[index];
+        if( dial.generation == _cacheUpdateGeneration_ ){ continue; }
+        dial.generation = _cacheUpdateGeneration_;
+        _dirtyCachedDialIndices_.push_back(dial.dialIndex);
+        ++_dirtyCachedDialCount_;
+        ++dirtyMultiInputDials;
+        multiInputTransforms += dial.inputCount;
       }
     }
   }

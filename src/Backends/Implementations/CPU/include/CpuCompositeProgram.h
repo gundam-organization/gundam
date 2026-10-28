@@ -96,7 +96,7 @@ namespace Backends {
           const auto& binding = model_.formulaInputs[dial.firstFormulaInput + index_];
           return binding.parameterIndex < 0 ? binding.constant : load(binding.parameterIndex);
         };
-        response = evaluateFormula(model_.formulaPrograms[dial.formulaProgramIndex], read, formulaScratch_);
+        response = evaluateBoundFormula(model_.formulaPrograms[dial.formulaProgramIndex], read, formulaScratch_);
       }
       else{
         double x = load(0);

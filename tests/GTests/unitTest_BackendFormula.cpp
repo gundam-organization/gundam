@@ -245,3 +245,46 @@ TEST(BackendFormula, CompositeUsesScratchInputsAndValidatesFormulaBindings) {
   model.compositeInstructions[0].dial.formulaProgramIndex = 1;
   EXPECT_THROW(backend.build(view), std::runtime_error);
 }
+
+TEST(BackendFormula, CacheDependenciesDeduplicateRepeatedAndSimultaneouslyChangedParameters) {
+  using namespace Backends;
+  EngineView view;
+  auto& model = view.propagation;
+  model.parameterCount = 3;
+  model.totalBins = 1;
+  model.dialInputs = {{0}, {0}, {1}};
+  model.formulaPrograms.push_back(FormulaCompiler::compile("[a]+[b]+[c]", {"a", "b", "c"}));
+  model.formulaInputs = {{0, 0.}, {1, 0.}, {2, 0.}};
+  BackendDialDescriptor dial;
+  dial.type = BackendDialType::Formula;
+  dial.inputCount = 3;
+  model.dials.push_back(dial);
+  EventView event;
+  event.globalBinIndex = 0;
+  model.events.push_back(event);
+  model.eventWeights.push_back({1., 0, 1});
+  model.eventDialIndices.push_back(0);
+  for( auto traversal : {CpuCacheTraversal::Auto, CpuCacheTraversal::Indexed} ){
+    CpuBackend backend;
+    backend.build(view);
+    backend.setDiagnosticCacheTraversal(traversal);
+    const std::vector<std::vector<double>> points{{1., 2., 0.}, {2., 2., 0.}, {3., 4., 0.},
+                                                  {3., 4., 1.}, {3., 4., 1.}, {3., 5., 1.}};
+    const std::vector<std::size_t> candidates{1, 1, 1, 0, 0, 1};
+    for( std::size_t i = 0; i < points.size(); ++i ){
+      PropagationInputs inputs;
+      inputs.parameters.values = points[i];
+      const auto token = backend.requestPropagation(inputs);
+      EXPECT_DOUBLE_EQ(backend.getEventWeightsHostView(token)[0], 2 * points[i][0] + points[i][1]);
+      EXPECT_EQ(backend.getLastTimingSummary().cacheCandidateCount, candidates[i]);
+      EXPECT_EQ(backend.getLastTimingSummary().cacheInputTransformCount, 3 * candidates[i]);
+    }
+    // A rebuild must reset dependency generations and response validity.
+    backend.build(view);
+    PropagationInputs inputs;
+    inputs.parameters.values = points.back();
+    const auto token = backend.requestPropagation(inputs);
+    EXPECT_EQ(backend.getLastTimingSummary().cacheCandidateCount, 1);
+    EXPECT_DOUBLE_EQ(backend.getEventWeightsHostView(token)[0], 11.);
+  }
+}

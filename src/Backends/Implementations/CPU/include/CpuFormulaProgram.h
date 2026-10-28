@@ -60,6 +60,16 @@ namespace Backends {
     return stack_[0];
   }
 
+  // Resolve the dial's bindings once, outside the opcode loop. All formulas
+  // then use the same contiguous-input interpreter, including composite nodes.
+  // Scratch contains stackSize + inputCount doubles and belongs to the worker.
+  template<typename InputReader>
+  double evaluateBoundFormula(const FormulaProgram& program_, InputReader readInput_, double* scratch_) {
+    auto* values = scratch_ + program_.stackSize;
+    for( std::size_t i = 0; i < program_.inputCount; ++i ){ values[i] = readInput_(i); }
+    return evaluateFormula(program_, [values](std::size_t index_){ return values[index_]; }, scratch_);
+  }
+
   inline void validateFormulaDial(const PropagationView& model_, const BackendDialDescriptor& dial_,
                                    std::size_t availableInputs_ = std::size_t(-1)) {
     if( dial_.type != BackendDialType::Formula ){ return; }
@@ -91,7 +101,7 @@ namespace Backends {
       const auto& input = model_.dialInputs[dial_.firstInput + binding.parameterIndex];
       return Semantics::transformDialInput(input, parameters_[input.parameterIndex]);
     };
-    return Semantics::clampDialResponse(dial_, evaluateFormula(program, read, stack_));
+    return Semantics::clampDialResponse(dial_, evaluateBoundFormula(program, read, stack_));
   }
 }
 

@@ -134,7 +134,15 @@ ENUM_FIELD( Indexed )
     Result* _activeResult_{nullptr};
     const PropagationInputs* _activeInputs_{nullptr};
     std::vector<std::vector<std::uint32_t>> _cachedDialsByParameter_{};
-    std::vector<std::uint32_t> _multiInputCachedDials_{};
+    struct MultiInputCachedDial {
+      std::uint32_t dialIndex{0};
+      std::uint32_t generation{0};
+      std::size_t inputCount{0};
+    };
+    std::vector<MultiInputCachedDial> _multiInputCachedDials_{};
+    // Entries index the compact multi-input list, not the full dial model.
+    std::vector<std::vector<std::uint32_t>> _multiInputDialsByParameter_{};
+    std::uint32_t _cacheUpdateGeneration_{0};
     std::vector<std::uint32_t> _dirtyCachedDialIndices_{};
     std::vector<std::uint8_t> _changedCacheParameters_{};
     CpuCacheTraversal _cacheTraversal_{CpuCacheTraversal::Auto};

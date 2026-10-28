@@ -38,6 +38,13 @@ program. Binning constants, response limits, smoothing, and observable targets
 retain their existing behavior. Formulas without parameter inputs are evaluated
 once when the CPU backend is built.
 
+The CPU response cache indexes multi-input dials by their parameter dependencies.
+Only lists belonging to changed parameters are visited; generation markers
+deduplicate dials reached through several changed parameters or repeated inputs.
+During formula evaluation, named input bindings are resolved once into a
+contiguous worker-local array before interpreting the bytecode. The worker's
+preallocated formula scratch contains both this array and the evaluation stack.
+
 Unsupported syntax (including conditionals, comparisons, positional `x[i]`, ROOT
 distribution shortcuts and arbitrary C++ calls) raises an error during layout
 construction. There is no fallback to ROOT evaluation. Floating-point results

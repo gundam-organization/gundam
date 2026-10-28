@@ -4,6 +4,38 @@ These scripts measure performance; they are not part of the regular regression
 suite. Use a Release build with the Python interface enabled and select the
 matching installed `GUNDAM` Python module.
 
+## CPU formulas and composites with Eb migration
+
+`230CpuFormulaCompositeBenchmark.py` replays the five physical Eb parameters on
+the Upgrade configuration. Use the same data and migration overrides as the fit,
+then append `onlyEb.yaml` to isolate those dials:
+
+```sh
+env -u DYLD_LIBRARY_PATH \
+  PYTHONPATH="$PWD/cmake-build-release/src/PythonInterface" \
+  python3.15 tests/benchmarks/230CpuFormulaCompositeBenchmark.py \
+  --work-dir /path/to/upgrade-cc-2026 --threads 4 \
+  --output /path/to/new-eb-benchmark \
+  --override override/datasetHighlandv5.27.1_CCLyon.yaml \
+    override/ebMigrationDial.yaml override/binResponse.yaml \
+    override/backendCpuTest.yaml override/onlyEb.yaml
+```
+
+The model is loaded once as Asimov data. PCA initialization, parameter-step
+response scans, plotting and sampled OS profiling are disabled. No minimization
+or Hesse is run and no event limit is added. Constant, individual-coordinate and
+all-Eb changes alternate between ±0.1 and ±0.2 prior sigma. Defaults use three
+trials of 160 calls per scenario with eight warmups, rotating scenario order.
+
+The output contains the resolved configuration, actual loaded module and hash,
+parameter manifest, per-call timings/counters/likelihoods, and median/p95
+summaries. Histogram digests are captured after each trial; event weight, Pmu
+and bin digests are captured after the final trial of each scenario. All host
+materialization and digest calculation occur outside the timed evaluations.
+Separate baseline and candidate processes can therefore compare exact outputs
+as well as timing. The script assumes the five named physical Eb coordinates
+and loaded `Pmu` variable of this configuration.
+
 ## Resident MPS profiling with production inputs
 
 Build Release with `WITH_PYTHON_INTERFACE=ON`, then select that build's Python
