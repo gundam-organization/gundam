@@ -98,7 +98,7 @@ def backend_config(args):
                 'weightLayout': 'warpInterleaved' if args.worker.endswith('-interleaved') else 'eventMajor'}}
 
 
-def load_engine(args):
+def load_engine(args, *, preserve_configuration=False):
     import GUNDAM
     progress(f'{args.worker}: Python module {GUNDAM.__file__}')
     missing = [name for name in (*SECONDS_FIELDS, *COUNT_FIELDS)
@@ -114,12 +114,13 @@ def load_engine(args):
     if args.override:
         builder.override(args.override)
     config = json.loads(builder.getConfig().toString())['fitterEngineConfig']
-    config.update(enablePca=False, scaleParStepWithChi2Response=False,
-                  generateSamplePlots=False, generateOneSigmaPlots=False)
+    if not preserve_configuration:
+        config.update(enablePca=False, scaleParStepWithChi2Response=False,
+                      generateSamplePlots=False, generateOneSigmaPlots=False)
     # Replace backend-specific overrides so CPU never inherits CUDA-only keys.
     backend = backend_config(args)
     backend_type = backend['type']
-    config['likelihoodInterfaceConfig']['backendManagerConfig'] = backend
+    config.setdefault('likelihoodInterfaceConfig', {})['backendManagerConfig'] = backend
     write_json(args.output / 'resolved-fitter-config.json', config)
     engine = GUNDAM.FitterEngine()
     engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
@@ -321,7 +322,7 @@ def measure_resident(args):
             progress(f'{case}: replacing backend; keeping loaded events, dials and Asimov data')
             engine.getBackendsManager().replaceBackend(
                 backend['type'], GUNDAM.JsonType(json.dumps(backend['backendConfig'])))
-            config['likelihoodInterfaceConfig']['backendManagerConfig'] = backend
+            config.setdefault('likelihoodInterfaceConfig', {})['backendManagerConfig'] = backend
             write_json(args.output / 'resolved-fitter-config.json', config)
             engine.evaluateLikelihood()  # Prime new buffers outside measurements.
         write_json(args.output / 'setup.json', {

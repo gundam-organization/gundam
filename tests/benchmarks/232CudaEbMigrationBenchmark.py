@@ -30,13 +30,26 @@ DEFAULT_CASES = ['CPU', 'CUDA-cachedResponses', 'CUDA-cachedResponses-interleave
                  'CUDA-recomputeResponses', 'CUDA-recomputeResponses-interleaved']
 
 
+def config_sections(config):
+    """Read the same paths/aliases accepted by GUNDAM without migrating them."""
+    engine = config['fitterEngineConfig']
+    likelihood = engine.get('likelihoodInterfaceConfig', {})
+    propagator = likelihood.get('propagatorConfig', engine.get('propagatorConfig'))
+    if not isinstance(propagator, dict):
+        raise RuntimeError('Missing propagatorConfig in the fitter or likelihood configuration')
+    sample_set = propagator.get('sampleSetConfig', propagator.get('fitSampleSetConfig'))
+    if not isinstance(sample_set, dict):
+        raise RuntimeError('Missing sampleSetConfig/fitSampleSetConfig in the propagator')
+    samples = sample_set.get('sampleList', sample_set.get('fitSampleList'))
+    if not isinstance(samples, list):
+        raise RuntimeError('Expected an unfolded sampleList/fitSampleList')
+    return propagator, samples
+
+
 def prepare_config(config, variant, variable, width, sample_match):
     """Change explicit benchmark controls after resolving user-supplied inputs."""
     config = copy.deepcopy(config)
-    samples = config['fitterEngineConfig']['likelihoodInterfaceConfig'][
-        'propagatorConfig']['sampleSetConfig']['sampleList']
-    if not isinstance(samples, list):
-        raise RuntimeError('Expected an unfolded sampleList')
+    propagator, samples = config_sections(config)
     selected = [sample['name'] for sample in samples
                 if sample.get('isEnabled', True) and re.search(sample_match, sample['name'])]
     if not selected:
@@ -56,7 +69,7 @@ def prepare_config(config, variant, variable, width, sample_match):
         elif isinstance(value, list):
             for child in value:
                 visit(child)
-    visit(config['fitterEngineConfig']['likelihoodInterfaceConfig']['propagatorConfig'])
+    visit(propagator)
     if not all(counts.values()):
         raise RuntimeError(f'The selected configuration needs Composite and Formula definitions: {counts}')
     if variable is None:
@@ -180,7 +193,7 @@ def worker(args):
     replay.config, replay.override = args.output / 'input-config.json', []
     replay.worker, replay.execution_mode = args.worker_case, 'isolated'
     replay.event_variables, replay.require_rebinning = [coverage['variable']], True
-    engine = profiling.load_engine(replay)
+    engine = profiling.load_engine(replay, preserve_configuration=True)
     sequence = profiling.parameter_sequence(replay, engine)
     center = profiling.snapshot_events(replay, engine, 'center', args.seed)
     check_loaded_model(engine, coverage, args.worker_case, args.probe_events)

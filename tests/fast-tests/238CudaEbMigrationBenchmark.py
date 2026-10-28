@@ -123,6 +123,50 @@ def main():
             assert counts['rebinnedEventCount']['max'] == 0  # Preserve automatic-dial cache reuse.
 
         assert 'Smoothing overhead' in (output / 'report.md').read_text()
+        # GUNDAM accepts relocated/aliased fields. Inspect them without migrating
+        # the user's config, including the mixed layout created by a backend override.
+        legacy = copy.deepcopy(config)
+        fitter = legacy['fitterEngineConfig']
+        fitter['generateSamplePlots'] = True  # Preserve user flags; light output suppresses actual plots.
+        likelihood = fitter.pop('likelihoodInterfaceConfig')
+        propagator = likelihood.pop('propagatorConfig')
+        propagator['fitSampleSetConfig'] = propagator.pop('sampleSetConfig')
+        sample_set = propagator['fitSampleSetConfig']
+        sample_set['fitSampleList'] = sample_set.pop('sampleList')
+        sample_set['fitSampleList'][0]['binningResponse'] = copy.deepcopy(original_response)
+        propagator['parameterSetListConfig'] = propagator.pop('parametersManagerConfig')['parameterSetList']
+        propagator['dataSetList'] = likelihood.pop('dataSetList')
+        joint = likelihood.pop('jointProbabilityConfig')
+        propagator['llhStatFunction'] = joint.pop('type')
+        propagator['llhConfig'] = joint
+        fitter['propagatorConfig'] = propagator
+        for with_backend in (False, True):
+            source = copy.deepcopy(legacy)
+            if with_backend:
+                source['fitterEngineConfig']['likelihoodInterfaceConfig'] = {
+                    'backendManagerConfig': {'isEnabled': True, 'type': 'CUDA'}}
+            prepared, legacy_coverage = bench.prepare_config(source, 'configured', None, None, 'sample')
+            assert prepared == source
+            assert legacy_coverage['variable'] == 'X'
+            name = 'legacy-backend' if with_backend else 'legacy'
+            (folder / f'{name}.json').write_text(json.dumps(source))
+            legacy_output = folder / f'{name}-results'
+            with (folder / f'{name}.log').open('w') as log:
+                code = subprocess.run([sys.executable, str(path), '--work-dir', str(folder),
+                    '--config', f'{name}.json', '--cases', 'CPU', '--calls', '3',
+                    '--global-calls', '3', '--trials', '1', '--warmup', '1',
+                    '--output', str(legacy_output)], stdout=log, stderr=subprocess.STDOUT).returncode
+            if code:
+                print((folder / f'{name}.log').read_text())
+                for native in legacy_output.glob('*/CPU/native.log'):
+                    print(native.read_text()[-6000:])
+                raise RuntimeError(f'{name} benchmark failed')
+            resolved = json.loads((legacy_output / 'configured' / 'CPU' / 'resolved-fitter-config.json').read_text())
+            expected = copy.deepcopy(source['fitterEngineConfig'])
+            expected.setdefault('likelihoodInterfaceConfig', {})['backendManagerConfig'] = {
+                'isEnabled': True, 'type': 'CPU', 'backendConfig': {}}
+            assert resolved == expected  # Only the backend changes, not physics/initialization settings.
+
         # Cross-variant comparison must reject different replay coordinates.
         mismatch = output / 'smooth' / 'CPU' / 'global-trial1.json'
         values = json.loads(mismatch.read_text())
