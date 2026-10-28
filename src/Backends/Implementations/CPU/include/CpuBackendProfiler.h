@@ -30,7 +30,7 @@ namespace Backends {
       Snapshot begin{}, end{};
       std::size_t evaluatedDials{0}, unchangedInputs{0};
       std::size_t weightEvents{0}, weightBlocks{0};
-      std::array<std::size_t, 13> evaluatedDialTypes{};
+      std::array<std::size_t, 14> evaluatedDialTypes{};
       bool ran{false};
     };
     class WorkerScope {

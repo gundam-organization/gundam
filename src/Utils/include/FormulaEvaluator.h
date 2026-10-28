@@ -15,6 +15,8 @@ public:
   void setInputNames(const std::vector<std::string>& names_, const std::vector<std::string>& constantNames_ = {});
 
   [[nodiscard]] int getInputCount() const{ return _inputCount_; }
+  [[nodiscard]] const std::string& getFormulaStr() const{ return _formulaStr_; }
+  [[nodiscard]] const std::vector<int>& getParameterInputIndices() const{ return _parameterInputIndices_; }
   TFormula& getFormula(){ return _formula_; }
   const TFormula& getFormula() const{ return _formula_; }
 
@@ -37,6 +39,7 @@ private:
   void checkInputsBound() const;
 
   TFormula _formula_{};
+  std::string _formulaStr_;
   int _inputCount_{-1};
   bool _isInputOrderMatching_{false};
   // One entry per ROOT parameter; -1 keeps a configured constant.

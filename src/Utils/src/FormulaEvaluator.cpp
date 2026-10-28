@@ -13,6 +13,7 @@ void FormulaEvaluator::setFormulaStr(const std::string& formulaStr_){
   // Expressions must not register themselves by name in ROOT's global
   // registry, including when loaders compile the same text independently.
   _formula_ = TFormula(formulaStr_.c_str(), formulaStr_.c_str(), false);
+  _formulaStr_ = formulaStr_;
   LogThrowIf(not _formula_.IsValid(), "\"" << formulaStr_ << "\": could not be parsed as formula expression.");
   LogThrowIf(_formula_.GetNdim() != 0,
              "Formula evaluation requires named inputs such as [delta]; positional x[i] inputs are unsupported");

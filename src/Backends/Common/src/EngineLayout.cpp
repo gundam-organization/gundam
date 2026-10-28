@@ -1,4 +1,5 @@
 #include "EngineLayout.h"
+#include "FormulaCompiler.h"
 
 #include "Bilinear.h"
 #include "Bicubic.h"
@@ -6,6 +7,7 @@
 #include "CompositeDial.h"
 #include "DialResponseSupervisor.h"
 #include "EventDialCache.h"
+#include "EventFormula.h"
 #include "ExternalWeightDispatcher.h"
 #include "Tabulated.h"
 #include "Kriged.h"
@@ -16,6 +18,7 @@
 #include "MonotonicSpline.h"
 #include "Norm.h"
 #include "Parameter.h"
+#include "RootFormula.h"
 #include "Sample.h"
 #include "SampleSet.h"
 #include "Shift.h"
@@ -205,7 +208,9 @@ namespace {
         if( not dialIndexMap.emplace(interface, uncompiledDial).second ){ continue; }
         const auto* dial = interface->getDialBaseRef();
         LogThrowIf(dial == nullptr, "Null DialBase while building EngineView.");
-        if( dynamic_cast<const CompositeDial*>(dial) != nullptr ){ continue; }
+        if( dynamic_cast<const CompositeDial*>(dial) != nullptr
+            or dynamic_cast<const RootFormula*>(dial) != nullptr
+            or dynamic_cast<const EventFormula*>(dial) != nullptr ){ continue; }
         if( dynamic_cast<const Shift*>(dial) != nullptr ){ ++payloadCount; }
         else if( dynamic_cast<const Norm*>(dial) == nullptr
                  and dynamic_cast<const ExternalWeightDispatcher*>(dial) == nullptr
@@ -225,6 +230,7 @@ namespace {
     std::unordered_map<const ExternalWeightBuffer*, std::size_t> externalSourceIndices{};
     std::unordered_map<const std::vector<double>*, std::size_t> tableSourceIndices{};
     CompositePayloadMap compositePayloads;
+    std::unordered_map<const RootFormula*, std::size_t> formulaPrograms;
     std::size_t externalWeightCount{0};
     std::unordered_set<const DialInputBuffer*> variableInputBuffers;
 
@@ -282,7 +288,36 @@ namespace {
           dialRef.maxResponse = smoothing.maxResponse - smoothing.maxWidth;
         }
 
-        if( const auto* composite = dynamic_cast<const CompositeDial*>(dialBase) ){
+        const auto* eventFormula = dynamic_cast<const EventFormula*>(dialBase);
+        const auto* formula = dynamic_cast<const RootFormula*>(eventFormula == nullptr ? dialBase : eventFormula->getFormula());
+        if( formula != nullptr ){
+          dialRef.type = Backends::BackendDialType::Formula;
+          const auto inserted = formulaPrograms.emplace(formula, propagation.formulaPrograms.size());
+          if( inserted.second ){
+            LogThrowIf(formula->getInputCount() < 0, "Formula inputs have not been bound.");
+            const auto& root = formula->getFormula();
+            const auto& indices = formula->getParameterInputIndices();
+            std::vector<std::string> names(formula->getInputCount());
+            std::map<std::string, double> constants;
+            for( int i = 0; i < root.GetNpar(); ++i ){
+              if( indices.at(i) >= 0 ){ names.at(indices[i]) = root.GetParName(i); }
+              else{ constants.emplace(root.GetParName(i), root.GetParameter(i)); }
+            }
+            propagation.formulaPrograms.push_back(Backends::FormulaCompiler::compile(
+                formula->getFormulaStr(), names, constants));
+          }
+          dialRef.formulaProgramIndex = inserted.first->second;
+          dialRef.firstFormulaInput = propagation.formulaInputs.size();
+          for( int i = 0; i < formula->getInputCount(); ++i ){
+            if( eventFormula == nullptr ){ propagation.formulaInputs.push_back({i, 0.}); }
+            else{
+              const auto& source = eventFormula->getDefinition().inputs.at(i);
+              propagation.formulaInputs.push_back({source.parameterIndex,
+                  source.eventIndex < 0 ? 0. : eventFormula->getEventValues().at(source.eventIndex)});
+            }
+          }
+        }
+        else if( const auto* composite = dynamic_cast<const CompositeDial*>(dialBase) ){
           dialRef.type = Backends::BackendDialType::Composite;
           dialRef.compositeProgram = compileComposite(propagation, *composite, compositePayloads);
         }

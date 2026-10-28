@@ -1,6 +1,7 @@
 set(LIB_NAME GundamBackends)
 
 set(SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/FormulaCompiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BinningGeometry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/DevicePropagationModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EventStateCache.cpp
@@ -78,6 +79,9 @@ if(APPLE)
 endif()
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/FormulaProgram.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/FormulaCompiler.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuFormulaProgram.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DialDependencyGroups.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DialDependencies.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/HistogramEventIndex.h

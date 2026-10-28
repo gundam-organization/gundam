@@ -46,6 +46,8 @@ ENUM_FIELD( EventVariable )
     std::size_t externalBlockIndex{0};
     std::size_t externalWeightIndex{0};
     std::size_t compositeProgram{0};
+    std::size_t formulaProgramIndex{0};
+    std::size_t firstFormulaInput{0};
     std::size_t firstTableTerm{0};
     std::size_t tableTermCount{0};
     bool allowExtrapolation{false};

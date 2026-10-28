@@ -143,6 +143,7 @@ ENUM_FIELD( Indexed )
     bool _usesLinearCacheTraversal_{false};
     std::vector<double> _cachedDialResponses_{};
     std::vector<std::vector<double>> _compositeScratch_{};
+    std::vector<std::vector<double>> _formulaScratch_{};
     std::vector<double> _cachedDialInputs_{};
     struct CachedInputGroup {
       std::size_t firstInput{0};

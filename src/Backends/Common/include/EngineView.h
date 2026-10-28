@@ -2,6 +2,7 @@
 #define GUNDAM_BACKEND_MODEL_H
 
 #include "EngineDescriptors.h"
+#include "FormulaProgram.h"
 #include "BinningGeometry.h"
 
 #include <cstdint>
@@ -56,6 +57,8 @@ namespace Backends {
     std::vector<CompositeProgram> compositePrograms{};
     std::vector<CompositeInstruction> compositeInstructions{};
     std::vector<BackendDialInputDescriptor> compositeInputs{};
+    std::vector<FormulaProgram> formulaPrograms{};
+    std::vector<FormulaInput> formulaInputs{};
     std::vector<BackendTableTerm> tableTerms{};
     std::vector<ExternalWeightBlockDescriptor> externalWeightBlocks{};
     std::vector<SampleView> samples{};
@@ -87,6 +90,8 @@ namespace Backends {
       compositePrograms.clear();
       compositeInstructions.clear();
       compositeInputs.clear();
+      formulaPrograms.clear();
+      formulaInputs.clear();
       tableTerms.clear();
       externalWeightBlocks.clear();
       samples.clear();

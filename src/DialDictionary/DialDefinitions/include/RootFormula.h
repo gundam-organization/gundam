@@ -24,6 +24,8 @@ public:
   void setFormulaStr(const std::string& formulaStr_);
   void setInputNames(const std::vector<std::string>& names_, const std::vector<std::string>& constantNames_ = {});
   [[nodiscard]] int getInputCount() const{ return _evaluator_.getInputCount(); }
+  [[nodiscard]] const std::string& getFormulaStr() const{ return _evaluator_.getFormulaStr(); }
+  [[nodiscard]] const std::vector<int>& getParameterInputIndices() const{ return _evaluator_.getParameterInputIndices(); }
 
   TFormula& getFormula(){ return _evaluator_.getFormula(); }
   const TFormula& getFormula() const{ return _evaluator_.getFormula(); }
