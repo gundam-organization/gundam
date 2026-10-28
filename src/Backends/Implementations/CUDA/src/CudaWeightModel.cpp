@@ -1,6 +1,7 @@
 #include "CudaWeightModel.h"
 #include "CudaBinning.h"
 #include "DialDependencyGroups.h"
+#include "DialProgramValidation.h"
 #include "HistogramEventIndex.h"
 #include "Semantics/BackendDialSemantics.h"
 
@@ -21,7 +22,8 @@ namespace {
     return type_ == Backends::BackendDialType::ExternalWeight or Backends::isTableDial(type_);
   }
 
-  void validateDial(const Backends::PropagationView& model_, const Backends::BackendDialDescriptor& dial_) {
+  void validateDial(const Backends::PropagationView& model_, const Backends::BackendDialDescriptor& dial_, bool compositeNode_ = false) {
+    const auto& inputs = compositeNode_ ? model_.compositeInputs : model_.dialInputs;
     using namespace Backends;
     require(dial_.payloadOffset <= model_.dialPayloads.size()
             and dial_.payloadSize <= model_.dialPayloads.size() - dial_.payloadOffset,
@@ -29,6 +31,9 @@ namespace {
     require(dial_.payloadSize <= std::size_t(std::numeric_limits<int>::max() - 16), "dial payload is too large.");
     const auto size = dial_.payloadSize;
     switch( dial_.type ){
+      case BackendDialType::Formula:
+        validateFormulaDial(model_, dial_, inputs.size()); break;
+      case BackendDialType::Composite: require(not compositeNode_, "nested composites must be flattened."); break;
       case BackendDialType::Norm: break;
       case BackendDialType::Shift: require(size >= 1, "Shift requires a constant payload."); break;
       case BackendDialType::CompactSpline:
@@ -37,7 +42,7 @@ namespace {
       case BackendDialType::GeneralSpline: require(size >= 8 and (size - 2) % 3 == 0, "invalid general spline payload."); break;
       case BackendDialType::Graph: require(size >= 2 and size % 2 == 0, "invalid graph payload."); break;
       case BackendDialType::Bilinear:
-      case BackendDialType::Bicubic: Semantics::validateSurfaceDial(model_, dial_); break;
+      case BackendDialType::Bicubic: Semantics::validateSurfaceDial(model_, dial_, inputs.size()); break;
       case BackendDialType::ExternalWeight:
         require(dial_.externalBlockIndex < model_.externalWeightBlocks.size(), "invalid external block index.");
         require(dial_.externalWeightIndex < model_.externalWeightBlocks[dial_.externalBlockIndex].count,
@@ -48,12 +53,13 @@ namespace {
       default: throw std::runtime_error("CudaBackend: unsupported dial type.");
     }
     if( dial_.type != BackendDialType::Shift and not isExternal(dial_.type) ){
-      const auto count = dial_.type == BackendDialType::Bilinear or dial_.type == BackendDialType::Bicubic ? 2u : 1u;
-      require(dial_.inputCount == count and dial_.firstInput <= model_.dialInputs.size()
-              and count <= model_.dialInputs.size() - dial_.firstInput, "invalid dial parameter input range.");
+      const auto count = dial_.type == BackendDialType::Formula or dial_.type == BackendDialType::Composite
+          ? dial_.inputCount : (dial_.type == BackendDialType::Bilinear or dial_.type == BackendDialType::Bicubic ? 2u : 1u);
+      require(dial_.inputCount == count and dial_.firstInput <= inputs.size()
+              and count <= inputs.size() - dial_.firstInput, "invalid dial parameter input range.");
       for( std::size_t i = 0; i < count; ++i ){
-        const auto& input = model_.dialInputs[dial_.firstInput + i];
-        require(input.source == DialInputSource::Parameter and input.parameterIndex < model_.parameterCount,
+        const auto& input = inputs[dial_.firstInput + i];
+        require(input.source == DialInputSource::Parameter and (compositeNode_ or input.parameterIndex < model_.parameterCount),
                 "event-variable dial inputs are not supported; parameter index must be valid.");
         require(not input.useMirror or (std::isfinite(input.mirrorMin) and std::isfinite(input.mirrorRange)
                 and input.mirrorRange > 0.), "mirror range must be finite and positive.");
@@ -93,6 +99,11 @@ namespace {
 }
 
 Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_) {
+  static_assert(std::is_trivially_copyable<CudaFormulaProgram>::value);
+  static_assert(std::is_trivially_copyable<FormulaInstruction>::value);
+  static_assert(std::is_trivially_copyable<FormulaInput>::value);
+  static_assert(std::is_trivially_copyable<CompositeProgram>::value);
+  static_assert(std::is_trivially_copyable<CompositeInstruction>::value);
   static_assert(std::is_trivially_copyable<BackendDialDescriptor>::value);
   static_assert(std::is_trivially_copyable<BackendDialInputDescriptor>::value);
   static_assert(std::is_trivially_copyable<BackendEventWeightDescriptor>::value);
@@ -126,6 +137,19 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   require(model.totalBins >= 0, "totalBins must be nonnegative.");
   require(model.events.size() == model.eventWeights.size(), "event weight layout size mismatch.");
   require(not model.hasReweightCap or std::isfinite(model.maxReweight), "reweight cap must be finite.");
+  for( const auto& program : model.formulaPrograms ){
+    program.validate();
+    for( double value : program.constants ){ require(std::isfinite(value), "formula literals must be finite."); }
+  }
+  for( const auto& input : model.formulaInputs ){
+    require(std::isfinite(input.constant), "formula constants must be finite.");
+  }
+  validateCompositePrograms(model);
+  for( const auto& instruction : model.compositeInstructions ){
+    validateDial(model, instruction.dial, true);
+    require(not std::isnan(instruction.inputMin) and not std::isnan(instruction.inputMax)
+            and instruction.inputMin <= instruction.inputMax, "invalid composite spline input bounds.");
+  }
   for( const auto& dial : model.dials ){ validateDial(model, dial); }
   for( auto dial : model.eventDialIndices ){ require(dial < model.dials.size(), "event dial index is out of range."); }
   for( const auto& event : model.eventWeights ){
@@ -159,7 +183,10 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   for( const auto& group : groups.multiParameterDials ){
     const auto first = out.parameterDialIndices.size();
     out.parameterDialIndices.insert(out.parameterDialIndices.end(), group.second.begin(), group.second.end());
-    out.surfaceGroups.push_back({group.first[0], group.first[1], first, out.parameterDialIndices.size()});
+    if( group.first.size() == 2 ){
+      out.surfaceGroups.push_back({group.first[0], group.first[1], first, out.parameterDialIndices.size()});
+    }
+    else{ out.multiInputGroups.push_back({group.first, first, out.parameterDialIndices.size()}); }
   }
   for( const auto& group : groups.externalDials ){
     const auto first = out.parameterDialIndices.size();
@@ -328,6 +355,40 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     require(sample.dataSums.empty() or bool(sample.evalBin), "likelihood evaluator is missing.");
   }
   out.events = model.eventWeights;
+  out.formulaInputs = model.formulaInputs;
+  out.compositePrograms = model.compositePrograms;
+  out.compositeInstructions = model.compositeInstructions;
+  out.compositeInputs = model.compositeInputs;
+  for( const auto& program : model.formulaPrograms ){
+    out.formulaPrograms.push_back({out.formulaInstructions.size(), program.instructions.size(),
+                                   out.formulaConstants.size(), program.stackSize});
+    out.formulaInstructions.insert(out.formulaInstructions.end(), program.instructions.begin(), program.instructions.end());
+    out.formulaConstants.insert(out.formulaConstants.end(), program.constants.begin(), program.constants.end());
+  }
+  for( std::size_t i = 0; i < out.dials.size(); ++i ){
+    const auto& dial = out.dials[i];
+    if( dial.type != BackendDialType::Composite and dial.type != BackendDialType::Formula ){ continue; }
+    if( out.programScratchOffsets.empty() ){ out.programScratchOffsets.resize(out.dials.size()); }
+    out.programScratchOffsets[i] = out.programScratchSize;
+    std::size_t slots = dial.inputCount, stack = 0;
+    if( dial.type == BackendDialType::Formula ){ stack = out.formulaPrograms[dial.formulaProgramIndex].stackSize; }
+    else{
+      const auto& program = out.compositePrograms[dial.compositeProgram];
+      slots = program.scratchSize();
+      for( std::size_t j = 0; j < program.instructionCount; ++j ){
+        const auto& node = out.compositeInstructions[program.firstInstruction + j].dial;
+        if( node.type == BackendDialType::Formula ){
+          stack = std::max(stack, out.formulaPrograms[node.formulaProgramIndex].stackSize);
+        }
+      }
+    }
+    // Reserve at least one slot so constant/empty graphs have valid pointers.
+    require(slots <= std::numeric_limits<std::size_t>::max() - stack, "program scratch overflow.");
+    slots = std::max<std::size_t>(1, slots + stack);
+    require(slots <= std::numeric_limits<std::size_t>::max() / sizeof(double) - out.programScratchSize,
+            "program scratch allocation overflow.");
+    out.programScratchSize += slots;
+  }
   out.inputs = model.dialInputs;
   out.payloads = model.dialPayloads;
   if( interleaveEventDials_ and not out.events.empty() ){
@@ -378,7 +439,8 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
 
 void Backends::CudaResponseUpdatePlan::select(const std::vector<std::size_t>& offsets_,
     const std::vector<double>& previous_, const std::vector<double>& current_,
-    const std::vector<CudaSurfaceGroup>& surfaceGroups_) {
+    const std::vector<CudaSurfaceGroup>& surfaceGroups_,
+    const std::vector<CudaMultiInputGroup>& multiInputGroups_) {
   require(previous_.size() == current_.size() and offsets_.size() == current_.size() + 1,
           "response update parameter layout mismatch.");
   ranges.clear();
@@ -393,6 +455,15 @@ void Backends::CudaResponseUpdatePlan::select(const std::vector<std::size_t>& of
   for( const auto& group : surfaceGroups_ ){
     if( previous_[group.firstParameter] == current_[group.firstParameter]
         and previous_[group.secondParameter] == current_[group.secondParameter] ){ continue; }
+    const auto count = group.endDial - group.firstDial;
+    ranges.push_back({group.firstDial, group.endDial, blockCount});
+    dialCount += count;
+    blockCount += (count - 1) / cudaResponseBlockSize + 1;
+  }
+  for( const auto& group : multiInputGroups_ ){
+    const bool changed = std::any_of(group.parameters.begin(), group.parameters.end(),
+        [&](std::size_t index_){ return previous_[index_] != current_[index_]; });
+    if( not changed ){ continue; }
     const auto count = group.endDial - group.firstDial;
     ranges.push_back({group.firstDial, group.endDial, blockCount});
     dialCount += count;

@@ -6,6 +6,7 @@ Use --execution-mode isolated for observable/dynamic/smoothed models: backend
 replacement currently requires fixed bins and no observable responses.
 CUDA stages use the backend's existing stream events, without extra stage fences.
 """
+from array import array
 import argparse
 import hashlib
 import importlib.util
@@ -135,6 +136,59 @@ def load_engine(args):
     return engine
 
 
+def snapshot_events(args, engine, scenario, seed):
+    """Materialize only after evaluation timers; retain values for tolerant comparisons."""
+    manager = engine.getBackendsManager()
+    # A final untimed evaluation uses normal materialization, which also handles
+    # fixed-bin models that do not publish an EventState output.
+    manager.setEnableAutoMaterialize(True)
+    try:
+        engine.evaluateLikelihood()
+    finally:
+        manager.setEnableAutoMaterialize(False)
+    values, counts = array('d'), []
+    samples = engine.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList()
+    for sample in samples:
+        events = sample.getEventList()
+        counts.append(len(events))
+        for event in events:
+            values.extend((event.getEventWeight(), float(event.getIndices().bin)))
+            for name in args.event_variables:
+                values.append(event.getVariables().fetchVariable(name).getVarAsDouble())
+    if any(not math.isfinite(value) for value in values):
+        raise RuntimeError('Nonfinite materialized event state')
+    filename = f'{scenario}-events-{seed}.bin'
+    with (args.output / filename).open('wb') as stream:
+        values.tofile(stream)
+    return {'file': filename, 'sampleEventCounts': counts, 'variables': args.event_variables,
+            'stride': 2 + len(args.event_variables), 'values': len(values), 'format': 'native-double'}
+
+
+def compare_events(left_dir, right_dir, left, right, relative, absolute):
+    if left is None and right is None:
+        return 0., 0
+    if left is None or right is None or any(left[key] != right[key] for key in
+            ('sampleEventCounts', 'variables', 'stride', 'values', 'format')):
+        raise RuntimeError('Event snapshot layouts differ')
+    snapshots = []
+    for directory, entry in ((left_dir, left), (right_dir, right)):
+        values = array('d')
+        with (directory / entry['file']).open('rb') as stream:
+            values.fromfile(stream, entry['values'])
+            if stream.read(1):
+                raise RuntimeError('Unexpected trailing event snapshot data')
+        snapshots.append(values)
+    maximum, mismatches = 0., 0
+    for index, (a, b) in enumerate(zip(*snapshots)):
+        if index % left['stride'] == 1:
+            mismatches += a != b  # Bin membership must agree exactly.
+        else:
+            maximum = max(maximum, abs(a - b))
+            if not math.isclose(a, b, rel_tol=relative, abs_tol=absolute):
+                raise RuntimeError(f'Event state differs at value {index}: {a} versus {b}')
+    return maximum, mismatches
+
+
 def evaluate_pass(args, engine, sequence, scenario, calls, seed):
     sequence.reset()
     engine.evaluateLikelihood()  # Identical center and primed cache in every trial.
@@ -169,7 +223,10 @@ def evaluate_pass(args, engine, sequence, scenario, calls, seed):
     outside = outside_histogram(engine)
     if any(not math.isfinite(v) for pair in bins + outside for v in pair):
         raise RuntimeError('Nonfinite materialized histogram')
-    return {'rows': rows, 'timings': summarize(rows), 'histogram': bins, 'outsideHistogram': outside}
+    result = {'rows': rows, 'timings': summarize(rows), 'histogram': bins, 'outsideHistogram': outside}
+    if args.event_variables is not None:
+        result['eventSnapshot'] = snapshot_events(args, engine, scenario, seed)
+    return result
 
 
 def measure(args, engine=None, sequence=None):
@@ -285,10 +342,16 @@ def compare(output, cases, scenarios, trials, relative, absolute):
         entries = {}
         for scenario in scenarios:
             max_llh, max_bin, max_outside, passed = 0., 0., 0., True
+            max_event, bin_mismatches = 0., 0
             for trial in range(1, trials + 1):
                 name = f'{scenario}-trial{trial}.json'
                 left = json.loads((output / reference / name).read_text())
                 right = json.loads((output / case / name).read_text())
+                event_delta, mismatches = compare_events(output / reference, output / case,
+                    left.get('eventSnapshot'), right.get('eventSnapshot'), relative, absolute)
+                max_event = max(max_event, event_delta)
+                bin_mismatches += mismatches
+                passed &= mismatches == 0
                 if len(left['rows']) != len(right['rows']):
                     raise RuntimeError('Evaluation counts differ')
                 for a, b in zip(left['rows'], right['rows']):
@@ -312,7 +375,8 @@ def compare(output, cases, scenarios, trials, relative, absolute):
             def median(case_name):
                 summary = json.loads((output / case_name / 'summary.json').read_text())
                 return summary['scenarios'][scenario]['timings']['evaluationSeconds']['medianMs']
-            entries[scenario] = {'passed': passed, 'maxAbsoluteLikelihoodDifference': max_llh,
+            entries[scenario] = {'passed': passed, 'maxAbsoluteEventDifference': max_event,
+                                 'eventBinMismatches': bin_mismatches, 'maxAbsoluteLikelihoodDifference': max_llh,
                                  'maxAbsoluteHistogramOrErrorDifference': max_bin,
                                  'maxAbsoluteOutsideOrErrorDifference': max_outside,
                                  'speedupOverReference': median(reference) / median(case)}
@@ -363,7 +427,9 @@ def write_report(output, cases):
                   'Inspect `local1-coordinate-costs.json` for the most expensive parameter changes.',
                   'Each case summary ranks CUDA stages in `gpuStageRanking`.',
                   '`comparison.json` checks every measured likelihood and each trial\'s final histogram',
-                  '(contents, errors and smoothed outside bins), and reports speedups against CPU when selected.', '',
+                  '(contents, errors and smoothed outside bins), and reports speedups against CPU when selected.',
+                  '`--event-variables Pmu` also compares all event weights, Pmu and exact bin membership',
+                  'after each trial. Event materialization and comparison are outside evaluation timers.', '',
                   'These are seeded propagation workloads, not the distribution of calls in a real fit.',
                   'The gap between evaluation and GPU time also contains host preparation, transfers,',
                   'likelihood/penalty work, launch overhead and synchronization. It is not all GPU wait.',
@@ -433,6 +499,8 @@ def main():
                         help='Require at least one measured rebin in every nonconstant scenario/case')
     parser.add_argument('--scenarios', nargs='+', choices=['constant', 'local1', 'local2', 'global'],
                         default=['constant', 'local1', 'local2', 'global'])
+    parser.add_argument('--event-variables', nargs='*', default=None,
+                        help='Compare all event weights, exact bin indices and these variables outside timers')
     parser.add_argument('--relative-tolerance', type=float, default=1e-9)
     parser.add_argument('--absolute-tolerance', type=float, default=1e-7)
     parser.add_argument('--output', type=Path,

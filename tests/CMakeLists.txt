@@ -99,6 +99,7 @@ if( WITH_GOOGLE_TEST )
 
   if(WITH_BACKENDS)
     list(APPEND FAST_TESTS GTests/unitTest_CudaBackend.cpp)
+    list(APPEND FAST_TESTS GTests/unitTest_CudaBackendPrograms.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_EngineLayout.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_CpuComposite.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_BackendFormula.cpp)
@@ -126,24 +127,27 @@ if( WITH_GOOGLE_TEST )
 
   if(WITH_BACKENDS AND GUNDAM_CUDA_ENABLED)
     add_executable(gundamGTest_cudaBackend.exe
+        GTests/unitTest_CudaBackendPrograms.cpp
         GTests/unitTest_CudaBackendDevice.cpp
         GTests/unitTest_CudaBackendPropagation.cpp
         GTests/unitTest_CudaBackendSurface.cpp
         GTests/unitTest_CudaBackendExternal.cpp
         GTests/unitTest_CudaBackendObservable.cpp
         GTests/unitTest_CudaBackendSmoothed.cpp)
+    target_compile_definitions(gundamGTest_cudaBackend.exe PRIVATE GUNDAM_TEST_CUDA_DEVICE)
     target_link_libraries(gundamGTest_cudaBackend.exe PRIVATE
         GTest::gtest_main GundamBackends CUDA::cudart)
     set_property(TARGET gundamGTest_cudaBackend.exe APPEND PROPERTY
         BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
     # Register without discovery: building must work without an allocated GPU.
+    add_test(NAME cuda-backend-programs COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPrograms.*)
     add_test(NAME cuda-backend-skeleton COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendDevice.*)
     add_test(NAME cuda-backend-propagation COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPropagation.*)
     add_test(NAME cuda-backend-surfaces COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSurface.*)
     add_test(NAME cuda-backend-external COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendExternal.*)
     add_test(NAME cuda-backend-observables COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendObservable.*)
     add_test(NAME cuda-backend-smoothed COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSmoothed.*)
-    set_tests_properties(cuda-backend-skeleton cuda-backend-propagation cuda-backend-surfaces cuda-backend-external cuda-backend-observables cuda-backend-smoothed PROPERTIES LABELS "cuda;device" TIMEOUT 120)
+    set_tests_properties(cuda-backend-programs cuda-backend-skeleton cuda-backend-propagation cuda-backend-surfaces cuda-backend-external cuda-backend-observables cuda-backend-smoothed PROPERTIES LABELS "cuda;device" TIMEOUT 120)
   endif()
 
   ## Create a list of all of the regular tests.  These are always

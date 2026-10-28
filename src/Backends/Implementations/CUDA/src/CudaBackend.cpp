@@ -139,6 +139,12 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->diagnostics = {
       {"available", true}, {"events", packed.events.size()}, {"uniqueDials", packed.dials.size()},
       {"surfaceDials", packed.dials.size() - packed.surfaceOffset},
+      {"formulaPrograms", packed.formulaPrograms.size()},
+      {"formulaInstructions", packed.formulaInstructions.size()},
+      {"compositePrograms", packed.compositePrograms.size()},
+      {"compositeInstructions", packed.compositeInstructions.size()},
+      {"programScratchBytes", packed.programScratchSize * sizeof(double)},
+      {"multiInputDependencyGroups", packed.multiInputGroups.size()},
       {"observableResponses", packed.variableResponses.size()},
       {"hasEventState", packed.hasEventState},
       {"hasSmoothedBinning", packed.hasSmoothedBinning},

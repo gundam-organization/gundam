@@ -1,5 +1,6 @@
 #include "CudaDeviceContext.h"
 #include "CudaWeightModel.h"
+#include "CudaDialPrograms.h"
 #include "CudaBinning.h"
 #include "BackendTypes.h"
 #include "PropagationInputs.h"
@@ -92,12 +93,26 @@ namespace {
     DeviceBuffer<Backends::BackendTableTerm> tableTerms;
     DeviceBuffer<Backends::ExternalWeightBlockDescriptor> externalBlocks;
     DeviceBuffer<double> externalWeights;
+    DeviceBuffer<Backends::CudaFormulaProgram> formulaPrograms;
+    DeviceBuffer<Backends::FormulaInstruction> formulaInstructions;
+    DeviceBuffer<double> formulaConstants, programScratch;
+    DeviceBuffer<Backends::FormulaInput> formulaInputs;
+    DeviceBuffer<Backends::CompositeProgram> compositePrograms;
+    DeviceBuffer<Backends::CompositeInstruction> compositeInstructions;
+    DeviceBuffer<Backends::BackendDialInputDescriptor> compositeInputs;
+    DeviceBuffer<std::size_t> programScratchOffsets;
+    Backends::CudaProgramView programView() const {
+      return {formulaPrograms.data, formulaInstructions.data, formulaConstants.data, formulaInputs.data,
+              compositePrograms.data, compositeInstructions.data, compositeInputs.data, inputs.data,
+              payloads.data, programScratchOffsets.data, programScratch.data};
+    }
     std::vector<Backends::CudaExternalGroup> externalGroups{};
     std::vector<std::uint64_t> externalGenerations{}, currentExternalGenerations{};
     Backends::CudaResponseUpdatePlan externalUpdatePlan{};
     std::size_t externalDialCount{0};
     std::vector<std::size_t> parameterDialOffsets{};
     std::vector<Backends::CudaSurfaceGroup> surfaceGroups{};
+    std::vector<Backends::CudaMultiInputGroup> multiInputGroups{};
     std::size_t surfaceOffset{0};
     std::vector<double> previousParameters{};
     Backends::CudaResponseUpdatePlan updatePlan{};
@@ -141,12 +156,18 @@ namespace {
   __device__ void evaluateResponse(std::size_t i, const Backends::BackendDialDescriptor* dials_,
                                   const Backends::BackendDialInputDescriptor* inputs_, const double* payloads_,
                                   const double* parameters_, double* responses_, double* previousInputs_,
-                                  bool reuse_, int* error_, double* previousSecondInputs_, std::size_t surfaceOffset_) {
+                                  bool reuse_, int* error_, double* previousSecondInputs_, std::size_t surfaceOffset_, Backends::CudaProgramView programs_) {
     using namespace Backends;
     const auto& dial = dials_[i];
     // External/table dials are evaluated by their generation-dependent kernel.
     if( dial.type == BackendDialType::ExternalWeight or dial.type == BackendDialType::Tabulated
         or dial.type == BackendDialType::Kriged ){ return; }
+    if( dial.type == BackendDialType::Formula or dial.type == BackendDialType::Composite ){
+      const double response = evaluateCudaProgram(programs_, dial, i, parameters_);
+      if( not ::isfinite(response) ){ atomicExch(error_, 1); }
+      responses_[i] = ::isfinite(response) ? response : 0.;
+      return;
+    }
     double input = 0.;
     if( dial.type != BackendDialType::Shift ){
       const auto& descriptor = inputs_[dial.firstInput];
@@ -196,11 +217,11 @@ namespace {
   __global__ void evaluateResponses(const Backends::BackendDialDescriptor* dials_, std::size_t count_,
                                     const Backends::BackendDialInputDescriptor* inputs_, const double* payloads_,
                                     const double* parameters_, double* responses_, double* previousInputs_,
-                                    bool reuse_, int* error_, double* previousSecondInputs_, std::size_t surfaceOffset_) {
+                                    bool reuse_, int* error_, double* previousSecondInputs_, std::size_t surfaceOffset_, Backends::CudaProgramView programs_) {
     for( std::size_t i = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
          i < count_; i += std::size_t(blockDim.x) * gridDim.x ){
       evaluateResponse<surfaces_>(i, dials_, inputs_, payloads_, parameters_, responses_, previousInputs_, reuse_, error_,
-                                  previousSecondInputs_, surfaceOffset_);
+                                  previousSecondInputs_, surfaceOffset_, programs_);
     }
   }
 
@@ -209,7 +230,7 @@ namespace {
       std::size_t rangeCount_, std::size_t blockCount_, const std::uint32_t* indices_,
       const Backends::BackendDialDescriptor* dials_, const Backends::BackendDialInputDescriptor* inputs_,
       const double* payloads_, const double* parameters_, double* responses_, double* previousInputs_, int* error_,
-      double* previousSecondInputs_, std::size_t surfaceOffset_) {
+      double* previousSecondInputs_, std::size_t surfaceOffset_, Backends::CudaProgramView programs_) {
     __shared__ std::size_t first, end;
     for( std::size_t block = blockIdx.x; block < blockCount_; block += gridDim.x ){
       if( threadIdx.x == 0 ){
@@ -228,7 +249,7 @@ namespace {
       const auto index = first + threadIdx.x;
       if( index < end ){
         evaluateResponse<surfaces_>(indices_[index], dials_, inputs_, payloads_, parameters_, responses_, previousInputs_, true, error_,
-                                    previousSecondInputs_, surfaceOffset_);
+                                    previousSecondInputs_, surfaceOffset_, programs_);
       }
       __syncthreads(); // Shared bounds must survive until every thread finished.
     }
@@ -543,6 +564,15 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
     b.dials.upload(model_.dials, _impl_->stream);
     b.inputs.upload(model_.inputs, _impl_->stream);
     b.payloads.upload(model_.payloads, _impl_->stream);
+    b.formulaPrograms.upload(model_.formulaPrograms, _impl_->stream);
+    b.formulaInstructions.upload(model_.formulaInstructions, _impl_->stream);
+    b.formulaConstants.upload(model_.formulaConstants, _impl_->stream);
+    b.formulaInputs.upload(model_.formulaInputs, _impl_->stream);
+    b.compositePrograms.upload(model_.compositePrograms, _impl_->stream);
+    b.compositeInstructions.upload(model_.compositeInstructions, _impl_->stream);
+    b.compositeInputs.upload(model_.compositeInputs, _impl_->stream);
+    b.programScratchOffsets.upload(model_.programScratchOffsets, _impl_->stream);
+    b.programScratch.allocate(model_.programScratchSize);
     b.dialIndices.upload(model_.eventDialIndices, _impl_->stream);
     b.parameterDialIndices.upload(model_.parameterDialIndices, _impl_->stream);
     b.externalGroups = model_.externalGroups;
@@ -557,9 +587,10 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
     b.parameterDialOffsets = model_.parameterDialOffsets;
     b.previousParameters.resize(model_.parameterCount);
     b.surfaceGroups = model_.surfaceGroups;
+    b.multiInputGroups = model_.multiInputGroups;
     b.surfaceOffset = model_.surfaceOffset;
-    b.updatePlan.ranges.reserve(model_.parameterCount + b.surfaceGroups.size());
-    b.responseUpdates.allocate(model_.parameterCount + b.surfaceGroups.size());
+    b.updatePlan.ranges.reserve(model_.parameterCount + b.surfaceGroups.size() + b.multiInputGroups.size());
+    b.responseUpdates.allocate(model_.parameterCount + b.surfaceGroups.size() + b.multiInputGroups.size());
     b.histogramBins = model_.binOffsets.size() - 1;
     b.hasSmoothedBinning = model_.hasSmoothedBinning;
     const auto histogramCount = b.histogramBins + (b.hasSmoothedBinning ? model_.samples.size() : 0);
@@ -637,7 +668,7 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     if( b.hasEventState ){ b.stateCache.prepare(inputs_); }
     const bool updateState = b.hasEventState and b.stateCache.needsUpdate(inputs_);
     const auto preparationStart = std::chrono::steady_clock::now();
-    if( reuse ){ b.updatePlan.select(b.parameterDialOffsets, b.previousParameters, parameters_, b.surfaceGroups); }
+    if( reuse ){ b.updatePlan.select(b.parameterDialOffsets, b.previousParameters, parameters_, b.surfaceGroups, b.multiInputGroups); }
     for( std::size_t i = 0; i < externalWeights_.size(); ++i ){
       b.currentExternalGenerations[i] = externalWeights_[i].generation;
     }
@@ -684,13 +715,13 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
         evaluateSelectedResponses<withSurfaces><<<blocks, blockSize, 0, stream>>>(b.responseUpdates.data,
             b.updatePlan.ranges.size(), b.updatePlan.blockCount, b.parameterDialIndices.data,
             b.dials.data, b.inputs.data, b.payloads.data, b.parameters.data,
-            b.responses.data, b.previousInputs.data, b.error.data, b.previousSecondInputs.data, b.surfaceOffset);
+            b.responses.data, b.previousInputs.data, b.error.data, b.previousSecondInputs.data, b.surfaceOffset, b.programView());
         checkCuda(cudaGetLastError(), "selected dial response kernel launch");
       }
       else if( not sparse and candidates ){
         evaluateResponses<withSurfaces><<<gridSize(b.dials.size), blockSize, 0, stream>>>(b.dials.data, b.dials.size,
             b.inputs.data, b.payloads.data, b.parameters.data, b.responses.data, b.previousInputs.data,
-            reuse, b.error.data, b.previousSecondInputs.data, b.surfaceOffset);
+            reuse, b.error.data, b.previousSecondInputs.data, b.surfaceOffset, b.programView());
         checkCuda(cudaGetLastError(), "dial response kernel launch");
       }
     };
@@ -962,6 +993,8 @@ Backends::BackendResourceUsage Backends::CudaDeviceContext::getResourceUsage() c
   usage.deviceName = _impl_->deviceName;
   const auto& b = *_impl_->buffers;
   usage.allocatedBytes = allocatedBufferBytes(
+      b.formulaPrograms, b.formulaInstructions, b.formulaConstants, b.formulaInputs,
+      b.compositePrograms, b.compositeInstructions, b.compositeInputs, b.programScratchOffsets, b.programScratch,
       b.events, b.dials, b.inputs, b.payloads, b.parameters,
       b.responses, b.previousInputs, b.previousSecondInputs, b.weights, b.sums,
       b.sumSquares, b.dialIndices, b.parameterDialIndices, b.responseUpdates, b.externalResponseUpdates,

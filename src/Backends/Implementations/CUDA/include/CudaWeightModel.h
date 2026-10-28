@@ -8,11 +8,20 @@
 #include <vector>
 
 namespace Backends {
-  // Disjoint surface response slots sharing one unordered dependency pair.
+  // Disjoint response slots sharing one unordered dependency pair.
   // Ordered x/y input descriptors remain attached to each individual dial.
   struct CudaSurfaceGroup {
     std::size_t firstParameter{0}, secondParameter{0};
     std::size_t firstDial{0}, endDial{0};
+  };
+
+  struct CudaMultiInputGroup {
+    std::vector<std::size_t> parameters{};
+    std::size_t firstDial{0}, endDial{0};
+  };
+
+  struct CudaFormulaProgram {
+    std::size_t firstInstruction{0}, instructionCount{0}, firstConstant{0}, stackSize{0};
   };
 
   struct CudaExternalGroup {
@@ -41,13 +50,24 @@ namespace Backends {
     std::vector<BackendDialDescriptor> dials{};
     std::vector<BackendDialInputDescriptor> inputs{};
     std::vector<double> payloads{};
+    std::vector<CudaFormulaProgram> formulaPrograms{};
+    std::vector<FormulaInstruction> formulaInstructions{};
+    std::vector<double> formulaConstants{};
+    std::vector<FormulaInput> formulaInputs{};
+    std::vector<CompositeProgram> compositePrograms{};
+    std::vector<CompositeInstruction> compositeInstructions{};
+    std::vector<BackendDialInputDescriptor> compositeInputs{};
+    // Allocated only for models with programs; each root has disjoint workspace.
+    std::vector<std::size_t> programScratchOffsets{};
+    std::size_t programScratchSize{0};
     std::vector<std::uint32_t> eventDialIndices{};
     std::size_t eventDialStride{1};
-    // Scalar CSR followed by disjoint surface/external groups in parameterDialIndices.
+    // Scalar CSR followed by disjoint pair/multi-input/external groups in parameterDialIndices.
     // Constant Shift dials are initialized by the dense pass.
     std::vector<std::size_t> parameterDialOffsets{};
     std::vector<std::uint32_t> parameterDialIndices{};
     std::vector<CudaSurfaceGroup> surfaceGroups{};
+    std::vector<CudaMultiInputGroup> multiInputGroups{};
     // External/table responses have disjoint dependencies on producer blocks.
     std::vector<CudaExternalGroup> externalGroups{};
     std::vector<ExternalWeightBlockDescriptor> externalWeightBlocks{};
@@ -92,7 +112,8 @@ namespace Backends {
     std::size_t dialCount{0};
     std::size_t blockCount{0};
     void select(const std::vector<std::size_t>& offsets_, const std::vector<double>& previous_,
-                const std::vector<double>& current_, const std::vector<CudaSurfaceGroup>& surfaceGroups_ = {});
+                const std::vector<double>& current_, const std::vector<CudaSurfaceGroup>& surfaceGroups_ = {},
+                const std::vector<CudaMultiInputGroup>& multiInputGroups_ = {});
     void selectExternal(const std::vector<CudaExternalGroup>& groups_,
                         const std::vector<std::uint64_t>& previous_, const std::vector<std::uint64_t>& current_,
                         bool force_ = false);
