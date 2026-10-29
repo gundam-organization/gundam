@@ -1,5 +1,6 @@
 #ifndef GUNDAM_BACKEND_HOST_PROPAGATION_H
 #define GUNDAM_BACKEND_HOST_PROPAGATION_H
+#include "Semantics/BackendLikelihood.h"
 
 #include "EngineView.h"
 #include "PropagationInputs.h"
@@ -55,7 +56,18 @@ namespace Backends::Semantics {
         const int globalBin = sample.binOffset + iBin;
         const double pred = histSums_.at(globalBin);
         const double predErr = std::sqrt(histSumSquares_.at(globalBin));
-        likelihoodValue += sample.evalBin(sample.dataSums[iBin], pred, predErr, iBin);
+        if( sample.portableOptions.kind == LikelihoodKind::Host ){
+          likelihoodValue += sample.evalBin(sample.dataSums[iBin], pred, predErr, iBin);
+        }
+        else{
+          // Preserve the reference sqrt(sumSquares) -> error^2 conversion.
+          const double variance = sample.portableOptions.useNominalVariance
+              ? sample.nominalVariances.at(iBin) : predErr * predErr;
+          const double value = LikelihoodSemantics::evaluate<LikelihoodSemantics::DoubleMath>(
+              sample.dataSums[iBin], pred, variance, sample.portableOptions);
+          if( std::isnan(value) ){ throw std::runtime_error("Invalid portable statistical likelihood."); }
+          likelihoodValue += value;
+        }
       }
     }
 

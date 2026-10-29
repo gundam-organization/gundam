@@ -1,6 +1,7 @@
 #include "MpsEventPropagation.h"
 #include "MpsBackendInternal.h"
 #include "DialDependencyGroups.h"
+#include "LikelihoodModel.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -9,7 +10,7 @@
 
 namespace {
 const char* const kDiagnosticKernelNames[]{"evaluate_propagation_dials", "propagate_event_state", "rebin_events", "clear_contribution_counts",
-    "count_bin_contributions", "index_histogram_chunks", "scatter_bin_contributions", "reduce_histogram_chunks", "finish_dynamic_histograms", "reduce_histogram_chunks_parallel"};
+    "count_bin_contributions", "index_histogram_chunks", "scatter_bin_contributions", "reduce_histogram_chunks", "finish_dynamic_histograms", "reduce_histogram_chunks_parallel", "evaluate_likelihood_partials", "finish_likelihood"};
 }
 
 Backends::MpsEventPropagation::MpsEventPropagation(id<MTLDevice> device_, id<MTLCommandQueue> queue_, id<MTLLibrary> library_)
@@ -42,7 +43,7 @@ void Backends::MpsEventPropagation::clear() {
   _valid_ = false;
 }
 
-void Backends::MpsEventPropagation::build(const PropagationView& model_) {
+void Backends::MpsEventPropagation::build(const PropagationView& model_, const LikelihoodView& likelihood_) {
   clearBuffers();
   _model_ = &model_;
   _packed_.build(model_);
@@ -74,6 +75,14 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_) {
   upload(Buffer::Intervals, _packed_.intervals);
   upload(Buffer::Bins, _packed_.bins);
   upload(Buffer::Nodes, _packed_.nodes);
+  _deviceLikelihood_ = hasPortableLikelihood(likelihood_);
+  const auto likelihoodBins = packLikelihood<ObservableScalar>(likelihood_, model_.totalBins);
+  _likelihoodBinCount_ = likelihoodBins.size();
+  upload(Buffer::LikelihoodBins, likelihoodBins);
+  upload(Buffer::LikelihoodCount, std::vector<DeviceIndex>{DeviceIndex(_likelihoodBinCount_)});
+  allocate(Buffer::LikelihoodPartials, ((_likelihoodBinCount_ + 63) / 64) * sizeof(ObservableScalar));
+  allocate(Buffer::LikelihoodTotal, sizeof(ObservableScalar));
+  allocate(Buffer::LikelihoodReadback, sizeof(ObservableScalar), true);
   upload(Buffer::Bounds, _packed_.bounds);
   upload(Buffer::NodeBins, _packed_.nodeBins);
   upload(Buffer::ReusableBins, _packed_.reusableBins);
@@ -112,10 +121,7 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_) {
     allocate(slot, std::size_t(_packed_.histogramBins) * sizeof(ObservableScalar));
   }
   // Readback buffers are created lazily for EventState/EventWeights, which fits
-  // usually leave resident. Histogram readback remains necessary for host LLH.
-  for( auto slot : {Buffer::ReadbackSums, Buffer::ReadbackSquares} ){
-    allocate(slot, std::size_t(_packed_.histogramBins) * sizeof(ObservableScalar), true);
-  }
+  // usually leave resident. Histogram readback is allocated lazily for diagnostics.
   std::memset(buffer(Buffer::Control).contents, 0, sizeof(DevicePropagationControl));
   buildDialCache();
   // Uploads have completed. Retain only the host metadata used at runtime.
@@ -309,12 +315,17 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
     Buffer::EventWeights, Buffer::PartialSums, Buffer::PartialSquares, Buffer::Control});
   dispatch(encoder, Kernel::Finish, _packed_.histogramBins, {Buffer::ChunkOffsets, Buffer::PartialSums, Buffer::PartialSquares,
     Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::Control});
+  if( _deviceLikelihood_ ){
+    dispatch(encoder, Kernel::LikelihoodPartials, (_likelihoodBinCount_ + 63) / 64,
+        {Buffer::LikelihoodBins, Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::LikelihoodPartials, Buffer::LikelihoodCount});
+    dispatch(encoder, Kernel::LikelihoodFinish, 1, {Buffer::LikelihoodPartials, Buffer::LikelihoodTotal, Buffer::LikelihoodCount});
+  }
   [encoder endEncoding];
-  auto blit = [command blitCommandEncoder];
-  std::size_t histogramBytes = std::size_t(_packed_.histogramBins) * sizeof(ObservableScalar);
-  copy(blit, Buffer::HistogramSums, Buffer::ReadbackSums, histogramBytes);
-  copy(blit, Buffer::HistogramSquares, Buffer::ReadbackSquares, histogramBytes);
-  [blit endEncoding];
+  if( _deviceLikelihood_ ){
+    auto blit = [command blitCommandEncoder];
+    copy(blit, Buffer::LikelihoodTotal, Buffer::LikelihoodReadback, sizeof(ObservableScalar));
+    [blit endEncoding];
+  }
   timing_.commandEncodeSeconds += secondsSince(encodeStart);
   auto waitStart = std::chrono::steady_clock::now();
   [command commit];
@@ -332,19 +343,21 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   for( std::size_t i = 0; i < inputs_.externalWeights.size(); ++i ){ _cachedExternalGenerations_[i] = inputs_.externalWeights[i].generation; }
   _lastRebuiltIndex_ = control.rebuildIndex != 0;
   _valid_ = true;
-  auto readbackStart = std::chrono::steady_clock::now();
-  const auto* sums = static_cast<const ObservableScalar*>(buffer(Buffer::ReadbackSums).contents);
-  const auto* squares = static_cast<const ObservableScalar*>(buffer(Buffer::ReadbackSquares).contents);
-  auto readValues = [](const ObservableScalar* values_, std::size_t count_, std::vector<double>& output_){
-    output_.resize(count_);
-    for( std::size_t i = 0; i < count_; ++i ){ output_[i] = double(values_[i].high) + values_[i].low; }
-  };
-  readValues(sums, model.totalBins, result_.histSums);
-  readValues(squares, model.totalBins, result_.histSumSquares);
-  readValues(sums + model.totalBins, _packed_.histogramBins - model.totalBins, result_.outsideSums);
-  readValues(squares + model.totalBins, _packed_.histogramBins - model.totalBins, result_.outsideSumSquares);
-  timing_.histogramReadbackBytes += 2 * histogramBytes;
-  timing_.histogramReadbackSeconds += secondsSince(readbackStart);
+  if( _deviceLikelihood_ ){
+    const auto value = *static_cast<const ObservableScalar*>(buffer(Buffer::LikelihoodReadback).contents);
+    result_.likelihood = double(value.high) + value.low;
+    if( std::isnan(result_.likelihood) ){
+      invalidate();
+      throw std::runtime_error("MPS: invalid statistical likelihood.");
+    }
+    timing_.likelihoodReadbackBytes += sizeof(ObservableScalar);
+  }
+  else{ materializeHistograms(result_, timing_); }
+  for( const auto& stage : _diagnosticStageGpuSeconds_ ){
+    if( stage.first == "evaluate_likelihood_partials" || stage.first == "finish_likelihood" ){
+      timing_.likelihoodDeviceSeconds += stage.second;
+    }
+  }
   timing_.rebinnedEventCount = control.rebinnedEvents;
   timing_.binCandidateCount = control.candidates;
   timing_.binContributionCount = control.contributionCount;
@@ -355,6 +368,32 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   const auto* samples = static_cast<const DeviceIndex*>(buffer(Buffer::ChangedSamples).contents);
   for( std::size_t i = 0; i < changed.size(); ++i ){ changed[i] = samples[i] != 0; }
   _cache_.commit(inputs_, changed);
+}
+
+void Backends::MpsEventPropagation::materializeHistograms(PropagationResult& result_, BackendTimingSummary& timing_) {
+  if( result_.histSums.size() == std::size_t(_model_->totalBins) ){ return; }
+  auto start = std::chrono::steady_clock::now();
+  auto command = [_queue_ commandBuffer];
+  auto blit = [command blitCommandEncoder];
+  const auto bytes = std::size_t(_packed_.histogramBins) * sizeof(ObservableScalar);
+  copy(blit, Buffer::HistogramSums, Buffer::ReadbackSums, bytes);
+  copy(blit, Buffer::HistogramSquares, Buffer::ReadbackSquares, bytes);
+  [blit endEncoding];
+  [command commit];
+  [command waitUntilCompleted];
+  LogThrowIf(command.status != MTLCommandBufferStatusCompleted, "Metal histogram readback failed.");
+  const auto* sums = static_cast<const ObservableScalar*>(buffer(Buffer::ReadbackSums).contents);
+  const auto* squares = static_cast<const ObservableScalar*>(buffer(Buffer::ReadbackSquares).contents);
+  auto readValues = [](const ObservableScalar* values_, std::size_t count_, std::vector<double>& output_){
+    output_.resize(count_);
+    for( std::size_t i = 0; i < count_; ++i ){ output_[i] = double(values_[i].high) + values_[i].low; }
+  };
+  readValues(sums, _model_->totalBins, result_.histSums);
+  readValues(squares, _model_->totalBins, result_.histSumSquares);
+  readValues(sums + _model_->totalBins, _packed_.histogramBins - _model_->totalBins, result_.outsideSums);
+  readValues(squares + _model_->totalBins, _packed_.histogramBins - _model_->totalBins, result_.outsideSumSquares);
+  timing_.histogramReadbackBytes += 2 * bytes;
+  timing_.histogramReadbackSeconds += secondsSince(start);
 }
 
 void Backends::MpsEventPropagation::materializeWeights(PropagationResult& result_, BackendTimingSummary& timing_) {
@@ -441,6 +480,7 @@ std::string Backends::MpsEventPropagation::getExecutionState() const {
 
 std::string Backends::MpsEventPropagation::getDiagnostics() const {
   JsonType out;
+  out["likelihoodExecution"] = _deviceLikelihood_ ? "device" : "host";
   out["evaluatedDials"] = _lastEvaluatedDials_;
   out["updatedEventWeights"] = _lastUpdatedWeights_;
   out["rebuiltContributionIndex"] = _lastRebuiltIndex_;
@@ -452,7 +492,7 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   out["contributionCapacity"] = _packed_.contributionCapacity;
   out["histogramChunkCapacity"] = _packed_.histogramChunkCapacity;
   out["buffers"] = JsonType::array();
-  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights", "FormulaPrograms", "FormulaInstructions", "FormulaConstants", "ProgramInputs", "CompositePrograms", "CompositeInstructions", "ProgramScratch"};
+  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights", "FormulaPrograms", "FormulaInstructions", "FormulaConstants", "ProgramInputs", "CompositePrograms", "CompositeInstructions", "ProgramScratch", "LikelihoodBins", "LikelihoodCount", "LikelihoodPartials", "LikelihoodTotal", "LikelihoodReadback"};
   static_assert(sizeof(names) / sizeof(*names) == std::size_t(Buffer::Count));
   for( std::size_t i = 0; i < _buffers_.size(); ++i ){
     auto value = _buffers_[i];

@@ -388,7 +388,7 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     require(sample.binOffset >= 0 and std::size_t(sample.binOffset) <= std::size_t(model.totalBins)
             and sample.dataSums.size() <= std::size_t(model.totalBins) - std::size_t(sample.binOffset),
             "likelihood bin range is outside the histogram.");
-    require(sample.dataSums.empty() or bool(sample.evalBin), "likelihood evaluator is missing.");
+    require(sample.dataSums.empty() or sample.portableOptions.kind != LikelihoodKind::Host or bool(sample.evalBin), "likelihood evaluator is missing.");
   }
   out.events = model.eventWeights;
   out.formulaInputs = std::move(native.formulaInputs);

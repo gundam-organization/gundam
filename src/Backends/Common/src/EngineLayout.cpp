@@ -15,6 +15,7 @@
 #include "Graph.h"
 #include "Histogram.h"
 #include "LikelihoodInterface.h"
+#include "JointProbabilitySnapshot.h"
 #include "MonotonicSpline.h"
 #include "Norm.h"
 #include "Parameter.h"
@@ -517,6 +518,17 @@ namespace {
       }
 
       auto* jointProbability = likelihoodInterface_.getJointProbabilityPtr();
+      const auto snapshot = JointProbability::snapshotJointProbability(*jointProbability, samplePair);
+      auto& options = sampleRef.portableOptions;
+      using Kind = JointProbability::JointProbabilitySnapshot::Kind;
+      if( snapshot.kind == Kind::Poisson ){ options.kind = Backends::LikelihoodKind::Poisson; }
+      else if( snapshot.kind == Kind::BarlowBeeston2022 ){ options.kind = Backends::LikelihoodKind::BarlowBeeston2022; }
+      options.usePoissonLikelihood = snapshot.usePoissonLikelihood;
+      options.useNominalVariance = snapshot.useNominalVariance;
+      options.throwIfInfLlh = snapshot.throwIfInfLlh;
+      options.fractionalErrorLimit = snapshot.fractionalErrorLimit;
+      options.expectedValueMinimum = snapshot.expectedValueMinimum;
+      sampleRef.nominalVariances = snapshot.nominalVariances;
       sampleRef.evalBin = [jointProbability, samplePair](double data_, double pred_, double err_, int bin_){
         return jointProbability->evalWithPrediction(samplePair, data_, pred_, err_, bin_);
       };

@@ -4,6 +4,7 @@
 #include "EngineDescriptors.h"
 #include "FormulaProgram.h"
 #include "BinningGeometry.h"
+#include "LikelihoodTypes.h"
 
 #include <cstdint>
 #include <functional>
@@ -41,6 +42,8 @@ namespace Backends {
     std::vector<double> dataSums{};
     std::vector<bool> ignoredBins{};
     std::function<double(double, double, double, int)> evalBin{};
+    LikelihoodOptions<double> portableOptions{};
+    std::vector<double> nominalVariances{};
   };
 
   struct PropagationView {

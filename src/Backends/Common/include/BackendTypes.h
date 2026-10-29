@@ -98,6 +98,9 @@ ENUM_FIELD( Unavailable )
     double eventWeightMaterializationSeconds{0};
     double histogramMaterializationSeconds{0};
     double likelihoodHostSeconds{0};
+    // CUDA stage time; Metal provides this in diagnostic stage profiling mode.
+    double likelihoodDeviceSeconds{0};
+    std::size_t likelihoodReadbackBytes{0};
     std::size_t uniqueDialCount{0};
     std::size_t cachedDialCount{0};
     std::size_t eventDialIndexCount{0};

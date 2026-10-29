@@ -1,6 +1,7 @@
 #include "MpsBackend.h"
 
 #include "MpsBackendInternal.h"
+#include "LikelihoodModel.h"
 #include "Semantics/BackendHostPropagation.h"
 
 Backends::MpsBackend::MpsBackend() : _impl_(std::make_unique<MpsBackendImpl>()) {}
@@ -48,6 +49,7 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
   _impl_->lastResult = MpsBackendImpl::Result();
   _impl_->buildTiming = BackendTimingSummary();
   _impl_->useEventPropagation = _impl_->propagationMode == MpsPropagationMode::cachedResponses
+      or hasPortableLikelihood(engineView_.likelihood)
       or engineView_.propagation.requiresEventBinning() or engineView_.propagation.hasReweightCap;
   for( const auto& dial : engineView_.propagation.dials ){
     if( dial.type == BackendDialType::Formula or dial.type == BackendDialType::Composite ){ _impl_->useEventPropagation = true; }
@@ -65,7 +67,7 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
   if( _impl_->useEventPropagation ){
     LogThrowIf(not _impl_->isAvailable, "Metal is unavailable for event propagation.");
     _impl_->releaseDeviceBuffers();
-    _impl_->eventPropagation->build(_impl_->model);
+    _impl_->eventPropagation->build(_impl_->model, _impl_->likelihoodModel);
   }
   else{
     if( _impl_->eventPropagation ){ _impl_->eventPropagation->clear(); }
@@ -111,7 +113,10 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Propag
     status.eventState = _impl_->model.requiresEventBinning() ? OutputState::ReadyOnDevice : OutputState::NotRequested;
     status.sampleLikelihoods = OutputState::Failed;
     if( _impl_->likelihoodModel.empty() ){ status.statLikelihood = OutputState::Failed; }
-    else{ _impl_->calculateLikelihood(); status.statLikelihood = OutputState::ReadyOnHost; }
+    else{
+      if( !hasPortableLikelihood(_impl_->likelihoodModel) ){ _impl_->calculateLikelihood(); }
+      status.statLikelihood = OutputState::ReadyOnHost;
+    }
     status.backend = BackendStatus::Ready;
     _impl_->lastTiming.propagationWallSeconds = secondsSince(propagationStart);
     return _impl_->lastResult.token;
@@ -189,7 +194,8 @@ void Backends::MpsBackend::materialize(const PropagationToken& token_, OutputReq
     _impl_->lastResult.status.eventWeights = OutputState::ReadyOnHost;
   }
   else if( output_ == OutputRequest::Histograms ){
-    _impl_->materializeHistograms();
+    if( _impl_->useEventPropagation ){ _impl_->eventPropagation->materializeHistograms(_impl_->lastResult, _impl_->lastTiming); }
+    else{ _impl_->materializeHistograms(); }
     _impl_->lastResult.status.histograms = OutputState::ReadyOnHost;
   }
   else if( output_ == OutputRequest::SampleLikelihoods ){
@@ -218,11 +224,13 @@ const std::vector<double>& Backends::MpsBackend::getEventWeightsHostView(const P
 
 const std::vector<double>& Backends::MpsBackend::getHistogramSumsHostView(const PropagationToken& token_) const {
   LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
+  if( _impl_->useEventPropagation ){ _impl_->eventPropagation->materializeHistograms(_impl_->lastResult, _impl_->lastTiming); }
   return _impl_->lastResult.histSums;
 }
 
 const std::vector<double>& Backends::MpsBackend::getHistogramSumSquaresHostView(const PropagationToken& token_) const {
   LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
+  if( _impl_->useEventPropagation ){ _impl_->eventPropagation->materializeHistograms(_impl_->lastResult, _impl_->lastTiming); }
   return _impl_->lastResult.histSumSquares;
 }
 
@@ -249,10 +257,12 @@ const Backends::EventState& Backends::MpsBackend::getEventStateHostView(const Pr
 }
 const std::vector<double>& Backends::MpsBackend::getOutsideSumsHostView(const PropagationToken& token_) const {
   LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
+  if( _impl_->useEventPropagation ){ _impl_->eventPropagation->materializeHistograms(_impl_->lastResult, _impl_->lastTiming); }
   return _impl_->lastResult.outsideSums;
 }
 const std::vector<double>& Backends::MpsBackend::getOutsideSumSquaresHostView(const PropagationToken& token_) const {
   LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MpsBackend propagation token.");
+  if( _impl_->useEventPropagation ){ _impl_->eventPropagation->materializeHistograms(_impl_->lastResult, _impl_->lastTiming); }
   return _impl_->lastResult.outsideSumSquares;
 }
 
@@ -274,6 +284,7 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["unifiedMemory"] = impl.isAvailable && impl.device.hasUnifiedMemory;
   out["stageProfiling"] = impl.enableDiagnosticStageProfiling;
   out["propagationMode"] = impl.propagationMode.toString();
+  out["likelihoodExecution"] = hasPortableLikelihood(impl.likelihoodModel) ? "device" : "host";
   out["path"] = impl.useEventPropagation ? "eventPropagation" : (impl.isWeightModelSupported ? "packedWeights" : "hostFallback");
   out["fallbackReason"] = impl.deviceModelFallbackReason;
   out["events"] = impl.model.events.size();

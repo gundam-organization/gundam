@@ -108,6 +108,7 @@ if( WITH_GOOGLE_TEST )
     list(APPEND FAST_TESTS GTests/unitTest_ExternalWeightBackend.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_BackendBinning.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_BackendShared.cpp)
+    list(APPEND FAST_TESTS GTests/unitTest_BackendLikelihood.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_BackendResponseSmoothing.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_BackendSurface.cpp)
     list(APPEND FAST_TESTS GTests/unitTest_BackendTable.cpp)
@@ -128,6 +129,7 @@ if( WITH_GOOGLE_TEST )
   if(WITH_BACKENDS AND GUNDAM_CUDA_ENABLED)
     add_executable(gundamGTest_cudaBackend.exe
         GTests/unitTest_CudaBackendPrograms.cpp
+        GTests/unitTest_BackendLikelihood.cpp
         GTests/unitTest_CudaBackendDevice.cpp
         GTests/unitTest_CudaBackendPropagation.cpp
         GTests/unitTest_CudaBackendSurface.cpp
@@ -141,13 +143,14 @@ if( WITH_GOOGLE_TEST )
         BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
     # Register without discovery: building must work without an allocated GPU.
     add_test(NAME cuda-backend-programs COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPrograms.*)
+    add_test(NAME cuda-backend-likelihood COMMAND gundamGTest_cudaBackend.exe --gtest_filter=BackendLikelihood.*)
     add_test(NAME cuda-backend-skeleton COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendDevice.*)
     add_test(NAME cuda-backend-propagation COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPropagation.*)
     add_test(NAME cuda-backend-surfaces COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSurface.*)
     add_test(NAME cuda-backend-external COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendExternal.*)
     add_test(NAME cuda-backend-observables COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendObservable.*)
     add_test(NAME cuda-backend-smoothed COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSmoothed.*)
-    set_tests_properties(cuda-backend-programs cuda-backend-skeleton cuda-backend-propagation cuda-backend-surfaces cuda-backend-external cuda-backend-observables cuda-backend-smoothed PROPERTIES LABELS "cuda;device" TIMEOUT 120)
+    set_tests_properties(cuda-backend-programs cuda-backend-likelihood cuda-backend-skeleton cuda-backend-propagation cuda-backend-surfaces cuda-backend-external cuda-backend-observables cuda-backend-smoothed PROPERTIES LABELS "cuda;device" TIMEOUT 120)
   endif()
 
   ## Create a list of all of the regular tests.  These are always

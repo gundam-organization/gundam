@@ -1,6 +1,7 @@
 #include "CudaBackend.h"
 #include "CudaWeightModel.h"
 #include "PropagationResult.h"
+#include "LikelihoodModel.h"
 #include "Semantics/BackendHostPropagation.h"
 
 #ifdef GUNDAM_USING_CUDA
@@ -129,7 +130,7 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   initializeDevice();
 #ifdef GUNDAM_USING_CUDA
   const auto uploadStart = Clock::now();
-  _impl_->context->build(packed, engineView_->propagation);
+  _impl_->context->build(packed, engineView_->propagation, engineView_->likelihood);
   _impl_->buildTiming.buildBufferUploadSeconds = elapsed(uploadStart);
 #endif
   _impl_->engineView = std::move(engineView_);
@@ -138,6 +139,7 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->result.outsideSums.assign(packed.samples.size(), 0.);
   _impl_->result.outsideSumSquares.assign(packed.samples.size(), 0.);
   _impl_->diagnostics = {
+      {"likelihoodExecution", hasPortableLikelihood(getEngineView().likelihood) ? "device" : "host"},
       {"available", true}, {"events", packed.events.size()}, {"uniqueDials", packed.dials.size()},
       {"graphDials", std::count_if(packed.dials.begin(), packed.dials.end(),
           [](const auto& dial_){ return dial_.type == BackendDialType::Graph; })},
@@ -215,11 +217,18 @@ Backends::PropagationToken Backends::CudaBackend::requestPropagation(const Propa
     result.status.sampleLikelihoods = OutputState::Failed;
     result.status.statLikelihood = OutputState::Failed;
     if( not view.likelihood.empty() ){
-      readHistograms();
-      const auto likelihoodStart = Clock::now();
-      result.likelihood = Semantics::calculateLikelihood(view.likelihood, result.histSums, result.histSumSquares);
-      _impl_->timing.likelihoodHostSeconds = elapsed(likelihoodStart);
-      if( not std::isfinite(result.likelihood) ){ throw std::runtime_error("CudaBackend: likelihood must be finite."); }
+      if( hasPortableLikelihood(view.likelihood) ){
+#ifdef GUNDAM_USING_CUDA
+        result.likelihood = _impl_->context->readLikelihood();
+        _impl_->timing.likelihoodReadbackBytes = sizeof(double);
+#endif
+      }
+      else{
+        readHistograms();
+        const auto likelihoodStart = Clock::now();
+        result.likelihood = Semantics::calculateLikelihood(view.likelihood, result.histSums, result.histSumSquares);
+        _impl_->timing.likelihoodHostSeconds = elapsed(likelihoodStart);
+      }
       result.status.statLikelihood = OutputState::ReadyOnHost;
     }
     if( _nextTokenId_ == 0 ){ throw std::runtime_error("CudaBackend token sequence exhausted."); }
@@ -235,7 +244,7 @@ Backends::PropagationToken Backends::CudaBackend::requestPropagation(const Propa
     totals.cachedDialSeconds += _impl_->timing.cachedDialStageSeconds;
     totals.eventWeightsSeconds += _impl_->timing.eventWeightsStageSeconds;
     totals.histogramSeconds += _impl_->timing.histogramStageSeconds;
-    totals.likelihoodSeconds += _impl_->timing.likelihoodHostSeconds;
+    totals.likelihoodSeconds += _impl_->timing.likelihoodHostSeconds + _impl_->timing.likelihoodDeviceSeconds;
     return result.token;
   }
   catch(...){ invalidateResult(); throw; }

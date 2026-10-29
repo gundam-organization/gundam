@@ -2,6 +2,8 @@
 #include "CudaWeightModel.h"
 #include "CudaDialPrograms.h"
 #include "CudaBinning.h"
+#include "LikelihoodModel.h"
+#include "Semantics/BackendLikelihood.h"
 #include "BackendTypes.h"
 #include "PropagationInputs.h"
 #include "EventStateCache.h"
@@ -84,6 +86,8 @@ namespace {
   }
 
   struct WeightBuffers {
+    DeviceBuffer<Backends::LikelihoodBin<double>> likelihoodBins;
+    DeviceBuffer<double> likelihoodPartials, likelihoodTotal;
     DeviceBuffer<Backends::BackendEventWeightDescriptor> events;
     DeviceBuffer<Backends::BackendDialDescriptor> dials;
     DeviceBuffer<Backends::BackendDialInputDescriptor> inputs;
@@ -491,6 +495,34 @@ namespace {
     }
   }
 
+  __global__ void evaluateLikelihoodBins(const Backends::LikelihoodBin<double>* bins_, std::size_t count_,
+      const double* sums_, const double* squares_, double* partials_) {
+    __shared__ double values[256];
+    const auto index = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
+    double value = 0.;
+    if( index < count_ ){
+      const auto bin = bins_[index];
+      if( !bin.ignored ){
+        const double error = sqrt(squares_[bin.globalBin]);
+        const double variance = bin.options.useNominalVariance ? bin.nominalVariance : error * error;
+        value = Backends::LikelihoodSemantics::evaluate<Backends::LikelihoodSemantics::DoubleMath>(
+            bin.data, sums_[bin.globalBin], variance, bin.options);
+      }
+    }
+    values[threadIdx.x] = value;
+    __syncthreads();
+    for( unsigned stride = blockDim.x / 2; stride; stride /= 2 ){
+      if( threadIdx.x < stride ){ values[threadIdx.x] += values[threadIdx.x + stride]; }
+      __syncthreads();
+    }
+    if( threadIdx.x == 0 ){ partials_[blockIdx.x] = values[0]; }
+  }
+  __global__ void finishLikelihood(const double* partials_, std::size_t count_, double* total_) {
+    double total = 0.;
+    for( std::size_t i = 0; i < count_; ++i ){ total += partials_[i]; }
+    *total_ = total;
+  }
+
   template<bool fractional_>
   __global__ void reduceHistograms(const std::size_t* offsets_, const std::size_t* events_,
                                    std::size_t bins_, const double* weights_, double* sums_,
@@ -534,7 +566,7 @@ struct Backends::CudaDeviceContext::Impl {
   int deviceIndex{0};
   std::string deviceName{};
   cudaStream_t stream{nullptr};
-  std::array<cudaEvent_t, 7> stages{};
+  std::array<cudaEvent_t, 8> stages{};
   std::unique_ptr<WeightBuffers> buffers{};
 
   ~Impl() {
@@ -568,7 +600,7 @@ Backends::CudaDeviceContext::CudaDeviceContext(int deviceIndex_) : _impl_(std::m
 Backends::CudaDeviceContext::~CudaDeviceContext() = default;
 const std::string& Backends::CudaDeviceContext::getDeviceName() const { return _impl_->deviceName; }
 
-void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const PropagationView& original_) {
+void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const PropagationView& original_, const LikelihoodView& likelihood_) {
   DeviceScope scope(_impl_->deviceIndex);
   _impl_->buffers.reset();
   auto buffers = std::make_unique<WeightBuffers>();
@@ -658,6 +690,11 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
     b.sums.allocate(histogramCount);
     b.sumSquares.allocate(b.sums.size);
     b.error.allocate(1);
+    const auto likelihoodBins = packLikelihood<double>(likelihood_, original_.totalBins);
+    b.likelihoodBins.upload(likelihoodBins, _impl_->stream);
+    b.likelihoodPartials.allocate((likelihoodBins.size() + 255) / 256);
+    const std::vector<double> initialLikelihood{0.};
+    b.likelihoodTotal.upload(initialLikelihood, _impl_->stream);
     b.hasReweightCap = model_.hasReweightCap;
     b.maxReweight = model_.maxReweight;
     b.interleavedEventDials = model_.eventDialStride == 32;
@@ -869,6 +906,13 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       checkCuda(cudaGetLastError(), "histogram kernel launch");
     }
     record(6);
+    if( b.likelihoodBins.size ){
+      evaluateLikelihoodBins<<<static_cast<unsigned>(b.likelihoodPartials.size), 256, 0, stream>>>(
+          b.likelihoodBins.data, b.likelihoodBins.size, b.sums.data, b.sumSquares.data, b.likelihoodPartials.data);
+      finishLikelihood<<<1, 1, 0, stream>>>(b.likelihoodPartials.data, b.likelihoodPartials.size, b.likelihoodTotal.data);
+      checkCuda(cudaGetLastError(), "likelihood kernel launch");
+    }
+    record(7);
     checkCuda(cudaMemcpyAsync(&error, b.error.data, sizeof(int), cudaMemcpyDeviceToHost, stream), "execution error readback");
     if( updateState ){
       if( b.changedSamples.size ){
@@ -912,9 +956,20 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     timing_.variableStageSeconds = updateState ? elapsed(3, 4) : 0.;
     timing_.binningStageSeconds = updateState ? elapsed(4, 5) : 0.;
     timing_.histogramStageSeconds = elapsed(5, 6);
-    timing_.devicePropagationSeconds = elapsed(0, 6);
+    timing_.likelihoodDeviceSeconds = elapsed(6, 7);
+    timing_.devicePropagationSeconds = elapsed(0, 7);
   }
   catch(...){ b.cachePrimed = false; b.stateCache.invalidate(); cudaStreamSynchronize(stream); throw; }
+}
+
+double Backends::CudaDeviceContext::readLikelihood() {
+  DeviceScope scope(_impl_->deviceIndex);
+  double total = 0.;
+  checkCuda(cudaMemcpyAsync(&total, _impl_->buffers->likelihoodTotal.data, sizeof(double),
+                            cudaMemcpyDeviceToHost, _impl_->stream), "likelihood total readback");
+  checkCuda(cudaStreamSynchronize(_impl_->stream), "likelihood readback completion");
+  if( std::isnan(total) ){ throw std::runtime_error("CudaBackend: invalid statistical likelihood."); }
+  return total;
 }
 
 void Backends::CudaDeviceContext::readWeights(std::vector<double>& weights_) {
@@ -1020,6 +1075,7 @@ Backends::BackendResourceUsage Backends::CudaDeviceContext::getResourceUsage() c
   usage.deviceName = _impl_->deviceName;
   const auto& b = *_impl_->buffers;
   usage.allocatedBytes = allocatedBufferBytes(
+      b.likelihoodBins, b.likelihoodPartials, b.likelihoodTotal,
       b.formulaPrograms, b.formulaInstructions, b.formulaConstants, b.formulaInputs,
       b.compositePrograms, b.compositeInstances, b.compositeNodeData, b.compositeInstructions, b.compositeInputs, b.programScratchOffsets, b.programScratch,
       b.events, b.dials, b.inputs, b.payloads, b.parameters,

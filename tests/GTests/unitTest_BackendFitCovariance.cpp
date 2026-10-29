@@ -213,9 +213,16 @@ namespace {
   };
 
   FitResult fit(const FitInput& input_, const std::string& backend_, const std::string& mode_,
-                const std::string& layout_ = "eventMajor") {
+                const std::string& layout_ = "eventMajor", const std::string& probability_ = "") {
     FitterEngine engine;
-    engine.configure(ConfigReader(makeConfig(input_, backend_, mode_, layout_)));
+    auto config = makeConfig(input_, backend_, mode_, layout_);
+    if( !probability_.empty() ){
+      config["likelihoodInterfaceConfig"]["jointProbabilityConfig"] = {{"type", probability_}};
+    }
+    if( backend_ == "MPS" ){
+      config["likelihoodInterfaceConfig"]["backendManagerConfig"]["backendConfig"] = {{"propagationMode", mode_}};
+    }
+    engine.configure(ConfigReader(config));
     engine.getLikelihoodInterface().setDataType(LikelihoodInterface::DataType::Asimov);
     engine.initialize();
     if( backend_ != "Original" and (not engine.getBackendsManager().hasBackend()
@@ -466,3 +473,31 @@ TEST_P(CudaFitCovariance, ResidentSwitchMatchesCpu) {
 INSTANTIATE_TEST_SUITE_P(Modes, CudaFitCovariance,
     testing::Values("cachedResponses", "recomputeResponses"),
     [](const testing::TestParamInfo<const char*>& info_){ return info_.param; });
+
+#if defined(__APPLE__) && defined(GUNDAM_USING_BACKENDS)
+TEST(BackendFitCovariance, DeviceStatLikelihoodMatchesOriginalFitAndHesse) {
+  FitEnvironment environment;
+  FitInput input;
+  for( const auto* probability : {"PoissonLLH", "BarlowLLH_BANFF_OA2021"} ){
+    const auto original = fit(input, "Original", "", "eventMajor", probability);
+    ASSERT_EQ(original.status, 0);
+    ASSERT_EQ(original.covarianceStatus, 3);
+    for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){
+      SCOPED_TRACE(::testing::Message() << probability << ", " << mode);
+      const auto device = fit(input, "MPS", mode, "eventMajor", probability);
+      EXPECT_EQ(device.status, 0);
+      EXPECT_EQ(device.covarianceStatus, 3);
+      EXPECT_LT(device.edm, device.targetEdm);
+      EXPECT_NEAR(device.likelihood, original.likelihood, 1e-7);
+      for( std::size_t i = 0; i < parameterCount; ++i ){
+        EXPECT_NEAR(device.values[i], original.values[i], 2e-4 * original.errors[i]);
+        EXPECT_NEAR(device.errors[i], original.errors[i], 2e-4 * original.errors[i]);
+        for( std::size_t j = 0; j < parameterCount; ++j ){
+          EXPECT_NEAR(device.covariance(i, j), original.covariance(i, j),
+                      5e-4 * original.errors[i] * original.errors[j]);
+        }
+      }
+    }
+  }
+}
+#endif

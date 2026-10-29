@@ -25,7 +25,8 @@ namespace Backends {
     [[nodiscard]] std::string getDiagnostics() const;
     [[nodiscard]] std::string getExecutionState() const;
     [[nodiscard]] const std::map<std::string, double>& getDiagnosticStageGpuSeconds() const { return _diagnosticStageGpuSeconds_; }
-    void build(const PropagationView& model_);
+    void build(const PropagationView& model_, const LikelihoodView& likelihood_ = {});
+    void materializeHistograms(PropagationResult& result_, BackendTimingSummary& timing_);
     void clear();
     void invalidate(){ _cache_.invalidate(); _valid_ = false; }
     void propagate(const PropagationInputs& inputs_, PropagationResult& result_, BackendTimingSummary& timing_);
@@ -41,9 +42,9 @@ namespace Backends {
       EventWeights, BinCounts, BinPositions, BinContributions, ChunkOffsets, Chunks,
       PartialSums, PartialSquares, HistogramSums, HistogramSquares, ReadbackSums, ReadbackSquares,
       ReadbackVariables, ReadbackBins, ReadbackCounts, ReadbackContributions, ReadbackWeights, FormulaPrograms, FormulaInstructions, FormulaConstants,
-      ProgramInputs, CompositePrograms, CompositeInstructions, ProgramScratch, Count
+      ProgramInputs, CompositePrograms, CompositeInstructions, ProgramScratch, LikelihoodBins, LikelihoodCount, LikelihoodPartials, LikelihoodTotal, LikelihoodReadback, Count
     };
-    enum class Kernel { Dials, Events, Binning, ClearCounts, CountContributions, IndexChunks, Scatter, Reduce, Finish, ReduceParallel, Count };
+    enum class Kernel { Dials, Events, Binning, ClearCounts, CountContributions, IndexChunks, Scatter, Reduce, Finish, ReduceParallel, LikelihoodPartials, LikelihoodFinish, Count };
     id<MTLBuffer> buffer(Buffer buffer_) const { return _buffers_[std::size_t(buffer_)]; }
     struct DialGroup { std::size_t dependency, first, count; bool external; };
     struct MultiDialGroup { std::vector<std::size_t> parameters; std::size_t first, count; };
@@ -64,6 +65,8 @@ namespace Backends {
     std::vector<std::uint64_t> _externalGenerations_{};
     std::uint64_t _materializedRevision_{0};
     bool _valid_{false};
+    bool _deviceLikelihood_{false};
+    std::size_t _likelihoodBinCount_{0};
     bool _enableDiagnosticStageProfiling_{false};
     bool _enableDialCache_{true};
     std::vector<DialGroup> _dialGroups_{};
