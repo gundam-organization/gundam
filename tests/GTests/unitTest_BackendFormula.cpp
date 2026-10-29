@@ -41,7 +41,7 @@ TEST(BackendFormula, ArithmeticFunctionsAndPrecedenceMatchRoot) {
       "erf([delta])+erfc([delta])+floor([alpha])+ceil([alpha])",
       "min([delta],[alpha])+max([delta],[alpha])",
       "TMath::Exp([delta])+TMath::Power([q3],2)+TMath::Pi()",
-      "std::sin([delta])+TMath::TwoPi()", "pi", "2.5"};
+      "std::sin([delta])+TMath::TwoPi()", "2.5"};
   for( const auto& expression : expressions ){
     SCOPED_TRACE(expression);
     TFormula root("backendFormulaReference", expression.c_str(), false);
@@ -60,6 +60,9 @@ TEST(BackendFormula, ArithmeticFunctionsAndPrecedenceMatchRoot) {
 }
 
 TEST(BackendFormula, ConstantsAndDomainErrors) {
+  // ROOT 6.34 rounds the bare "pi" constant to six decimal places in TFormula.
+  // Check it independently; TMath::Pi() remains covered by the ROOT comparisons above.
+  EXPECT_DOUBLE_EQ(evaluate(Backends::FormulaCompiler::compile("pi", {}), {}), std::acos(-1.));
   const auto program = Backends::FormulaCompiler::compile("[a]+[bin]", {"unused", "a"}, {{"bin", 4.5}});
   EXPECT_DOUBLE_EQ(evaluate(program, {99., 2.}), 6.5);
   for( const auto& expression : {"sqrt([a])", "log([a])", "1/[a]", "asin([a])", "exp([a])"} ){
