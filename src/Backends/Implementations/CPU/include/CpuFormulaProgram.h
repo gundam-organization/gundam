@@ -24,6 +24,9 @@ namespace Backends {
   // Scratch contains stackSize + inputCount doubles and belongs to the worker.
   template<typename InputReader>
   double evaluateBoundFormula(const FormulaProgram& program_, InputReader readInput_, double* scratch_) {
+    if( program_.nativePlan.kernel != NativeFormulaKernel::Interpreter ){
+      return evaluateNativeFormulaPlan(program_.nativePlan, readInput_);
+    }
     auto* values = scratch_ + program_.stackSize;
     for( std::size_t i = 0; i < program_.inputCount; ++i ){ values[i] = readInput_(i); }
     return evaluateFormula(program_, [values](std::size_t index_){ return values[index_]; }, scratch_);

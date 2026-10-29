@@ -7,6 +7,7 @@
 #include "CudaDeviceContext.h"
 #endif
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -143,7 +144,18 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
       {"formulaInstructions", packed.formulaInstructions.size()},
       {"compositePrograms", packed.compositePrograms.size()},
       {"compositeInstructions", packed.compositeInstructions.size()},
+      {"compositeInstances", packed.compositeInstances.size()},
+      {"compositeNodeDataBytes", packed.compositeNodeData.size() * sizeof(std::size_t)},
+      {"originalCompositeInstructions", getEngineView().propagation.compositeInstructions.size()},
+      {"compositeTemplateBytes", packed.compositePrograms.size() * sizeof(NativeCompositeTemplate)
+          + packed.compositeInstructions.size() * sizeof(CompositeInstruction)
+          + packed.compositeInputs.size() * sizeof(BackendDialInputDescriptor)},
+      {"fastCompositeInstances", std::count_if(packed.compositeInstances.begin(), packed.compositeInstances.end(),
+          [&](const auto& instance_){ return packed.compositePrograms[instance_.programIndex].isChain; })},
+      {"fastFormulaPrograms", std::count_if(packed.formulaPrograms.begin(), packed.formulaPrograms.end(),
+          [](const auto& program_){ return program_.nativePlan.kernel != NativeFormulaKernel::Interpreter; })},
       {"programScratchBytes", packed.programScratchSize * sizeof(double)},
+      {"programKernel", packed.onlyFastPrograms ? "fast" : (packed.compositePrograms.empty() and packed.formulaPrograms.empty() ? "none" : "mixed")},
       {"multiInputDependencyGroups", packed.multiInputGroups.size()},
       {"observableResponses", packed.variableResponses.size()},
       {"hasEventState", packed.hasEventState},

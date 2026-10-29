@@ -2,6 +2,7 @@
 #define GUNDAM_CPU_BACKEND_H
 
 #include "EngineView.h"
+#include "NativeDialProgramModel.h"
 #include "EventStateCache.h"
 #include "PropagationResult.h"
 #include "BackendTypes.h"
@@ -128,21 +129,20 @@ ENUM_FIELD( Indexed )
     std::size_t _cachedContributionCount_{0};
     GenericToolbox::Time::Timer _variableStageTimer_{};
     GenericToolbox::Time::Timer _binningStageTimer_{};
+    NativeDialProgramModel _nativePrograms_;
     std::shared_ptr<const EngineView> _engineView_{std::make_shared<EngineView>()};
     Result _lastResult_{};
     GenericToolbox::ParallelWorker _threadPool_{};
     Result* _activeResult_{nullptr};
     const PropagationInputs* _activeInputs_{nullptr};
     std::vector<std::vector<std::uint32_t>> _cachedDialsByParameter_{};
-    struct MultiInputCachedDial {
-      std::uint32_t dialIndex{0};
-      std::uint32_t generation{0};
-      std::size_t inputCount{0};
+    struct MultiInputCacheGroup {
+      std::vector<std::size_t> parameters;
+      std::vector<std::uint32_t> dials;
+      std::size_t inputTransforms{0};
+      bool changed{false};
     };
-    std::vector<MultiInputCachedDial> _multiInputCachedDials_{};
-    // Entries index the compact multi-input list, not the full dial model.
-    std::vector<std::vector<std::uint32_t>> _multiInputDialsByParameter_{};
-    std::uint32_t _cacheUpdateGeneration_{0};
+    std::vector<MultiInputCacheGroup> _multiInputCacheGroups_{};
     std::vector<std::uint32_t> _dirtyCachedDialIndices_{};
     std::vector<std::uint8_t> _changedCacheParameters_{};
     CpuCacheTraversal _cacheTraversal_{CpuCacheTraversal::Auto};

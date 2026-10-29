@@ -332,12 +332,16 @@ def measure_resident(args):
     args.output = root
 
 
-def compare(output, cases, scenarios, trials, relative, absolute):
+def compare(output, cases, scenarios, trials, relative, absolute, *, reference_directory=None,
+            comparison_name='comparison.json'):
     reference = 'CPU' if 'CPU' in cases else cases[0]
-    manifest = json.loads((output / reference / 'parameters.json').read_text())
+    reference_dir = reference_directory if reference_directory is not None else output / reference
+    manifest = json.loads((reference_dir / 'parameters.json').read_text())
     comparison = {'reference': reference, 'relativeTolerance': relative,
                   'absoluteTolerance': absolute, 'passed': True, 'cases': {}}
-    for case in (case for case in cases if case != reference):
+    if reference_directory is not None:
+        comparison['referenceDirectory'] = str(reference_dir)
+    for case in (case for case in cases if case != reference or reference_directory is not None):
         if manifest != json.loads((output / case / 'parameters.json').read_text()):
             raise RuntimeError(f'{case}: parameter manifests differ')
         entries = {}
@@ -346,9 +350,9 @@ def compare(output, cases, scenarios, trials, relative, absolute):
             max_event, bin_mismatches = 0., 0
             for trial in range(1, trials + 1):
                 name = f'{scenario}-trial{trial}.json'
-                left = json.loads((output / reference / name).read_text())
+                left = json.loads((reference_dir / name).read_text())
                 right = json.loads((output / case / name).read_text())
-                event_delta, mismatches = compare_events(output / reference, output / case,
+                event_delta, mismatches = compare_events(reference_dir, output / case,
                     left.get('eventSnapshot'), right.get('eventSnapshot'), relative, absolute)
                 max_event = max(max_event, event_delta)
                 bin_mismatches += mismatches
@@ -380,12 +384,13 @@ def compare(output, cases, scenarios, trials, relative, absolute):
                                  'eventBinMismatches': bin_mismatches, 'maxAbsoluteLikelihoodDifference': max_llh,
                                  'maxAbsoluteHistogramOrErrorDifference': max_bin,
                                  'maxAbsoluteOutsideOrErrorDifference': max_outside,
-                                 'speedupOverReference': median(reference) / median(case)}
+                                 'speedupOverReference': json.loads((reference_dir / 'summary.json').read_text())[
+                                     'scenarios'][scenario]['timings']['evaluationSeconds']['medianMs'] / median(case)}
             comparison['passed'] &= passed
         comparison['cases'][case] = entries
-    write_json(output / 'comparison.json', comparison)
+    write_json(output / comparison_name, comparison)
     if not comparison['passed']:
-        raise RuntimeError('Numerical comparison failed; see comparison.json')
+        raise RuntimeError(f'Numerical comparison failed; see {comparison_name}')
 
 
 def write_report(output, cases):

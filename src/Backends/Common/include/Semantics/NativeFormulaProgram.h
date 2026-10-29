@@ -2,6 +2,7 @@
 #define GUNDAM_NATIVE_FORMULA_PROGRAM_H
 
 #include "FormulaTypes.h"
+#include "NativeFormulaPlan.h"
 #include "Semantics/BackendSemanticsQualifiers.h"
 
 #include <cmath>
@@ -54,6 +55,37 @@ namespace Backends::NativeFormulaMath {
 }
 
 namespace Backends {
+  template<typename InputReader>
+  GUNDAM_BACKEND_ALWAYS_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double evaluateNativeFormulaPlan(const NativeFormulaPlan& plan_, InputReader read_) {
+    const auto load = [&](unsigned int i_) {
+      return plan_.literalMask & (1u << i_) ? plan_.literals[i_] : read_(plan_.inputs[i_]);
+    };
+    if( plan_.kernel == NativeFormulaKernel::Constant ){ return plan_.literals[0]; }
+    const double a = load(0);
+    if( plan_.kernel == NativeFormulaKernel::Input ){ return a; }
+    const double b = load(1);
+    if( plan_.kernel == NativeFormulaKernel::MultiplyThenAdd ){
+      const double c = load(2);
+#if defined(__CUDA_ARCH__)
+      return __dadd_rn(a, __dmul_rn(b, c));
+#else
+      // The bytecode rounds the multiply before the add. Prevent contraction.
+      volatile double product = b * c;
+      return a + product;
+#endif
+    }
+    switch( plan_.operation ){
+      case FormulaOpcode::Add: return a + b;
+      case FormulaOpcode::Subtract: return a - b;
+      case FormulaOpcode::Multiply: return a * b;
+      case FormulaOpcode::Divide: return a / b;
+      case FormulaOpcode::Min: return a <= b ? a : b;
+      case FormulaOpcode::Max: return a >= b ? a : b;
+      default: GUNDAM_BACKEND_SEMANTICS_ASSERT(false); return NAN;
+    }
+  }
+
   // A range view lets CUDA use packed tables without changing CPU's existing
   // FormulaProgram calling convention or introducing temporary input copies.
   struct NativeFormulaInstructions {
@@ -67,6 +99,7 @@ namespace Backends {
   struct NativeFormulaView {
     NativeFormulaInstructions instructions;
     const double* constants;
+    NativeFormulaPlan nativePlan{};
   };
 
   // Callers retain their input binding strategy and own the stack. The same
@@ -75,6 +108,9 @@ namespace Backends {
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
   double evaluateNativeFormula(const Program& program_, InputReader readInput_,
       double* stack_, InvalidOpcode invalidOpcode_) {
+    if( program_.nativePlan.kernel != NativeFormulaKernel::Interpreter ){
+      return evaluateNativeFormulaPlan(program_.nativePlan, readInput_);
+    }
     std::size_t top{0};
     for( const auto& instruction : program_.instructions ){
       const auto op = instruction.opcode;

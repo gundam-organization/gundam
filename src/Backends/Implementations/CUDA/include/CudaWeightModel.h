@@ -2,6 +2,7 @@
 #define GUNDAM_CUDA_WEIGHT_MODEL_H
 
 #include "EngineView.h"
+#include "NativeDialProgramModel.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -22,6 +23,7 @@ namespace Backends {
 
   struct CudaFormulaProgram {
     std::size_t firstInstruction{0}, instructionCount{0}, firstConstant{0}, stackSize{0};
+    NativeFormulaPlan nativePlan{};
   };
 
   struct CudaExternalGroup {
@@ -54,12 +56,15 @@ namespace Backends {
     std::vector<FormulaInstruction> formulaInstructions{};
     std::vector<double> formulaConstants{};
     std::vector<FormulaInput> formulaInputs{};
-    std::vector<CompositeProgram> compositePrograms{};
+    std::vector<NativeCompositeTemplate> compositePrograms{};
+    std::vector<NativeCompositeInstance> compositeInstances{};
+    std::vector<std::size_t> compositeNodeData{};
     std::vector<CompositeInstruction> compositeInstructions{};
     std::vector<BackendDialInputDescriptor> compositeInputs{};
     // Allocated only for models with programs; each root has disjoint workspace.
     std::vector<std::size_t> programScratchOffsets{};
     std::size_t programScratchSize{0};
+    bool onlyFastPrograms{false};
     std::vector<std::uint32_t> eventDialIndices{};
     std::size_t eventDialStride{1};
     // Scalar CSR followed by disjoint pair/multi-input/external groups in parameterDialIndices.
@@ -103,6 +108,7 @@ namespace Backends {
     std::size_t firstDial{0};
     std::size_t endDial{0};
     std::size_t firstBlock{0};
+    bool direct{false};
   };
 
   // Reused host-side dispatch storage. Blocks tile changed dependency ranges;
@@ -113,7 +119,8 @@ namespace Backends {
     std::size_t blockCount{0};
     void select(const std::vector<std::size_t>& offsets_, const std::vector<double>& previous_,
                 const std::vector<double>& current_, const std::vector<CudaSurfaceGroup>& surfaceGroups_ = {},
-                const std::vector<CudaMultiInputGroup>& multiInputGroups_ = {});
+                const std::vector<CudaMultiInputGroup>& multiInputGroups_ = {},
+                const std::vector<std::uint32_t>& indices_ = {});
     void selectExternal(const std::vector<CudaExternalGroup>& groups_,
                         const std::vector<std::uint64_t>& previous_, const std::vector<std::uint64_t>& current_,
                         bool force_ = false);

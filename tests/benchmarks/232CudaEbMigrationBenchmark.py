@@ -343,6 +343,9 @@ def parse_args(argv=None):
                         default=['constant', 'local1', 'local2', 'global'])
     parser.add_argument('--relative-tolerance', type=float, default=1e-9)
     parser.add_argument('--absolute-tolerance', type=float, default=1e-7)
+    parser.add_argument('--reference-output', type=Path, help='Optional earlier benchmark folder; compare every case with its CPU snapshots')
+    parser.add_argument('--discard-event-snapshots', action='store_true',
+                        help='Delete binary snapshots only after successful numerical/migration checks')
     parser.add_argument('--output', type=Path, default=Path(time.strftime('cuda-migration-%Y%m%d-%H%M%S-') + str(os.getpid())))
     parser.add_argument('--worker-case', choices=profiling.CASES, help=argparse.SUPPRESS)
     parser.add_argument('--worker-variant', choices=['configured', 'hard', 'smooth'], help=argparse.SUPPRESS)
@@ -374,6 +377,11 @@ def parse_args(argv=None):
     args.work_dir = args.work_dir.resolve()
     args.config = (args.work_dir / args.config).resolve()
     args.output = args.output.resolve()
+    if args.reference_output is not None:
+        args.reference_output = args.reference_output.resolve()
+        for variant in args.variants:
+            if not (args.reference_output / variant / 'CPU' / 'summary.json').is_file():
+                parser.error(f'Missing CPU reference for {variant}: {args.reference_output}')
     if not args.config.is_file():
         parser.error(f'Configuration does not exist: {args.config}')
     return args
@@ -407,11 +415,21 @@ def main():
             run_worker(args, variant, case)
         profiling.compare(args.output / variant, args.cases, args.scenarios, args.trials,
                           args.relative_tolerance, args.absolute_tolerance)
+        if args.reference_output is not None:
+            profiling.compare(args.output / variant, args.cases, args.scenarios, args.trials,
+                args.relative_tolerance, args.absolute_tolerance,
+                reference_directory=args.reference_output / variant / 'CPU',
+                comparison_name='comparison-reference.json')
         profiling.write_report(args.output / variant, args.cases)
+        if args.discard_event_snapshots:
+            for case in args.cases:
+                for snapshot in (args.output / variant / case).glob('*.bin'):
+                    snapshot.unlink()
     verify_variant_replay(args)
     summaries = write_report(args)
     write_json(args.output / 'summary.json', {'complete': True, 'variants': summaries,
-        'gpuComparisonPerformed': any(case != 'CPU' for case in args.cases)})
+        'gpuComparisonPerformed': any(case != 'CPU' for case in args.cases),
+        'eventSnapshotsRetained': not args.discard_event_snapshots})
     progress(f'SUCCESS: {args.output / "report.md"}')
 
 

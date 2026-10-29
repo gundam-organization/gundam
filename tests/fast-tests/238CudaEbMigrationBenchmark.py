@@ -91,6 +91,20 @@ def main():
         configured_coverage = json.loads((configured_dir / 'coverage.json').read_text())
         assert configured_coverage['variable'] == 'X'
         assert configured_coverage['samples'][0]['smoothed']
+        checked_output = folder / 'reference-checked'
+        with (folder / 'reference-run.log').open('w') as log:
+            completed = subprocess.run([sys.executable, str(path), '--work-dir', str(folder),
+                '--config', 'config.json', '--override', 'bin-response.json', '--cases', 'CPU',
+                '--calls', '5', '--global-calls', '3', '--trials', '1', '--warmup', '1',
+                '--reference-output', str(default_output), '--discard-event-snapshots',
+                '--output', str(checked_output)], stdout=log, stderr=subprocess.STDOUT)
+        if completed.returncode:
+            print((folder / 'reference-run.log').read_text())
+            raise RuntimeError('Reference comparison failed')
+        assert json.loads((checked_output / 'configured' / 'comparison-reference.json').read_text())['passed']
+        assert not json.loads((checked_output / 'summary.json').read_text())['eventSnapshotsRetained']
+        assert not list(checked_output.rglob('*.bin'))
+        assert list(default_output.rglob('*.bin'))  # Never remove the reference data.
         output = folder / 'results'
         with (folder / 'run.log').open('w') as log:
             completed = subprocess.run([sys.executable, str(path), '--work-dir', str(folder),

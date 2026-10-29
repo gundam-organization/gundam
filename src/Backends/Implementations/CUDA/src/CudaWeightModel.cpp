@@ -6,6 +6,8 @@
 #include "Semantics/BackendDialSemantics.h"
 
 #include <algorithm>
+#include <map>
+#include <numeric>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -177,6 +179,40 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     }
   }
   else{ out.dials = model.dials; }
+  NativeDialProgramModel native;
+  native.build(model, out.dials);
+  if( not native.dials.empty() ){ out.dials = std::move(native.dials); }
+  if( not native.compositeInstances.empty() or not native.formulaPrograms.empty() ){
+    // Keep ordinary reweights and the surface suffix unchanged. Program roots
+    // become contiguous by dependencies/template, enabling direct range dispatch.
+    using GroupKey = std::pair<std::vector<std::size_t>, std::pair<BackendDialType, std::size_t>>;
+    std::map<GroupKey, std::vector<std::size_t>> programGroups;
+    std::vector<std::size_t> order;
+    order.reserve(out.dials.size());
+    for( std::size_t i = 0; i < out.surfaceOffset; ++i ){
+      const auto& dial = out.dials[i];
+      if( dial.type != BackendDialType::Composite and dial.type != BackendDialType::Formula ){ order.push_back(i); continue; }
+      std::vector<std::size_t> parameters;
+      for( std::size_t j = 0; j < dial.inputCount; ++j ){ parameters.push_back(model.dialInputs[dial.firstInput + j].parameterIndex); }
+      std::sort(parameters.begin(), parameters.end());
+      const auto program = dial.type == BackendDialType::Composite
+          ? native.compositeInstances[dial.compositeProgram].programIndex : dial.formulaProgramIndex;
+      programGroups[{std::move(parameters), {dial.type, program}}].push_back(i);
+    }
+    for( const auto& group : programGroups ){ order.insert(order.end(), group.second.begin(), group.second.end()); }
+    for( std::size_t i = out.surfaceOffset; i < out.dials.size(); ++i ){ order.push_back(i); }
+    std::vector<BackendDialDescriptor> sorted;
+    std::vector<std::uint32_t> destinations(order.size());
+    sorted.reserve(order.size());
+    for( std::size_t i = 0; i < order.size(); ++i ){
+      sorted.push_back(out.dials[order[i]]); destinations[order[i]] = static_cast<std::uint32_t>(i);
+    }
+    if( dialSlots.empty() ){
+      dialSlots.resize(order.size()); std::iota(dialSlots.begin(), dialSlots.end(), 0);
+    }
+    for( auto& slot : dialSlots ){ slot = destinations[slot]; }
+    out.dials = std::move(sorted);
+  }
   auto groups = buildDialDependencyGroups(model, out.dials);
   out.parameterDialOffsets = std::move(groups.parameterOffsets);
   out.parameterDialIndices = std::move(groups.parameterDialIndices);
@@ -355,25 +391,31 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     require(sample.dataSums.empty() or bool(sample.evalBin), "likelihood evaluator is missing.");
   }
   out.events = model.eventWeights;
-  out.formulaInputs = model.formulaInputs;
-  out.compositePrograms = model.compositePrograms;
-  out.compositeInstructions = model.compositeInstructions;
-  out.compositeInputs = model.compositeInputs;
-  for( const auto& program : model.formulaPrograms ){
+  out.formulaInputs = std::move(native.formulaInputs);
+  out.compositePrograms = std::move(native.compositePrograms);
+  out.compositeInstances = std::move(native.compositeInstances);
+  out.compositeNodeData = std::move(native.compositeNodeData);
+  out.compositeInstructions = std::move(native.compositeInstructions);
+  out.compositeInputs = std::move(native.compositeInputs);
+  for( const auto& program : native.formulaPrograms ){
     out.formulaPrograms.push_back({out.formulaInstructions.size(), program.instructions.size(),
-                                   out.formulaConstants.size(), program.stackSize});
+                                   out.formulaConstants.size(), program.stackSize, program.nativePlan});
     out.formulaInstructions.insert(out.formulaInstructions.end(), program.instructions.begin(), program.instructions.end());
     out.formulaConstants.insert(out.formulaConstants.end(), program.constants.begin(), program.constants.end());
   }
   for( std::size_t i = 0; i < out.dials.size(); ++i ){
     const auto& dial = out.dials[i];
     if( dial.type != BackendDialType::Composite and dial.type != BackendDialType::Formula ){ continue; }
+    const bool fast = dial.type == BackendDialType::Formula
+        ? out.formulaPrograms[dial.formulaProgramIndex].nativePlan.kernel != NativeFormulaKernel::Interpreter
+        : out.compositePrograms[out.compositeInstances[dial.compositeProgram].programIndex].isChain;
+    if( fast ){ continue; }
     if( out.programScratchOffsets.empty() ){ out.programScratchOffsets.resize(out.dials.size()); }
     out.programScratchOffsets[i] = out.programScratchSize;
     std::size_t slots = dial.inputCount, stack = 0;
     if( dial.type == BackendDialType::Formula ){ stack = out.formulaPrograms[dial.formulaProgramIndex].stackSize; }
     else{
-      const auto& program = out.compositePrograms[dial.compositeProgram];
+      const auto& program = out.compositePrograms[out.compositeInstances[dial.compositeProgram].programIndex];
       slots = program.scratchSize();
       for( std::size_t j = 0; j < program.instructionCount; ++j ){
         const auto& node = out.compositeInstructions[program.firstInstruction + j].dial;
@@ -389,6 +431,16 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
             "program scratch allocation overflow.");
     out.programScratchSize += slots;
   }
+  out.onlyFastPrograms = (not out.formulaPrograms.empty() or not out.compositePrograms.empty())
+      and std::all_of(out.dials.begin(), out.dials.end(), [&](const auto& dial_){
+        if( dial_.type == BackendDialType::Formula ){
+          return out.formulaPrograms[dial_.formulaProgramIndex].nativePlan.kernel != NativeFormulaKernel::Interpreter;
+        }
+        if( dial_.type == BackendDialType::Composite ){
+          return out.compositePrograms[out.compositeInstances[dial_.compositeProgram].programIndex].isChain;
+        }
+        return true;
+      });
   out.inputs = model.dialInputs;
   out.payloads = model.dialPayloads;
   if( interleaveEventDials_ and not out.events.empty() ){
@@ -440,34 +492,35 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
 void Backends::CudaResponseUpdatePlan::select(const std::vector<std::size_t>& offsets_,
     const std::vector<double>& previous_, const std::vector<double>& current_,
     const std::vector<CudaSurfaceGroup>& surfaceGroups_,
-    const std::vector<CudaMultiInputGroup>& multiInputGroups_) {
+    const std::vector<CudaMultiInputGroup>& multiInputGroups_,
+    const std::vector<std::uint32_t>& indices_) {
   require(previous_.size() == current_.size() and offsets_.size() == current_.size() + 1,
           "response update parameter layout mismatch.");
   ranges.clear();
   dialCount = blockCount = 0;
-  for( std::size_t i = 0; i < current_.size(); ++i ){
-    if( previous_[i] == current_[i] or offsets_[i] == offsets_[i + 1] ){ continue; }
-    const auto count = offsets_[i + 1] - offsets_[i];
-    ranges.push_back({offsets_[i], offsets_[i + 1], blockCount});
+  auto append = [&](std::size_t first_, std::size_t end_) {
+    const auto count = end_ - first_;
+    const bool direct = not indices_.empty() and end_ <= indices_.size()
+        and std::size_t(indices_[first_]) + count - 1 == indices_[end_ - 1];
+    ranges.push_back({direct ? std::size_t(indices_[first_]) : first_,
+                      direct ? std::size_t(indices_[first_]) + count : end_, blockCount, direct});
     dialCount += count;
     blockCount += (count - 1) / cudaResponseBlockSize + 1;
+  };
+  for( std::size_t i = 0; i < current_.size(); ++i ){
+    if( previous_[i] == current_[i] or offsets_[i] == offsets_[i + 1] ){ continue; }
+    append(offsets_[i], offsets_[i + 1]);
   }
   for( const auto& group : surfaceGroups_ ){
     if( previous_[group.firstParameter] == current_[group.firstParameter]
         and previous_[group.secondParameter] == current_[group.secondParameter] ){ continue; }
-    const auto count = group.endDial - group.firstDial;
-    ranges.push_back({group.firstDial, group.endDial, blockCount});
-    dialCount += count;
-    blockCount += (count - 1) / cudaResponseBlockSize + 1;
+    append(group.firstDial, group.endDial);
   }
   for( const auto& group : multiInputGroups_ ){
     const bool changed = std::any_of(group.parameters.begin(), group.parameters.end(),
         [&](std::size_t index_){ return previous_[index_] != current_[index_]; });
     if( not changed ){ continue; }
-    const auto count = group.endDial - group.firstDial;
-    ranges.push_back({group.firstDial, group.endDial, blockCount});
-    dialCount += count;
-    blockCount += (count - 1) / cudaResponseBlockSize + 1;
+    append(group.firstDial, group.endDial);
   }
 }
 

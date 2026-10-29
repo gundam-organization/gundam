@@ -1,6 +1,7 @@
 set(LIB_NAME GundamBackends)
 
 set(SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/NativeDialProgramModel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/FormulaCompiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BinningGeometry.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/DevicePropagationModel.cpp
@@ -88,6 +89,8 @@ if(APPLE)
 endif()
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/NativeFormulaPlan.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/NativeDialProgramModel.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/SharedFormulaOperations.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/NativeCompositeProgram.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/NativeFormulaProgram.h

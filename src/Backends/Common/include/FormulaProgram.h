@@ -2,6 +2,7 @@
 #define GUNDAM_FORMULA_PROGRAM_H
 
 #include "FormulaTypes.h"
+#include "NativeFormulaPlan.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -13,6 +14,8 @@ namespace Backends {
     std::vector<double> constants;
     std::size_t inputCount{0};
     std::size_t stackSize{0};
+
+    NativeFormulaPlan nativePlan{};
 
     // Validate untrusted descriptors once, before entering the hot loop.
     void validate() const;
