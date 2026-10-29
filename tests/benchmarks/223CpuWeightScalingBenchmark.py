@@ -226,7 +226,7 @@ def measure(args):
     progress(f'SUCCESS: all worker counts preserve LLH and histograms. Results: {args.output}')
 
 
-def main(single_thread=False, description=None):
+def main(single_thread=False, description=None, benchmark_name=None):
     parser = argparse.ArgumentParser(description=description or __doc__)
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--override', nargs='*', default=[])
@@ -249,8 +249,10 @@ def main(single_thread=False, description=None):
         parser.add_argument('--profile-calls', type=int, default=40, help='Separate sampled evaluations')
     else:
         parser.set_defaults(perf_record=False, profile_calls=40)
-    prefix = 'cpu-single-thread-' if single_thread else 'cpu-weight-scaling-'
-    parser.add_argument('--output', type=Path, default=Path(time.strftime(prefix + '%Y%m%d-%H%M%S-') + str(os.getpid())))
+    name = benchmark_name or Path(__file__).stem
+    parser.add_argument('--output', type=Path,
+                        default=Path(f'benchmark-{name}-{time.strftime("%Y%m%d%H%M%S")}'),
+                        help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss)')
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     if single_thread and (args.threads != 1 or args.workers != [1]):

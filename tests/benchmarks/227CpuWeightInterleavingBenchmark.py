@@ -130,7 +130,9 @@ def main():
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--override', nargs='*', default=[])
     parser.add_argument('--work-dir', type=Path, default=Path.cwd())
-    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--output', type=Path,
+                        default=Path(f'benchmark-{Path(__file__).stem}-{time.strftime("%Y%m%d%H%M%S")}'),
+                        help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss)')
     parser.add_argument('--threads', type=int, default=4)
     parser.add_argument('--workers', nargs='+', type=int)
     parser.add_argument('--calls', type=int, default=60)

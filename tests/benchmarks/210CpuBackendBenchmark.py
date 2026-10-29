@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import argparse
 import math
 import sys
 import time
@@ -206,9 +207,19 @@ def make_parameter_points(nb_points: int) -> list[tuple[float, float]]:
     return points
 
 
+def parse_output_directory(script_path: str) -> Path:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('script_dir', nargs='?', help=argparse.SUPPRESS)
+    parser.add_argument('--output', type=Path,
+                        default=Path(f'benchmark-{Path(script_path).stem}-{time.strftime("%Y%m%d%H%M%S")}'),
+                        help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss)')
+    return parser.parse_args().output.resolve()
+
+
 def main() -> int:
-    script_dir = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent
-    work_dir = Path.cwd()
+    work_dir = parse_output_directory(__file__)
+    work_dir.mkdir(parents=True, exist_ok=False)
+    print(f'Results: {work_dir}', flush=True)
     root_path = work_dir / "210CpuBackendBenchmark.root"
 
     nb_events = 120000

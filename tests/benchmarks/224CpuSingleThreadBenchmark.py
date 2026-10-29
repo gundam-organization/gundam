@@ -15,4 +15,4 @@ scaling = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(scaling)
 
 if __name__ == '__main__':
-    scaling.main(single_thread=True, description=__doc__)
+    scaling.main(single_thread=True, description=__doc__, benchmark_name=Path(__file__).stem)

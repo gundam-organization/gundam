@@ -59,15 +59,25 @@ def main():
     parser.add_argument('--bins', type=int, nargs='+', default=[64, 256])
     parser.add_argument('--threads', type=int, default=3)
     parser.add_argument('--repeat', type=int, default=9)
-    parser.add_argument('--output', type=Path, default=Path('221BinningBackendBenchmark.json'))
+    parser.add_argument('--output', type=Path,
+                        default=Path(f'benchmark-{Path(__file__).stem}-{time.strftime("%Y%m%d%H%M%S")}'),
+                        help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss); a .json file is also accepted')
     parser.add_argument('--backends', nargs='+', choices=['CPU', 'MPS'],
                         default=['CPU', 'MPS'] if sys.platform == 'darwin' else ['CPU'])
     args = parser.parse_args()
     if min([args.events, args.threads, args.repeat] + args.bins) <= 0:
         parser.error('Counts must be positive')
+    args.output = args.output.resolve()
+    if args.output.suffix.lower() == '.json':
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        report_path = args.output
+    else:
+        args.output.mkdir(parents=True, exist_ok=False)
+        report_path = args.output / 'summary.json'
+    print(f'Results: {report_path.parent}', flush=True)
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(args.threads)
-    path = Path.cwd() / '221BinningBackendBenchmark.root'
+    path = report_path.parent / '221BinningBackendBenchmark.root'
     random = np.random.default_rng(724)
     with uproot.recreate(path) as output:
         tree = output.mktree('events', {'X': 'float64', 'weight': 'float64'})
@@ -116,7 +126,7 @@ def main():
                             assert math.isclose(a, b, rel_tol=2e-5 if backend == 'MPS' else 1e-10, abs_tol=2e-5 if backend == 'MPS' else 1e-10), (a, b)
                 rows.append(row)
                 print(json.dumps(row), flush=True)
-    args.output.write_text(json.dumps(rows, indent=2) + '\n')
+    report_path.write_text(json.dumps(rows, indent=2) + '\n')
     print('SUCCESS: benchmark histogram sums and errors agree')
 
 

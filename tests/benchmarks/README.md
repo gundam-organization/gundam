@@ -4,6 +4,14 @@ These scripts measure performance; they are not part of the regular regression
 suite. Use a Release build with the Python interface enabled and select the
 matching installed `GUNDAM` Python module.
 
+`--output` is optional. By default, scripts create a directory in the launch
+directory named `benchmark-<script-name>-YYYYMMDDHHmmss`, using local time and
+the script name without its extension. An explicit `--output` path takes
+precedence. The single-thread wrapper uses its own script name; the CUDA shell
+wrapper uses the name of the Python profiler it launches. Existing directories
+are not overwritten. For compatibility, `221BinningBackendBenchmark.py` also
+accepts an explicit `.json` output file; directory outputs contain `summary.json`.
+
 ## CPU formulas and composites with Eb migration
 
 `230CpuFormulaCompositeBenchmark.py` replays the five physical Eb parameters on
@@ -132,7 +140,7 @@ warmup/priming. All response caches are primed; this isolates steady-state weigh
 and histogram costs, not the cost of updating all spline responses. There is no
 Migrad/HESSE run and no dataset reload between passes.
 
-Output under `cpu-single-thread-<timestamp>-<PID>/` includes the normal JSON
+Output under `benchmark-224CpuSingleThreadBenchmark-YYYYMMDDHHmmss/` includes the normal JSON
 reports with cache, weight, histogram, statistical likelihood, variable, binning,
 host input-preparation and complete-evaluation times. Their sum can differ from
 complete time because wrapper/penalty work is outside the listed timers. Select
@@ -230,7 +238,7 @@ No minimization, HESSE, global parameter updates or repeated dataset loading is
 required. Dataset initialization can still take a long time; progress heartbeats
 appear every 30 seconds and full native output is saved to `native.log`.
 
-Results are written under `cpu-weight-scaling-<timestamp>-<PID>/`:
+Results are written under `benchmark-223CpuWeightScalingBenchmark-YYYYMMDDHHmmss/`:
 
 - `settings.json` and `model.json`: invocation, model size, pool layout, affinity,
   host and SLURM allocation information.

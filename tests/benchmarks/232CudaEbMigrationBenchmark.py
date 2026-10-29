@@ -346,7 +346,9 @@ def parse_args(argv=None):
     parser.add_argument('--reference-output', type=Path, help='Optional earlier benchmark folder; compare every case with its CPU snapshots')
     parser.add_argument('--discard-event-snapshots', action='store_true',
                         help='Delete binary snapshots only after successful numerical/migration checks')
-    parser.add_argument('--output', type=Path, default=Path(time.strftime('cuda-migration-%Y%m%d-%H%M%S-') + str(os.getpid())))
+    parser.add_argument('--output', type=Path,
+                        default=Path(f'benchmark-{Path(__file__).stem}-{time.strftime("%Y%m%d%H%M%S")}'),
+                        help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss)')
     parser.add_argument('--worker-case', choices=profiling.CASES, help=argparse.SUPPRESS)
     parser.add_argument('--worker-variant', choices=['configured', 'hard', 'smooth'], help=argparse.SUPPRESS)
     args = parser.parse_args(argv)

@@ -15,13 +15,14 @@ def load_cpu_benchmark_module():
 
 
 def main() -> int:
+    cpu_benchmark = load_cpu_benchmark_module()
+    work_dir = cpu_benchmark.parse_output_directory(__file__)
     if platform.system() != "Darwin":
       print("SKIP: MPS backend benchmark requires macOS/Metal.")
       return 0
 
-    cpu_benchmark = load_cpu_benchmark_module()
-
-    work_dir = Path.cwd()
+    work_dir.mkdir(parents=True, exist_ok=False)
+    print(f'Results: {work_dir}', flush=True)
     root_path = work_dir / "211MpsBackendBenchmark.root"
     nb_events = 120000
     nb_parameter_points = 100

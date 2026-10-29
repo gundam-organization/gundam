@@ -221,7 +221,8 @@ def main():
     parser.add_argument('--scenarios', nargs='+', choices=['constant', 'local1', 'local2', 'global'],
                         default=['constant', 'local1', 'local2', 'global'])
     parser.add_argument('--output', type=Path,
-                        default=Path(time.strftime('mps-profiling-%Y%m%d-%H%M%S-') + str(os.getpid())))
+                        default=Path(f'benchmark-{Path(__file__).stem}-{time.strftime("%Y%m%d%H%M%S")}'),
+                        help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss)')
     parser.add_argument('--worker', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     if sys.platform != 'darwin':

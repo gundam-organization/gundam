@@ -119,7 +119,9 @@ def main():
     parser.add_argument("--global-calls", type=int, default=30)
     parser.add_argument("--seed", type=int, default=12345)
     parser.add_argument("--step-scale", type=float, default=.1)
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument('--output', type=Path,
+                        default=Path(f'benchmark-{Path(__file__).stem}-{time.strftime("%Y%m%d%H%M%S")}'),
+                        help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss)')
     parser.add_argument("--worker", choices=["original", "CPU", "MPS"], help=argparse.SUPPRESS)
     args = parser.parse_args()
     args.work_dir = args.work_dir.resolve()

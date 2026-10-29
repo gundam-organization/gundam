@@ -159,7 +159,9 @@ def main():
     parser.add_argument('--work-dir', type=Path, required=True)
     parser.add_argument('--config', type=Path, default=Path('ndUpCcInc.yaml'))
     parser.add_argument('--override', nargs='+', required=True)
-    parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--output', type=Path,
+                        default=Path(f'benchmark-{Path(__file__).stem}-{time.strftime("%Y%m%d%H%M%S")}'),
+                        help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss)')
     parser.add_argument('--threads', type=int, default=4)
     parser.add_argument('--trials', type=int, default=3)
     parser.add_argument('--calls', type=int, default=160)

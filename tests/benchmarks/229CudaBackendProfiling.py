@@ -510,7 +510,8 @@ def main():
     parser.add_argument('--relative-tolerance', type=float, default=1e-9)
     parser.add_argument('--absolute-tolerance', type=float, default=1e-7)
     parser.add_argument('--output', type=Path,
-                        default=Path(time.strftime('cuda-profiling-%Y%m%d-%H%M%S-') + str(os.getpid())))
+                        default=Path(f'benchmark-{Path(__file__).stem}-{time.strftime("%Y%m%d%H%M%S")}'),
+                        help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss)')
     parser.add_argument('--execution-mode', choices=['resident', 'isolated'], default='resident')
     parser.add_argument('--worker', choices=(*CASES, 'resident'), help=argparse.SUPPRESS)
     args = parser.parse_args()

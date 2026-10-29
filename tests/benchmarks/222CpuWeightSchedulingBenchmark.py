@@ -371,7 +371,8 @@ def main():
     parser.add_argument('--trials', type=int, default=2)
     parser.add_argument('--rounds', type=int, default=1, help='Repeat cases, alternating forward and reverse order')
     parser.add_argument('--output', type=Path,
-                        default=Path(time.strftime('cpu-weight-benchmark-%Y%m%d-%H%M%S-') + str(os.getpid())))
+                        default=Path(f'benchmark-{Path(__file__).stem}-{time.strftime("%Y%m%d%H%M%S")}'),
+                        help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss)')
     parser.add_argument('--worker-threads', type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if min([*args.threads, *args.factors, args.calls, args.global_calls, args.warmup, args.trials, args.rounds,
