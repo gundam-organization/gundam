@@ -7,8 +7,7 @@
 
 namespace GundamDeviceMath {
   /// Interpolate one point in a graph with non-uniform points.  The graph can
-  /// have an arbitrary number of knots defined (at most 32 with the temporary
-  /// GUNDAM_GRAPH_UNROLLED_SEARCH benchmark option).
+  /// have an arbitrary number of knots defined.
   ///
   /// This takes the parameter value, a minimum and maximum bound, the
   /// buffer of data for this graph, and the number of data elements in the
@@ -33,18 +32,9 @@ namespace GundamDeviceMath {
     const int knotCount = dim_ / 2;
     int ix = 0;
 #define CHECK_OFFSET(ioff)  if ((ix + ioff < knotCount) && (x_ > data_[2 * (ix + ioff) + 1])) ix += ioff
-#ifdef GUNDAM_GRAPH_UNROLLED_SEARCH
-    // Temporary benchmark variant: callers must supply at most 32 knots.
-    CHECK_OFFSET(16);
-    CHECK_OFFSET(8);
-    CHECK_OFFSET(4);
-    CHECK_OFFSET(2);
-    CHECK_OFFSET(1);
-#else
     for( int offset = 1 << (31 - __builtin_clz(knotCount)) ; offset > 0 ; offset >>= 1 ){
       CHECK_OFFSET(offset);
     }
-#endif
 #undef CHECK_OFFSET
 
     if( ix + 1 >= knotCount ){ ix--; }

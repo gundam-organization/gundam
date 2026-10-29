@@ -15,11 +15,8 @@
 #include "CalculateGraph.h"
 
 TEST(GraphCheck,SearchBoundaries) {
-    // Exercise the unrolled boundary; only the loop supports larger graphs.
+    // Exercise graph sizes around power-of-two search boundaries.
     for (int count : {1, 2, 3, 15, 16, 17, 19, 31, 32, 33, 63, 64, 65, 129}) {
-#ifdef GUNDAM_GRAPH_UNROLLED_SEARCH
-        if (count > 32) continue;
-#endif
         std::vector<double> data;
         for (int i = 0; i < count; ++i) {
             data.push_back(std::sin(double(i)));

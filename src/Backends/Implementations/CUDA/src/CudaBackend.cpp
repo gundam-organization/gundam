@@ -125,14 +125,6 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   if( not engineView_ ){ throw std::runtime_error("CudaBackend requires a model."); }
   const auto start = Clock::now();
   const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved);
-#ifdef GUNDAM_GRAPH_UNROLLED_SEARCH
-  // Validate once at initialization, outside the timed device evaluation.
-  for( const auto& dial : packed.dials ){
-    if( dial.type == BackendDialType::Graph and dial.payloadSize > 64 ){
-      throw std::runtime_error("GUNDAM_GRAPH_UNROLLED_SEARCH only supports graphs with at most 32 knots.");
-    }
-  }
-#endif
   _impl_->buildTiming.buildCompatibilityScanSeconds = elapsed(start);
   initializeDevice();
 #ifdef GUNDAM_USING_CUDA
@@ -149,11 +141,6 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
       {"available", true}, {"events", packed.events.size()}, {"uniqueDials", packed.dials.size()},
       {"graphDials", std::count_if(packed.dials.begin(), packed.dials.end(),
           [](const auto& dial_){ return dial_.type == BackendDialType::Graph; })},
-#ifdef GUNDAM_GRAPH_UNROLLED_SEARCH
-      {"graphUnrolledSearch", true},
-#else
-      {"graphUnrolledSearch", false},
-#endif
       {"surfaceDials", packed.dials.size() - packed.surfaceOffset},
       {"formulaPrograms", packed.formulaPrograms.size()},
       {"formulaInstructions", packed.formulaInstructions.size()},
