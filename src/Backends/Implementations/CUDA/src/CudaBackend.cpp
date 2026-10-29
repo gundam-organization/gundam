@@ -125,6 +125,14 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   if( not engineView_ ){ throw std::runtime_error("CudaBackend requires a model."); }
   const auto start = Clock::now();
   const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved);
+#ifdef GUNDAM_GRAPH_UNROLLED_SEARCH
+  // Validate once at initialization, outside the timed device evaluation.
+  for( const auto& dial : packed.dials ){
+    if( dial.type == BackendDialType::Graph and dial.payloadSize > 64 ){
+      throw std::runtime_error("GUNDAM_GRAPH_UNROLLED_SEARCH only supports graphs with at most 32 knots.");
+    }
+  }
+#endif
   _impl_->buildTiming.buildCompatibilityScanSeconds = elapsed(start);
   initializeDevice();
 #ifdef GUNDAM_USING_CUDA

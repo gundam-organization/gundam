@@ -717,7 +717,9 @@ No input files are modified or converted from splines to graphs.
 
 The temporary CMake option `GUNDAM_GRAPH_UNROLLED_SEARCH` defaults to `OFF`
 (the original dynamic loop). `ON` uses explicit offsets `16/8/4/2/1` for up to
-32 knots and retains a loop for higher offsets in larger graphs. It changes
+32 knots, without any fallback branch or loop. CUDA backend initialization
+rejects graphs with more than 32 knots in this mode, outside evaluation timers.
+Other callers of the shared function must respect this temporary limit. It changes
 only graph interval search, not general-spline search, interpolation, caching
 or weight layout. It applies to the shared function used by CacheManager,
 CPU/CUDA backends and the embedded MPS kernels. This benchmark measures the
