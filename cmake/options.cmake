@@ -37,6 +37,13 @@ option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
 # dev options
 option( USE_STATIC_LINKS "Use static link of libraries and apps instead of shared." OFF )
 option( CXX_WARNINGS "Enable most C++ warning flags." ON )
+option( GUNDAM_GRAPH_UNROLLED_SEARCH "Temporary graph-search A/B benchmark: unroll offsets 16/8/4/2/1." OFF )
+set(GUNDAM_GRAPH_SEARCH_DEFINITION "")
+if( GUNDAM_GRAPH_UNROLLED_SEARCH )
+  add_definitions( -D GUNDAM_GRAPH_UNROLLED_SEARCH )
+  # Metal kernels are compiled at runtime from an embedded source string.
+  set(GUNDAM_GRAPH_SEARCH_DEFINITION "#define GUNDAM_GRAPH_UNROLLED_SEARCH 1")
+endif()
 
 
 # Reading options

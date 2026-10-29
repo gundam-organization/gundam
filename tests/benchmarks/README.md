@@ -705,3 +705,83 @@ numerical checks in `comparison.json`. A faster response stage is not expected
 from this change. GPU tests check equality with the original layout for ordered
 products, histogram sums/errors and likelihood, and optional regular tests
 compare both propagation modes against the CPU fit/Hesse covariance reference.
+
+## OA2024: graph search loop versus unrolled (issue #1039)
+
+`239CudaGraphSearchBenchmark.py` wraps the existing production profiling driver.
+It uses `configOA2024.yaml`, `override/v13Prod.yaml` and
+`override/backendCudaTest.yaml` from a copy of `GundamInputOA2024` (the local
+source inputs are `/Users/nadrino/Documents/Work/Output/results/gundam/GundamInputOA2024`).
+Pass the corresponding **CC directory**, with its existing data paths/environment.
+No input files are modified or converted from splines to graphs.
+
+The temporary CMake option `GUNDAM_GRAPH_UNROLLED_SEARCH` defaults to `OFF`
+(the original dynamic loop). `ON` uses explicit offsets `16/8/4/2/1` for up to
+32 knots and retains a loop for higher offsets in larger graphs. It changes
+only graph interval search, not general-spline search, interpolation, caching
+or weight layout. It applies to the shared function used by CacheManager,
+CPU/CUDA backends and the embedded MPS kernels. This benchmark measures the
+**CUDA backend**, not the legacy CacheManager execution path.
+
+Run both passes in the same GPU allocation, using the same environment, Python,
+checkout, inputs, CPU affinity and GPU. The commands below reuse an existing
+Release build; preserve its toolkit, architecture and dependency settings.
+Use the Python interpreter matching the build. `--build-dir` selects its
+Python module and checks loaded GUNDAM library paths on Linux, rejecting an
+installed library outside that build. Sanitize `LD_LIBRARY_PATH` if necessary.
+Compilation must finish before each run; the recorded CMake cache alone cannot
+prove that a stale binary was rebuilt.
+The CUDA diagnostics also report the compiled search option and graph dial
+count. The wrapper checks them after measurement and exits nonzero if the
+binary disagrees with the cache or the workload contains no graph dials.
+
+```bash
+repo=$PWD
+buildDir=/sps/t2k/ablanche/build/gundam
+inputDir=/sps/t2k/ablanche/work/results/gundam/GundamInputOA2024
+resultDir=/sps/t2k/ablanche/work/results/graph-search-ab
+
+# First pass: original loop.
+cmake -S "$repo" -B "$buildDir" -DCMAKE_BUILD_TYPE=Release \
+  -DWITH_CUDA_LIB=ON -DWITH_BACKENDS=ON -DWITH_PYTHON_INTERFACE=ON \
+  -DGUNDAM_GRAPH_UNROLLED_SEARCH=OFF
+cmake --build "$buildDir" -j4
+python3 tests/benchmarks/239CudaGraphSearchBenchmark.py \
+  --build-dir "$buildDir" --work-dir "$inputDir" --output "$resultDir/loop"
+
+# Second pass: rebuild, then replay exactly the same proposals.
+cmake -S "$repo" -B "$buildDir" -DGUNDAM_GRAPH_UNROLLED_SEARCH=ON
+cmake --build "$buildDir" -j4
+python3 tests/benchmarks/239CudaGraphSearchBenchmark.py \
+  --build-dir "$buildDir" --work-dir "$inputDir" --output "$resultDir/unrolled" \
+  --reference "$resultDir/loop"
+```
+
+Both runs refuse to overwrite an existing output directory. Defaults: four host
+threads, three trials, ten warmup calls, 100 constant calls, one full sweep of
+single-coordinate changes, and 100 global calls per trial, with seeded proposals.
+Each run loads the dataset once, then measures both `cachedResponses` and
+`recomputeResponses`, using the same `warpInterleaved` layout. No fit or Hesse
+is performed; loading, backend replacement, warmup and final histogram extraction
+are excluded from evaluation timers. Expect production dataset initialization
+to take much longer than the timed passes. Additional driver options are accepted,
+e.g. `--global-calls 300 --trials 5`; use identical options for both passes.
+
+Read `unrolled/graph-search-comparison.md`: ratios above 1 mean the unrolled
+variant is faster. The comparison checks settings, resolved configurations,
+parameter manifests, proposal digests, every measured likelihood and final trial
+histogram contents/errors (default rtol `1e-9`, atol `1e-7`); failures exit nonzero.
+Detailed measurements are in each case's trial JSON and `report.md`.
+`graph-search-build.json` records the option, CMake cache, loaded library paths
+and hashes of GUNDAM shared libraries in the selected build, alongside the
+profiling driver's existing commit, module hash, GPU and Slurm metadata.
+
+Focus on `cachedDialStageSeconds` for global changes and for recompute mode:
+these force response evaluation. Constant cached calls can skip graph evaluation
+entirely and serve as a control. Full-evaluation speedup includes other work;
+the response stage itself includes spline and other dial types too. Inspect
+`native.log`/model diagnostics for the graph population before interpreting a
+null result as evidence about graph search. These timings do not isolate SM
+occupancy, memory stalls, or predict whole-fit speedups.
+
+Restore `-DGUNDAM_GRAPH_UNROLLED_SEARCH=OFF` and rebuild after the experiment.

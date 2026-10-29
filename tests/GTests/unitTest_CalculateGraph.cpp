@@ -2,6 +2,7 @@
 #include <string>
 #include <memory>
 #include <cmath>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -12,6 +13,32 @@
 // Test the CalculateGraph routine on the CPU.
 
 #include "CalculateGraph.h"
+
+TEST(GraphCheck,SearchBoundaries) {
+    // Exercise the unrolled boundary and the fallback for larger graphs.
+    for (int count : {1, 2, 3, 15, 16, 17, 19, 31, 32, 33, 63, 64, 65, 129}) {
+        std::vector<double> data;
+        for (int i = 0; i < count; ++i) {
+            data.push_back(std::sin(double(i)));
+            data.push_back(double(i * i + i));
+        }
+        for (int step = -4; step <= 4 * count; ++step) {
+            const double x = double(step) * (count - 1) / 4.;
+            int segment = 0;
+            while (segment + 2 < count && x > data[2 * (segment + 1) + 1]) ++segment;
+            double expected = data[0];
+            if (count > 1) {
+                const double fraction = (x - data[2 * segment + 1])
+                    / (data[2 * (segment + 1) + 1] - data[2 * segment + 1]);
+                expected = data[2 * segment] + fraction * (data[2 * (segment + 1)] - data[2 * segment]);
+                if (expected < -2.) expected = -2.;
+                if (expected > 2.) expected = 2.;
+            }
+            EXPECT_DOUBLE_EQ(CalculateGraph(x, -2., 2., data.data(), int(data.size())), expected)
+                << "knots=" << count << " x=" << x;
+        }
+    }
+}
 
 TEST(GraphCheck,TwoPoints) {
     // Test linear interpolation between two points

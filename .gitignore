@@ -58,3 +58,5 @@ cpu-**
 mps-**
 
 benchmark*
+!tests/benchmarks/
+tests/benchmarks/__pycache__/

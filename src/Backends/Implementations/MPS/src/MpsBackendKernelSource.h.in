@@ -4,6 +4,8 @@
 #include <metal_stdlib>
 using namespace metal;
 
+@GUNDAM_GRAPH_SEARCH_DEFINITION@
+
 #define GUNDAM_DEVICE_MATH_INLINE static inline
 #define GUNDAM_DEVICE_MATH_FLOAT float
 #define GUNDAM_DEVICE_MATH_SCALAR float

@@ -139,6 +139,13 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->result.outsideSumSquares.assign(packed.samples.size(), 0.);
   _impl_->diagnostics = {
       {"available", true}, {"events", packed.events.size()}, {"uniqueDials", packed.dials.size()},
+      {"graphDials", std::count_if(packed.dials.begin(), packed.dials.end(),
+          [](const auto& dial_){ return dial_.type == BackendDialType::Graph; })},
+#ifdef GUNDAM_GRAPH_UNROLLED_SEARCH
+      {"graphUnrolledSearch", true},
+#else
+      {"graphUnrolledSearch", false},
+#endif
       {"surfaceDials", packed.dials.size() - packed.surfaceOffset},
       {"formulaPrograms", packed.formulaPrograms.size()},
       {"formulaInstructions", packed.formulaInstructions.size()},
