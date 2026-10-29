@@ -56,3 +56,5 @@ work/
 # Benchmarks
 cpu-**
 mps-**
+
+benchmark*

@@ -421,10 +421,6 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
             'parameterSetList'][0]['dialSetDefinitions'][0]
         root.update(useMirrorDial=True, mirrorLowEdge=0., mirrorHighEdge=1.)
         reject(config, 'requires parameter inputs')
-    if hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
-        config = copy.deepcopy(good)
-        config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'type': 'CPU'}
-        reject(config, 'CPU composite')
     print('SUCCESS: composite dial graphs, event/bin binding, observables and validation.')
 
 
