@@ -9,18 +9,15 @@ on:
       - opened
       - reopened
       - synchronize
+      - ready_for_review
       - labeled # check for labels
 
 jobs:
 
   build:
 
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
-
-    # save CPU time on GitHub
-    # either it's a push to main
-    # either ( disable for draft PRs && correctly labeled )
-    # if: ${{ github.event_name == 'push' || github.event.pull_request.labels.*.name == 'enable workflow' }}
 
     steps:
     - uses: actions/checkout@v4
