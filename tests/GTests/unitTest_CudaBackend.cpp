@@ -54,6 +54,17 @@ TEST(CudaBackend, ConfigurationValidatesDeviceIndexWithoutADevice) {
       static_cast<unsigned long long>(std::numeric_limits<int>::max()) + 1}})), std::runtime_error);
 }
 
+TEST(CudaBackend, LikelihoodTuningConfigurationIsValidatedWithoutADevice) {
+  Backends::CudaBackend backend;
+  for( int size : {0, 32, 64, 128, 256} ){
+    EXPECT_NO_THROW(backend.configure(ConfigReader(JsonType{{"likelihoodBlockSize", size}, {"reusePrediction", false}})));
+  }
+  for( const auto& size : {JsonType(-1), JsonType(48), JsonType(512), JsonType(64.5), JsonType("64"), JsonType(true)} ){
+    EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"likelihoodBlockSize", size}})), std::exception);
+  }
+  EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"reusePrediction", "false"}})), std::exception);
+}
+
 TEST(CudaBackend, UnbuiltBackendRejectsResultsAndInventedTokens) {
   Backends::CudaBackend backend;
   EXPECT_THROW((void)backend.getEngineView(), std::runtime_error);

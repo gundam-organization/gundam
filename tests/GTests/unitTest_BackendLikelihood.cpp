@@ -364,10 +364,85 @@ TEST(BackendLikelihood, MetalKeepsHistogramsResidentInBothModes) {
 #endif
 #ifdef GUNDAM_TEST_CUDA_DEVICE
 TEST(BackendLikelihood, CudaKeepsHistogramsResidentInBothModes) {
-  for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){
+  for( int size : {0, 32, 64, 128, 256} ){
+    for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){
+      CudaBackend gpu;
+      gpu.configure(ConfigReader(JsonType{{"propagationMode", mode}, {"likelihoodBlockSize", size}}));
+      checkResidentLikelihood(gpu, false);
+    }
+  }
+}
+
+TEST(BackendLikelihood, CudaPredictionReuseHonorsExternalGenerationsAndFailureInvalidation) {
+  auto view = likelihoodView(LikelihoodKind::BarlowBeeston2022);
+  view.propagation.parameterCount = 2;
+  view.propagation.externalWeightBlocks = {{0, 1}};
+  view.propagation.dials[0].type = BackendDialType::ExternalWeight;
+  view.propagation.dials[0].externalWeightIndex = 0;
+  CudaBackend gpu;
+  gpu.build(view);
+  double weight = 1.;
+  PropagationInputs inputs;
+  inputs.parameters.values = {1., 0.};
+  inputs.externalWeights = {{&weight, 1, 0, 1}};
+  const auto first = gpu.requestPropagation(inputs);
+  const double original = gpu.getLikelihood(first);
+  inputs.parameters.values[1] = .2;
+  auto token = gpu.requestPropagation(inputs);
+  EXPECT_EQ(gpu.getLikelihood(token), original);
+  auto timing = gpu.getLastTimingSummary();
+  EXPECT_EQ(timing.eventWeightsStageSeconds, 0.);
+  EXPECT_EQ(timing.histogramStageSeconds, 0.);
+  EXPECT_EQ(timing.likelihoodDeviceSeconds, 0.);
+  EXPECT_EQ(timing.likelihoodReadbackBytes, 8);
+  EXPECT_EQ(timing.histogramReadbackBytes, 0);
+  weight = 1.1;
+  inputs.externalWeights[0].generation++;
+  token = gpu.requestPropagation(inputs);
+  EXPECT_GT(gpu.getLikelihood(token), original);
+  EXPECT_GT(gpu.getLastTimingSummary().cacheCandidateCount, 0);
+  inputs.parameters.values[1] = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(gpu.requestPropagation(inputs), std::runtime_error);
+  EXPECT_FALSE(gpu.isReady(token));
+  inputs.parameters.values[1] = .2;
+  token = gpu.requestPropagation(inputs);
+  EXPECT_GT(gpu.getLastTimingSummary().cacheCandidateCount, 0); // Invalid cache forces a refresh.
+  EXPECT_TRUE(std::isfinite(gpu.getLikelihood(token)));
+  gpu.configure(ConfigReader(JsonType{{"reusePrediction", false}}));
+  gpu.build(view);
+  gpu.requestPropagation(inputs);
+  gpu.requestPropagation(inputs);
+  EXPECT_GT(gpu.getLastTimingSummary().histogramStageSeconds, 0.);
+}
+
+TEST(BackendLikelihood, CudaParallelFinalReductionHandlesManyPartials) {
+  for( int size : {32, 64, 128, 256} ){
+    EngineView view;
+    const int count = 65537; // More than 256 partials even for 256-thread blocks.
+    view.propagation.totalBins = count;
+    LikelihoodSampleView sample;
+    sample.portableOptions = {LikelihoodKind::BarlowBeeston2022, 0, 0, 1, 1e150, -1.};
+    auto ref = reference("BarlowLLH_BANFF_OA2021");
+    double expected = 0.;
+    for( int i = 0; i < count; ++i ){
+      const double data = .1 + .001*i, pred = data * (1. + .01*(i%7-3));
+      sample.dataSums.push_back(data);
+      sample.ignoredBins.push_back(i%19 == 0);
+      EventView event;
+      event.resultIndex = i;
+      event.globalBinIndex = i;
+      view.propagation.events.push_back(event);
+      view.propagation.eventWeights.push_back({pred, 0, 0});
+      if( !sample.ignoredBins.back() ){ expected += ref->eval(data, pred, pred*pred, i); }
+    }
+    view.likelihood.samples = {sample};
     CudaBackend gpu;
-    gpu.configure(ConfigReader(JsonType{{"propagationMode", mode}}));
-    checkResidentLikelihood(gpu, false);
+    gpu.configure(ConfigReader(JsonType{{"likelihoodBlockSize", size}}));
+    gpu.build(view);
+    const auto token = gpu.requestPropagation({});
+    EXPECT_NEAR(gpu.getLikelihood(token), expected, 1e-11*std::max(1., expected));
+    EXPECT_EQ(gpu.getLastTimingSummary().likelihoodReadbackBytes, 8);
+    EXPECT_EQ(gpu.getLastTimingSummary().histogramReadbackBytes, 0);
   }
 }
 #endif

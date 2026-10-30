@@ -51,10 +51,12 @@ std::string Backends::CudaBackend::getName() const { return "CUDA/" + _propagati
 void Backends::CudaBackend::configureImpl() {
   _impl_ = std::make_unique<CudaBackendImpl>();
   _deviceIndex_ = 0;
+  _likelihoodBlockSize_ = 0;
+  _reusePrediction_ = true;
   _propagationMode_ = CudaPropagationMode::cachedResponses;
   _weightLayout_ = CudaWeightLayout::warpInterleaved;
   _config_.clearFields();
-  _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}, {"weightLayout"}});
+  _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}, {"weightLayout"}, {"likelihoodBlockSize"}, {"reusePrediction"}});
   _config_.checkConfiguration();
   // fillValue tolerates conversion errors; explicit device/mode selections must
   // not silently fall back to defaults when they are malformed.
@@ -67,6 +69,16 @@ void Backends::CudaBackend::configureImpl() {
   if( const auto* mode = _config_.getJsonEntry("propagationMode") ){
     if( not mode->is_string() ){ throw std::runtime_error("CudaBackend: propagationMode must be a string."); }
   }
+  if( const auto* size = _config_.getJsonEntry("likelihoodBlockSize") ){
+    if( not size->is_number_integer() or (*size != 0 and *size != 32 and *size != 64 and *size != 128 and *size != 256) ){
+      throw std::runtime_error("CudaBackend: likelihoodBlockSize must be 0 (automatic), 32, 64, 128 or 256.");
+    }
+  }
+  if( const auto* reuse = _config_.getJsonEntry("reusePrediction") ){
+    if( not reuse->is_boolean() ){ throw std::runtime_error("CudaBackend: reusePrediction must be a boolean."); }
+  }
+  _config_.fillValue(_likelihoodBlockSize_, "likelihoodBlockSize");
+  _config_.fillValue(_reusePrediction_, "reusePrediction");
   _config_.fillValue(_deviceIndex_, "deviceIndex");
   _config_.fillEnum(_propagationMode_, "propagationMode");
   if( const auto* layout = _config_.getJsonEntry("weightLayout") ){
@@ -127,10 +139,15 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   const auto start = Clock::now();
   const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved);
   _impl_->buildTiming.buildCompatibilityScanSeconds = elapsed(start);
+  // Smaller blocks expose more independent work for short binned likelihoods.
+  // This is a starting policy, not a V100 performance claim; benchmark overrides
+  // allow measuring occupancy/register tradeoffs without changing arithmetic.
+  const unsigned int likelihoodBlockSize = _likelihoodBlockSize_ != 0 ? _likelihoodBlockSize_
+      : (engineView_->propagation.totalBins <= 8192 ? 64u : 256u);
   initializeDevice();
 #ifdef GUNDAM_USING_CUDA
   const auto uploadStart = Clock::now();
-  _impl_->context->build(packed, engineView_->propagation, engineView_->likelihood);
+  _impl_->context->build(packed, engineView_->propagation, engineView_->likelihood, likelihoodBlockSize);
   _impl_->buildTiming.buildBufferUploadSeconds = elapsed(uploadStart);
 #endif
   _impl_->engineView = std::move(engineView_);
@@ -140,6 +157,8 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->result.outsideSumSquares.assign(packed.samples.size(), 0.);
   _impl_->diagnostics = {
       {"likelihoodExecution", hasPortableLikelihood(getEngineView().likelihood) ? "device" : "host"},
+      {"requestedLikelihoodBlockSize", _likelihoodBlockSize_}, {"likelihoodBlockSize", likelihoodBlockSize},
+      {"likelihoodReduction", "parallel256"}, {"reusePrediction", _reusePrediction_},
       {"available", true}, {"events", packed.events.size()}, {"uniqueDials", packed.dials.size()},
       {"graphDials", std::count_if(packed.dials.begin(), packed.dials.end(),
           [](const auto& dial_){ return dial_.type == BackendDialType::Graph; })},
@@ -205,7 +224,7 @@ Backends::PropagationToken Backends::CudaBackend::requestPropagation(const Propa
     }
 #ifdef GUNDAM_USING_CUDA
     _impl_->context->propagate(inputs_,
-        _propagationMode_ == CudaPropagationMode::recomputeResponses, _impl_->timing);
+        _propagationMode_ == CudaPropagationMode::recomputeResponses, _reusePrediction_, _impl_->timing);
 #else
     initializeDevice();
 #endif

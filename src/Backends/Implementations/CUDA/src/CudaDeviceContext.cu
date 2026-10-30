@@ -88,6 +88,7 @@ namespace {
   struct WeightBuffers {
     DeviceBuffer<Backends::LikelihoodBin<double>> likelihoodBins;
     DeviceBuffer<double> likelihoodPartials, likelihoodTotal;
+    unsigned int likelihoodBlockSize{256};
     DeviceBuffer<Backends::BackendEventWeightDescriptor> events;
     DeviceBuffer<Backends::BackendDialDescriptor> dials;
     DeviceBuffer<Backends::BackendDialInputDescriptor> inputs;
@@ -518,9 +519,16 @@ namespace {
     if( threadIdx.x == 0 ){ partials_[blockIdx.x] = values[0]; }
   }
   __global__ void finishLikelihood(const double* partials_, std::size_t count_, double* total_) {
+    __shared__ double values[256];
     double total = 0.;
-    for( std::size_t i = 0; i < count_; ++i ){ total += partials_[i]; }
-    *total_ = total;
+    for( std::size_t i = threadIdx.x; i < count_; i += blockDim.x ){ total += partials_[i]; }
+    values[threadIdx.x] = total;
+    __syncthreads();
+    for( unsigned stride = blockDim.x / 2; stride; stride /= 2 ){
+      if( threadIdx.x < stride ){ values[threadIdx.x] += values[threadIdx.x + stride]; }
+      __syncthreads();
+    }
+    if( threadIdx.x == 0 ){ *total_ = values[0]; }
   }
 
   template<bool fractional_>
@@ -600,7 +608,7 @@ Backends::CudaDeviceContext::CudaDeviceContext(int deviceIndex_) : _impl_(std::m
 Backends::CudaDeviceContext::~CudaDeviceContext() = default;
 const std::string& Backends::CudaDeviceContext::getDeviceName() const { return _impl_->deviceName; }
 
-void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const PropagationView& original_, const LikelihoodView& likelihood_) {
+void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const PropagationView& original_, const LikelihoodView& likelihood_, unsigned int likelihoodBlockSize_) {
   DeviceScope scope(_impl_->deviceIndex);
   _impl_->buffers.reset();
   auto buffers = std::make_unique<WeightBuffers>();
@@ -692,7 +700,11 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
     b.error.allocate(1);
     const auto likelihoodBins = packLikelihood<double>(likelihood_, original_.totalBins);
     b.likelihoodBins.upload(likelihoodBins, _impl_->stream);
-    b.likelihoodPartials.allocate((likelihoodBins.size() + 255) / 256);
+    if( likelihoodBlockSize_ != 32 and likelihoodBlockSize_ != 64 and likelihoodBlockSize_ != 128 and likelihoodBlockSize_ != 256 ){
+      throw std::runtime_error("CUDA likelihood block size is invalid.");
+    }
+    b.likelihoodBlockSize = likelihoodBlockSize_;
+    b.likelihoodPartials.allocate((likelihoodBins.size() + likelihoodBlockSize_ - 1) / likelihoodBlockSize_);
     const std::vector<double> initialLikelihood{0.};
     b.likelihoodTotal.upload(initialLikelihood, _impl_->stream);
     b.hasReweightCap = model_.hasReweightCap;
@@ -705,7 +717,7 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
 }
 
 void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bool recomputeResponses_,
-                                           BackendTimingSummary& timing_) {
+                                           bool reusePrediction_, BackendTimingSummary& timing_) {
   DeviceScope scope(_impl_->deviceIndex);
   if( not _impl_->buffers ){ throw std::runtime_error("CudaBackend device model has not been built."); }
   auto& b = *_impl_->buffers;
@@ -735,6 +747,10 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     const bool sparse = reuse and (b.updatePlan.dialCount <= (b.dials.size - b.externalDialCount) / 2
         or (directPrograms and b.updatePlan.dialCount < b.dials.size - b.externalDialCount));
     const auto candidates = sparse ? b.updatePlan.dialCount : b.dials.size - b.externalDialCount;
+    // Conservative invalidation: any selected response, observable/binning
+    // update or failed/unprimed cache forces fresh weights and histograms.
+    const bool updatePrediction = not reusePrediction_ or not reuse or updateState
+        or inputs_.forceBinningUpdate or candidates != 0 or b.externalUpdatePlan.dialCount != 0;
     timing_.cacheCandidateCount = candidates + b.externalUpdatePlan.dialCount;
     timing_.cachePreparationSeconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - preparationStart).count();
@@ -799,7 +815,7 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       checkCuda(cudaGetLastError(), "external/table response kernel launch");
     }
     record(2);
-    if( b.events.size ){
+    if( updatePrediction and b.events.size ){
       if( b.interleavedEventDials ){
         reweightEvents<true><<<gridSize(b.events.size), blockSize, 0, stream>>>(b.events.data, b.events.size,
             b.dialIndices.data, b.responses.data, b.weights.data, b.hasReweightCap, b.maxReweight, b.error.data);
@@ -893,7 +909,7 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       checkCuda(cudaGetLastError(), "dynamic histogram index kernel launch");
     }
     record(5);
-    if( b.sums.size ){
+    if( updatePrediction and b.sums.size ){
       const auto blocks = static_cast<unsigned int>(std::min<std::size_t>(b.sums.size, 65535));
       if( b.hasSmoothedBinning ){
         reduceHistograms<true><<<blocks, blockSize, 0, stream>>>(b.binOffsets.data, nullptr,
@@ -906,10 +922,10 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       checkCuda(cudaGetLastError(), "histogram kernel launch");
     }
     record(6);
-    if( b.likelihoodBins.size ){
-      evaluateLikelihoodBins<<<static_cast<unsigned>(b.likelihoodPartials.size), 256, 0, stream>>>(
+    if( updatePrediction and b.likelihoodBins.size ){
+      evaluateLikelihoodBins<<<static_cast<unsigned>(b.likelihoodPartials.size), b.likelihoodBlockSize, 0, stream>>>(
           b.likelihoodBins.data, b.likelihoodBins.size, b.sums.data, b.sumSquares.data, b.likelihoodPartials.data);
-      finishLikelihood<<<1, 1, 0, stream>>>(b.likelihoodPartials.data, b.likelihoodPartials.size, b.likelihoodTotal.data);
+      finishLikelihood<<<1, 256, 0, stream>>>(b.likelihoodPartials.data, b.likelihoodPartials.size, b.likelihoodTotal.data);
       checkCuda(cudaGetLastError(), "likelihood kernel launch");
     }
     record(7);
@@ -952,11 +968,11 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
         * sizeof(CudaBinContribution);
     timing_.parameterUploadSeconds = elapsed(0, 1);
     timing_.cachedDialStageSeconds = elapsed(1, 2);
-    timing_.eventWeightsStageSeconds = elapsed(2, 3);
+    timing_.eventWeightsStageSeconds = updatePrediction ? elapsed(2, 3) : 0.;
     timing_.variableStageSeconds = updateState ? elapsed(3, 4) : 0.;
     timing_.binningStageSeconds = updateState ? elapsed(4, 5) : 0.;
-    timing_.histogramStageSeconds = elapsed(5, 6);
-    timing_.likelihoodDeviceSeconds = elapsed(6, 7);
+    timing_.histogramStageSeconds = updatePrediction ? elapsed(5, 6) : 0.;
+    timing_.likelihoodDeviceSeconds = (updatePrediction and b.likelihoodBins.size != 0) ? elapsed(6, 7) : 0.;
     timing_.devicePropagationSeconds = elapsed(0, 7);
   }
   catch(...){ b.cachePrimed = false; b.stateCache.invalidate(); cudaStreamSynchronize(stream); throw; }

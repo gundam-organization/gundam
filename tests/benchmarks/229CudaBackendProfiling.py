@@ -36,11 +36,11 @@ SECONDS_FIELDS = ('parameterUploadSeconds', 'cachedDialStageSeconds',
                   'eventWeightsStageSeconds', 'variableStageSeconds', 'binningStageSeconds',
                   'histogramStageSeconds', 'externalWeightUploadSeconds',
                   'devicePropagationSeconds', 'histogramReadbackSeconds',
-                  'likelihoodHostSeconds', 'eventWeightReadbackSeconds')
+                  'likelihoodHostSeconds', 'likelihoodDeviceSeconds', 'eventWeightReadbackSeconds')
 COUNT_FIELDS = ('histogramReadbackBytes', 'eventWeightReadbackBytes', 'eventStateReadbackBytes',
                 'cacheCandidateCount', 'rebinnedEventCount', 'binCandidateCount',
                 'binContributionCount', 'contributionBufferBytes', 'externalWeightUploadBytes',
-                'externalWeightUploadBlocks')
+                'externalWeightUploadBlocks', 'likelihoodReadbackBytes')
 
 
 def stats(values):
@@ -95,7 +95,9 @@ def backend_config(args):
     return {'isEnabled': True, 'type': backend_type,
             'backendConfig': {} if backend_type == 'CPU' else {
                 'deviceIndex': args.device_index, 'propagationMode': args.worker.split('-')[1],
-                'weightLayout': 'warpInterleaved' if args.worker.endswith('-interleaved') else 'eventMajor'}}
+                'weightLayout': 'warpInterleaved' if args.worker.endswith('-interleaved') else 'eventMajor',
+                'likelihoodBlockSize': getattr(args, 'likelihood_block_size', 0),
+                'reusePrediction': not getattr(args, 'disable_prediction_reuse', False)}}
 
 
 def load_engine(args, *, preserve_configuration=False):
@@ -117,6 +119,19 @@ def load_engine(args, *, preserve_configuration=False):
     if not preserve_configuration:
         config.update(enablePca=False, scaleParStepWithChi2Response=False,
                       generateSamplePlots=False, generateOneSigmaPlots=False)
+    probability = getattr(args, 'likelihood', 'configured')
+    if probability != 'configured':
+        llh = config.setdefault('likelihoodInterfaceConfig', {})
+        legacy = config.get('propagatorConfig', {})
+        samples = legacy.get('sampleSetConfig', legacy.get('fitSampleSetConfig', {}))
+        original = llh.get('jointProbabilityConfig', legacy.get('llhConfig', samples.get('llhConfig', {})))
+        barlow_options = {'ignoreBinsWithZeroPredictionAtPrior', 'muteZeroPredBinWarn',
+            'allowZeroMcWhenZeroData', 'usePoissonLikelihood', 'BBNoUpdateWeights',
+            'fractionalErrorLimit', 'expectedValueMinimum', 'verboseLevel', 'isVerbose', 'throwIfInfLlh'}
+        llh['jointProbabilityConfig'] = {k: v for k,v in original.items() if k in barlow_options} if probability != 'PoissonLLH' else {}
+        llh['jointProbabilityConfig']['type'] = probability
+        if probability == 'PoissonLLH':
+            llh['jointProbabilityConfig']['ignoreBinsWithZeroPredictionAtPrior'] = True
     # Replace backend-specific overrides so CPU never inherits CUDA-only keys.
     backend = backend_config(args)
     backend_type = backend['type']
@@ -212,9 +227,13 @@ def evaluate_pass(args, engine, sequence, scenario, calls, seed):
         if not math.isfinite(value) or any(not math.isfinite(v) or v < 0 for v in seconds.values()):
             raise RuntimeError(f'{scenario}: nonfinite result or invalid timing at call {call}')
         counts = {name: getattr(timing, name) for name in COUNT_FIELDS}
+        if args.worker != 'CPU' and getattr(args, 'require_device_likelihood', False):
+            if counts['histogramReadbackBytes'] or counts['likelihoodReadbackBytes'] != 8:
+                raise RuntimeError('Expected a resident statistical likelihood with exactly 8 bytes of LLH readback')
         if counts['eventWeightReadbackBytes'] or counts['eventStateReadbackBytes']:
             raise RuntimeError('Unexpected event readback during resident evaluation')
         rows.append({'seconds': seconds, 'counts': counts, 'likelihood': value,
+                     'statLikelihood': engine.getLikelihoodInterface().getLastStatLikelihood(),
                      'changedFitCoordinates': changed, 'coordinateIndices': indices,
                      'sequenceDigest': digest.hexdigest()})
         if time.monotonic() - last_progress >= 5:
@@ -248,6 +267,10 @@ def measure(args, engine=None, sequence=None):
               'scenarios': {}}
     if args.worker != 'CPU':
         result['model'] = json.loads(engine.getBackendsManager().getDiagnosticCuda())
+        if getattr(args, 'require_device_likelihood', False) and result['model'].get('likelihoodExecution') != 'device':
+            raise RuntimeError('This benchmark requires PoissonLLH or Barlow-Beeston 2022 resident on CUDA')
+        if getattr(args, 'require_v100', False) and 'V100' not in result['model'].get('device', ''):
+            raise RuntimeError('Selected CUDA device is not a V100: ' + result['model'].get('device', 'unknown'))
         if args.execution_mode == 'resident' and len(args.cases) > 1 and result['model'].get('hasEventState'):
             raise RuntimeError('Observable/binning models require --execution-mode isolated for multiple backend cases')
         write_json(args.output / 'model.json', result['model'])
@@ -269,7 +292,7 @@ def measure(args, engine=None, sequence=None):
         # within each clock domain; never add GPU time to host wait/evaluation.
         cuda_stages = ('parameterUploadSeconds', 'cachedDialStageSeconds',
                        'eventWeightsStageSeconds', 'variableStageSeconds',
-                       'binningStageSeconds', 'histogramStageSeconds')
+                       'binningStageSeconds', 'histogramStageSeconds', 'likelihoodDeviceSeconds')
         gpu_ranking = sorted(cuda_stages, key=lambda key: timings[key]['medianMs'], reverse=True)
         entry = {'callsPerTrial': calls, 'trials': args.trials, 'timings': timings,
                  'medianResponseCandidates': statistics.median(row['counts']['cacheCandidateCount'] for row in rows),
@@ -347,6 +370,7 @@ def compare(output, cases, scenarios, trials, relative, absolute, *, reference_d
         entries = {}
         for scenario in scenarios:
             max_llh, max_bin, max_outside, passed = 0., 0., 0., True
+            max_stat = 0.
             max_event, bin_mismatches = 0., 0
             for trial in range(1, trials + 1):
                 name = f'{scenario}-trial{trial}.json'
@@ -362,6 +386,9 @@ def compare(output, cases, scenarios, trials, relative, absolute, *, reference_d
                 for a, b in zip(left['rows'], right['rows']):
                     if a['sequenceDigest'] != b['sequenceDigest']:
                         raise RuntimeError('Parameter sequences differ')
+                    if 'statLikelihood' in a and 'statLikelihood' in b:
+                        max_stat = max(max_stat, abs(a['statLikelihood'] - b['statLikelihood']))
+                        passed &= math.isclose(a['statLikelihood'], b['statLikelihood'], rel_tol=relative, abs_tol=absolute)
                     max_llh = max(max_llh, abs(a['likelihood'] - b['likelihood']))
                     passed &= math.isclose(a['likelihood'], b['likelihood'], rel_tol=relative, abs_tol=absolute)
                 if len(left['histogram']) != len(right['histogram']):
@@ -382,6 +409,7 @@ def compare(output, cases, scenarios, trials, relative, absolute, *, reference_d
                 return summary['scenarios'][scenario]['timings']['evaluationSeconds']['medianMs']
             entries[scenario] = {'passed': passed, 'maxAbsoluteEventDifference': max_event,
                                  'eventBinMismatches': bin_mismatches, 'maxAbsoluteLikelihoodDifference': max_llh,
+                                 'maxAbsoluteStatLikelihoodDifference': max_stat,
                                  'maxAbsoluteHistogramOrErrorDifference': max_bin,
                                  'maxAbsoluteOutsideOrErrorDifference': max_outside,
                                  'speedupOverReference': json.loads((reference_dir / 'summary.json').read_text())[
@@ -398,12 +426,12 @@ def write_report(output, cases):
              'Execution mode: ' + json.loads((output / 'settings.json').read_text())['execution_mode'] + '.', '',
              'All durations below are medians in milliseconds. GPU event intervals overlap',
              'host evaluation time. Do not add these columns together.', '',
-             '| Case | Scenario | Evaluation | Host preparation | GPU total | Dial responses | Event weights | Observables + search | Bin index | Histograms | Histogram readback | Host likelihood |',
-             '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
+             '| Case | Scenario | Evaluation | Host preparation | GPU total | Dial responses | Event weights | Observables + search | Bin index | Histograms | Histogram readback | Host likelihood | Device likelihood |',
+             '|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|']
     fields = ('evaluationSeconds', 'hostPreparationSeconds', 'devicePropagationSeconds',
               'cachedDialStageSeconds', 'eventWeightsStageSeconds', 'variableStageSeconds',
               'binningStageSeconds', 'histogramStageSeconds',
-              'histogramReadbackSeconds', 'likelihoodHostSeconds')
+              'histogramReadbackSeconds', 'likelihoodHostSeconds', 'likelihoodDeviceSeconds')
     for case in cases:
         summary = json.loads((output / case / 'summary.json').read_text())
         for scenario, entry in summary['scenarios'].items():
@@ -493,6 +521,13 @@ def main():
     parser.add_argument('--cases', nargs='+', choices=CASES,
                         default=['CUDA-cachedResponses-interleaved', 'CUDA-recomputeResponses-interleaved'])
     parser.add_argument('--device-index', type=int, default=0)
+    parser.add_argument('--likelihood-block-size', type=int, choices=[0, 32, 64, 128, 256], default=0,
+                        help='CUDA likelihood block size; zero selects the automatic policy')
+    parser.add_argument('--disable-prediction-reuse', action='store_true',
+                        help='Recompute weights/histograms/LLH even when responses are cached and unchanged')
+    parser.add_argument('--likelihood', choices=['configured', 'PoissonLLH', 'BarlowLLH_BANFF_OA2021'], default='configured')
+    parser.add_argument('--require-device-likelihood', action='store_true')
+    parser.add_argument('--require-v100', action='store_true')
     parser.add_argument('--threads', type=int, default=4)
     parser.add_argument('--calls', type=int, default=30)
     parser.add_argument('--global-calls', type=int, default=10)

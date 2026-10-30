@@ -754,3 +754,30 @@ reduction. The native microbenchmark exercises that current implementation via
 archived JSON. See [optimization validation](../../docs/backends/ResidentLikelihoodOptimization.md).
 The production benchmark also accepts legacy frontend configurations such as
 OA2024's `configOA2024.yaml`, preserving legacy likelihood options.
+
+## CUDA statistical likelihoods on a V100
+
+`235CudaV100LikelihoodBenchmark.py` compares CPU, cached CUDA and recompute CUDA
+with a configurable likelihood block-size sweep and optional prediction-cache
+A/B measurements. It requires resident Poisson/Barlow-2022 likelihoods, checks
+scalar-only LLH readback, and compares statistical likelihoods independently of
+parameter penalties. Input selections are preserved. Independent workers support
+dynamic/smoothed models; fixed-bin models can use `--execution-mode resident`.
+
+```sh
+python3 tests/benchmarks/235CudaV100LikelihoodBenchmark.py \
+  --work-dir /path/to/inputs --config config.yaml \
+  --python-module-dir "$PWD/cmake-build-v100/src/PythonInterface" \
+  --output /tmp/v100-likelihood-benchmark
+```
+
+The default tests `auto` and `256` blocks with the configured likelihood. Use
+`--block-sizes auto 32 64 128 256 --reuse-modes on off` for a larger sweep, and
+`--likelihoods PoissonLLH BarlowLLH_BANFF_OA2021` to explicitly test both functions.
+An optional `--test-executable` runs the CUDA device/likelihood tests first.
+The selected CUDA device must be a V100 unless `--allow-other-gpu` is supplied.
+
+[CC Lyon build, Slurm submission and result interpretation](../../docs/backends/CudaV100LikelihoodBenchmark.md)
+include the provided `235CudaV100LikelihoodBenchmark.sbatch` job template.
+These are preliminary CUDA policies inspired by MPS; V100 performance must be
+measured rather than inferred from Metal results.
