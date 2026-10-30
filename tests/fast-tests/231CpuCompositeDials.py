@@ -18,8 +18,8 @@ def compare(path, dial, exact=True, backendType='CPU', backendConfig=None):
     engines = []
     for backend in (False, True):
         config = helpers.make_config(path, copy.deepcopy(dial))
-        config['likelihoodInterfaceConfig']['backendManagerConfig'] = {
-            'isEnabled': backend, 'type': backendType, 'backendConfig': backendConfig or {}}
+        config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': backend, 'useBackend': backendType,
+            'options': [{'name': backendType, **(backendConfig or {})}]}
         engine = helpers.build(config)
         if backend and backendType == 'MPS':
             assert json.loads(engine.getBackendsManager().getDiagnosticMps())['path'] == 'eventPropagation'

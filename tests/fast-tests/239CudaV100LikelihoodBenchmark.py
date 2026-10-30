@@ -38,7 +38,7 @@ def main():
         (folder/'config.json').write_text(json.dumps(config))
         args = bench.parse_args(['--work-dir', str(folder), '--config', 'config.json'])
         assert args.block_sizes == ['auto','256'] and args.reuse_modes == ['on']
-        assert args.likelihoods == ['configured'] and args.execution_mode == 'isolated'
+        assert args.likelihoods == ['configured'] and args.execution_mode == 'resident'
         assert not args.allow_other_gpu
         command = bench.command(args, 'PoissonLLH', 'auto', 'off', folder/'planned')
         assert '--require-device-likelihood' in command and '--require-v100' in command
@@ -48,8 +48,8 @@ def main():
         args.likelihood_block_size = 64
         args.disable_prediction_reuse = True
         config = bench.profiling.backend_config(args)
-        assert config['backendConfig']['likelihoodBlockSize'] == 64
-        assert not config['backendConfig']['reusePrediction']
+        assert config['options'][0]['likelihoodBlockSize'] == 64
+        assert not config['options'][0]['reusePrediction']
         output = folder/'results'
         with (folder/'run.log').open('w') as log:
             result = subprocess.run([sys.executable, str(path), '--work-dir', str(folder),

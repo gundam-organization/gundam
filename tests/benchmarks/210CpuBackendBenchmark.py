@@ -57,7 +57,7 @@ def build_config_text(root_path: Path, backend_type: str | None = None) -> str:
     backend_config = ""
     if backend_type is not None:
         backend_config = f"""
-    backendConfig:
+    backendManagerConfig:
       isEnabled: true
       type: {backend_type}
 """

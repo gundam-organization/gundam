@@ -77,9 +77,14 @@ def load_engine(args):
     config.update(enablePca=False, scaleParStepWithChi2Response=False,
                   generateSamplePlots=False, generateOneSigmaPlots=False)
     backend = config['likelihoodInterfaceConfig'].setdefault('backendManagerConfig', {})
-    backend.update(isEnabled=True, type='MPS')
+    backend.pop('type', None)
+    backend.update(isEnabled=True, useBackend='MPS')
+    options = next((entry for entry in backend.setdefault('options', []) if entry['name'] == backend['useBackend']), None)
+    if options is None:
+        options = {'name': backend['useBackend']}
+        backend['options'].append(options)
     if args.propagation_mode:
-        backend.setdefault('backendConfig', {})['propagationMode'] = args.propagation_mode
+        options['propagationMode'] = args.propagation_mode
     write_json(args.output / 'resolved-fitter-config.json', config)
     engine = GUNDAM.FitterEngine()
     engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))

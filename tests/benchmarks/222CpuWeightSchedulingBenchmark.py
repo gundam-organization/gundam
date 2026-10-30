@@ -240,8 +240,8 @@ def load_engine(args, threads):
                   generateSamplePlots=False, generateOneSigmaPlots=False)
     # The benchmark uses cheap runtime layout diagnostics; no sampled probes
     # or OS snapshots run during the measurements.
-    config['likelihoodInterfaceConfig']['backendManagerConfig'] = {
-        'isEnabled': True, 'type': 'CPU', 'backendConfig': {'weightScheduling': 'Fixed'}}
+    config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': 'CPU',
+        'options': [{'name': 'CPU', 'weightScheduling': 'Fixed'}]}
     engine = GUNDAM.FitterEngine()
     engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
     engine.getLikelihoodInterface().setDataType(GUNDAM.LikelihoodInterface.DataType.Asimov)

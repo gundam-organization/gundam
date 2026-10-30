@@ -49,9 +49,14 @@ def measure(args):
         builder.override(args.override)
     config = json.loads(builder.getConfig().toString())['fitterEngineConfig']
     backend = config['likelihoodInterfaceConfig'].setdefault('backendManagerConfig', {})
-    backend.update(isEnabled=True, type='CPU')
+    backend.pop('type', None)
+    backend.update(isEnabled=True, useBackend='CPU')
+    options = next((entry for entry in backend.setdefault('options', []) if entry['name'] == backend['useBackend']), None)
+    if options is None:
+        options = {'name': backend['useBackend']}
+        backend['options'].append(options)
     # Ordinary stage timers suffice; exclude sampled OS probes from this pass.
-    backend.setdefault('backendConfig', {})['profileOutputPath'] = ''
+    options['profileOutputPath'] = ''
     config.update(generateSamplePlots=False, generateOneSigmaPlots=False)
     save(args.output / 'resolved-fitter-config.json', config)
     engine = GUNDAM.FitterEngine()

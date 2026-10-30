@@ -52,8 +52,8 @@ def exercise_manual_binning(path, backend_name="CPU", backend_mode=None):
             }]}},
         }
         if backend:
-            li['backendManagerConfig'] = {'isEnabled': True, 'type': backend_name,
-                                          'backendConfig': {'propagationMode': backend_mode} if backend_mode else {}}
+            li['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend_name,
+                'options': [{'name': backend_name, **({'propagationMode': backend_mode} if backend_mode else {})}]}
         config = {'likelihoodInterfaceConfig': li, 'enablePca': False, 'scaleParStepWithChi2Response': False,
                   'generateSamplePlots': False, 'generateOneSigmaPlots': False}
         engine = GUNDAM.FitterEngine()

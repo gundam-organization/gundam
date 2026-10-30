@@ -2,8 +2,8 @@
 """Profile resident production CUDA likelihood evaluations and compare response modes.
 
 By default cases share one loaded Asimov model. No fit/Hesse is performed.
-Use --execution-mode isolated for observable/dynamic/smoothed models: backend
-replacement currently requires fixed bins and no observable responses.
+Backend activation also supports observable, dynamic and smoothed models.
+Use --execution-mode isolated for an independent process and dataset load per case.
 CUDA stages use the backend's existing stream events, without extra stage fences.
 """
 from array import array
@@ -92,12 +92,13 @@ def count_summary(rows):
 
 def backend_config(args):
     backend_type = 'CPU' if args.worker == 'CPU' else 'CUDA'
-    return {'isEnabled': True, 'type': backend_type,
-            'backendConfig': {} if backend_type == 'CPU' else {
-                'deviceIndex': args.device_index, 'propagationMode': args.worker.split('-')[1],
-                'weightLayout': 'warpInterleaved' if args.worker.endswith('-interleaved') else 'eventMajor',
-                'likelihoodBlockSize': getattr(args, 'likelihood_block_size', 0),
-                'reusePrediction': not getattr(args, 'disable_prediction_reuse', False)}}
+    options = {} if backend_type == 'CPU' else {
+        'deviceIndex': args.device_index, 'propagationMode': args.worker.split('-')[1],
+        'weightLayout': 'warpInterleaved' if args.worker.endswith('-interleaved') else 'eventMajor',
+        'likelihoodBlockSize': getattr(args, 'likelihood_block_size', 0),
+        'reusePrediction': not getattr(args, 'disable_prediction_reuse', False)}
+    return {'isEnabled': True, 'useBackend': backend_type,
+        'options': [{'name': backend_type, **options}]}
 
 
 def load_engine(args, *, preserve_configuration=False):
@@ -134,7 +135,7 @@ def load_engine(args, *, preserve_configuration=False):
             llh['jointProbabilityConfig']['ignoreBinsWithZeroPredictionAtPrior'] = True
     # Replace backend-specific overrides so CPU never inherits CUDA-only keys.
     backend = backend_config(args)
-    backend_type = backend['type']
+    backend_type = backend['useBackend']
     config.setdefault('likelihoodInterfaceConfig', {})['backendManagerConfig'] = backend
     write_json(args.output / 'resolved-fitter-config.json', config)
     engine = GUNDAM.FitterEngine()
@@ -271,8 +272,6 @@ def measure(args, engine=None, sequence=None):
             raise RuntimeError('This benchmark requires PoissonLLH or Barlow-Beeston 2022 resident on CUDA')
         if getattr(args, 'require_v100', False) and 'V100' not in result['model'].get('device', ''):
             raise RuntimeError('Selected CUDA device is not a V100: ' + result['model'].get('device', 'unknown'))
-        if args.execution_mode == 'resident' and len(args.cases) > 1 and result['model'].get('hasEventState'):
-            raise RuntimeError('Observable/binning models require --execution-mode isolated for multiple backend cases')
         write_json(args.output / 'model.json', result['model'])
         progress(f"{args.worker}: weight layout {result['model']['weightLayout']}, "
                  f"{result['model']['packedEventDialIndexBytes']} index bytes")
@@ -326,8 +325,8 @@ def measure(args, engine=None, sequence=None):
 
 def measure_resident(args):
     import GUNDAM
-    if not hasattr(GUNDAM.BackendManager, 'replaceBackend'):
-        raise RuntimeError('Rebuild/reinstall the Python interface: replaceBackend is unavailable')
+    if not hasattr(GUNDAM.BackendManager, 'activate'):
+        raise RuntimeError('Rebuild/reinstall the Python interface: activate is unavailable')
     root = args.output
     engine = sequence = config = None
     for case in args.cases:
@@ -343,8 +342,9 @@ def measure_resident(args):
             sequence.reset()
             backend = backend_config(args)
             progress(f'{case}: replacing backend; keeping loaded events, dials and Asimov data')
-            engine.getBackendsManager().replaceBackend(
-                backend['type'], GUNDAM.JsonType(json.dumps(backend['backendConfig'])))
+            engine.getBackendsManager().activate(
+                backend['useBackend'], GUNDAM.JsonType(json.dumps(
+                    {key: value for key, value in backend['options'][0].items() if key != 'name'})))
             config.setdefault('likelihoodInterfaceConfig', {})['backendManagerConfig'] = backend
             write_json(args.output / 'resolved-fitter-config.json', config)
             engine.evaluateLikelihood()  # Prime new buffers outside measurements.
@@ -560,8 +560,6 @@ def main():
             re.compile(args.parameter_match)
         except re.error as error:
             parser.error(f'Invalid --parameter-match: {error}')
-    if args.require_rebinning and args.execution_mode != 'isolated':
-        parser.error('--require-rebinning needs --execution-mode isolated; resident replacement requires fixed bins')
     args.cases = list(dict.fromkeys(args.cases))
     args.scenarios = list(dict.fromkeys(args.scenarios))
     args.work_dir = args.work_dir.resolve()

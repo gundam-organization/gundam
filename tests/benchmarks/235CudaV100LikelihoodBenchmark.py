@@ -32,8 +32,8 @@ def parse_args(argv=None):
     p.add_argument('--likelihoods', nargs='+', choices=['configured', 'PoissonLLH', 'BarlowLLH_BANFF_OA2021'], default=['configured'])
     p.add_argument('--cases', nargs='+', choices=profiling.CASES,
                    default=['CPU', 'CUDA-cachedResponses-interleaved', 'CUDA-recomputeResponses-interleaved'])
-    p.add_argument('--execution-mode', choices=['isolated', 'resident'], default='isolated',
-                   help='Isolated supports observable/binning responses; resident loads fixed-bin inputs once per experiment')
+    p.add_argument('--execution-mode', choices=['isolated', 'resident'], default='resident',
+                   help='Resident loads inputs once per experiment and switches backends in memory; isolated reloads each case')
     p.add_argument('--scenarios', nargs='+', choices=['constant','local1','local2','global'],
                    default=['constant','local1','local2','global'])
     p.add_argument('--threads', type=int, default=4)
@@ -61,8 +61,6 @@ def parse_args(argv=None):
         p.error('Configuration does not exist: '+str(args.config))
     if min(args.calls, args.global_calls, args.trials, args.threads) <= 0 or min(args.warmup, args.device_index) < 0:
         p.error('Counts must be positive; warmup and device-index may be zero')
-    if args.require_rebinning and args.execution_mode != 'isolated':
-        p.error('--require-rebinning requires isolated execution')
     return args
 
 

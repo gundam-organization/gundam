@@ -74,7 +74,7 @@ def compare(reference, output):
         raise RuntimeError('Reference parameter manifests differ')
     configs = [read(path, 'resolved-config.json') for path in (reference, output)]
     for config in configs:
-        config['likelihoodInterfaceConfig']['backendManagerConfig']['backendConfig'].pop('profileOutputPath')
+        config['likelihoodInterfaceConfig']['backendManagerConfig']['options'][0].pop('profileOutputPath')
     if configs[0] != configs[1]:
         raise RuntimeError('Reference model configurations differ')
     before, after = read(reference, 'summary.json'), read(output, 'summary.json')
@@ -143,8 +143,13 @@ def measure(args):
     config.update(enablePca=False, scaleParStepWithChi2Response=False,
                   generateSamplePlots=False, generateOneSigmaPlots=False)
     backend = config['likelihoodInterfaceConfig'].setdefault('backendManagerConfig', {})
-    backend.update(isEnabled=True, type='CPU')
-    backend.setdefault('backendConfig', {}).update(
+    backend.pop('type', None)
+    backend.update(isEnabled=True, useBackend='CPU')
+    options = next((entry for entry in backend.setdefault('options', []) if entry['name'] == backend['useBackend']), None)
+    if options is None:
+        options = {'name': backend['useBackend']}
+        backend['options'].append(options)
+    options.update(
         profileOutputPath=str(args.output / 'cpu-profile.jsonl'), profileSampleInterval=100,
         profileMaxSamples=1)
     write_json(args.output / 'resolved-config.json', config)

@@ -12,9 +12,10 @@ fitterEngineConfig:
   likelihoodInterfaceConfig:
     backendManagerConfig:
       isEnabled: true
-      type: MPS
-      backendConfig:
-        propagationMode: cachedResponses
+      useBackend: MPS
+      options:
+        - name: MPS
+          propagationMode: cachedResponses
 ```
 
 `cachedResponses` is the default, including for scalar dials and fixed bins.

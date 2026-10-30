@@ -99,10 +99,10 @@ def run(args):
 
     def replace(case):
         if case == 'CPU':
-            manager.replaceBackend('CPU', GUNDAM.JsonType('{}'))
+            manager.activate('CPU', GUNDAM.JsonType('{}'))
         else:
             mode = case.removeprefix('MPS-')
-            manager.replaceBackend('MPS', GUNDAM.JsonType(json.dumps({'propagationMode': mode})))
+            manager.activate('MPS', GUNDAM.JsonType(json.dumps({'propagationMode': mode})))
             diagnostics = json.loads(manager.getDiagnosticMps())
             if diagnostics.get('likelihoodExecution') != 'device':
                 raise RuntimeError('Likelihood is not device resident: ' + str(diagnostics))

@@ -87,10 +87,8 @@ extern "C" int weights(const char*, int, int, double values[], int, int index[],
     def run(backend, mode=None):
         config = json.loads(json.dumps(base_config))
         if backend:
-            config['likelihoodInterfaceConfig']['backendManagerConfig'] = {
-                'isEnabled': True, 'type': backend,
-                'backendConfig': {'propagationMode': mode} if mode else {},
-            }
+            config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend,
+                'options': [{'name': backend, **({'propagationMode': mode} if mode else {})}]}
         engine = GUNDAM.FitterEngine()
         engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
         engine.initialize()

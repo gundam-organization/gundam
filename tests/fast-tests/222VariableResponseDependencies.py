@@ -61,8 +61,8 @@ def run(command):
                                           {'name': 'weight', 'priorValue': 1., 'priorType': 'Flat',
                                            'dialSetDefinitions': [{'dialType': 'Normalization'}]}]}]}}}
         if backend != 'standard':
-            li['backendManagerConfig'] = {'isEnabled': True, 'type': backend,
-                                          'backendConfig': {'propagationMode': mode} if mode else {}}
+            li['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend,
+                'options': [{'name': backend, **({'propagationMode': mode} if mode else {})}]}
         config = {'likelihoodInterfaceConfig': li, 'enablePca': False,
                   'scaleParStepWithChi2Response': False, 'generateSamplePlots': False,
                   'generateOneSigmaPlots': False}

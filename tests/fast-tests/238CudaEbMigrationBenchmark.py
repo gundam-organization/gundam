@@ -177,8 +177,8 @@ def main():
                 raise RuntimeError(f'{name} benchmark failed')
             resolved = json.loads((legacy_output / 'configured' / 'CPU' / 'resolved-fitter-config.json').read_text())
             expected = copy.deepcopy(source['fitterEngineConfig'])
-            expected.setdefault('likelihoodInterfaceConfig', {})['backendManagerConfig'] = {
-                'isEnabled': True, 'type': 'CPU', 'backendConfig': {}}
+            expected.setdefault('likelihoodInterfaceConfig', {})['backendManagerConfig'] = {'isEnabled': True, 'useBackend': 'CPU',
+                'options': [{'name': 'CPU'}]}
             assert resolved == expected  # Only the backend changes, not physics/initialization settings.
 
         # Cross-variant comparison must reject different replay coordinates.

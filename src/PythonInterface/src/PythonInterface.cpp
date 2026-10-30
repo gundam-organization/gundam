@@ -617,6 +617,13 @@ PYBIND11_MODULE(GUNDAM, module) {
     LogThrowIf(cuda == nullptr, "CUDA diagnostics require a CUDA backend.");
     return cuda->getDiagnostics();
   })
+  .def("getActiveBackendName", &Backends::BackendManager::getActiveBackendName)
+  .def("getAvailableBackendNames", &Backends::BackendManager::getAvailableBackendNames)
+  .def("deactivateBackend", &Backends::BackendManager::deactivateBackend)
+  .def("activate", [](Backends::BackendManager& manager_, const std::string& name_, const pybind11::object& config_){
+    if( config_.is_none() ){ manager_.activate(name_); }
+    else { manager_.activate(name_, ConfigReader(config_.cast<JsonType>())); }
+  }, pybind11::arg("name"), pybind11::arg("config") = pybind11::none())
   .def("replaceBackend", [](Backends::BackendManager& manager_, const std::string& type_, const JsonType& config_){
     manager_.replaceBackend(type_, ConfigReader(config_));
   }, pybind11::arg("type"), pybind11::arg("backendConfig") = JsonType::object())

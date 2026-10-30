@@ -24,7 +24,7 @@ def build_mps_config_text(cpu_test_module, root_path: Path, enable_backend: bool
     if enable_backend:
         config_text = config_text.replace("type: CPU", "type: MPS")
         if mode is not None:
-            config_text = config_text.replace("type: MPS", f"type: MPS\n      backendConfig:\n        propagationMode: {mode}")
+            config_text = config_text.replace("type: MPS", f"type: MPS\n      options:\n        - name: MPS\n          propagationMode: {mode}")
     return config_text
 
 

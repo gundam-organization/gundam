@@ -1,6 +1,8 @@
 #include "BackendManager.h"
 
 #include "LikelihoodInterface.h"
+#include "JointProbabilityBase.h"
+#include "CudaBackend.h"
 #include "ExternalWeightBuffer.h"
 #include "DialInputBuffer.h"
 #include "Logger.h"
@@ -55,16 +57,23 @@ std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& tim
 }
 
 void Backends::BackendManager::configureImpl() {
-  _config_.defineFields({
-    {"isEnabled"},
-    {"type"},
-    {"backendConfig"},
-  });
-
+  _config_.clearFields();
+  _config_.defineFields({{"isEnabled"}, {"useBackend", {"type"}}, {"options"}});
+  _config_.checkConfiguration();
+  const auto& config = _config_.getConfig();
+  LogThrowIf(not config.is_null() and not config.is_object(), "BackendManager configuration must be an object.");
+  for( auto entry = config.begin(); entry != config.end(); ++entry ){
+    const auto& key = entry.key();
+    LogThrowIf(key != "isEnabled" and key != "useBackend" and key != "type" and key != "options" and key != "name",
+               "Unsupported BackendManager field: " << key << ". Put backend settings in the named options list.");
+  }
+  _isEnabled_ = false;
+  _type_ = "CPU";
+  _backendOptions_ = JsonType::array();
   _config_.fillValue(_isEnabled_, "isEnabled");
-  _config_.fillValue(_type_, "type");
-  _config_.fillValue(_backendConfig_, "backendConfig");
-  _config_.printUnusedKeys();
+  _config_.fillValue(_type_, "useBackend");
+  _config_.fillValue(_backendOptions_, "options");
+  LogThrowIf(not _backendOptions_.is_array(), "Backend options must be a list of named configurations.");
 }
 
 bool Backends::BackendManager::shouldMaterialize(OutputRequest outputRequest_) const {
@@ -219,63 +228,141 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
 }
 
 void Backends::BackendManager::initializeImpl() {
-  ++_backendGeneration_;
-  _lastPropagationToken_ = {};
-  if( not _isEnabled_ ){
-    _binningUpdateListeners_.clear();
-    _hostBinningChanged_.reset();
-    _backend_ = nullptr;
-    return;
+  deactivateBackend();
+  _availableBackendList_.clear();
+  std::vector<std::string> names{"CPU"};
+  if( CudaBackend::isCompiled() ){ names.emplace_back("CUDA"); }
+#ifdef __APPLE__
+  names.emplace_back("MPS");
+#endif
+  std::vector<std::string> configuredNames;
+  for( const auto& option : _backendOptions_ ){
+    LogThrowIf(not option.is_object() or not option.contains("name") or not option.at("name").is_string(),
+               "Each backend option must be an object with a string name.");
+    const auto name = option.at("name").get<std::string>();
+    LogThrowIf(std::find(configuredNames.begin(), configuredNames.end(), name) != configuredNames.end(),
+               "Duplicate backend options: " << name);
+    configuredNames.push_back(name);
+    LogThrowIf(name != "CPU" and name != "CUDA" and name != "MPS", "Unknown backend: " << name);
   }
-  LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendsManager requires a LikelihoodInterface before initialize().");
+  for( const auto& name : names ){
+    JsonType options = JsonType::object();
+    for( const auto& option : _backendOptions_ ){
+      if( option.at("name") == name ){ options = option; options.erase("name"); }
+    }
+    auto backend = makeBackend(name);
+    ConfigReader config(options);
+    backend->configure(config);
+    _availableBackendList_.push_back({name, config, std::move(backend)});
+  }
+  // Capture the prior mask before any parameter scans or backend switches. A
+  // bin emptied by a later prediction must never become an ignored prior bin.
+  _ignoredBinsAtPrior_.clear();
+  if( _likelihoodInterfacePtr_ != nullptr ){
+    for( const auto& sample : _likelihoodInterfacePtr_->getSamplePairList() ){
+      std::vector<bool> ignored;
+      for( const auto& bin : sample.model->getHistogram().getBinContentList() ){
+        ignored.push_back(_likelihoodInterfacePtr_->getJointProbabilityPtr()->isIgnoreBinsWithZeroPredictionAtPrior()
+                          and bin.sumWeights == 0.);
+      }
+      _ignoredBinsAtPrior_.push_back(std::move(ignored));
+    }
+  }
+  if( _isEnabled_ ){ activate(_type_); }
+}
 
-  LogInfo << "Initializing propagation backend: " << _type_ << std::endl;
-  _backendEngineLayout_ = std::make_shared<EngineLayout>();
-  _backendEngineLayout_->build(*_likelihoodInterfacePtr_);
-  _lastMaterializedStateRevision_ = 0;
-  _lastMaterializedVariableRevision_ = 0;
-  _lastMaterializedSampleRevisions_.clear();
+void Backends::BackendManager::buildEngineLayout() {
+  LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendManager requires a LikelihoodInterface before activation.");
+  auto layout = std::make_shared<EngineLayout>();
+  layout->build(*_likelihoodInterfacePtr_);
+  LogThrowIf(layout->view.likelihood.samples.size() != _ignoredBinsAtPrior_.size(),
+             "Cannot change the likelihood sample list after initialization.");
+  for( std::size_t i = 0; i < _ignoredBinsAtPrior_.size(); ++i ){
+    auto& sample = layout->view.likelihood.samples[i];
+    LogThrowIf(sample.ignoredBins.size() != _ignoredBinsAtPrior_[i].size(),
+               "Cannot change the likelihood bin count after initialization.");
+    sample.ignoredBins = _ignoredBinsAtPrior_[i];
+  }
+
   _binningUpdateListeners_.clear();
   _hostBinningChanged_ = std::make_shared<bool>(false);
-  for( const auto& binding : _backendEngineLayout_->bindings.samples ){
+  for( const auto& binding : layout->bindings.samples ){
     _binningUpdateListeners_.push_back(binding.sample->addBinningUpdateListener(
         [changed = _hostBinningChanged_]{ *changed = true; }));
   }
-
-  LogInfo << "Propagation backend enabled: " << _type_
-          << " with fixed device outputs [EventWeights, Histograms, StatLikelihood]"
-          << std::endl;
-  if( _enableAutoMaterialize_ and not _materializeOutputList_.empty() ){
-    LogInfo << "Propagation backend auto materialization requests "
-            << GenericToolbox::toString(_materializeOutputList_) << std::endl;
-  }
-
-  _backend_ = makeBackend(*this);
-  LogThrowIf(_backend_ == nullptr, "Could not create propagation backend.");
-  _backend_->configure(_backendConfig_);
-  _backend_->buildShared(std::shared_ptr<const EngineView>(_backendEngineLayout_, &_backendEngineLayout_->view));
+  _backendEngineLayout_ = std::move(layout);
 }
 
-void Backends::BackendManager::replaceBackend(const std::string& type_, const ConfigReader& backendConfig_) {
-  LogThrowIf(not isInitialized() or not hasBackend(), "Backend replacement requires an initialized backend.");
-  LogThrowIf(_backendEngineLayout_->view.propagation.requiresEventBinning()
-             or (_hostBinningChanged_ and *_hostBinningChanged_),
-             "Backend replacement requires unchanged fixed binning and no observable responses.");
-  // Validate type/configuration while the old backend is still usable.
-  auto replacement = makeBackend(type_);
-  replacement->configure(backendConfig_);
+std::string Backends::BackendManager::getActiveBackendName() const { return _activeBackendName_; }
+
+std::vector<std::string> Backends::BackendManager::getAvailableBackendNames() const {
+  std::vector<std::string> names;
+  for( const auto& entry : _availableBackendList_ ){ names.push_back(entry.name); }
+  return names;
+}
+
+void Backends::BackendManager::deactivateBackend() {
+  if( hasBackend() ){
+    if( _lastPropagationToken_.isValid ){
+      _activeBackendPtr_->wait(_lastPropagationToken_);
+      const auto status = _activeBackendPtr_->getStatus(_lastPropagationToken_);
+      for( auto output : {OutputRequest::EventState, OutputRequest::EventWeights,
+                         OutputRequest::Histograms, OutputRequest::StatLikelihood} ){
+        const auto state = status.state(output);
+        if( state == OutputState::ReadyOnDevice or state == OutputState::ReadyOnHost ){ materialize(output); }
+      }
+    }
+    _activeBackendPtr_ = nullptr;
+    for( auto& entry : _availableBackendList_ ){
+      if( entry.name != _activeBackendName_ ){ continue; }
+      entry.backend.reset(); // Release all device buffers before constructing another backend.
+      entry.backend = makeBackend(entry.name);
+      entry.backend->configure(entry.config);
+    }
+    _activeBackendName_.clear();
+    if( _likelihoodInterfacePtr_ != nullptr ){
+      auto& propagator = _likelihoodInterfacePtr_->getModelPropagator();
+      propagator.invalidateVariableResponses();
+      propagator.getDialManager().invalidateInputBuffers();
+    }
+  }
   ++_backendGeneration_;
   _lastPropagationToken_ = {};
   _lastPreparationSeconds_ = 0.;
   _lastMaterializedStateRevision_ = _lastMaterializedVariableRevision_ = 0;
   _lastMaterializedSampleRevisions_.clear();
-  _backend_.reset(); // Never keep two production device models allocated.
-  _type_ = type_;
-  _backendConfig_ = backendConfig_;
-  _backend_ = std::move(replacement);
-  // Install before building: failure leaves an unbuilt backend that throws on
-  // propagation, rather than silently falling back to the original engine.
-  _backend_->buildShared(std::shared_ptr<const EngineView>(_backendEngineLayout_, &_backendEngineLayout_->view));
+  _binningUpdateListeners_.clear();
+  _hostBinningChanged_.reset();
+  _backendEngineLayout_ = std::make_shared<EngineLayout>(); // Release the old flattened host model as well.
+}
+
+void Backends::BackendManager::activate(const std::string& name_) { activateImpl(name_, nullptr); }
+
+void Backends::BackendManager::activate(const std::string& name_, const ConfigReader& config_) {
+  activateImpl(name_, &config_);
+}
+
+void Backends::BackendManager::activateImpl(const std::string& name_, const ConfigReader* config_) {
+  auto found = std::find_if(_availableBackendList_.begin(), _availableBackendList_.end(),
+                            [&](const auto& entry_){ return entry_.name == name_; });
+  LogThrowIf(found == _availableBackendList_.end(), "Backend is not available in this build: " << name_);
+  // Validate overrides before releasing the active backend. Configuration never allocates device buffers.
+  const auto config = config_ == nullptr ? found->config : *config_;
+  auto replacement = makeBackend(name_);
+  replacement->configure(config);
+  deactivateBackend();
+  buildEngineLayout(); // Rebuild from in-memory host state, including observable and binning changes.
+  // Publish only after a successful build; failures release partially allocated buffers.
+  replacement->buildShared(std::shared_ptr<const EngineView>(_backendEngineLayout_, &_backendEngineLayout_->view));
+  found->config = config;
+  found->backend = std::move(replacement);
+  _activeBackendPtr_ = found->backend.get();
+  _activeBackendName_ = name_;
+  _type_ = name_;
+}
+
+void Backends::BackendManager::replaceBackend(const std::string& type_, const ConfigReader& backendConfig_) {
+  activate(type_, backendConfig_);
 }
 
 std::future<Backends::BackendPropagationResult> Backends::BackendManager::propagate() {
@@ -284,7 +371,7 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for backend propagation.");
   auto prepareStart = std::chrono::steady_clock::now();
   auto& propagator = _likelihoodInterfacePtr_->getModelPropagator();
-  const bool handlesEventState = _backend_->getCapabilities().supportsObservableTransforms;
+  const bool handlesEventState = _activeBackendPtr_->getCapabilities().supportsObservableTransforms;
   propagator.preparePropagation(not handlesEventState);
   _lastPreparationSeconds_ = std::chrono::duration<double>(std::chrono::steady_clock::now() - prepareStart).count();
 
@@ -324,7 +411,7 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
       }
     }
   }
-  auto token = _backend_->requestPropagation(inputs);
+  auto token = _activeBackendPtr_->requestPropagation(inputs);
   if( token.isValid ){
     *_hostBinningChanged_ = false;
     if( handlesEventState ){ propagator.invalidateVariableResponses(); }

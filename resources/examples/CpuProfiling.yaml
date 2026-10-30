@@ -4,8 +4,9 @@ fitterEngineConfig:
   likelihoodInterfaceConfig:
     backendManagerConfig:
       isEnabled: true
-      type: CPU
-      backendConfig:
-        profileOutputPath: cpu-profile-4.jsonl
-        profileSampleInterval: 100
-        profileMaxSamples: 200
+      useBackend: CPU
+      options:
+        - name: CPU
+          profileOutputPath: cpu-profile-4.jsonl
+          profileSampleInterval: 100
+          profileMaxSamples: 200

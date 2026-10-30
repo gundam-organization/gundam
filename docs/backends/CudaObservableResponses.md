@@ -47,7 +47,8 @@ construction. Rebin, candidate and contribution counters are available.
 Smoothed bins/fractional contributions are now implemented, pending CC
 validation: see [smoothed binning](CudaSmoothedBinning.md).
 `DialInputSource::EventVariable` remains rejected during model preparation. No CPU propagation fallback is used.
-Resident backend replacement retains its existing fixed-model restriction.
+Resident backend activation supports observable responses and dynamic/smoothed
+binning: see [backend lifecycle](BackendLifecycle.md).
 
 ## Device regression at the CC
 

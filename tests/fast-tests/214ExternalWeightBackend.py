@@ -43,10 +43,8 @@ def main():
                       generateSamplePlots=False, generateOneSigmaPlots=False)
         likelihood_config = config['likelihoodInterfaceConfig']
         if backend:
-            likelihood_config['backendManagerConfig'] = {
-                'isEnabled': True, 'type': backend,
-                'backendConfig': {'propagationMode': mode} if mode else {},
-            }
+            likelihood_config['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend,
+                'options': [{'name': backend, **({'propagationMode': mode} if mode else {})}]}
         sets = likelihood_config['propagatorConfig']['parametersManagerConfig']['parameterSetList']
         second = copy.deepcopy(sets[0])
         second['name'] = 'SecondExternalSource'

@@ -480,9 +480,9 @@ capacity and allocator reservations must not be interpreted as resident bytes.
 `229CudaBackendProfiling.py` profiles the full selected production model using
 Asimov data, without Migrad, Hesse, PCA, plots or step-response scans. By default
 (`--execution-mode resident`) it loads the model once in one worker process,
-then replaces only the backend between cases, reusing the immutable layout,
-events, dials and Asimov data. This replacement requires fixed bins and no
-observable responses; use `--execution-mode isolated` for migration or smoothing.
+then activates each backend using the already-loaded events, dials and Asimov
+data. Observable responses, dynamic binning and smoothing are supported; the
+host state is synchronized and the layout rebuilt when switching backends.
 The previous backend's buffers are released before
 the next backend is built. Parameters are restored to their initial effective
 fit coordinates; each new backend is primed and warmed up outside measurements.
@@ -509,9 +509,9 @@ python3 tests/benchmarks/229CudaBackendProfiling.py \
 
 ### CUDA migration and smoothing on upgrade-cc-2026
 
-Use the same script with `--execution-mode isolated`: dynamic/observable models
-cannot currently use resident backend replacement. Each case loads the model
-once; loading and warmup are outside evaluation timings and `setup.json` records
+Use the same script with `--execution-mode resident` to share the loaded model
+between cases, including dynamic/observable models. `isolated` remains available
+for independent processes; loading and warmup are outside evaluation timings and `setup.json` records
 initialization separately. This benchmark uses Asimov data (the fitter's `-a`)
 without running a fit or Hesse, with all input selections/limits preserved.
 
@@ -761,8 +761,9 @@ OA2024's `configOA2024.yaml`, preserving legacy likelihood options.
 with a configurable likelihood block-size sweep and optional prediction-cache
 A/B measurements. It requires resident Poisson/Barlow-2022 likelihoods, checks
 scalar-only LLH readback, and compares statistical likelihoods independently of
-parameter penalties. Input selections are preserved. Independent workers support
-dynamic/smoothed models; fixed-bin models can use `--execution-mode resident`.
+parameter penalties. Input selections are preserved. `isolated` runs each case
+in an independent process; `--execution-mode resident` is the default and supports
+dynamic/smoothed models.
 
 ```sh
 python3 tests/benchmarks/235CudaV100LikelihoodBenchmark.py \

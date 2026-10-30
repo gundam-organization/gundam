@@ -174,9 +174,9 @@ namespace {
     auto& likelihood = config["likelihoodInterfaceConfig"];
     likelihood["datasetList"][0]["model"]["filePathList"] = {input_.path};
     if( backend_ != "Original" ){
-      likelihood["backendManagerConfig"] = {{"isEnabled", true}, {"type", backend_}};
+      likelihood["backendManagerConfig"] = {{"isEnabled", true}, {"useBackend", backend_}};
       if( backend_ == "CUDA" ){
-        likelihood["backendManagerConfig"]["backendConfig"] = {{"propagationMode", mode_}, {"weightLayout", layout_}};
+        likelihood["backendManagerConfig"]["options"] = JsonType::array({{{"name", backend_}, {"propagationMode", mode_}, {"weightLayout", layout_}}});
       }
     }
     return config;
@@ -220,7 +220,7 @@ namespace {
       config["likelihoodInterfaceConfig"]["jointProbabilityConfig"] = {{"type", probability_}};
     }
     if( backend_ == "MPS" ){
-      config["likelihoodInterfaceConfig"]["backendManagerConfig"]["backendConfig"] = {{"propagationMode", mode_}};
+      config["likelihoodInterfaceConfig"]["backendManagerConfig"]["options"] = JsonType::array({{{"name", backend_}, {"propagationMode", mode_}}});
     }
     engine.configure(ConfigReader(config));
     engine.getLikelihoodInterface().setDataType(LikelihoodInterface::DataType::Asimov);
@@ -384,7 +384,7 @@ TEST(BackendFitCovariance, ResidentReplacementPreservesLoadedModelAndRejectsStal
   engine.initialize();
   auto& manager = engine.getBackendsManager();
   manager.setEnableAutoMaterialize(false);
-  const auto* layout = &manager.getEngineLayout();
+  EXPECT_EQ(manager.getActiveBackendName(), "CPU");
   auto& parameters = engine.getLikelihoodInterface().getModelPropagator()
       .getParametersManager().getParameterSetsList()[0].getParameterList();
   const auto* parameter = &parameters[0];
@@ -399,10 +399,9 @@ TEST(BackendFitCovariance, ResidentReplacementPreservesLoadedModelAndRejectsStal
   for( const auto& bin : histogram.getBinContentList() ){ sums.push_back(bin.sumWeights); }
   for( int iteration = 0; iteration < 3; ++iteration ){
     auto pending = manager.propagate();
-    manager.replaceBackend("CPU", ConfigReader(JsonType::object()));
+    manager.activate("CPU", ConfigReader(JsonType::object()));
     EXPECT_THROW((void)pending.get(), std::exception);
     EXPECT_THROW(manager.materialize(Backends::OutputRequest::Histograms), std::exception);
-    EXPECT_EQ(&manager.getEngineLayout(), layout);
     EXPECT_EQ(&parameters[0], parameter);
     EXPECT_FALSE(manager.isAutoMaterializeEnabled());
     engine.evaluateLikelihood();
@@ -413,16 +412,17 @@ TEST(BackendFitCovariance, ResidentReplacementPreservesLoadedModelAndRejectsStal
     }
   }
   const auto* backend = manager.getBackend();
-  EXPECT_THROW(manager.replaceBackend("invalid", ConfigReader(JsonType::object())), std::exception);
+  EXPECT_THROW(manager.activate("invalid", ConfigReader(JsonType::object())), std::exception);
   EXPECT_EQ(manager.getBackend(), backend);
-  EXPECT_THROW(manager.replaceBackend("CUDA", ConfigReader(JsonType{{"deviceIndex", -1}})), std::exception);
+  EXPECT_THROW(manager.activate("CUDA", ConfigReader(JsonType{{"deviceIndex", -1}})), std::exception);
   EXPECT_EQ(manager.getBackend(), backend);
   engine.evaluateLikelihood();
   EXPECT_NEAR(engine.getLikelihoodInterface().getLastLikelihood(), reference, 1.e-12);
   if( not Backends::CudaBackend::isCompiled() ){
-    EXPECT_THROW(manager.replaceBackend("CUDA", ConfigReader(JsonType::object())), std::exception);
-    EXPECT_THROW(engine.evaluateLikelihood(), std::exception);
-    manager.replaceBackend("CPU", ConfigReader(JsonType::object()));
+    EXPECT_THROW(manager.activate("CUDA", ConfigReader(JsonType::object())), std::exception);
+    EXPECT_EQ(manager.getBackend(), backend);
+    EXPECT_NO_THROW(engine.evaluateLikelihood());
+    manager.activate("CPU", ConfigReader(JsonType::object()));
     engine.evaluateLikelihood();
     EXPECT_NEAR(engine.getLikelihoodInterface().getLastLikelihood(), reference, 1.e-12);
   }
@@ -453,7 +453,7 @@ TEST_P(CudaFitCovariance, ResidentSwitchMatchesCpu) {
   engine.initialize();
   auto& manager = engine.getBackendsManager();
   manager.setEnableAutoMaterialize(false);
-  const auto* layout = &manager.getEngineLayout();
+  EXPECT_EQ(manager.getActiveBackendName(), "CPU");
   auto& parameters = engine.getLikelihoodInterface().getModelPropagator()
       .getParametersManager().getParameterSetsList()[0].getParameterList();
   for( std::size_t i = 0; i < parameterCount; ++i ){ parameters[i].setParameterValue(startValues[i]); }
@@ -461,9 +461,8 @@ TEST_P(CudaFitCovariance, ResidentSwitchMatchesCpu) {
   const auto reference = engine.getLikelihoodInterface().getLastLikelihood();
   std::remove(input.path.c_str());
   for( const auto* type : {"CUDA", "CPU", "CUDA"} ){
-    manager.replaceBackend(type, ConfigReader(std::string(type) == "CUDA"
+    manager.activate(type, ConfigReader(std::string(type) == "CUDA"
         ? JsonType{{"propagationMode", GetParam()}} : JsonType::object()));
-    EXPECT_EQ(&manager.getEngineLayout(), layout);
     engine.evaluateLikelihood();
     EXPECT_NEAR(engine.getLikelihoodInterface().getLastLikelihood(), reference, 1.e-10);
   }

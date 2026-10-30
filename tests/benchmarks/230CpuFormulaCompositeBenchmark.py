@@ -41,8 +41,13 @@ def run(args):
     config.update(enablePca=False, scaleParStepWithChi2Response=False,
                   generateSamplePlots=False, generateOneSigmaPlots=False)
     backend = config['likelihoodInterfaceConfig'].setdefault('backendManagerConfig', {})
-    backend.update(isEnabled=True, type='CPU')
-    backend.setdefault('backendConfig', {})['profileOutputPath'] = ''
+    backend.pop('type', None)
+    backend.update(isEnabled=True, useBackend='CPU')
+    options = next((entry for entry in backend.setdefault('options', []) if entry['name'] == backend['useBackend']), None)
+    if options is None:
+        options = {'name': backend['useBackend']}
+        backend['options'].append(options)
+    options['profileOutputPath'] = ''
     save(args.output / 'resolved-config.json', config)
     engine = GUNDAM.FitterEngine()
     engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))

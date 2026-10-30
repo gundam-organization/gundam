@@ -19,14 +19,16 @@ def run(path, profile, factor=2):
     text = helper.build_config_text(path, True)
     if profile is not None:
         text = text.replace('      type: CPU', f'''      type: CPU
-      backendConfig:
-        profileOutputPath: "{profile}"
-        profileSampleInterval: 3
-        profileMaxSamples: 8''')
+      options:
+        - name: CPU
+          profileOutputPath: "{profile}"
+          profileSampleInterval: 3
+          profileMaxSamples: 8''')
     else:
         text = text.replace('      type: CPU', '''      type: CPU
-      backendConfig:
-        weightScheduling: Fixed''')
+      options:
+        - name: CPU
+          weightScheduling: Fixed''')
     builder = GUNDAM.ConfigUtils.ConfigBuilder()
     builder.setConfigFromYamlString(text)
     reader = GUNDAM.ConfigUtils.ConfigReader(builder.getConfig())

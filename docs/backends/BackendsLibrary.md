@@ -31,6 +31,7 @@ on every device.
 Implementation details, numerical precision and performance choices are documented
 with each backend:
 
+- [Backend activation and configuration](BackendLifecycle.md).
 - [CPU structure](cpu/BackendStructure.md) and [optimization choices](cpu/ReweightOptimization.md).
 - [MPS structure](mps/BackendStructure.md).
 - [CUDA implementation and validation](../guides/CudaBackend.md).
@@ -42,7 +43,7 @@ with each backend:
 ## Compatibility
 
 These tables describe the `CPU`, `MPS` and `CUDA` backends selected through
-`backendManagerConfig.type`. The original propagation path and the legacy
+`backendManagerConfig.useBackend`. The original propagation path and the legacy
 `CacheManager` (including its CUDA implementation) are separate execution paths;
 their capabilities must not be inferred from these tables.
 
@@ -61,7 +62,7 @@ itself establish numerical validation on every model or device.
 | Propagation and result tokens | ✅ | ✅ | ✅ Synchronous CUDA executor and token invalidation |
 | Host materialization | ✅ Event state, weights and histograms | ✅ Event state, weight and histogram readback | ✅ Lazy weight, histogram and event-state readback; strict path validated at CC |
 | Dial-response and event-state caches | ✅ | ✅ Depends on propagation mode | ✅ Sparse response cache validated on CC OA2024; strict observable dependency/revision cache validated at CC |
-| Resident backend replacement | ✅ Unchanged fixed-bin model | ⚠️ Fixed-bin API available; MPS replacement not validated here | ✅ Both response modes and index layouts exercised with CPU in one OA2024 process on CC V100 |
+| Backend activation/deactivation | ✅ Fixed, dynamic and smoothed binning | ✅ Dynamic/smoothed lifecycle tested against CPU and original engine | ⚠️ Same lifecycle API; device lifecycle regression must run at CC with `GUNDAM_TEST_CUDA=1` |
 | Numerical regression tests | ✅ CPU comparisons | ✅ MPS comparisons | ✅ Both modes compared against CPU on CC V100; error/retry tests passed |
 | Small fit and full Hesse covariance regression | ✅ Original/CPU comparison and analytic covariance reference pass locally | — Not included in this regression | ✅ Both modes pass at CC, including the analytic covariance reference |
 | Standalone CUDA infrastructure test | — | — | ✅ FP64 kernel validated on CC-IN2P3 V100, interactive and Slurm batch |
