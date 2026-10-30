@@ -2,7 +2,6 @@
 
 #include "LikelihoodInterface.h"
 #include "JointProbabilityBase.h"
-#include "CudaBackend.h"
 #include "ExternalWeightBuffer.h"
 #include "DialInputBuffer.h"
 #include "Logger.h"
@@ -230,11 +229,7 @@ void Backends::BackendManager::materialize(OutputRequest outputRequest_) {
 void Backends::BackendManager::initializeImpl() {
   deactivateBackend();
   _availableBackendList_.clear();
-  std::vector<std::string> names{"CPU"};
-  if( CudaBackend::isCompiled() ){ names.emplace_back("CUDA"); }
-#ifdef __APPLE__
-  names.emplace_back("MPS");
-#endif
+  const auto names = getCompiledBackendNames();
   std::vector<std::string> configuredNames;
   for( const auto& option : _backendOptions_ ){
     LogThrowIf(not option.is_object() or not option.contains("name") or not option.at("name").is_string(),

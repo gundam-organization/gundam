@@ -19,7 +19,9 @@
 
 #ifdef GUNDAM_USING_BACKENDS
 #include "CpuBackend.h"
+#ifdef GUNDAM_USING_CUDA
 #include "CudaBackend.h"
+#endif
 #ifdef __APPLE__
 #include "MpsBackend.h"
 #endif
@@ -612,11 +614,13 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getType", &Backends::BackendManager::getType)
   .def("getLastPreparationSeconds", &Backends::BackendManager::getLastPreparationSeconds)
   .def("setEnableAutoMaterialize", &Backends::BackendManager::setEnableAutoMaterialize)
+#ifdef GUNDAM_USING_CUDA
   .def("getDiagnosticCuda", [](const Backends::BackendManager& manager_){
     auto* cuda = dynamic_cast<const Backends::CudaBackend*>(manager_.getBackend());
     LogThrowIf(cuda == nullptr, "CUDA diagnostics require a CUDA backend.");
     return cuda->getDiagnostics();
   })
+#endif
   .def("getActiveBackendName", &Backends::BackendManager::getActiveBackendName)
   .def("getAvailableBackendNames", &Backends::BackendManager::getAvailableBackendNames)
   .def("deactivateBackend", &Backends::BackendManager::deactivateBackend)

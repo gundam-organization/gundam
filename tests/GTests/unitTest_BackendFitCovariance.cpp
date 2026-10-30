@@ -1,7 +1,7 @@
 #ifdef GUNDAM_USING_BACKENDS
 #include "FitterEngine.h"
 #include "RootMinimizer.h"
-#include "CudaBackend.h"
+#include "BackendFactory.h"
 #include "GundamGlobals.h"
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
@@ -418,7 +418,8 @@ TEST(BackendFitCovariance, ResidentReplacementPreservesLoadedModelAndRejectsStal
   EXPECT_EQ(manager.getBackend(), backend);
   engine.evaluateLikelihood();
   EXPECT_NEAR(engine.getLikelihoodInterface().getLastLikelihood(), reference, 1.e-12);
-  if( not Backends::CudaBackend::isCompiled() ){
+  const auto compiled = Backends::getCompiledBackendNames();
+  if( std::find(compiled.begin(), compiled.end(), "CUDA") == compiled.end() ){
     EXPECT_THROW(manager.activate("CUDA", ConfigReader(JsonType::object())), std::exception);
     EXPECT_EQ(manager.getBackend(), backend);
     EXPECT_NO_THROW(engine.evaluateLikelihood());

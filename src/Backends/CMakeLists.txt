@@ -16,12 +16,14 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendProfiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuWeightProbe.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendBinning.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/src/CudaBackend.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/src/CudaWeightModel.cpp
 )
 
 if(GUNDAM_CUDA_ENABLED)
-  list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/src/CudaDeviceContext.cu)
+  list(APPEND SRCFILES
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/src/CudaBackend.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/src/CudaWeightModel.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/src/CudaDeviceContext.cu
+  )
 endif()
 
 if(APPLE)
@@ -109,9 +111,6 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DialDependencyGroups.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DialDependencies.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/HistogramEventIndex.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBackend.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaWeightModel.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBinning.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ResponseSmoothingPacking.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendBinningSemantics.h
@@ -143,12 +142,25 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuCacheAlignment.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackendProfiler.h
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuWeightProbe.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsSplinePayloadLayout.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsWeightTypes.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackendInternal.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEventPropagation.h
 )
+
+if(GUNDAM_CUDA_ENABLED)
+  list(APPEND HEADERS
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBackend.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaWeightModel.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBinning.h
+  )
+endif()
+
+if(APPLE)
+  list(APPEND HEADERS
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsSplinePayloadLayout.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsWeightTypes.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackendInternal.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEventPropagation.h
+  )
+endif()
 
 if( USE_STATIC_LINKS )
   add_library(${LIB_NAME} STATIC ${SRCFILES})
@@ -162,8 +174,6 @@ target_include_directories(
     PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Common/include
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include
     PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
@@ -177,13 +187,15 @@ target_link_libraries(
 
 if(GUNDAM_CUDA_ENABLED)
   target_link_libraries(${LIB_NAME} PRIVATE CUDA::cudart)
-  target_compile_definitions(${LIB_NAME} PRIVATE GUNDAM_USING_CUDA)
+  target_compile_definitions(${LIB_NAME} PUBLIC GUNDAM_USING_CUDA)
+  target_include_directories(${LIB_NAME} BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include)
   set_target_properties(${LIB_NAME} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
   set_property(TARGET ${LIB_NAME} APPEND PROPERTY
       BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
 endif()
 
 if(APPLE)
+  target_include_directories(${LIB_NAME} BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include)
   target_link_libraries(${LIB_NAME} PUBLIC "-framework Foundation" "-framework Metal")
 endif()
 

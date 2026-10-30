@@ -3,11 +3,14 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace Backends {
 
   class BackendManager;
   class Backend;
+
+  [[nodiscard]] std::vector<std::string> getCompiledBackendNames();
 
   std::unique_ptr<Backend> makeBackend(const BackendManager& config_);
   std::unique_ptr<Backend> makeBackend(const std::string& type_);
