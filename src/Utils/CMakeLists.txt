@@ -20,6 +20,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGreetings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/VariableDictionary.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ConfigUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/PoissonDeviance.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/FormulaUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamApp.h
