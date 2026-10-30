@@ -1,35 +1,86 @@
+# Each child directory owns its Python3 imported targets. This prevents one
+# interpreter's headers or link settings from leaking into another module.
+set(pythonCandidates)
+if(GUNDAM_PYTHON_VERSIONS STREQUAL "AUTO")
+  file(TO_CMAKE_PATH "$ENV{PATH}" pythonSearchPaths)
+  foreach(pythonSearchPath IN LISTS pythonSearchPaths)
+    if(NOT IS_DIRECTORY "${pythonSearchPath}")
+      continue()
+    endif()
+    file(GLOB pythonPathCandidates
+        "${pythonSearchPath}/python3.*" "${pythonSearchPath}/python3" "${pythonSearchPath}/python.exe")
+    foreach(pythonCandidate IN LISTS pythonPathCandidates)
+      get_filename_component(pythonName "${pythonCandidate}" NAME)
+      if(pythonName MATCHES "^python3(\\.[0-9]+)?(\\.exe)?$" OR pythonName STREQUAL "python.exe")
+        list(APPEND pythonCandidates "${pythonCandidate}")
+      endif()
+    endforeach()
+  endforeach()
+else()
+  foreach(pythonSelection IN LISTS GUNDAM_PYTHON_VERSIONS)
+    if(pythonSelection MATCHES "^3\\.[0-9]+$")
+      unset(pythonSelectedExecutable CACHE)
+      find_program(pythonSelectedExecutable NAMES "python${pythonSelection}" "python${pythonSelection}.exe")
+      if(NOT pythonSelectedExecutable)
+        cmessage(FATAL_ERROR "Requested Python ${pythonSelection} was not found in PATH.")
+      endif()
+      list(APPEND pythonCandidates "${pythonSelectedExecutable}")
+      unset(pythonSelectedExecutable CACHE)
+    elseif(IS_ABSOLUTE "${pythonSelection}" AND EXISTS "${pythonSelection}")
+      list(APPEND pythonCandidates "${pythonSelection}")
+    else()
+      cmessage(FATAL_ERROR "Invalid GUNDAM_PYTHON_VERSIONS entry '${pythonSelection}': expected 3.x or an absolute interpreter path.")
+    endif()
+  endforeach()
+endif()
+list(REMOVE_DUPLICATES pythonCandidates)
 
-set( LIB_NAME "GUNDAM" )
+set(pythonAvailableVersions)
+foreach(pythonCandidate IN LISTS pythonCandidates)
+  execute_process(COMMAND "${pythonCandidate}" -c
+      "import sys; assert sys.implementation.name == 'cpython' and sys.version_info.major == 3; print('%d.%d' % sys.version_info[:2])"
+      RESULT_VARIABLE pythonProbeResult OUTPUT_VARIABLE pythonVersion
+      ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE TIMEOUT 10)
+  if(NOT pythonProbeResult STREQUAL "0")
+    if(NOT GUNDAM_PYTHON_VERSIONS STREQUAL "AUTO")
+      cmessage(FATAL_ERROR "Cannot run CPython interpreter: ${pythonCandidate}")
+    endif()
+    continue()
+  endif()
+  list(APPEND pythonAvailableVersions "${pythonVersion}")
+  string(REPLACE "." "_" pythonVersionTag "${pythonVersion}")
+  list(APPEND pythonCandidates_${pythonVersionTag} "${pythonCandidate}")
+endforeach()
+list(REMOVE_DUPLICATES pythonAvailableVersions)
+if(GUNDAM_PYTHON_VERSIONS STREQUAL "AUTO")
+  # Natural ordering compares minor versions numerically (3.14 comes before 3.9).
+  list(SORT pythonAvailableVersions COMPARE NATURAL ORDER DESCENDING)
+endif()
 
-set( SRC_FILE_LIST
-    src/PythonInterface.cpp
-)
-
-pybind11_add_module( ${LIB_NAME} NO_EXTRAS ${SRC_FILE_LIST} )
-
-target_include_directories( ${LIB_NAME} PUBLIC
-    ${PYBIND11_INCLUDE_DIRS}
-)
-
-target_include_directories( ${LIB_NAME} BEFORE PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_compile_definitions( ${LIB_NAME} PUBLIC
-    VERSION_INFO=${GUNDAM_FULL_VERSION_STR}
-)
-
-target_link_libraries( ${LIB_NAME} PUBLIC
-    GundamFitter
-)
-
-#target_include_directories(${LIB_NAME} PUBLIC
-#    ${CMAKE_CURRENT_SOURCE_DIR}/include)
-#
-#target_link_libraries( ${LIB_NAME} PUBLIC
-#    ${ROOT_LIBRARIES}
-#)
-#
-install( TARGETS ${LIB_NAME} DESTINATION lib )
-
-
+add_custom_target(GUNDAM)
+set(pythonBuiltVersions)
+set(pythonAttemptedVersions)
+foreach(pythonVersion IN LISTS pythonAvailableVersions)
+  string(REPLACE "." "_" pythonVersionTag "${pythonVersion}")
+  foreach(pythonCandidate IN LISTS pythonCandidates_${pythonVersionTag})
+    # Failed candidates of the same version must also have separate directories.
+    set(pythonBinaryDirectory "python${pythonVersionTag}")
+    if(pythonVersion IN_LIST pythonAttemptedVersions)
+      string(MD5 pythonCandidateTag "${pythonCandidate}")
+      string(APPEND pythonBinaryDirectory "-${pythonCandidateTag}")
+    endif()
+    list(APPEND pythonAttemptedVersions "${pythonVersion}")
+    add_subdirectory(Module "${pythonBinaryDirectory}")
+    if(pythonVersion IN_LIST pythonBuiltVersions)
+      break()
+    endif()
+  endforeach()
+  list(LENGTH pythonBuiltVersions pythonBuiltCount)
+  if(GUNDAM_PYTHON_VERSIONS STREQUAL "AUTO" AND pythonBuiltCount GREATER_EQUAL 3)
+    break()
+  endif()
+endforeach()
+if(NOT pythonBuiltVersions)
+  cmessage(FATAL_ERROR "No usable Python interface could be configured. Install CPython development files and expose python3.x in PATH, or set GUNDAM_PYTHON_VERSIONS.")
+endif()
+cmessage(STATUS "GUNDAM Python interfaces: ${pythonBuiltVersions}")

@@ -18,6 +18,7 @@ option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for 
 option( WITH_BACKENDS "Enable compiling of the experimental backend library." ON )
 option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
+set( GUNDAM_PYTHON_VERSIONS "AUTO" CACHE STRING "Python interfaces: AUTO (three newest usable versions in PATH), or a semicolon-separated list of versions/executable paths." )
 option( WITH_ASAN "Enable AddressSanitizer instrumentation." OFF )
 option( WITH_TESTS "Build CMake tests." ON )
 option( WITH_GOOGLE_TEST "Enable GoogleTest (disable at your own risk).." ON )
@@ -127,9 +128,12 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 if(WITH_PYTHON_INTERFACE)
-  set( PYBIND11_PYTHON_VERSION 3.8.10 )
-  set( PYBIND11_FINDPYTHON ON )
-  find_package( pybind11 REQUIRED )
+  if(CMAKE_VERSION VERSION_LESS 3.18)
+    cmessage(FATAL_ERROR "The Python interface requires CMake 3.18 or newer.")
+  endif()
+  # Discover Python separately for each module, without attaching one ABI to pybind11.
+  set( PYBIND11_NOPYTHON ON )
+  find_package( pybind11 CONFIG REQUIRED )
 endif()
 
 if(WITH_ASAN AND WITH_PYTHON_INTERFACE AND APPLE)
