@@ -35,13 +35,16 @@ on every device.
 | --- | --- | --- |
 | `GundamBackendsCommonFormula` | Formula compilation and arithmetic evaluation | None |
 | `GundamBackendsCommonBinning` | Bin geometry, spatial index and binning semantics | None |
-| `GundamBackendsCommonModel` | Engine views, descriptors and propagation inputs/outputs | Formula, Binning |
+| `GundamBackendsCommonModel` | Backend contract, engine views and propagation inputs/outputs | Formula, Binning |
 | `GundamBackendsCommonExecution` | Shared evaluation, packing and cache invalidation | Model |
-| `GundamBackendsCommonManager` | Backend contract, factory and engine integration | Execution |
+| `GundamBackendsCommonManager` | Factory and engine integration | Model |
 
-Manager is the entry point. It also compiles the CPU and enabled CUDA/MPS
-implementations selected by the factory. `GundamBackends` remains a CMake alias
-for Manager. Only Manager depends on `GundamStatisticalInference`; the other
+Manager is the entry point. Its factory links the enabled implementation libraries:
+`GundamBackendsCPU` (always), `GundamBackendsCUDA` (when CUDA is enabled), and
+`GundamBackendsMPS` (on macOS). Each implementation has its own `CMakeLists.txt`
+under `Implementations` and depends on Execution. The abstract `Backend` contract
+belongs to Model so implementations do not depend on Manager. `GundamBackends`
+remains a CMake alias for Manager. Only Manager depends on `GundamStatisticalInference`; the other
 libraries operate on backend descriptors. Conversion from `Histogram` to
 `BinningGeometry` belongs to Manager's `BinningGeometryBuilder`.
 
