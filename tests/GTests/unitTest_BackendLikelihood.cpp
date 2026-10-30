@@ -42,6 +42,19 @@ namespace {
   }
 }
 
+TEST(BackendLikelihood, DoubleMathPreservesBinary64LimitsAndSpecialValues) {
+  using Limits = std::numeric_limits<double>;
+  EXPECT_DOUBLE_EQ(Math::minimum(), Limits::min());
+  EXPECT_DOUBLE_EQ(Math::logMinimum(), std::log(Limits::min()));
+  EXPECT_EQ(Math::infinity(), Limits::infinity());
+  EXPECT_TRUE(std::isnan(Math::invalid()));
+  for( double value : {-Limits::max(), -Limits::min(), -Limits::denorm_min(), 0.,
+                      Limits::denorm_min(), Limits::min(), Limits::max(),
+                      -Limits::infinity(), Limits::infinity(), Limits::quiet_NaN()} ){
+    EXPECT_EQ(Math::finite(value), std::isfinite(value));
+  }
+}
+
 TEST(BackendLikelihood, PoissonMatchesUntouchedReferenceIncludingEmptyAndNegativeBins) {
   auto ref = reference("PoissonLLH");
   const auto config = options(*ref);

@@ -2,8 +2,8 @@
 #define GUNDAM_BACKEND_LIKELIHOOD_H
 #ifndef __METAL_VERSION__
 #include "LikelihoodTypes.h"
+#include <cfloat>
 #include <cmath>
-#include <limits>
 #endif
 
 namespace Backends::LikelihoodSemantics {
@@ -13,11 +13,13 @@ namespace Backends::LikelihoodSemantics {
     GUNDAM_LLH_INLINE static double sqrt(double x_) { return ::sqrt(x_); }
     GUNDAM_LLH_INLINE static double log(double x_) { return ::log(x_); }
     GUNDAM_LLH_INLINE static double log1p(double x_) { return ::log1p(x_); }
-    GUNDAM_LLH_INLINE static bool finite(double x_) { return x_ <= std::numeric_limits<double>::max() && x_ >= -std::numeric_limits<double>::max(); }
-    GUNDAM_LLH_INLINE static double minimum() { return std::numeric_limits<double>::min(); }
-    GUNDAM_LLH_INLINE static double logMinimum() { return ::log(std::numeric_limits<double>::min()); }
-    GUNDAM_LLH_INLINE static double infinity() { return std::numeric_limits<double>::infinity(); }
-    GUNDAM_LLH_INLINE static double invalid() { return std::numeric_limits<double>::quiet_NaN(); }
+    // C constants and CUDA-supported math functions avoid host-only constexpr
+    // calls from the device pass (no --expt-relaxed-constexpr required).
+    GUNDAM_LLH_INLINE static bool finite(double x_) { return x_ <= DBL_MAX && x_ >= -DBL_MAX; }
+    GUNDAM_LLH_INLINE static double minimum() { return DBL_MIN; }
+    GUNDAM_LLH_INLINE static double logMinimum() { return ::log(DBL_MIN); }
+    GUNDAM_LLH_INLINE static double infinity() { return HUGE_VAL; }
+    GUNDAM_LLH_INLINE static double invalid() { return ::nan(""); }
   };
 #endif
   template<typename Scalar> GUNDAM_LLH_INLINE Scalar absolute(Scalar x_) { return x_ < Scalar(0) ? -x_ : x_; }
