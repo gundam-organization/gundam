@@ -77,10 +77,17 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
   upload(Buffer::Nodes, _packed_.nodes);
   _deviceLikelihood_ = hasPortableLikelihood(likelihood_);
   const auto likelihoodBins = packLikelihood<ObservableScalar>(likelihood_, model_.totalBins);
-  _likelihoodBinCount_ = likelihoodBins.size();
+  LogThrowIf(likelihoodBins.size() > std::numeric_limits<DeviceIndex>::max(), "Metal likelihood bin count exceeds index range.");
+  _likelihoodWork_.binCount = DeviceIndex(likelihoodBins.size());
+  // Keep many lanes active for small likelihoods. Larger likelihoods amortize
+  // per-bin dispatch traffic over short chunks; final reduction is parallel.
+  _likelihoodWork_.binsPerThread = likelihoodBins.size() <= 8192 ? 1 : 8;
+  _likelihoodWork_.partialCount = DeviceIndex((likelihoodBins.size() + _likelihoodWork_.binsPerThread - 1)
+      / _likelihoodWork_.binsPerThread);
+  _lastUpdatedPrediction_ = true;
   upload(Buffer::LikelihoodBins, likelihoodBins);
-  upload(Buffer::LikelihoodCount, std::vector<DeviceIndex>{DeviceIndex(_likelihoodBinCount_)});
-  allocate(Buffer::LikelihoodPartials, ((_likelihoodBinCount_ + 63) / 64) * sizeof(ObservableScalar));
+  upload(Buffer::LikelihoodCount, std::vector<LikelihoodWorkLayout>{_likelihoodWork_});
+  allocate(Buffer::LikelihoodPartials, _likelihoodWork_.partialCount * sizeof(ObservableScalar));
   allocate(Buffer::LikelihoodTotal, sizeof(ObservableScalar));
   allocate(Buffer::LikelihoodReadback, sizeof(ObservableScalar), true);
   upload(Buffer::Bounds, _packed_.bounds);
@@ -235,7 +242,9 @@ void Backends::MpsEventPropagation::dispatch(id<MTLComputeCommandEncoder> encode
   [encoder_ setComputePipelineState:pipeline];
   NSUInteger index{0};
   for( auto slot : buffers_ ){ [encoder_ setBuffer:buffer(slot) offset:0 atIndex:index++]; }
-  NSUInteger width = std::min<NSUInteger>(256, pipeline.maxTotalThreadsPerThreadgroup);
+  NSUInteger width = kernel_ == Kernel::LikelihoodFinish ? GUNDAM_LIKELIHOOD_REDUCTION_WIDTH
+      : std::min<NSUInteger>(256, pipeline.maxTotalThreadsPerThreadgroup);
+  LogThrowIf(width > pipeline.maxTotalThreadsPerThreadgroup, "Metal likelihood reduction threadgroup is unsupported.");
   [encoder_ dispatchThreads:MTLSizeMake(count_, 1, 1) threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
   if( probeCommand != nil ){
     [encoder_ endEncoding];
@@ -292,6 +301,8 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
       }
     }
   }
+  const bool updatePrediction = updateWeights || _cache_.needsUpdate(inputs_) || !_valid_;
+  _lastUpdatedPrediction_ = updatePrediction;
   auto encodeStart = std::chrono::steady_clock::now();
   auto command = [_queue_ commandBuffer];
   auto encoder = [command computeCommandEncoder];
@@ -310,15 +321,19 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
     dispatch(encoder, Kernel::IndexChunks, 1, {Buffer::BinCounts, Buffer::BinPositions, Buffer::ChunkOffsets, Buffer::Chunks, Buffer::Control});
     dispatch(encoder, Kernel::Scatter, model.events.size(), {Buffer::Events, Buffer::EventCounts, Buffer::Contributions, Buffer::BinPositions, Buffer::BinContributions, Buffer::Control});
   }
-  const bool parallel = _pipelines_[std::size_t(Kernel::ReduceParallel)].threadExecutionWidth == 32;
-  dispatch(encoder, parallel ? Kernel::ReduceParallel : Kernel::Reduce, std::size_t(_packed_.histogramChunkCapacity) * (parallel ? 32 : 1), {Buffer::Chunks, Buffer::BinContributions, Buffer::Contributions,
-    Buffer::EventWeights, Buffer::PartialSums, Buffer::PartialSquares, Buffer::Control});
-  dispatch(encoder, Kernel::Finish, _packed_.histogramBins, {Buffer::ChunkOffsets, Buffer::PartialSums, Buffer::PartialSquares,
-    Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::Control});
-  if( _deviceLikelihood_ ){
-    dispatch(encoder, Kernel::LikelihoodPartials, (_likelihoodBinCount_ + 63) / 64,
-        {Buffer::LikelihoodBins, Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::LikelihoodPartials, Buffer::LikelihoodCount});
-    dispatch(encoder, Kernel::LikelihoodFinish, 1, {Buffer::LikelihoodPartials, Buffer::LikelihoodTotal, Buffer::LikelihoodCount});
+  // Resident predictions are unchanged when neither weights nor observables /
+  // binning changed. The total stays on device and is still read as one scalar.
+  if( updatePrediction ){
+    const bool parallel = _pipelines_[std::size_t(Kernel::ReduceParallel)].threadExecutionWidth == 32;
+    dispatch(encoder, parallel ? Kernel::ReduceParallel : Kernel::Reduce, std::size_t(_packed_.histogramChunkCapacity) * (parallel ? 32 : 1), {Buffer::Chunks, Buffer::BinContributions, Buffer::Contributions,
+      Buffer::EventWeights, Buffer::PartialSums, Buffer::PartialSquares, Buffer::Control});
+    dispatch(encoder, Kernel::Finish, _packed_.histogramBins, {Buffer::ChunkOffsets, Buffer::PartialSums, Buffer::PartialSquares,
+      Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::Control});
+    if( _deviceLikelihood_ ){
+      dispatch(encoder, Kernel::LikelihoodPartials, _likelihoodWork_.partialCount,
+          {Buffer::LikelihoodBins, Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::LikelihoodPartials, Buffer::LikelihoodCount});
+      dispatch(encoder, Kernel::LikelihoodFinish, GUNDAM_LIKELIHOOD_REDUCTION_WIDTH, {Buffer::LikelihoodPartials, Buffer::LikelihoodTotal, Buffer::LikelihoodCount});
+    }
   }
   [encoder endEncoding];
   if( _deviceLikelihood_ ){
@@ -475,12 +490,16 @@ Backends::BackendDeviceView Backends::MpsEventPropagation::getDeviceView() const
 
 std::string Backends::MpsEventPropagation::getExecutionState() const {
   return JsonType{{"evaluatedDials", _lastEvaluatedDials_}, {"updatedEventWeights", _lastUpdatedWeights_},
-                  {"rebuiltContributionIndex", _lastRebuiltIndex_}}.dump();
+                  {"rebuiltContributionIndex", _lastRebuiltIndex_}, {"updatedPrediction", _lastUpdatedPrediction_}}.dump();
 }
 
 std::string Backends::MpsEventPropagation::getDiagnostics() const {
   JsonType out;
   out["likelihoodExecution"] = _deviceLikelihood_ ? "device" : "host";
+  out["likelihoodBinsPerThread"] = _likelihoodWork_.binsPerThread;
+  out["likelihoodPartialCount"] = _likelihoodWork_.partialCount;
+  out["likelihoodReductionWidth"] = GUNDAM_LIKELIHOOD_REDUCTION_WIDTH;
+  out["updatedPrediction"] = _lastUpdatedPrediction_;
   out["evaluatedDials"] = _lastEvaluatedDials_;
   out["updatedEventWeights"] = _lastUpdatedWeights_;
   out["rebuiltContributionIndex"] = _lastRebuiltIndex_;

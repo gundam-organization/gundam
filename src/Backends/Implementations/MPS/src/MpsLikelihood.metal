@@ -26,11 +26,11 @@ kernel void evaluate_likelihood_partials(
     device const Backends::ObservableScalar* sums [[buffer(1)]],
     device const Backends::ObservableScalar* squares [[buffer(2)]],
     device Backends::ObservableScalar* partials [[buffer(3)]],
-    constant uint& count [[buffer(4)]], uint index [[thread_position_in_grid]]) {
+    constant Backends::LikelihoodWorkLayout& work [[buffer(4)]], uint index [[thread_position_in_grid]]) {
   using namespace Backends;
   using namespace LikelihoodSemantics;
   ObservableScalar total(0);
-  for( uint i = index * 64; i < min(count, (index + 1) * 64); ++i ){
+  for( uint i = index * work.binsPerThread; i < min(work.binCount, (index + 1) * work.binsPerThread); ++i ){
     auto bin = bins[i];
     if( bin.ignored ){ continue; }
     auto error = MetalMath::sqrt(squares[bin.globalBin]);
@@ -42,12 +42,21 @@ kernel void evaluate_likelihood_partials(
 kernel void finish_likelihood(
     device const Backends::ObservableScalar* partials [[buffer(0)]],
     device Backends::ObservableScalar* total [[buffer(1)]],
-    constant uint& count [[buffer(2)]], uint index [[thread_position_in_grid]]) {
+    constant Backends::LikelihoodWorkLayout& work [[buffer(2)]],
+    uint lane [[thread_index_in_threadgroup]]) {
   using namespace Backends;
-  if( index ){ return; }
+  threadgroup ObservableScalar values[GUNDAM_LIKELIHOOD_REDUCTION_WIDTH];
   ObservableScalar value(0);
-  for( uint i = 0; i < (count + 63) / 64; ++i ){
+  for( uint i = lane; i < work.partialCount; i += GUNDAM_LIKELIHOOD_REDUCTION_WIDTH ){
     value = LikelihoodSemantics::addLikelihood(value, partials[i]);
   }
-  total[0] = value;
+  values[lane] = value;
+  threadgroup_barrier(mem_flags::mem_threadgroup);
+  for( uint stride = GUNDAM_LIKELIHOOD_REDUCTION_WIDTH / 2; stride; stride /= 2 ){
+    if( lane < stride ){
+      values[lane] = LikelihoodSemantics::addLikelihood(values[lane], values[lane + stride]);
+    }
+    threadgroup_barrier(mem_flags::mem_threadgroup);
+  }
+  if( lane == 0 ){ total[0] = values[0]; }
 }

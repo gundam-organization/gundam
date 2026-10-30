@@ -246,6 +246,113 @@ TEST(BackendLikelihood, MetalPreservesInfinityEmptyBinsAndHostFallback) {
   EXPECT_EQ(gpu.getLikelihood(gpu.requestPropagation(inputs)), 0.);
 }
 
+TEST(BackendLikelihood, MetalReusesPredictionAndInvalidatesForExternalWeights) {
+  using namespace Backends;
+  auto view = likelihoodView(LikelihoodKind::BarlowBeeston2022);
+  // The second parameter has no effect on the prediction (e.g. penalty only).
+  view.propagation.parameterCount = 2;
+  view.propagation.externalWeightBlocks = {{0, 1}};
+  auto& dial = view.propagation.dials[0];
+  dial.type = BackendDialType::ExternalWeight;
+  dial.externalWeightIndex = 0;
+  MpsBackend gpu;
+  gpu.build(view);
+  gpu.setDiagnosticStageProfiling(true);
+  double weight = 1.;
+  PropagationInputs inputs;
+  inputs.parameters.values = {1., 0.};
+  inputs.externalWeights = {{&weight, 1, 0, 1}};
+  auto first = gpu.requestPropagation(inputs);
+  const double original = gpu.getLikelihood(first);
+  EXPECT_TRUE(JsonType::parse(gpu.getDiagnosticEventPropagationState()).at("updatedPrediction"));
+  inputs.parameters.values[1] = .2;
+  auto reused = gpu.requestPropagation(inputs);
+  EXPECT_EQ(gpu.getLikelihood(reused), original);
+  EXPECT_FALSE(JsonType::parse(gpu.getDiagnosticEventPropagationState()).at("updatedPrediction"));
+  auto stages = JsonType::parse(gpu.getDiagnosticStageGpuSeconds());
+  EXPECT_EQ(stages.count("reduce_histogram_chunks_parallel"), 0);
+  EXPECT_EQ(stages.count("evaluate_likelihood_partials"), 0);
+  EXPECT_EQ(gpu.getLastTimingSummary().likelihoodReadbackBytes, 8);
+  EXPECT_EQ(gpu.getLastTimingSummary().histogramReadbackBytes, 0);
+  gpu.materialize(reused, OutputRequest::Histograms);
+  EXPECT_EQ(gpu.getHistogramSumsHostView(reused).size(), 530);
+  weight = 1.1;
+  inputs.externalWeights[0].generation++;
+  const auto changed = gpu.requestPropagation(inputs);
+  EXPECT_GT(gpu.getLikelihood(changed), original);
+  EXPECT_TRUE(JsonType::parse(gpu.getDiagnosticEventPropagationState()).at("updatedPrediction"));
+  // Explicit binning invalidation also prevents reuse, even at identical weights.
+  inputs.forceBinningUpdate = true;
+  gpu.requestPropagation(inputs);
+  EXPECT_TRUE(JsonType::parse(gpu.getDiagnosticEventPropagationState()).at("updatedPrediction"));
+}
+
+TEST(BackendLikelihood, MetalBarlowResolvesLowRatesNearTheMinimum) {
+  using namespace Backends;
+  auto ref = reference("BarlowLLH_BANFF_OA2021");
+  for( double data : {1e-12, 1e-8, 1e-4, 1., 1e8} ){
+    for( double shift : {-1e-5, -1e-8, 0., 1e-8, 1e-5} ){
+      for( double fractionalVariance : {1e-8, .1, 1.} ){
+        SCOPED_TRACE(::testing::Message() << data << ", " << shift << ", " << fractionalVariance);
+        const double prediction = data*(1.+shift);
+        const double variance = prediction*prediction*fractionalVariance;
+        EngineView view;
+        view.propagation.totalBins = 1;
+        EventView event;
+        event.globalBinIndex = 0;
+        view.propagation.events = {event};
+        view.propagation.eventWeights = {{prediction, 0, 0}};
+        LikelihoodSampleView sample;
+        sample.dataSums = {data};
+        sample.nominalVariances = {variance};
+        sample.portableOptions = {LikelihoodKind::BarlowBeeston2022, 0, 1, 1, 1e150, -1.};
+        view.likelihood.samples = {sample};
+        MpsBackend gpu;
+        gpu.build(view);
+        const double expected = ref->eval(data, prediction, variance, 0);
+        const double actual = gpu.getLikelihood(gpu.requestPropagation({}));
+        EXPECT_GE(actual, 0.);
+        // Float-pair inputs have ~48 significant bits. A relative 1e-8
+        // displacement leaves fewer bits in the residual; test relative LLH
+        // precision instead of a fixed absolute tolerance that masks tiny rates.
+        EXPECT_NEAR(actual, expected, expected > 0. ? expected*2e-5 : data*1e-25);
+      }
+    }
+  }
+}
+
+TEST(BackendLikelihood, MetalParallelReductionHandlesLargeAndUnevenBinCounts) {
+  using namespace Backends;
+  for( int count : {1, 127, 129, 4140, 8192, 8193, 65536} ){
+    EngineView view;
+    view.propagation.totalBins = count;
+    LikelihoodSampleView sample;
+    sample.portableOptions = {LikelihoodKind::BarlowBeeston2022, 0, 0, 1, 1e150, -1.};
+    double expected = 0.;
+    auto ref = reference("BarlowLLH_BANFF_OA2021");
+    for( int i = 0; i < count; ++i ){
+      double data = .1 + .001*i;
+      double weight = data*(1. + .02*(i%7 - 3));
+      sample.dataSums.push_back(data);
+      sample.ignoredBins.push_back(i%19 == 0);
+      EventView event;
+      event.resultIndex = i;
+      event.globalBinIndex = i;
+      view.propagation.events.push_back(event);
+      view.propagation.eventWeights.push_back({weight, 0, 0});
+      if( !sample.ignoredBins.back() ){ expected += ref->eval(data, weight, weight*weight, i); }
+    }
+    view.likelihood.samples.push_back(sample);
+    MpsBackend gpu;
+    gpu.build(view);
+    const auto token = gpu.requestPropagation({});
+    EXPECT_NEAR(gpu.getLikelihood(token), expected, 1e-10 * std::max(1., expected));
+    const auto diagnostic = JsonType::parse(gpu.getDiagnostics()).at("executor");
+    EXPECT_EQ(diagnostic.at("likelihoodBinsPerThread"), count <= 8192 ? 1 : 8);
+    EXPECT_EQ(gpu.getLastTimingSummary().histogramReadbackBytes, 0);
+  }
+}
+
 TEST(BackendLikelihood, MetalKeepsHistogramsResidentInBothModes) {
   for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){
     MpsBackend gpu;

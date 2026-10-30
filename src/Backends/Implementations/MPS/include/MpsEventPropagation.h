@@ -66,7 +66,8 @@ namespace Backends {
     std::uint64_t _materializedRevision_{0};
     bool _valid_{false};
     bool _deviceLikelihood_{false};
-    std::size_t _likelihoodBinCount_{0};
+    LikelihoodWorkLayout _likelihoodWork_{};
+    bool _lastUpdatedPrediction_{true};
     bool _enableDiagnosticStageProfiling_{false};
     bool _enableDialCache_{true};
     std::vector<DialGroup> _dialGroups_{};

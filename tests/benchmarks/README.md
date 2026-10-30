@@ -717,3 +717,40 @@ no measurable overall benefit from unrolling; the dynamic loop is retained.
 These results do not establish performance equivalence in the legacy CacheManager.
 The temporary build option and A/B driver have been removed. Production profiling
 remains available through `229CudaBackendProfiling.py` as documented above.
+
+## Resident statistical likelihoods: CPU/MPS
+
+`233ResidentLikelihoodBenchmark.py` loads a production Asimov model once and
+compares CPU with both MPS response modes, using identical seeded coordinate
+sequences. It rotates backend order over three trials, warms up each scenario,
+checks every statistical likelihood against CPU, and verifies scalar-only MPS
+readback. Histogram materialization and synchronized GPU stage probes are measured
+separately from ordinary evaluation. Use the matching Release Python module.
+
+```sh
+env -u DYLD_LIBRARY_PATH \
+  PYTHONPATH="$PWD/cmake-build-release/src/PythonInterface" \
+  python3.15 tests/benchmarks/233ResidentLikelihoodBenchmark.py \
+  --work-dir /path/to/fit --config config.yaml \
+  --output /tmp/resident-likelihood-benchmark
+```
+
+Optional flags include `--override file.yaml`, `--likelihood PoissonLLH`, and
+`--threads 12 --cpu-only --probe-calls 0`. Barlow preserves the configuration's
+options; Poisson enables `ignoreBinsWithZeroPredictionAtPrior` to avoid infinite
+contributions from empty prior bins. Results are controlled evaluation workloads,
+not a full Migrad/Hesse benchmark.
+
+`234MetalLikelihoodMicrobenchmark.mm` isolates the likelihood kernels at several
+bin counts and compares alternative work chunk sizes without editing production
+sources. Its header documents the build command; `--reverse` reverses chunk order.
+
+See [the M4 Max results](../../docs/backends/ResidentLikelihoodBenchmark.md) for
+measurements, a temporary full-pipeline chunk-size experiment, and limitations.
+
+The retained Metal implementation now uses adaptive chunks and a parallel final
+reduction. The native microbenchmark exercises that current implementation via
+`LikelihoodWorkLayout`; historical serial-reduction measurements remain in the
+archived JSON. See [optimization validation](../../docs/backends/ResidentLikelihoodOptimization.md).
+The production benchmark also accepts legacy frontend configurations such as
+OA2024's `configOA2024.yaml`, preserving legacy likelihood options.

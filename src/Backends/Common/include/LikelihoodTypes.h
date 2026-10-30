@@ -11,6 +11,8 @@
 #define GUNDAM_LLH_INLINE inline
 #endif
 
+#define GUNDAM_LIKELIHOOD_REDUCTION_WIDTH 128
+
 namespace Backends {
   // Fixed-width, trivially copyable descriptors; independent of JointProbability.
 #ifdef __METAL_VERSION__
@@ -19,6 +21,14 @@ namespace Backends {
   using LikelihoodIndex = std::uint32_t;
 #endif
   enum class LikelihoodKind : LikelihoodIndex { Host, Poisson, BarlowBeeston2022 };
+
+  // Shared host/device work description. The final reduction uses one fixed
+  // threadgroup, independently of the number of partial contributions.
+  struct LikelihoodWorkLayout {
+    LikelihoodIndex binCount{0};
+    LikelihoodIndex binsPerThread{1};
+    LikelihoodIndex partialCount{0};
+  };
 
   template<typename Scalar> struct LikelihoodOptions {
     LikelihoodKind kind{LikelihoodKind::Host};
