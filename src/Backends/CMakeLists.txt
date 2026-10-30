@@ -27,7 +27,6 @@ if(GUNDAM_CUDA_ENABLED)
 endif()
 
 if(APPLE)
-  enable_language(OBJCXX)
   list(APPEND SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEventPropagation.mm
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendImpl.mm

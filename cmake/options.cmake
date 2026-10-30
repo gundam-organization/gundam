@@ -89,7 +89,6 @@ else()
 endif()
 
 if( WITH_BACKENDS )
-  cmessage( STATUS "-D WITH_BACKENDS=ON: enabling experimental backend library..." )
   add_definitions( -D GUNDAM_USING_BACKENDS )
 else()
   cmessage( STATUS "Experimental backend library is disabled. Use -D WITH_BACKENDS=ON if needed." )
