@@ -76,11 +76,6 @@ std::vector<std::string> SampleSet::fetchRequestedVariablesForIndexing() const{
     for (auto &binContext: sample.getHistogram().getBinContextList()) {
       for (auto &edges: binContext.bin.getEdgesList()) { GenericToolbox::addIfNotInVector(edges.varName, out); }
     }
-    if( sample.getSampleWeightFormula() != nullptr ) {
-      for( int iPar = 0 ; iPar < sample.getSampleWeightFormula()->GetNpar() ; iPar++ ){
-        GenericToolbox::addIfNotInVector(sample.getSampleWeightFormula()->GetParName(iPar), out);
-      }
-    }
   }
   return out;
 }

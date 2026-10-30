@@ -23,6 +23,7 @@ namespace JointProbability{
   };
 
   double BarlowBeeston::eval(const SamplePair& samplePair_, int bin_) const {
+    if( this->isBinIgnored(samplePair_, bin_) ){ return 0.; }
     const double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     const double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
     const double mcUncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;

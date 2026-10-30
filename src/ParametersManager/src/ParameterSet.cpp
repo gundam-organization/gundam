@@ -6,7 +6,6 @@
 #include "BinSet.h"
 
 #include "GundamGlobals.h"
-#include "ParameterThrowerMarkHarz.h"
 #include "ConfigUtils.h"
 
 #include "GenericToolbox.Root.h"
@@ -42,7 +41,6 @@ void ParameterSet::configureImpl(){
     {"dialSetDefinitions"},
     {"enableOnlyParameters"},
     {"disableParameters"},
-    {"useMarkGenerator"},
     {"useEigenDecompForThrows"},
     {"enableEigenDecomp",{"useEigenDecompInFit"}},
     {"allowEigenDecompWithBounds"},
@@ -103,7 +101,6 @@ void ParameterSet::configureImpl(){
   _config_.fillValue(_disableParameters_, "disableParameters");
 
   // throw options
-  _config_.fillValue(_useMarkGenerator_, "useMarkGenerator");
   _config_.fillValue(_useEigenDecompForThrows_, "useEigenDecompForThrows");
 
   // eigen related parameters
@@ -633,42 +630,7 @@ void ParameterSet::throwParameters(bool rethrowIfNotInPhysical_, double gain_){
         }
       }; // End of generic function handling multiple throws
 
-  if( _useMarkGenerator_ ){
-    // Throw using an alternative method that was copied from BANFF
-    LogAlert << "Throwing parameters for " << _name_
-             << " using alternate generator: Mark Hartz Generator"
-             << std::endl;
-
-    int iPar{0};
-    for( auto& par : _parameterList_ ){
-      if( ParameterSet::isValidCorrelatedParameter(par) ){ throwsList[iPar++] = par.getPriorValue(); }
-    }
-
-    if( _markHartzGen_ == nullptr ){
-      LogInfo << "Generating Cholesky matrix in set: " << getName() << std::endl;
-      _markHartzGen_ = std::make_shared<ParameterThrowerMarkHarz>(throwsList, *_priorCovarianceMatrix_);
-    }
-    // TVectorD throws(_priorCovarianceMatrix_->GetNrows());
-
-    std::vector<double> throwPars;
-    std::function<void()> markScottThrowFct = [&](){
-      if ( _markHartzGen_ == nullptr) return;
-
-      throwPars.resize(_priorCovarianceMatrix_->GetNrows());
-
-      _markHartzGen_->ThrowSet(throwPars);
-      // THROWS ARE CENTERED AROUND 1!!
-
-      // convert to TVectorD
-      int iPar{0};
-      for( auto& thrownPar : throwPars ){
-        throwsList[iPar++] = thrownPar;
-      }
-    };
-
-    throwParsFct( markScottThrowFct );
-  }
-  else if( _useEigenDecompForThrows_ and isEnableEigenDecomp() ){
+  if( _useEigenDecompForThrows_ and isEnableEigenDecomp() ){
     // Throw using eigen value decomposition.  This will work with degenerate
     // "covariance matrices", even if they are not positive definite (ouch),
     // so it provides an alternative to Cholesky decomposition, but is not the
@@ -1156,54 +1118,62 @@ void ParameterSet::defineParameters(){
 
     if( not _parameterDefinitionConfig_.empty() ){
       // Alternative 1: define dials then parameters
-      if (_parameterNamesList_ != nullptr) {
+      ConfigReader selectedParConfig;
+
+      if( _parameterNamesList_ != nullptr ) {
         // Find the parameter using the name from the vector of names for
         // the covariance.
-
-        ConfigReader selectedParConfig;
-
-        // search with name
         std::string parName = _parameterNamesList_->At(par.getParameterIndex())->GetName();
         for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
           parConfig.defineFields({
-            {"name", {"parameterName"}},
+              {"name", {"parameterName"}},
           });
-          if( parConfig.hasField("name") ){
-            if( parName == parConfig.fetchValue<std::string>("name") ){
-              selectedParConfig = parConfig;
-              break;
-            }
+          if( parConfig.hasField("name")
+              and parName == parConfig.fetchValue<std::string>("name") ){
+            selectedParConfig = parConfig;
+            break;
           }
         }
-
-        // not found? try with the index
-        if( selectedParConfig.empty() ){
-          for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
-            parConfig.defineFields({{"parameterIndex"}});
-            if( parConfig.hasField("parameterIndex") ){
-              if( par.getParameterIndex() == parConfig.fetchValue<int>("parameterIndex") ){
-                selectedParConfig = parConfig;
-                break;
-              }
-            }
-          }
-        }
-
-        par.setConfig( selectedParConfig );
       }
-      else{
-        // No covariance provided, so find the name based on the order in
-        // the parameter set.
+
+      // Always allow an explicit parameterIndex mapping, even when the
+      // covariance file does not expose a parameter name list.
+      if( selectedParConfig.empty() ){
+        for( auto& parConfig : _parameterDefinitionConfig_.loop() ){
+          parConfig.defineFields({{"parameterIndex"}});
+          if( parConfig.hasField("parameterIndex")
+              and par.getParameterIndex() == parConfig.fetchValue<int>("parameterIndex") ){
+            selectedParConfig = parConfig;
+            break;
+          }
+        }
+      }
+
+      // If no covariance matrix is defined, parameters are created from the
+      // configuration order itself, so preserving the positional mapping keeps
+      // existing configs working without requiring parameterIndex.
+      if( selectedParConfig.empty() and _priorFullCovarianceMatrix_ == nullptr ){
         auto configVector = _parameterDefinitionConfig_.loop();
-        LogThrowIf(configVector.size() <= par.getParameterIndex(),
-                   "Parameter index out of range");
-        auto& parConfig = configVector.at(par.getParameterIndex());
-        par.setConfig( parConfig );
-
-        LogWarning << "Parameter #" << par.getParameterIndex()
-                   << " not defined by covariance matrix file"
-                   << std::endl;
+        if( size_t(par.getParameterIndex()) < configVector.size() ){
+          selectedParConfig = configVector.at(size_t(par.getParameterIndex()));
+        }
       }
+
+      if( selectedParConfig.empty() and par.isEnabled() ){
+        std::stringstream ss;
+        ss << "No parameterDefinitions entry mapped to enabled parameter #"
+           << par.getParameterIndex();
+        if( _parameterNamesList_ != nullptr ){
+          ss << " (\"" << _parameterNamesList_->At(par.getParameterIndex())->GetName() << "\")";
+        }
+        else{
+          ss << ". Please specify \"parameterIndex\" explicitly";
+        }
+        ss << ".";
+        LogWarning << ss.str() << std::endl;
+      }
+
+      par.setConfig( selectedParConfig );
     }
     else if( not _dialSetDefinitions_.empty() ){
       // Alternative 2: define dials then parameters

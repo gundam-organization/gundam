@@ -111,8 +111,7 @@ double DialInputBuffer::evalInputGradient(int iInput_) const{
 }
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
   LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");
-  _inputParameterReferenceList_.emplace_back(parReference_);
-  auto& parRef = _inputParameterReferenceList_.back();
+  auto& parRef = _inputParameterReferenceList_.emplace_back(parReference_);
   parRef.bufferIndex = int(_inputParameterReferenceList_.size())-1;
 }
 std::string DialInputBuffer::getSummary(bool shallow_) const{

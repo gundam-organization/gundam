@@ -26,16 +26,89 @@ As an entry list
 
 #### mc
 
-| Option                  | Type                | Description                                                     | Default |
-|-------------------------|---------------------|-----------------------------------------------------------------|---------|
-| tree                    | string              | Name of the TTree containing the data in each file              |         |
-| selectionCutFormula     | string              | Global selection cut (should return 0 if not selected)          |         |
-| nominalWeightFormula    | string/list(string) | Formula that returns the base weight of a given event           |         |
-| filePathList            | list(string)        | list of ROOT files containing the TTree                         |         |
-| additionalLeavesStorage | list(string)        | list of variables to be stored in memory                        |         |
-| variablesTransform      | list(json)          | list of transform operations that will be applied while loading |         |
-| variableDict        | list(json)          | dictionary translating a leaf/formula to variable name          |         |
-| fromHistContent         | json                | use hist bin content directly. This will create dummy events    |         |
+| Option                  | Type                         | Description                                                                 | Default |
+|-------------------------|------------------------------|-----------------------------------------------------------------------------|---------|
+| tree                    | string                       | Name of the TTree containing the data in each file                          |         |
+| selectionCutFormula     | formula                      | Global selection cut (should return 0 if not selected)                      |         |
+| nominalTreeWeightFormula | formula                     | Formula that returns the base weight of a given event                       |         |
+| filePathList            | list(string \| json)          | list of ROOT files containing the TTree; entries can attach friend TTrees   |         |
+| additionalLeavesStorage | list(string)                 | list of variables to be stored in memory                                    |         |
+| variablesTransform      | list(json)                   | Deprecated. Use `variableDict` entries with `evalFromLib` instead.          |         |
+| variableDict            | list(json)                   | dictionary translating a leaf, formula, or shared-library output to a variable name |         |
+| fromHistContent         | json                         | use hist bin content directly. This will create dummy events                |         |
+
+Formula fields can be written as a single expression, a list of expressions, or a list of named expression entries:
+
+```yaml
+myFormula: "[var1] * 4"
+myFormula: ["[var1] * 4", "[var2] + 1"]
+myFormula:
+  - { name: "part1", expr: "[var1] * 4" }
+  - { name: "part2", expr: "[var2] + 1" }
+```
+
+`variableDict` entries can define either an `expr` or an `evalFromLib` block:
+
+```yaml
+variableDict:
+  - { name: "myVar", expr: "treeBranch + 10." }
+  - name: "myVarFromLib"
+    evalFromLib:
+      title: "optional title"
+      libraryFile: "foo.so"
+      inputList:
+        - "[myVar]"
+        - "TMath::Abs(mode)"
+      messageOnError: "optional build hint"
+```
+
+`filePathList` keeps its historical list-of-strings syntax:
+
+```yaml
+filePathList:
+  - "${DATA_DIR}/events.root"
+```
+
+It can also use named entries to attach ROOT friend trees. The `name` keys identify list entries for configuration overrides; friend names are ROOT aliases and should be used to qualify their branches in formulas.
+
+```yaml
+filePathList:
+  - name: "run1"
+    path: "${DATA_DIR}/events-run1.root:events"
+    friendList:
+      - name: "weights"
+        path: "${DATA_DIR}/weights-run1.root:weights"
+      - name: "truth"
+        path: "${DATA_DIR}/truth-run1.root:truth"
+  - name: "run2"
+    path: "${DATA_DIR}/events-run2.root:events"
+    isEnabled: true
+    friendList:
+      - name: "weights"
+        path: "${DATA_DIR}/weights-run2.root:weights"
+        isEnabled: true
+      - name: "truth"
+        path: "${DATA_DIR}/truth-run2.root:truth"
+
+variableDict:
+  - { name: "weight", expr: "weights.nominalWeight" }
+```
+
+To attach several friend trees from the same ROOT file, use `treeList`:
+
+```yaml
+friendList:
+  - name: "xsec_syst_friends"
+    path: "/path/to/friend/trees/file.root"
+    treeList: ["friendTree1", "friendTree2"]
+
+variableDict:
+  - { name: "weight", expr: "friendTree1.nominalWeight * friendTree2.correction" }
+```
+
+With `treeList`, `name` identifies the group for configuration overrides, and each tree name becomes its ROOT friend alias. `path` must contain only the file path, without a `:tree` suffix. The list must be nonempty and contain nonempty tree names. Grouped entries can be mixed with single-tree entries; all resulting aliases must be unique within each main-file entry. Without `treeList`, `name` remains the alias as before.
+
+Both main-file and friend entries accept `isEnabled` (default: `true`). Disabled main files are excluded from the chain; disabled friends are not attached. For grouped friends, `isEnabled` applies to every tree in the group. Every enabled file entry must declare the same enabled friend aliases. Each enabled friend tree must have exactly the same number and order of entries as its corresponding main tree. A branch with a unique name may be referenced without its alias, but `friendAlias.branch` is the recommended form because it remains unambiguous.
 
 
 #### data
@@ -49,4 +122,3 @@ All options from MC
 | useReweightEngine        | bool   | Force to load the dials while loading the data. Used for custom toys that use the reweight engine for generating the histograms | false   |
 | evalModelAt              | json   | Specify which sets of parameters to eval the model and copy the events from. Parameter injector format                          |         |
 | overridePropagatorConfig | json   | Use a custom set of config option that will override the propagator config. Any parameter can be changed from here              |         |
-

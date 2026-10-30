@@ -16,9 +16,8 @@
 
 #include <vector>
 #include <string>
-#include <memory>
 
-
+namespace GenericToolbox { class ParallelWorker; }
 
 class Sample : public JsonBaseClass {
 
@@ -41,14 +40,15 @@ public:
   void setIndex(int index){ _index_ = index; }
   void setName(const std::string &name){ _name_ = name; }
   void setBinningFilePath(const ConfigReader &binningFilePath_){ _binningConfig_ = binningFilePath_; }
+  void setUseDynamicBinning(bool useDynamicBinning_){ _useDynamicBinning_ = useDynamicBinning_; }
 
   // const getters
   [[nodiscard]] auto isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] auto isUseDynamicBinning() const{ return _useDynamicBinning_; }
   [[nodiscard]] auto isEventMcThrowDisabled() const{ return _disableEventMcThrow_; }
   [[nodiscard]] auto getIndex() const{ return _index_; }
   [[nodiscard]] auto& getName() const{ return _name_; }
   [[nodiscard]] auto& getSelectionCutsStr() const{ return _selectionCutStr_; }
-  [[nodiscard]] auto& getSampleWeightFormula() const{ return _sampleWeightFormula_; }
   [[nodiscard]] auto& getSampleWeightFormulaStr() const{ return _sampleWeightFormulaStr_; }
   [[nodiscard]] auto& getBinningFilePath() const{ return _binningConfig_; }
   [[nodiscard]] auto& getHistogram() const{ return _histogram_; }
@@ -67,6 +67,8 @@ public:
   // core
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
+  void updateEventBinning();
+  void updateEventBinning(GenericToolbox::ParallelWorker& threadPool_);
 
   // printouts
   void printConfiguration() const;
@@ -79,6 +81,7 @@ public:
 private:
   // configuration
   bool _isEnabled_{true};
+  bool _useDynamicBinning_{false};
   bool _disableEventMcThrow_{false};
   int _index_{-1};
   std::string _name_;
@@ -93,7 +96,6 @@ private:
   Histogram _histogram_{};
   std::vector<Event> _eventList_{};
   std::vector<DatasetProperties> _loadedDatasetList_{};
-  std::shared_ptr<TFormula> _sampleWeightFormula_{nullptr};
 
 };
 

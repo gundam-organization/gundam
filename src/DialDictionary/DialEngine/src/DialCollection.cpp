@@ -6,6 +6,7 @@
 
 #include "TabulatedDialFactory.h"
 #include "KrigedDialFactory.h"
+#include "ExternalWeightDialFactory.h"
 
 #include "RootFormula.h"
 #include "Shift.h"
@@ -38,7 +39,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"printDialSummary", {"printDialsSummary"}},
       {"dialType", {"type", "dialsType"}},
       {"options", {"dialSubType"}},
-      {"treeExpression", {"dialLeafName"}},
+      {"dialBranchData", {"dialLeafName", "treeExpression"}},
       {"minDialResponse", {"minimumSplineResponse"}},
       {"maxDialResponse"},
       {"useMirrorDial"},
@@ -47,6 +48,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"allowDialExtrapolation"},
       {"applyCondition"},
       {"definitionRange"},
+      {"knotResponseLimits"},
       {"mirrorDefinitionRange"},
       {"applyConditions"},
       {"parametersBinningPath"},
@@ -104,6 +106,13 @@ void DialCollection::configureImpl() {
 }
 void DialCollection::initializeImpl() {
   LogThrowIf(_index_==-1, "Index not set.");
+
+  for( auto& collectionData : _dialCollectionData_ ){
+    if( auto* externalWeight = dynamic_cast<ExternalWeightDialFactory*>(collectionData.get()) ){
+      externalWeight->initialize();
+    }
+  }
+
   this->setupDialInterfaceReferences();
 }
 
@@ -134,8 +143,13 @@ std::string DialCollection::getSummary(bool shallow_) const{
   ss << this->getTitle();
   if( _dialType_ != DialType::Unset ){ ss << " / " << _dialType_; }
   if( not _dialOptions_.empty() ){ ss << ":\"" << _dialOptions_ << "\""; }
-  if( not _dialLeafName_.empty() ){ ss << " / dialLeafName:" << _dialLeafName_; }
+  if( not _dialLeafName_.empty() ){ ss << " / dialBranchData:" << _dialLeafName_; }
+  if( not _dialParameterValuesBranch_.empty() ){
+    ss << " / dialBranchData:{parameterValuesTArray:" << _dialParameterValuesBranch_
+       << ", weightValuesTArray:" << _dialResponsesBranch_ << "}";
+  }
   if( _definitionRange_.hasBound() ){ ss << " / definitionRange:" << _definitionRange_; }
+  if( _knotResponseLimits_.hasBound() ){ ss << " / knotResponseLimits:" << _knotResponseLimits_; }
   if( _mirrorDefinitionRange_.hasBound() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
 
   if( not shallow_ ){
@@ -285,8 +299,31 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
   // globals for the dialSet
   config_.fillValue(_enableDialsSummary_, "printDialSummary");
   config_.fillValue(_dialType_, "dialType");
-  config_.fillValue(_dialOptions_, "options");
-  config_.fillValue(_dialLeafName_, "treeExpression");
+  if( _dialType_ != DialType::ExternalWeight ){
+    config_.fillValue(_dialOptions_, "options");
+  }
+  if( config_.hasField("dialBranchData") ){
+    auto branchData = config_.fetchValue<ConfigReader>("dialBranchData");
+    _dialLeafName_.clear();
+    _dialParameterValuesBranch_.clear();
+    _dialResponsesBranch_.clear();
+    if( branchData.getConfig().is_string() ){
+      _dialLeafName_ = branchData.getConfig().get<std::string>();
+      LogThrowIf(_dialLeafName_.empty(), "dialBranchData must not be empty");
+    }
+    else{
+      LogThrowIf(not branchData.getConfig().is_object(),
+                 "dialBranchData must be a branch expression or {parameterValuesTArray, weightValuesTArray}");
+      branchData.defineFields({{"parameterValuesTArray"}, {"weightValuesTArray"}});
+      branchData.checkConfiguration();
+      _dialParameterValuesBranch_ = branchData.fetchValue<std::string>("parameterValuesTArray");
+      _dialResponsesBranch_ = branchData.fetchValue<std::string>("weightValuesTArray");
+      LogThrowIf(_dialParameterValuesBranch_.empty() or _dialResponsesBranch_.empty(),
+                 "dialBranchData requires non-empty parameterValuesTArray and weightValuesTArray branch names");
+      LogThrowIf(_dialType_ != DialType::Spline and _dialType_ != DialType::Graph,
+                 "TArray dialBranchData requires dialType Spline or Graph");
+    }
+  }
   config_.fillValue(_minDialResponse_, "minDialResponse");
   config_.fillValue(_maxDialResponse_, "maxDialResponse");
   config_.fillValue(_useMirrorDial_, "useMirrorDial");
@@ -295,6 +332,9 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
   config_.fillValue(_allowDialExtrapolation_, "allowDialExtrapolation");
   config_.fillValue(_applyConditionStr_, "applyCondition");
   config_.fillValue(_definitionRange_, "definitionRange");
+  config_.fillValue(_knotResponseLimits_, "knotResponseLimits");
+  LogThrowIf(_knotResponseLimits_.hasBothBounds() and _knotResponseLimits_.min > _knotResponseLimits_.max,
+             "knotResponseLimits: min must not exceed max");
   config_.fillValue(_mirrorDefinitionRange_, "mirrorDefinitionRange");
 
   if( config_.hasField("applyConditions") ){
@@ -403,12 +443,6 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
     _applyConditionStr_ = "( ";
     _applyConditionStr_ += GenericToolbox::joinVectorString(conditionsList, " ) && ( ");
     _applyConditionStr_ += " )";
-  }
-
-  if (not _applyConditionStr_.empty()) {
-    _applyConditionFormula_ = std::make_shared<TFormula>("_applyConditionFormula_", _applyConditionStr_.c_str());
-    LogThrowIf(not _applyConditionFormula_->IsValid(),
-               "\"" << _applyConditionStr_ << "\": could not be parsed as formula expression.")
   }
 
   if (_useMirrorDial_) {
@@ -671,6 +705,41 @@ bool DialCollection::initializeDialsWithKriging(const ConfigReader& dialsDefinit
   return true;
 }
 
+bool DialCollection::initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition_){
+  LogThrowIf(not dialsDefinition_.hasField("options"),
+             "ExternalWeight dial requires an options configuration block.");
+
+  auto externalWeightFactory = std::make_unique<ExternalWeightDialFactory>();
+  externalWeightFactory->configure(dialsDefinition_.fetchValue<ConfigReader>("options"));
+  _dialCollectionData_.emplace_back(std::move(externalWeightFactory));
+
+  int index = int(_dialCollectionData_.size()) - 1;
+
+  for( const auto& var : getCollectionData<ExternalWeightDialFactory>(index)->getInputEventVarNameList() ){
+    addExtraLeafName(var);
+  }
+
+  auto* externalWeight = getCollectionData<ExternalWeightDialFactory>(index);
+  if( externalWeight->useBinnedWeights() ){
+    _dialBinSet_ = externalWeight->getBinning();
+    _dialInterfaceList_.reserve(_dialBinSet_.getBinList().size());
+    for( std::size_t iBin = 0 ; iBin < _dialBinSet_.getBinList().size() ; ++iBin ){
+      _dialInterfaceList_.emplace_back();
+      _dialInterfaceList_.back().setDial(
+          DialBaseObject(externalWeight->makeBinnedDial(iBin))
+      );
+    }
+  }
+
+  addUpdate(
+      [index](DialCollection* dc){
+        dc->getCollectionData<ExternalWeightDialFactory>(index)
+          ->updateWeights(dc->getDialInputBufferList().front());
+      });
+
+  return true;
+}
+
 bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDefinition) {
   if( not dialsDefinition.hasField("binning") ){ return false; }
 
@@ -894,6 +963,12 @@ bool DialCollection::initializeDialsWithDefinition() {
     LogThrowIf(not initializeDialsWithKriging(dialsDefinition),
                "Error initializing dials with kriging");
   }
+  else if( _dialType_ == DialType::ExternalWeight ) {
+    LogThrowIf(not initializeDialsWithExternalWeight(dialsDefinition),
+               "Error initializing dials with external weights");
+    auto* externalWeight = getCollectionData<ExternalWeightDialFactory>(_dialCollectionData_.size() - 1);
+    _isEventByEvent_ = not externalWeight->useBinnedWeights();
+  }
   else if( dialsDefinition.hasField("binning") ) {
     // This dial collection is binned with different weights for each bin.
     // Create the dials here.
@@ -902,10 +977,9 @@ bool DialCollection::initializeDialsWithDefinition() {
       LogThrowIf(not initializeDialsWithBinningFile(dialsDefinition),
                "Error initializing dials with binning file");
     }
-  else if (not _dialLeafName_.empty()) {
-    // None of the other dial types are matched, and a dialLeafName field has
-    // been provided, so this is an event by event dial with one TGraph (or
-    // TSpline3) per event.  The generation of the dials will be handled in
+  else if (hasDialBranchData()) {
+    // Branch data defines an event-by-event dial from a ROOT object
+    // or a pair of TArray branches.  The generation of the dials will be handled in
     // DataDispenser.
     _isEventByEvent_ = true;
   }
@@ -1234,6 +1308,25 @@ void DialCollection::checkDialPointList(std::vector<DialUtils::DialPoint>& point
     [](const DialUtils::DialPoint& a_, const DialUtils::DialPoint& b_){
       return a_.x < b_.x; // a goes first?
     });
+
+  if( _knotResponseLimits_.hasBound() ){
+    bool knotsChanged{false};
+    for( auto& point : pointList_ ){
+      if( _knotResponseLimits_.isBelowMin(point.y) ){
+        point.y = _knotResponseLimits_.min;
+        knotsChanged = true;
+      }
+      if( _knotResponseLimits_.isAboveMax(point.y) ){
+        point.y = _knotResponseLimits_.max;
+        knotsChanged = true;
+      }
+    }
+    if( knotsChanged and _dialType_ == DialType::Spline and pointList_.size() > 1 ){
+      // Rebuild the slopes from the bounded knots before choosing a spline type.
+      auto spline = DialUtils::buildTSpline3(pointList_);
+      for( auto& point : pointList_ ){ point.slope = spline.Derivative(point.x); }
+    }
+  }
 
   if( _mirrorDefinitionRange_.hasBound() ){
     // TODO: process mirroring options

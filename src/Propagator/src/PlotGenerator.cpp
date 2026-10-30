@@ -8,6 +8,7 @@
 #include "GundamGlobals.h"
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
+#include "RootUtils.h"
 
 #include "Logger.h"
 #include "GenericToolbox.Root.h"
@@ -135,7 +136,6 @@ void PlotGenerator::configureImpl(){
 
 }
 void PlotGenerator::initializeImpl() {
-  LogWarning << __METHOD_NAME__ << std::endl;
   LogThrowIf(_modelSampleListPtr_ == nullptr);
 }
 
@@ -331,11 +331,9 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
   }
 
   // Now search for the associated data hist
-  for( auto& histsSamples : histsToStackMap ){
-    const std::string& canvasPath = histsSamples.first;
-    for( auto& histsToStack : histsSamples.second ){
+  for( auto& [canvasPath, sampleHistograms] : histsToStackMap ){
+    for( auto& [samplePtr, histograms] : sampleHistograms ){
       for( auto& histHolder : histHolderList_ ){
-        auto* samplePtr = histsToStack.first;
 
         // we are searching for data
         if( not histHolder.isData ) continue;
@@ -346,7 +344,7 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
         // same sample?
         if( samplePtr->getIndex() != histHolder.samplePtr->getIndex() ) continue;
 
-        histsToStack.second.emplace_back( &histHolder );
+        histograms.emplace_back( &histHolder );
         break; // no need to check for more
       }
 
@@ -354,13 +352,11 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
   }
 
   // Canvas builder
-  for ( const auto &histsToStackPair : histsToStackMap ) {
-    const std::string canvasFolderPath = histsToStackPair.first;
+  for( const auto& [canvasFolderPath, sampleHistograms] : histsToStackMap ){
 
     int canvasIndex = 0;
     int iSampleSlot = 0;
-    for (const auto &histList : histsToStackPair.second) {
-      auto* samplePtr = histList.first;
+    for( const auto& [samplePtr, histograms] : sampleHistograms ){
       iSampleSlot++;
 
       if (iSampleSlot > _canvasParameters_.nbXplots * _canvasParameters_.nbYplots) {
@@ -370,22 +366,24 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
 
       std::string canvasName = "samples_n" + std::to_string(canvasIndex);
       std::string canvasPath = canvasFolderPath + canvasName;
-      if (not GenericToolbox::isIn(canvasPath, _bufferCanvasList_)) {
-        _bufferCanvasList_[canvasPath] = std::make_shared<TCanvas>( canvasPath.c_str(), canvasPath.c_str(), _canvasParameters_.width, _canvasParameters_.height );
-        _bufferCanvasList_[canvasPath]->Divide(_canvasParameters_.nbXplots, _canvasParameters_.nbYplots);
+      auto [canvasIt, isNewCanvas] = _bufferCanvasList_.try_emplace(canvasPath);
+      auto& canvas = canvasIt->second;
+      if( isNewCanvas ){
+        canvas = std::make_shared<TCanvas>( canvasPath.c_str(), canvasPath.c_str(), _canvasParameters_.width, _canvasParameters_.height );
+        canvas->Divide(_canvasParameters_.nbXplots, _canvasParameters_.nbYplots);
       }
-      _bufferCanvasList_[canvasPath]->cd(iSampleSlot);
-      _bufferCanvasList_[canvasPath]->GetPad(iSampleSlot)->SetLeftMargin(0.12); // Y title prints ok
-      _bufferCanvasList_[canvasPath]->GetPad(iSampleSlot)->SetTopMargin(0.105); // 10^XX print correctly
-      _bufferCanvasList_[canvasPath]->GetPad(iSampleSlot)->SetRightMargin(0.); // don't lose space on the right
-      _bufferCanvasList_[canvasPath]->GetPad(iSampleSlot)->SetBottomMargin(0.11); // Leave a bit of space at the bottom
+      canvas->cd(iSampleSlot);
+      canvas->GetPad(iSampleSlot)->SetLeftMargin(0.12); // Y title prints ok
+      canvas->GetPad(iSampleSlot)->SetTopMargin(0.105); // 10^XX print correctly
+      canvas->GetPad(iSampleSlot)->SetRightMargin(0.); // don't lose space on the right
+      canvas->GetPad(iSampleSlot)->SetBottomMargin(0.11); // Leave a bit of space at the bottom
 
       // separating histograms
       TH1D *dataSampleHist{nullptr};
       std::vector<TH1D *> mcSampleHistList;
       double minYValue{std::nan("unset")};
       double maxYValue{std::nan("unset")};
-      for( const auto* histHolder : histList.second ) {
+      for( const auto* histHolder : histograms ) {
         TH1D* hist{ histHolder->histPtr.get() };
         GenericToolbox::Range yBounds;
         if( histHolder->isData ){
@@ -529,13 +527,13 @@ void PlotGenerator::generateCanvas(const std::vector<HistHolder> &histHolderList
   } // Hist to stack
 
   if (saveDir_ != nullptr) {
-    for (auto &canvas : _bufferCanvasList_) {
-      auto pathSplit = GenericToolbox::splitString(canvas.first, "/");
+    for( const auto& [canvasPath, canvas] : _bufferCanvasList_ ){
+      auto pathSplit = GenericToolbox::splitString(canvasPath, "/");
       std::string folderPath = GenericToolbox::joinVectorString(pathSplit, "/", 0, -1);
       std::string canvasName = pathSplit.back();
-      GenericToolbox::writeInTFileWithObjTypeExt(
+      RootUtils::writeCanvas(
           GenericToolbox::mkdirTFile(saveDir_, folderPath),
-          canvas.second.get(), canvasName, false
+          canvas.get(), canvasName, false
           );
     }
   }
@@ -674,7 +672,6 @@ std::vector<std::string> PlotGenerator::fetchListOfSplitVarNames() const {
 
 // Internals
 void PlotGenerator::defineHistogramHolders() {
-  LogWarning << __METHOD_NAME__ << std::endl;
   _histHolderCacheList_[0].clear();
 
   LogInfo << "Defining histogram holders..." << std::endl;
@@ -1017,4 +1014,3 @@ void PlotGenerator::buildEventBinCache( const std::vector<HistHolder *> &histPtr
   _threadPool_.runJob("fillEventHistCache");
   _threadPool_.removeJob("fillEventHistCache");
 }
-

@@ -109,9 +109,15 @@ void Propagator::buildDialCache(){
   _eventDialCache_.buildReferenceCache(_sampleSet_, _dialManager_.getDialCollectionList());
   _dialManager_.invalidateInputBuffers();
 }
+void Propagator::updateEventSampleBinning(){
+  for( auto& sample : _sampleSet_.getSampleList() ){
+    if( not sample.isUseDynamicBinning() ){ continue; }
+    sample.updateEventBinning(_threadPool_);
+  }
+}
 void Propagator::propagateParameters(){
   std::future<bool> result = applyParameters();
-  result.get();
+  static_cast<void>(result.get());
 }
 
 std::future<bool> Propagator::applyParameters(){
@@ -327,7 +333,10 @@ void Propagator::initializeCacheManager(){
   // the MC has been copied for the Asimov fit, or the "data" use the MC
   // reweighting cache.  This must also be before the first use of
   // reweightMcEvents that is done using the GPU.
-  Cache::Manager::Build(_sampleSet_, _eventDialCache_);
+  if( not Cache::Manager::Build(_sampleSet_, _eventDialCache_) ){
+    LogWarning << "Cache manager setup skipped. Propagation will use the CPU reweighting path." << std::endl;
+    return;
+  }
 
   // By default, make sure every data is copied to the CPU part
   // Some of those part might get disabled for faster calculation

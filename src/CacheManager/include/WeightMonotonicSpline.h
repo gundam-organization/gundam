@@ -12,8 +12,6 @@
 #include <memory>
 #include <vector>
 
-class SplineDial;
-
 namespace Cache {
   namespace Weight {
     class MonotonicSpline;

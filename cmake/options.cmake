@@ -19,6 +19,7 @@ option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for 
 option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)." OFF )
 option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
+option( WITH_ASAN "Enable AddressSanitizer instrumentation." OFF )
 option( WITH_TESTS "Build CMake tests." ON )
 option( WITH_GOOGLE_TEST "Enable GoogleTest (disable at your own risk).." ON )
 option( WITH_INTERFACE_TEST "Enable gundam-test.sh interface tests" ON)
@@ -119,6 +120,10 @@ if(WITH_PYTHON_INTERFACE)
   set( PYBIND11_PYTHON_VERSION 3.8.10 )
   set( PYBIND11_FINDPYTHON ON )
   find_package( pybind11 REQUIRED )
+endif()
+
+if(WITH_ASAN AND WITH_PYTHON_INTERFACE AND APPLE)
+  cmessage( WARNING "WITH_ASAN=ON with WITH_PYTHON_INTERFACE=ON on macOS may break Python module loading. Prefer disabling ASan for Python interface workflows." )
 endif()
 
 # Ensure that all lower level tests are on

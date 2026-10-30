@@ -31,14 +31,19 @@
 #include <pybind11/chrono.h>
 #include <pybind11/stl_bind.h>
 
+#include <cstdio>
 #include <cerrno>
 #include <cstring>
+#include <iostream>
 #include <string>
+#include <type_traits>
 #include <unistd.h>
 
 PYBIND11_MAKE_OPAQUE(std::vector<EventDialCache::CacheEntry>);
 PYBIND11_MAKE_OPAQUE(std::vector<EventDialCache::DialResponseCache>);
+PYBIND11_MAKE_OPAQUE(std::vector<Bin::Edges>);
 PYBIND11_MAKE_OPAQUE(std::vector<Histogram::BinContent>);
+PYBIND11_MAKE_OPAQUE(std::vector<Histogram::BinContext>);
 PYBIND11_MAKE_OPAQUE(std::vector<Event>);
 PYBIND11_MAKE_OPAQUE(std::vector<Parameter>);
 PYBIND11_MAKE_OPAQUE(std::vector<Parameter*>);
@@ -69,6 +74,15 @@ void setRuntimeWorkingDirectory(const std::string& dirPath_, bool createIfMissin
   }
 }
 
+void flushOutput(){
+  std::cout.flush();
+  std::cerr.flush();
+  std::fflush(nullptr);
+  if( Logger::getStreamBufferSupervisorPtr() != nullptr ){
+    Logger::getStreamBufferSupervisorPtr()->flush();
+  }
+}
+
 }
 
 
@@ -85,10 +99,13 @@ PYBIND11_MODULE(GUNDAM, module) {
              "Set the process working directory used by GUNDAM to resolve relative runtime paths.");
   module.def("getRuntimeWorkingDirectory", &GenericToolbox::getCurrentWorkingDirectory,
              "Get the process working directory used by GUNDAM to resolve relative runtime paths.");
+  module.def("flushOutput", &flushOutput, "Flush Python-adjacent C/C++ output streams used by GUNDAM.");
 
   // JsonType for the return type
   pybind11::class_<JsonType>(module, "JsonType")
   .def(pybind11::init())
+  .def(pybind11::init([](const std::string& jsonString_){ return JsonType::parse(jsonString_);}), pybind11::arg("jsonString"))
+  .def("toString", [](const JsonType& this_, bool shallow_){ return GenericToolbox::Json::toReadableString(this_, shallow_); }, pybind11::arg("shallow") = false)
   ;
 
 
@@ -111,6 +128,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def(pybind11::init<const std::string&>())
   .def(pybind11::init<const JsonType&>())
   .def("setConfig", pybind11::overload_cast<const std::string&>(&ConfigUtils::ConfigBuilder::setConfig))
+  .def("setConfigFromYamlString", &ConfigUtils::ConfigBuilder::setConfigFromYamlString)
   .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigBuilder::setConfig))
   .def("setConfig", pybind11::overload_cast<const JsonType&>(&ConfigUtils::ConfigBuilder::setConfig))
   .def("getConfig", pybind11::overload_cast<>(&ConfigUtils::ConfigBuilder::getConfig, pybind11::const_), pybind11::return_value_policy::reference)
@@ -162,6 +180,45 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<VariableHolder>(module, "VariableHolder")
   .def("getVarAsDouble", &VariableHolder::getVarAsDouble)
+  .def("setValue", [](VariableHolder& this_, const pybind11::object& value_){
+    const auto& type = this_.get().getType();
+    // Preserve the stored type and refresh the double cache via VariableHolder::set.
+    if( type == typeid(bool) ){ this_.set(value_.cast<bool>()); }
+    else if( type == typeid(char) ){
+      using CharValue = std::conditional<std::is_signed<char>::value, signed char, unsigned char>::type;
+      this_.set(static_cast<char>(value_.cast<CharValue>()));
+    }
+    else if( type == typeid(signed char) ){ this_.set(value_.cast<signed char>()); }
+    else if( type == typeid(unsigned char) ){ this_.set(value_.cast<unsigned char>()); }
+    else if( type == typeid(short) ){ this_.set(value_.cast<short>()); }
+    else if( type == typeid(unsigned short) ){ this_.set(value_.cast<unsigned short>()); }
+    else if( type == typeid(int) ){ this_.set(value_.cast<int>()); }
+    else if( type == typeid(unsigned int) ){ this_.set(value_.cast<unsigned int>()); }
+    else if( type == typeid(long) ){ this_.set(value_.cast<long>()); }
+    else if( type == typeid(unsigned long) ){ this_.set(value_.cast<unsigned long>()); }
+    else if( type == typeid(long long) ){ this_.set(value_.cast<long long>()); }
+    else if( type == typeid(unsigned long long) ){ this_.set(value_.cast<unsigned long long>()); }
+    else if( type == typeid(float) ){ this_.set(value_.cast<float>()); }
+    else if( type == typeid(double) ){ this_.set(value_.cast<double>()); }
+    else { throw pybind11::type_error("setValue requires a stored scalar numeric variable."); }
+  }, pybind11::arg("value"), "Set a scalar variable, preserving its C++ type and refreshing its cached double.")
+  .def("getValue", [](const VariableHolder& this_) -> pybind11::object {
+    const auto& value = this_.get();
+    const auto& type = value.getType();
+    // Read integers directly to preserve precision beyond the double cache.
+    if( type == typeid(char) ){ return pybind11::int_(value.getValue<char>()); }
+    if( type == typeid(signed char) ){ return pybind11::int_(value.getValue<signed char>()); }
+    if( type == typeid(unsigned char) ){ return pybind11::int_(value.getValue<unsigned char>()); }
+    if( type == typeid(short) ){ return pybind11::int_(value.getValue<short>()); }
+    if( type == typeid(unsigned short) ){ return pybind11::int_(value.getValue<unsigned short>()); }
+    if( type == typeid(int) ){ return pybind11::int_(value.getValue<int>()); }
+    if( type == typeid(unsigned int) ){ return pybind11::int_(value.getValue<unsigned int>()); }
+    if( type == typeid(long) ){ return pybind11::int_(value.getValue<long>()); }
+    if( type == typeid(unsigned long) ){ return pybind11::int_(value.getValue<unsigned long>()); }
+    if( type == typeid(long long) ){ return pybind11::int_(value.getValue<long long>()); }
+    if( type == typeid(unsigned long long) ){ return pybind11::int_(value.getValue<unsigned long long>()); }
+    return pybind11::float_(this_.getVarAsDouble());
+  }, "Return the stored integer exactly, or the cached double as a Python float.")
   ;
 
   pybind11::bind_vector<std::vector<VariableHolder>>(module, "VariableHolderList");
@@ -198,8 +255,15 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::bind_vector<std::vector<Event>>(module, "EventList");
 
+  pybind11::class_<DialInputBuffer>(module, "DialInputBuffer")
+  .def("update", &DialInputBuffer::update)
+  .def("getSummary", &DialInputBuffer::getSummary)
+  .def("invalidateBuffers", &DialInputBuffer::invalidateBuffers)
+  ;
+
   pybind11::class_<DialInterface>(module, "DialInterface")
   .def("evalResponse", &DialInterface::evalResponse)
+  .def("getInputBuffer", &DialInterface::getInputBuffer, pybind11::return_value_policy::reference_internal)
   .def("getSummary", &DialInterface::getSummary, pybind11::arg("shallow") = true);
 
   pybind11::class_<EventDialCache::DialResponseCache>(module, "DialResponseCache")
@@ -218,6 +282,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getEvent", [](EventDialCache::CacheEntry& this_){return this_.event;}, pybind11::return_value_policy::reference_internal)
   .def("getDialResponseCacheList", [](EventDialCache::CacheEntry& this_) -> std::vector<EventDialCache::DialResponseCache>& {return this_.dialResponseCacheList;}, pybind11::return_value_policy::reference_internal)
   .def("getSummary", &EventDialCache::CacheEntry::getSummary, pybind11::arg("shallow") = true)
+  .def("getDialIndicesAffecting", &EventDialCache::CacheEntry::getDialIndicesAffecting, pybind11::arg("parameter_"))
   ;
 
   pybind11::bind_vector<std::vector<EventDialCache::CacheEntry>>(module, "EventDialCacheEntryList");
@@ -238,7 +303,9 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getParameterValue", &Parameter::getParameterValue)
   .def("getGradient", &Parameter::getGradient)
   .def("isPenaltyDisabled", &Parameter::isPenaltyDisabled)
+  .def("getSummary", &Parameter::getSummary)
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
+  .def("setIsFixed", &Parameter::setIsFixed)
   ;
 
   pybind11::class_<TMatrixDSym, std::shared_ptr<TMatrixDSym>>(module, "TMatrixDSym")
@@ -260,6 +327,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::class_<ParameterSet>(module, "ParameterSet")
   .def(pybind11::init())
   .def("isEnableEigenDecomp", &ParameterSet::isEnableEigenDecomp)
+  .def("getName", &ParameterSet::getName)
   .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
   .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
   .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCovarianceMatrix, pybind11::const_))
@@ -275,7 +343,34 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("throwParameters", &ParametersManager::throwParameters)
   .def("exportParameterInjectorConfig", &ParametersManager::exportParameterInjectorConfig)
   .def("injectParameterValues", &ParametersManager::injectParameterValues)
+  .def("injectParameterValues", [](ParametersManager& self, const std::string& jsonString){ self.injectParameterValues(JsonType(jsonString)); })
   .def("getParameterSetsList", pybind11::overload_cast<>(&ParametersManager::getParameterSetsList), pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::class_<Bin::Edges>(module, "BinEdges")
+  .def("getCenterValue", &Bin::Edges::getCenterValue)
+  .def("getSummary", &Bin::Edges::getSummary, pybind11::arg("shallow") = true)
+  .def_readonly("isConditionVar", &Bin::Edges::isConditionVar)
+  .def_readonly("index", &Bin::Edges::index)
+  .def_readonly("varIndexCache", &Bin::Edges::varIndexCache)
+  .def_readonly("min", &Bin::Edges::min)
+  .def_readonly("max", &Bin::Edges::max)
+  .def_readonly("varName", &Bin::Edges::varName)
+  ;
+
+  pybind11::bind_vector<std::vector<Bin::Edges>>(module, "BinEdgesList");
+
+  pybind11::class_<Bin>(module, "Bin")
+  .def("isZeroWideRangesTolerated", &Bin::isZeroWideRangesTolerated)
+  .def("getIndex", &Bin::getIndex)
+  .def("getFormulaStr", &Bin::getFormulaStr)
+  .def("getTreeFormulaStr", &Bin::getTreeFormulaStr)
+  .def("getEdgesList", pybind11::overload_cast<>(&Bin::getEdgesList),
+       pybind11::return_value_policy::reference_internal)
+  .def("buildVariableNameList", &Bin::buildVariableNameList)
+  .def("getVolume", &Bin::getVolume)
+  .def("isVariableSet", &Bin::isVariableSet)
+  .def("getSummary", &Bin::getSummary, pybind11::arg("shallow") = true)
   ;
 
   pybind11::class_<Histogram::BinContent>(module, "HistogramBinContent")
@@ -286,13 +381,28 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::bind_vector<std::vector<Histogram::BinContent>>(module, "HistogramBinContentList");
 
+  pybind11::class_<Histogram::BinContext>(module, "HistogramBinContext")
+  .def_property_readonly("bin", [](Histogram::BinContext& this_) -> Bin& { return this_.bin; },
+                         pybind11::return_value_policy::reference_internal)
+  .def("getBin", [](Histogram::BinContext& this_) -> Bin& { return this_.bin; },
+       pybind11::return_value_policy::reference_internal)
+  ;
+
+  pybind11::bind_vector<std::vector<Histogram::BinContext>>(module, "HistogramBinContextList");
+
   pybind11::class_<Histogram>(module, "Histogram")
   .def("getNbBins", &Histogram::getNbBins)
   .def("getBinContentList", pybind11::overload_cast<>(&Histogram::getBinContentList),
        pybind11::return_value_policy::reference_internal)
+  .def("getBinContextList", pybind11::overload_cast<>(&Histogram::getBinContextList),
+       pybind11::return_value_policy::reference_internal)
   ;
 
   pybind11::class_<Sample>(module, "Sample")
+  .def("setUseDynamicBinning", &Sample::setUseDynamicBinning)
+  .def("isUseDynamicBinning", &Sample::isUseDynamicBinning)
+  .def("updateEventBinning", pybind11::overload_cast<>(&Sample::updateEventBinning),
+       "Reassign events in a dynamic sample; propagate afterwards to refill its histogram.")
   .def("isEnabled", &Sample::isEnabled)
   .def("isEventMcThrowDisabled", &Sample::isEventMcThrowDisabled)
   .def("getIndex", &Sample::getIndex)
@@ -320,6 +430,8 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<Propagator>(module, "Propagator")
   .def(pybind11::init())
+  .def("updateEventSampleBinning", &Propagator::updateEventSampleBinning,
+       "Reassign events in all dynamic samples; propagate afterwards to refill histograms.")
   .def("initialize", pybind11::overload_cast<>(&Propagator::initialize), pybind11::return_value_policy::reference)
   .def("getSampleSet", pybind11::overload_cast<>(&Propagator::getSampleSet), pybind11::return_value_policy::reference_internal)
   .def("getEventDialCache", pybind11::overload_cast<>(&Propagator::getEventDialCache), pybind11::return_value_policy::reference_internal)
@@ -363,9 +475,11 @@ PYBIND11_MODULE(GUNDAM, module) {
   likelihoodInterfaceClass
   .def(pybind11::init())
   .def("getSummary", &LikelihoodInterface::getSummary, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getSampleBreakdownTable", &LikelihoodInterface::getSampleBreakdownTable, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getLastLikelihood", &LikelihoodInterface::getLastLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getLastStatLikelihood", &LikelihoodInterface::getLastStatLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("evalLikelihood", &LikelihoodInterface::evalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwStatErrors", &LikelihoodInterface::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>())
@@ -384,7 +498,11 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
+  .def("isRootMinimizer", [](const MinimizerBase& this_){
+    return dynamic_cast<const RootMinimizer*>(&this_) != nullptr;
+  })
   .def("minimize", &MinimizerBase::minimize)
+  .def("getMinimizerStatus", &MinimizerBase::getMinimizerStatus)
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
   .def("setDisableCalcError", &MinimizerBase::setDisableCalcError)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
@@ -395,10 +513,24 @@ PYBIND11_MODULE(GUNDAM, module) {
   }, pybind11::arg("parArray"))
   .def("evalFitGradient", pybind11::overload_cast<>(&MinimizerBase::evalFitGradient))
   .def("evalFitGradient", pybind11::overload_cast<const std::vector<Parameter*>&>(&MinimizerBase::evalFitGradient))
+  .def("evalFitGradient", [](MinimizerBase& this_, const pybind11::list& parameters_){
+    std::vector<Parameter*> parameters;
+    parameters.reserve(parameters_.size());
+    for( const auto& parameter : parameters_ ){
+      auto* pointer = parameter.cast<Parameter*>();
+      if( pointer == nullptr ){ throw pybind11::value_error("Gradient parameters cannot contain None."); }
+      parameters.push_back(pointer);
+    }
+    this_.evalFitGradient(parameters);
+  })
   .def("getMinimizerFitParameterList", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterList), pybind11::return_value_policy::reference)
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
+  .def("getFunctionPrecision", &RootMinimizer::getFunctionPrecision)
+  .def("updateFitParameterSettings", &RootMinimizer::updateFitParameterSettings)
+  .def("hasConverged", &RootMinimizer::hasConverged)
+  .def("isMinimizeDone", &RootMinimizer::isMinimizeDone)
   .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)
   ;
 
