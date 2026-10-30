@@ -56,7 +56,7 @@ numériques entre réglages. Par défaut :
 - LLH device obligatoire et rapatriement de exactement 8 octets pour le total,
   sans poids, état d'événements ni histogrammes pendant les appels chronométrés.
 
-Le mode `resident`, par défaut, charge les inputs une fois par expérience, puis
+Le mode `resident`, par défaut, charge les inputs une fois par vraisemblance pour tout le balayage de réglages, puis
 active successivement CPU et CUDA depuis les événements déjà en mémoire. Les
 observables et le binning dynamique/lissé sont supportés. Le mode `isolated`
 recharge les inputs dans un processus indépendant par backend. Les temps

@@ -63,6 +63,31 @@ def main():
         summary = json.loads((output/'summary.json').read_text())
         assert summary['complete'] and len(summary['experiments']) == 8
         assert (output/'report.md').is_file()
+        setups = [json.loads((output/entry['directory']/'CPU'/'setup.json').read_text())
+                  for entry in summary['experiments']]
+        assert len({setup['pid'] for setup in setups}) == 1
+        assert sum(setup['includesDatasetLoading'] for setup in setups) == 2  # One per likelihood.
+        # A second sweep must finish even if the source is removed after its sole load.
+        original_load = bench.profiling.load_engine
+        loads = []
+        def load_once(arguments):
+            loads.append(arguments.worker)
+            assert len(loads) == 1
+            engine = original_load(arguments)
+            (folder/'input.root').unlink()
+            return engine
+        bench.profiling.load_engine = load_once
+        try:
+            bench.main(['--work-dir', str(folder), '--config', 'config.json',
+                        '--cases', 'CPU', '--block-sizes', 'auto', '64', '--reuse-modes', 'on', 'off',
+                        '--likelihoods', 'PoissonLLH', '--calls', '3', '--global-calls', '3',
+                        '--trials', '1', '--warmup', '1', '--output', str(folder/'without-source'),
+                        '--matrix-worker'])
+        finally:
+            bench.profiling.load_engine = original_load
+            os.chdir(previous)
+        assert len(loads) == 1
+
         reference = output/summary['experiments'][0]['directory']/'CPU'
         candidate = output/summary['experiments'][1]['directory']
         rows = candidate/'CPU'/'constant-trial1.json'

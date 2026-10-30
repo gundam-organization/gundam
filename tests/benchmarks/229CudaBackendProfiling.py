@@ -323,18 +323,19 @@ def measure(args, engine=None, sequence=None):
     write_json(args.output / 'summary.json', result)
 
 
-def measure_resident(args):
+def measure_resident(args, state=None):
     import GUNDAM
     if not hasattr(GUNDAM.BackendManager, 'activate'):
         raise RuntimeError('Rebuild/reinstall the Python interface: activate is unavailable')
     root = args.output
-    engine = sequence = config = None
+    engine, sequence, config = state if state is not None else (None, None, None)
     for case in args.cases:
         args.worker = case
         args.output = root / case
         args.output.mkdir()
         start = time.monotonic()
-        if engine is None:
+        loads_dataset = engine is None
+        if loads_dataset:
             engine = load_engine(args)
             sequence = parameter_sequence(args, engine)
             config = json.loads((args.output / 'resolved-fitter-config.json').read_text())
@@ -349,10 +350,11 @@ def measure_resident(args):
             write_json(args.output / 'resolved-fitter-config.json', config)
             engine.evaluateLikelihood()  # Prime new buffers outside measurements.
         write_json(args.output / 'setup.json', {
-            'seconds': time.monotonic() - start, 'includesDatasetLoading': case == args.cases[0],
+            'seconds': time.monotonic() - start, 'includesDatasetLoading': loads_dataset,
             'executionMode': 'resident', 'pid': os.getpid()})
         measure(args, engine, sequence)
     args.output = root
+    return engine, sequence, config
 
 
 def compare(output, cases, scenarios, trials, relative, absolute, *, reference_directory=None,
@@ -513,6 +515,25 @@ def run_worker(args, case):
         raise RuntimeError(f'{case} exited with code {code}; see {log_path}')
 
 
+def initialize_output(args):
+    args.output.mkdir(parents=True, exist_ok=False)
+    settings = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
+    settings.update(host=platform.node(), platform=platform.platform(), python=sys.executable,
+                    allowedCpus=sorted(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else None,
+                    environment={key: os.environ.get(key) for key in
+                                 ('CUDA_VISIBLE_DEVICES', 'SLURM_JOB_ID', 'PYTHONPATH')})
+    settings['gitCommit'] = subprocess.run(
+        ['git', '-C', str(Path(__file__).resolve().parents[2]), 'rev-parse', 'HEAD'],
+        capture_output=True, text=True, check=False).stdout.strip()
+    try:
+        settings['nvidiaSmi'] = subprocess.run(['nvidia-smi'], capture_output=True, text=True,
+                                              timeout=15, check=False).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        settings['nvidiaSmi'] = None
+    write_json(args.output / 'settings.json', settings)
+    write_json(args.output / 'summary.json', {'complete': False})
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, required=True)
@@ -573,22 +594,7 @@ def main():
         return
     if not args.config.is_file():
         parser.error(f'Configuration does not exist: {args.config}')
-    args.output.mkdir(parents=True, exist_ok=False)
-    settings = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
-    settings.update(host=platform.node(), platform=platform.platform(), python=sys.executable,
-                    allowedCpus=sorted(os.sched_getaffinity(0)) if hasattr(os, 'sched_getaffinity') else None,
-                    environment={key: os.environ.get(key) for key in
-                                 ('CUDA_VISIBLE_DEVICES', 'SLURM_JOB_ID', 'PYTHONPATH')})
-    settings['gitCommit'] = subprocess.run(
-        ['git', '-C', str(Path(__file__).resolve().parents[2]), 'rev-parse', 'HEAD'],
-        capture_output=True, text=True, check=False).stdout.strip()
-    try:
-        settings['nvidiaSmi'] = subprocess.run(['nvidia-smi'], capture_output=True, text=True,
-                                              timeout=15, check=False).stdout
-    except (OSError, subprocess.TimeoutExpired):
-        settings['nvidiaSmi'] = None
-    write_json(args.output / 'settings.json', settings)
-    write_json(args.output / 'summary.json', {'complete': False})
+    initialize_output(args)
     if args.execution_mode == 'resident':
         run_worker(args, 'resident')
     else:

@@ -80,6 +80,6 @@ after loading to verify transitions do not require disk access. Set
 `GUNDAM_TEST_CUDA=1` in a CUDA-enabled GPU allocation to include CUDA transitions.
 
 The V100 benchmark defaults to `--execution-mode resident`: inputs are loaded
-once per likelihood/tuning experiment, and backend switches reuse that data.
+once per likelihood for all block-size/reuse/backend combinations, and backend switches reuse that data.
 `--execution-mode isolated` remains available for independent process comparisons.
 Model setup, backend changes and warmup are excluded from evaluation timings.

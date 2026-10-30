@@ -2,12 +2,16 @@
 """Validate and benchmark resident CPU/CUDA statistical likelihoods on a V100.
 
 Run inside a GPU allocation using a CUDA-enabled GUNDAM Python module. No fit,
-Hesse or input reduction. Independent workers support dynamic/smoothed inputs.
+Hesse or input reduction. Resident mode loads once per likelihood, reusing the
+engine across all block sizes, reuse settings and backend cases.
 The automatic CUDA launch policy is a hypothesis, not a measured V100 optimum.
 """
 import argparse
+from argparse import Namespace
 import importlib.util
 import json
+import math
+import re
 import os
 from pathlib import Path
 import subprocess
@@ -32,8 +36,9 @@ def parse_args(argv=None):
     p.add_argument('--likelihoods', nargs='+', choices=['configured', 'PoissonLLH', 'BarlowLLH_BANFF_OA2021'], default=['configured'])
     p.add_argument('--cases', nargs='+', choices=profiling.CASES,
                    default=['CPU', 'CUDA-cachedResponses-interleaved', 'CUDA-recomputeResponses-interleaved'])
+    p.add_argument('--matrix-worker', action='store_true', help=argparse.SUPPRESS)
     p.add_argument('--execution-mode', choices=['isolated', 'resident'], default='resident',
-                   help='Resident loads inputs once per experiment and switches backends in memory; isolated reloads each case')
+                   help='Resident loads inputs once per likelihood for the entire tuning sweep; isolated reloads each case')
     p.add_argument('--scenarios', nargs='+', choices=['constant','local1','local2','global'],
                    default=['constant','local1','local2','global'])
     p.add_argument('--threads', type=int, default=4)
@@ -61,6 +66,14 @@ def parse_args(argv=None):
         p.error('Configuration does not exist: '+str(args.config))
     if min(args.calls, args.global_calls, args.trials, args.threads) <= 0 or min(args.warmup, args.device_index) < 0:
         p.error('Counts must be positive; warmup and device-index may be zero')
+    for name in ('step_scale', 'relative_tolerance', 'absolute_tolerance'):
+        if not math.isfinite(getattr(args, name)) or getattr(args, name) <= 0:
+            p.error(f'{name} must be finite and positive')
+    if args.parameter_match:
+        try:
+            re.compile(args.parameter_match)
+        except re.error as error:
+            p.error(f'Invalid --parameter-match: {error}')
     return args
 
 
@@ -114,13 +127,19 @@ def report(args, summary):
 
 def main(argv=None):
     args = parse_args(argv)
-    args.output.mkdir(parents=True, exist_ok=False)
     env = os.environ.copy()
     if args.python_module_dir:
         module = args.python_module_dir.resolve()
         if not module.is_dir():
             raise RuntimeError('Python module directory does not exist: '+str(module))
         env['PYTHONPATH'] = str(module)+(os.pathsep+env['PYTHONPATH'] if env.get('PYTHONPATH') else '')
+    if args.execution_mode == 'resident' and not args.matrix_worker:
+        # Import GUNDAM only in this persistent worker, with the selected module's environment.
+        arguments = list(sys.argv[1:] if argv is None else argv)
+        subprocess.run([sys.executable, '-u', str(Path(__file__).resolve()), *arguments,
+                        '--output', str(args.output), '--matrix-worker'], env=env, check=True)
+        return
+    args.output.mkdir(parents=True, exist_ok=False)
     settings = {k: str(v) if isinstance(v, Path) else v for k,v in vars(args).items()}
     profiling.write_json(args.output/'settings.json', settings)
     summary = {'complete': False, 'experiments': []}
@@ -132,12 +151,30 @@ def main(argv=None):
                 stdout=log, stderr=subprocess.STDOUT, env=env, check=True)
     references = {}
     for probability in args.likelihoods:
+        resident_state = None
         for block in args.block_sizes:
             for reuse in args.reuse_modes:
                 name = f'{probability}-block{block}-reuse{reuse}'
                 directory = args.output/name
                 profiling.progress('V100 matrix: '+name)
-                subprocess.run(command(args, probability, block, reuse, directory), env=env, check=True)
+                if args.execution_mode == 'resident':
+                    experiment = Namespace(**vars(args))
+                    experiment.output = directory
+                    experiment.likelihood = probability
+                    experiment.likelihood_block_size = 0 if block == 'auto' else int(block)
+                    experiment.disable_prediction_reuse = reuse == 'off'
+                    experiment.require_device_likelihood = True
+                    experiment.require_v100 = not args.allow_other_gpu
+                    profiling.initialize_output(experiment)
+                    resident_state = profiling.measure_resident(experiment, resident_state)
+                    profiling.compare(directory, args.cases, args.scenarios, args.trials,
+                                      args.relative_tolerance, args.absolute_tolerance)
+                    profiling.write_report(directory, args.cases)
+                    profiling.write_json(directory/'summary.json', {
+                        'complete': True, 'cases': {case: json.loads((directory/case/'summary.json').read_text())
+                                                  for case in args.cases}})
+                else:
+                    subprocess.run(command(args, probability, block, reuse, directory), env=env, check=True)
                 if probability not in references:
                     reference_case = 'CPU' if 'CPU' in args.cases else args.cases[0]
                     references[probability] = directory/reference_case
