@@ -1,5 +1,5 @@
 // Isolated likelihood-kernel experiment. Compile with the generated Metal source:
-// clang++ -O3 -std=c++17 -I src/Backends/Common/include \
+// clang++ -O3 -std=c++17 -I src/Backends/Common/Model/include -I src/Backends/Common/Formula/include -I src/Backends/Common/Execution/include -I src/Backends/Common/Binning/include \
 //   -I cmake-build-release/src/Backends/generated \
 //   tests/benchmarks/234MetalLikelihoodMicrobenchmark.mm \
 //   -framework Foundation -framework Metal -o /tmp/gundam-llh-micro

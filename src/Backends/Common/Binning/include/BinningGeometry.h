@@ -9,8 +9,6 @@
 #include <string>
 #include <vector>
 
-class Histogram;
-
 namespace Backends {
 
 // Compiled bin geometry. Offsets and numeric descriptors can also be packed
@@ -37,7 +35,6 @@ struct BinningGeometry {
   bool isSmoothed{false};
 };
 
-[[nodiscard]] BinningGeometry buildBinningGeometry(const Histogram& histogram_);
 
 namespace BinningSemantics {
   inline double cumulativeKernel(double position_) {

@@ -1,3 +1,4 @@
+#include "BinningGeometryBuilder.h"
 #include "CpuBackend.h"
 #ifdef __APPLE__
 #include "MpsBackend.h"

@@ -1,17 +1,11 @@
-set(LIB_NAME GundamBackends)
+set(LIB_NAME GundamBackendsCommonManager)
+
+add_subdirectory(Common/Formula)
+add_subdirectory(Common/Binning)
+add_subdirectory(Common/Model)
+add_subdirectory(Common/Execution)
 
 set(SRCFILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/NativeDialProgramModel.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/FormulaCompiler.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BinningGeometry.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/DevicePropagationModel.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EventStateCache.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/DeviceWeightModel.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EngineBindings.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/EngineLayout.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendFactory.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendManager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/src/BackendTypes.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackend.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuBackendProfiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/src/CpuWeightProbe.cpp
@@ -35,17 +29,17 @@ if(APPLE)
   )
   set_property(
       DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/SharedFormulaOperations.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/FormulaTypes.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/FormulaMath.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/Formula/include/DeviceMath/SharedFormulaOperations.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/Formula/include/FormulaTypes.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/Formula/include/DeviceMath/FormulaMath.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsDialPrograms.metal
-      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/DoubleFloat.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendBinningSemantics.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendVariableResponse.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/Model/include/DeviceMath/DoubleFloat.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/Binning/include/Semantics/BackendBinningSemantics.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/Execution/include/Semantics/BackendVariableResponse.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/Model/include/Semantics/BackendResponseSmoothing.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedBinningMath.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsWeightTypes.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationTypes.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/Common/Model/include/DevicePropagationTypes.h
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEventPropagationKernels.metal
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCommon.h
       ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCompact.h
@@ -58,21 +52,21 @@ if(APPLE)
       ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernelSource.h.in
   )
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedBinningMath.h MPS_SHARED_BINNING_MATH)
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendBinningSemantics.h MPS_BINNING_SEMANTICS)
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendVariableResponse.h MPS_SHARED_VARIABLE_RESPONSE)
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h MPS_RESPONSE_SMOOTHING)
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/FormulaTypes.h MPS_FORMULA_TYPES)
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/FormulaMath.h MPS_FORMULA_MATH)
-  foreach(LLH_FILE Common/include/LikelihoodTypes.h Common/include/Semantics/BackendLikelihood.h Implementations/MPS/src/MpsLikelihood.metal)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/Binning/include/Semantics/BackendBinningSemantics.h MPS_BINNING_SEMANTICS)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/Execution/include/Semantics/BackendVariableResponse.h MPS_SHARED_VARIABLE_RESPONSE)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/Model/include/Semantics/BackendResponseSmoothing.h MPS_RESPONSE_SMOOTHING)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/Formula/include/FormulaTypes.h MPS_FORMULA_TYPES)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/Formula/include/DeviceMath/FormulaMath.h MPS_FORMULA_MATH)
+  foreach(LLH_FILE Common/Model/include/LikelihoodTypes.h Common/Execution/include/Semantics/BackendLikelihood.h Implementations/MPS/src/MpsLikelihood.metal)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${LLH_FILE})
   endforeach()
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/LikelihoodTypes.h MPS_LIKELIHOOD_TYPES)
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendLikelihood.h MPS_LIKELIHOOD_SEMANTICS)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/Model/include/LikelihoodTypes.h MPS_LIKELIHOOD_TYPES)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/Execution/include/Semantics/BackendLikelihood.h MPS_LIKELIHOOD_SEMANTICS)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsLikelihood.metal MPS_LIKELIHOOD_KERNELS)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsDialPrograms.metal MPS_DIAL_PROGRAMS)
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/SharedFormulaOperations.h MPS_FORMULA_OPERATIONS)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/Formula/include/DeviceMath/SharedFormulaOperations.h MPS_FORMULA_OPERATIONS)
   string(REPLACE "#include \"DeviceMath/SharedFormulaOperations.h\"" "${MPS_FORMULA_OPERATIONS}" MPS_DIAL_PROGRAMS "${MPS_DIAL_PROGRAMS}")
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationTypes.h MPS_PROPAGATION_TYPES)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/Model/include/DevicePropagationTypes.h MPS_PROPAGATION_TYPES)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsEventPropagationKernels.metal MPS_EVENT_PROPAGATION_KERNELS)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCommon.h MPS_SHARED_SPLINE_COMMON)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCompact.h MPS_SHARED_SPLINE_COMPACT)
@@ -83,7 +77,7 @@ if(APPLE)
   file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedGraph.h MPS_SHARED_GRAPH)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsWeightTypes.h MPS_WEIGHT_TYPES)
   file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackendKernels.metal MPS_BACKEND_KERNEL_SOURCE)
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/DoubleFloat.h MPS_DOUBLE_FLOAT)
+  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/Common/Model/include/DeviceMath/DoubleFloat.h MPS_DOUBLE_FLOAT)
   set(MPS_OBSERVABLE_SPLINES "${MPS_SHARED_SPLINE_COMMON}\n${MPS_SHARED_SPLINE_COMPACT}\n${MPS_SHARED_SPLINE_UNIFORM}\n${MPS_SHARED_SPLINE_MONOTONIC}\n${MPS_SHARED_SPLINE_GENERAL}\n${MPS_SHARED_GRAPH}\n${MPS_SHARED_SURFACE}")
   string(REPLACE "GundamDeviceMath" "GundamObservableMath" MPS_OBSERVABLE_SPLINES "${MPS_OBSERVABLE_SPLINES}")
   string(REPLACE "SHARED_" "OBSERVABLE_SHARED_" MPS_OBSERVABLE_SPLINES "${MPS_OBSERVABLE_SPLINES}")
@@ -95,109 +89,8 @@ if(APPLE)
   list(APPEND SRCFILES ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/src/MpsBackend.mm)
 endif()
 
-set(HEADERS
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/NativeFormulaPlan.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/NativeDialProgramModel.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/SharedFormulaOperations.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/NativeCompositeProgram.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/NativeFormulaProgram.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/FormulaTypes.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DialProgramValidation.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/FormulaMath.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/FormulaProgram.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/FormulaCompiler.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuFormulaProgram.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DialDependencyGroups.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DialDependencies.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/HistogramEventIndex.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendResponseSmoothing.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ResponseSmoothingPacking.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendBinningSemantics.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendVariableResponse.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceMath/DoubleFloat.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BinningGeometry.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EventStateCache.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/PropagationResult.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DeviceWeightModel.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationModel.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/DevicePropagationTypes.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendManager.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendFactory.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/BackendTypes.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineBindings.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineDescriptors.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineLayout.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/EngineView.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Backend.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/PropagationInputs.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/ParameterSnapshot.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendSemanticsQualifiers.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemanticsCore.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendDialSemantics.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include/Semantics/BackendHostPropagation.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuCompositeProgram.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuWeightKernels.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackend.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuCacheAlignment.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuBackendProfiler.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include/CpuWeightProbe.h
-)
-
-if(GUNDAM_CUDA_ENABLED)
-  list(APPEND HEADERS
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBackend.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaWeightModel.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include/CudaBinning.h
-  )
-endif()
-
-if(APPLE)
-  list(APPEND HEADERS
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackend.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsSplinePayloadLayout.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsWeightTypes.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsBackendInternal.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include/MpsEventPropagation.h
-  )
-endif()
-
-if( USE_STATIC_LINKS )
-  add_library(${LIB_NAME} STATIC ${SRCFILES})
-else()
-  add_library(${LIB_NAME} SHARED ${SRCFILES})
-endif()
-
-target_include_directories(
-    ${LIB_NAME}
-    BEFORE
-    PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/Common/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CPU/include
-    PRIVATE
-    ${CMAKE_CURRENT_BINARY_DIR}/generated
-)
-
-target_link_libraries(
-    ${LIB_NAME}
-    PUBLIC
-    GundamDialDictionary
-    GundamStatisticalInference
-)
-
-if(GUNDAM_CUDA_ENABLED)
-  target_link_libraries(${LIB_NAME} PRIVATE CUDA::cudart)
-  target_compile_definitions(${LIB_NAME} PUBLIC GUNDAM_USING_CUDA)
-  target_include_directories(${LIB_NAME} BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/CUDA/include)
-  set_target_properties(${LIB_NAME} PROPERTIES CUDA_RUNTIME_LIBRARY Shared)
-  set_property(TARGET ${LIB_NAME} APPEND PROPERTY
-      BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
-endif()
-
-if(APPLE)
-  target_include_directories(${LIB_NAME} BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Implementations/MPS/include)
-  target_link_libraries(${LIB_NAME} PUBLIC "-framework Foundation" "-framework Metal")
-endif()
-
-target_compile_definitions(${LIB_NAME} PRIVATE GUNDAM_CPU_BUILD_TYPE="${CMAKE_BUILD_TYPE}")
-
-install(TARGETS ${LIB_NAME} DESTINATION lib)
+# Manager owns the public entry point and the concrete implementations selected by its factory.
+set(BACKENDS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(BACKENDS_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
+add_subdirectory(Common/Manager)
+add_library(GundamBackends ALIAS ${LIB_NAME})

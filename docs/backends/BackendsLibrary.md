@@ -26,6 +26,30 @@ Shared numerical semantics keep these implementations consistent; a common
 model does not require identical storage, scheduling or floating-point precision
 on every device.
 
+## Common libraries
+
+`src/Backends/Common` is split into five libraries, each with its own
+`include`, `src` and `CMakeLists.txt`:
+
+| Target | Responsibility | Dependencies within Common |
+| --- | --- | --- |
+| `GundamBackendsCommonFormula` | Formula compilation and arithmetic evaluation | None |
+| `GundamBackendsCommonBinning` | Bin geometry, spatial index and binning semantics | None |
+| `GundamBackendsCommonModel` | Engine views, descriptors and propagation inputs/outputs | Formula, Binning |
+| `GundamBackendsCommonExecution` | Shared evaluation, packing and cache invalidation | Model |
+| `GundamBackendsCommonManager` | Backend contract, factory and engine integration | Execution |
+
+Manager is the entry point. It also compiles the CPU and enabled CUDA/MPS
+implementations selected by the factory. `GundamBackends` remains a CMake alias
+for Manager. Only Manager depends on `GundamStatisticalInference`; the other
+libraries operate on backend descriptors. Conversion from `Histogram` to
+`BinningGeometry` belongs to Manager's `BinningGeometryBuilder`.
+
+`WITH_BACKENDS` enables the whole group. Each library follows `USE_STATIC_LINKS`
+like the other GUNDAM libraries: shared libraries by default, static archives
+when enabled. Library suffixes follow the platform (`.so` on Linux, `.dylib`
+on macOS).
+
 ## Available backends
 
 Implementation details, numerical precision and performance choices are documented
@@ -242,7 +266,7 @@ optimizations are production behavior; temporary A/B comparison switches have
 been removed. GPU stage profiling remains available for performance analysis.
 
 The compatibility rules are implemented in
-[`EngineLayout.cpp`](../../src/Backends/Common/src/EngineLayout.cpp),
+[`EngineLayout.cpp`](../../src/Backends/Common/Manager/src/EngineLayout.cpp),
 [`CpuBackend.cpp`](../../src/Backends/Implementations/CPU/src/CpuBackend.cpp),
 [`MpsBackend.mm`](../../src/Backends/Implementations/MPS/src/MpsBackend.mm) and
 [`CudaBackend.cpp`](../../src/Backends/Implementations/CUDA/src/CudaBackend.cpp).

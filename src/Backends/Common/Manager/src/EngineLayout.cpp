@@ -1,4 +1,5 @@
 #include "EngineLayout.h"
+#include "BinningGeometryBuilder.h"
 #include "FormulaCompiler.h"
 
 #include "Bilinear.h"
