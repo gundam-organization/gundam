@@ -524,6 +524,8 @@ namespace {
       using Kind = JointProbability::JointProbabilitySnapshot::Kind;
       if( snapshot.kind == Kind::Poisson ){ options.kind = Backends::LikelihoodKind::Poisson; }
       else if( snapshot.kind == Kind::BarlowBeeston2022 ){ options.kind = Backends::LikelihoodKind::BarlowBeeston2022; }
+      else if( snapshot.kind == Kind::BarlowBeestonLiteGaussian ){ options.kind = Backends::LikelihoodKind::BarlowBeestonLiteGaussian; }
+      else if( snapshot.kind == Kind::BarlowBeestonLitePoisson ){ options.kind = Backends::LikelihoodKind::BarlowBeestonLitePoisson; }
       options.usePoissonLikelihood = snapshot.usePoissonLikelihood;
       options.useNominalVariance = snapshot.useNominalVariance;
       options.throwIfInfLlh = snapshot.throwIfInfLlh;

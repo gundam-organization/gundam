@@ -1,9 +1,11 @@
 # Resident statistical likelihoods
 
-The CPU, CUDA and MPS backends have portable evaluators for `PoissonLLH` and
-`BarlowLLH_BANFF_OA2021`. The latter is the configuration name of the validated
-`BarlowBeestonBanff2022` class; it is not the older `BarlowLLH` implementation
-or the SFGD variant. No new configuration key is needed.
+The CPU, CUDA and MPS backends have portable evaluators for `PoissonLLH`,
+`BarlowLLH_BANFF_OA2021`, `BarlowBeestonLiteGaussian` and
+`BarlowBeestonLitePoisson`. The BANFF name selects the validated
+`BarlowBeestonBanff2022` class. The exact `BarlowBeeston` model and the SFGD
+variant are not portable likelihoods. No extra configuration key is needed;
+the existing `jointProbabilityConfig.type` selects the implementation.
 
 For these functions the GPU pipeline evaluates the likelihood from resident
 histogram sums and squared sums, reduces contributions on device, and reads
@@ -41,6 +43,26 @@ Numerical failures requiring an exception use a NaN total and are reported on
 the host without histogram readback. NaN totals are always rejected. Per-bin
 verbose messages and warnings from the reference classes are not reproduced
 by device kernels.
+
+The two lite models always use the current histogram variance; they do not
+capture nominal errors or export any BANFF compatibility flags. Gaussian uses
+Conway's analytic profile. Poisson uses the improved Dembinski-Abdelmotteleb
+effective-count model, equations (17)-(18). Both share the same portable
+implementation across CPU, CUDA and Metal, including the stable near-minimum
+expansions. Portable `evaluateLiteGaussian` and `evaluateLitePoisson` return
+both the value and analytic partial derivatives with respect to prediction
+and standard deviation. These match the host reference derivatives; the
+resident likelihood kernels consume the value only. This change does not add
+a new device parameter-gradient pipeline.
+
+Invalid lite inputs return positive infinity rather than the legacy BANFF
+NaN/throw sentinel. Empty data/MC bins contribute zero. The Poisson lite model
+rejects zero mean with nonzero variance, matching its host reference.
+
+The exact Barlow-Beeston solver requires counts and scale factors per source.
+The resident histograms contain only sums of weights and squared weights, so
+they cannot represent that model without a source decomposition. It remains
+unsupported; no effective single-source replacement is introduced.
 
 Unsupported likelihoods retain the host callback path and histogram readback.
 Diagnostics expose `likelihoodExecution` as `device` or `host`. Metal selects
@@ -99,3 +121,22 @@ not the full binary64 exponent range. CUDA uses binary64 throughout.
 CUDA measures the likelihood GPU stage; Metal reports its separate stage time
 only with diagnostic stage profiling enabled (otherwise it is included in total
 GPU propagation time). No performance benchmark is claimed by these tests.
+
+## Lite model validation
+
+`BackendLikelihood.LiteSnapshotsAndPortableValuesAndGradientsMatchReferences`
+checks values, analytic partial derivatives, invalid inputs and the variance
+conversion against the two reference classes. An EngineLayout test checks
+selection through `jointProbabilityConfig.type`, including the absence of
+nominal-error settings. CPU tests deliberately install a throwing host callback
+to verify that the portable evaluator is used.
+
+The resident integration tests cover both lite models on Metal in
+`cachedResponses` and `recomputeResponses` modes, multiple samples and masked
+bins, and assert zero histogram/event-weight readback. Low-rate tests cover
+rates down to 1e-12, small displacements from the minimum, empty bins and
+infinite likelihoods. The same resident tests are registered for CUDA builds.
+
+Local validation for this addition: 231 fast C++ tests pass on Apple, including
+live Metal execution. CUDA uses the shared host/device scalar implementation;
+CUDA compilation and device execution have not been validated on this machine.

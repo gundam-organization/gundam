@@ -27,8 +27,14 @@ namespace {
   LikelihoodOptions<double> options(const JointProbability::JointProbabilityBase& reference_) {
     auto snapshot = JointProbability::snapshotJointProbability(reference_, {});
     LikelihoodOptions<double> out;
-    out.kind = snapshot.kind == JointProbability::JointProbabilitySnapshot::Kind::Poisson
-        ? LikelihoodKind::Poisson : LikelihoodKind::BarlowBeeston2022;
+    using Kind = JointProbability::JointProbabilitySnapshot::Kind;
+    switch( snapshot.kind ){
+      case Kind::Poisson: out.kind = LikelihoodKind::Poisson; break;
+      case Kind::BarlowBeeston2022: out.kind = LikelihoodKind::BarlowBeeston2022; break;
+      case Kind::BarlowBeestonLiteGaussian: out.kind = LikelihoodKind::BarlowBeestonLiteGaussian; break;
+      case Kind::BarlowBeestonLitePoisson: out.kind = LikelihoodKind::BarlowBeestonLitePoisson; break;
+      default: out.kind = LikelihoodKind::Host;
+    }
     out.usePoissonLikelihood = snapshot.usePoissonLikelihood;
     out.throwIfInfLlh = snapshot.throwIfInfLlh;
     out.fractionalErrorLimit = snapshot.fractionalErrorLimit;
@@ -151,14 +157,18 @@ namespace {
   }
 
   void checkResidentLikelihood(Backend& gpu_, bool metal_) {
-    for( auto kind : {LikelihoodKind::Poisson, LikelihoodKind::BarlowBeeston2022} ){
-      for( int setting = 0; setting < 4; ++setting ){
+    for( auto kind : {LikelihoodKind::Poisson, LikelihoodKind::BarlowBeeston2022,
+                     LikelihoodKind::BarlowBeestonLiteGaussian, LikelihoodKind::BarlowBeestonLitePoisson} ){
+      const bool lite = kind == LikelihoodKind::BarlowBeestonLiteGaussian || kind == LikelihoodKind::BarlowBeestonLitePoisson;
+      for( int setting = 0; setting < (lite ? 1 : 4); ++setting ){
         const bool nominal = setting & 1;
         const bool poissonOnly = setting & 2;
         auto view = likelihoodView(kind, nominal, poissonOnly);
         gpu_.build(view);
-        const char* type = kind == LikelihoodKind::Poisson ? "PoissonLLH" : "BarlowLLH_BANFF_OA2021";
-        auto ref = kind == LikelihoodKind::Poisson ? reference(type)
+        const char* type = kind == LikelihoodKind::Poisson ? "PoissonLLH"
+            : kind == LikelihoodKind::BarlowBeestonLiteGaussian ? "BarlowBeestonLiteGaussian"
+            : kind == LikelihoodKind::BarlowBeestonLitePoisson ? "BarlowBeestonLitePoisson" : "BarlowLLH_BANFF_OA2021";
+        auto ref = kind == LikelihoodKind::Poisson || lite ? reference(type)
             : reference(type, {{"usePoissonLikelihood", poissonOnly}});
         auto stablePoisson = reference("BarlowLLH_BANFF_OA2021");
         PropagationToken previous;
@@ -179,7 +189,7 @@ namespace {
                 // the zero-variance 2022 reference provides a stable oracle.
                 expected += stablePoisson->eval(sample.dataSums[bin], pred, 0., bin);
               }
-              else{ expected += ref->eval(sample.dataSums[bin], pred, variance, bin); }
+              else{ expected += ref->eval(sample.dataSums[bin], pred, lite ? std::sqrt(variance) : variance, bin); }
             }
           }
           const double actual = gpu_.getLikelihood(token);
@@ -458,4 +468,114 @@ TEST(BackendLikelihood, CudaParallelFinalReductionHandlesManyPartials) {
     EXPECT_EQ(gpu.getLastTimingSummary().histogramReadbackBytes, 0);
   }
 }
+#endif
+
+TEST(BackendLikelihood, LiteSnapshotsAndPortableValuesAndGradientsMatchReferences) {
+  using namespace Backends;
+  for( const char* type : {"BarlowBeestonLiteGaussian", "BarlowBeestonLitePoisson"} ){
+    auto ref = reference(type);
+    auto config = options(*ref);
+    EXPECT_NE(config.kind, LikelihoodKind::Host);
+    auto snapshot = JointProbability::snapshotJointProbability(*ref, {});
+    EXPECT_FALSE(snapshot.useNominalVariance);
+    EXPECT_FALSE(snapshot.throwIfInfLlh);
+    for( double n : {0., 1e-6, 1., 20., 1e8} ){
+      for( double mu : {0., .1, 1., 20., 1e8, n*(1+1e-10)} ){
+        for( double sigma : {0., .01, 1., 100.} ){
+          SCOPED_TRACE(::testing::Message() << type << ": " << n << ", " << mu << ", " << sigma);
+          auto actual = config.kind == LikelihoodKind::BarlowBeestonLiteGaussian
+              ? LikelihoodSemantics::evaluateLiteGaussian<Math>(n, mu, sigma)
+              : LikelihoodSemantics::evaluateLitePoisson<Math>(n, mu, sigma);
+          same(actual.value, ref->eval(n, mu, sigma, 0));
+          same(actual.predictionGradient, ref->evalPredictionGradient(n, mu, sigma, 0));
+          same(actual.uncertaintyGradient, ref->evalSqrtSumSqWeightsGradient(n, mu, sigma, 0));
+          same(LikelihoodSemantics::evaluate<Math>(n, mu, sigma*sigma, config), actual.value);
+        }
+      }
+    }
+    for( double bad : {-1., std::numeric_limits<double>::infinity(), std::numeric_limits<double>::quiet_NaN()} ){
+      EXPECT_TRUE(std::isinf(LikelihoodSemantics::evaluate<Math>(bad, 2., 1., config)));
+      EXPECT_TRUE(std::isinf(LikelihoodSemantics::evaluate<Math>(1., bad, 1., config)));
+      EXPECT_TRUE(std::isinf(LikelihoodSemantics::evaluate<Math>(1., 2., bad, config)));
+    }
+  }
+}
+
+TEST(BackendLikelihood, CpuLiteLikelihoodsUseResidentMomentsWithoutCallback) {
+  for( auto kind : {LikelihoodKind::BarlowBeestonLiteGaussian, LikelihoodKind::BarlowBeestonLitePoisson} ){
+    CpuBackend cpu;
+    auto view = likelihoodView(kind);
+    auto ref = reference(kind == LikelihoodKind::BarlowBeestonLiteGaussian ? "BarlowBeestonLiteGaussian" : "BarlowBeestonLitePoisson");
+    cpu.build(view);
+    for( double parameter : {.5, 1., 1.+1e-10, 2.} ){
+      PropagationInputs inputs;
+      inputs.parameters.values = {parameter};
+      double expected = 0;
+      for( const auto& sample : view.likelihood.samples ){
+        for( size_t bin = 0; bin < sample.dataSums.size(); ++bin ){
+          if( sample.ignoredBins[bin] ) continue;
+          expected += ref->eval(sample.dataSums[bin], sample.dataSums[bin]*parameter,
+              std::sqrt(sample.nominalVariances[bin])*parameter, int(bin));
+        }
+      }
+      const double actual = cpu.getLikelihood(cpu.requestPropagation(inputs));
+      EXPECT_NEAR(actual, expected, 2e-11*std::max(1e-25, std::abs(expected)));
+    }
+  }
+}
+
+#if defined(__APPLE__) || defined(GUNDAM_TEST_CUDA_DEVICE)
+namespace {
+  void checkLiteEdges(Backend& backend_) {
+    for( auto kind : {LikelihoodKind::BarlowBeestonLiteGaussian, LikelihoodKind::BarlowBeestonLitePoisson} ){
+      auto ref = reference(kind == LikelihoodKind::BarlowBeestonLiteGaussian ? "BarlowBeestonLiteGaussian" : "BarlowBeestonLitePoisson");
+      for( double data : {0., 1e-12, 1e-4, 1., 1e8} ){
+        for( double shift : {-1e-5, -1e-8, 0., 1e-8, 1e-5} ){
+          SCOPED_TRACE(::testing::Message() << ref->getType() << ": " << data << ", " << shift);
+          EngineView view;
+          view.propagation.totalBins = 1;
+          const double prediction = data*(1+shift);
+          for( int i = 0; i < 10; ++i ){
+            EventView event;
+            event.globalBinIndex = 0;
+            event.resultIndex = i;
+            view.propagation.events.push_back(event);
+            view.propagation.eventWeights.push_back({prediction/10, 0, 0});
+          }
+          LikelihoodSampleView sample;
+          sample.dataSums = {data};
+          sample.portableOptions = options(*ref);
+          sample.evalBin = [](double, double, double, int) -> double { throw std::runtime_error("Unexpected host fallback"); };
+          view.likelihood.samples = {sample};
+          backend_.build(view);
+          const auto token = backend_.requestPropagation({});
+          const double expected = ref->eval(data, prediction, prediction/std::sqrt(10.), 0);
+          const double actual = backend_.getLikelihood(token);
+          EXPECT_GE(actual, 0);
+          EXPECT_NEAR(actual, expected, expected > 0 ? expected*5e-5 : data*1e-25);
+          EXPECT_EQ(backend_.getLastTimingSummary().histogramReadbackBytes, 0);
+          EXPECT_EQ(backend_.getLastTimingSummary().eventWeightReadbackBytes, 0);
+          // Positive observations with no MC expectation remain infinite,
+          // without a host exception or a replacement by a finite floor.
+          view.likelihood.samples[0].dataSums[0] = 1;
+          for( auto& event : view.propagation.eventWeights ) event.baseWeight = 0;
+          backend_.build(view);
+          EXPECT_EQ(backend_.getLikelihood(backend_.requestPropagation({})), std::numeric_limits<double>::infinity());
+        }
+      }
+    }
+  }
+}
+#ifdef __APPLE__
+TEST(BackendLikelihood, MetalLiteEmptyAndLowRateBinsStayResident) {
+  MpsBackend backend;
+  checkLiteEdges(backend);
+}
+#endif
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(BackendLikelihood, CudaLiteEmptyAndLowRateBinsStayResident) {
+  CudaBackend backend;
+  checkLiteEdges(backend);
+}
+#endif
 #endif

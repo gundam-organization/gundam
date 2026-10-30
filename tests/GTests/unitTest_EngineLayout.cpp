@@ -159,3 +159,31 @@ TEST(EngineLayout, TableDialsShareSourcesWithoutRequestingScalarPayloads) {
     EXPECT_EQ(propagation.eventDialIndices, (std::vector<std::uint32_t>{0, 1, 2, 0}));
   }
 }
+
+TEST(EngineLayout, ExportsLiteLikelihoodKindsFromConfiguration) {
+  for( const char* type : {"BarlowBeestonLiteGaussian", "BarlowBeestonLitePoisson"} ){
+    LikelihoodInterface likelihood;
+    likelihood.configure(ConfigReader(JsonType{{"jointProbabilityConfig", {{"type", type}}}}));
+    auto& samples = likelihood.getModelPropagator().getSampleSet().getSampleList();
+    samples.resize(1);
+    samples[0].setIndex(0);
+    samples[0].configure(ConfigReader(JsonType{{"name", "model"}, {"binning", {{"binningDefinition", {
+        {{"name", "X"}, {"edges", {0., 1.}}}}}}}}));
+    Sample data;
+    data.configure(ConfigReader(JsonType{{"name", "data"}, {"binning", {{"binningDefinition", {
+        {{"name", "X"}, {"edges", {0., 1.}}}}}}}}));
+    data.getHistogram().getBinContentList()[0].sumWeights = 12;
+    likelihood.getSamplePairList().push_back({&samples[0], &data});
+    Backends::EngineLayout layout;
+    layout.build(likelihood);
+    ASSERT_EQ(layout.view.likelihood.samples.size(), 1);
+    const auto& sample = layout.view.likelihood.samples[0];
+    const auto expected = std::string(type) == "BarlowBeestonLiteGaussian"
+        ? Backends::LikelihoodKind::BarlowBeestonLiteGaussian : Backends::LikelihoodKind::BarlowBeestonLitePoisson;
+    EXPECT_EQ(sample.portableOptions.kind, expected);
+    EXPECT_EQ(sample.portableOptions.useNominalVariance, 0);
+    EXPECT_EQ(sample.portableOptions.throwIfInfLlh, 0);
+    EXPECT_TRUE(sample.nominalVariances.empty());
+    EXPECT_DOUBLE_EQ(sample.evalBin(12, 10, 3, 0), likelihood.getJointProbabilityPtr()->eval(12, 10, 3, 0));
+  }
+}

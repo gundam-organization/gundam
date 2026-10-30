@@ -20,7 +20,7 @@ namespace Backends {
 #else
   using LikelihoodIndex = std::uint32_t;
 #endif
-  enum class LikelihoodKind : LikelihoodIndex { Host, Poisson, BarlowBeeston2022 };
+  enum class LikelihoodKind : LikelihoodIndex { Host, Poisson, BarlowBeeston2022, BarlowBeestonLiteGaussian, BarlowBeestonLitePoisson };
 
   // Shared host/device work description. The final reduction uses one fixed
   // threadgroup, independently of the number of partial contributions.

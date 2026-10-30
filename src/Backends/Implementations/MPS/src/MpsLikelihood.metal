@@ -7,6 +7,20 @@ namespace Backends::LikelihoodSemantics {
       // The small-residual branch is evaluated as a series by evaluate().
       return FormulaMath::log(Scalar(1) + x_);
     }
+    static Scalar exp(Scalar x_) { return FormulaMath::exp(x_); }
+    static Scalar expm1(Scalar x_) {
+      if( x_ < Scalar(-1)/Scalar(2) || x_ > Scalar(1)/Scalar(2) ) return exp(x_) - Scalar(1);
+      Scalar term = x_, sum = x_;
+      for( int order = 2; order <= 20; ++order ) { term = term * x_ / Scalar(order); sum += term; }
+      return sum;
+    }
+    static Scalar hypot(Scalar a_, Scalar b_) {
+      a_ = absolute(a_); b_ = absolute(b_);
+      Scalar larger = maximum(a_, b_), smaller = LikelihoodSemantics::minimum(a_, b_);
+      if( larger == Scalar(0) ) return Scalar(0);
+      Scalar ratio = smaller / larger;
+      return larger * sqrt(Scalar(1) + ratio * ratio);
+    }
     static bool finite(Scalar x_) { return FormulaMath::finite(x_); }
     // Metal has no binary64 exponent range. Zero represents DBL_MIN for the
     // floor/branch; its logarithm is retained explicitly for empty predictions.

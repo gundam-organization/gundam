@@ -110,6 +110,14 @@ namespace JointProbability{
     if( typeid(probability_) == typeid(PoissonLogLikelihood) ){
       out.kind = JointProbabilitySnapshot::Kind::Poisson;
     }
+    else if( typeid(probability_) == typeid(BarlowBeestonLiteGaussian) ){
+      out.kind = JointProbabilitySnapshot::Kind::BarlowBeestonLiteGaussian;
+      out.throwIfInfLlh = false;
+    }
+    else if( typeid(probability_) == typeid(BarlowBeestonLitePoisson) ){
+      out.kind = JointProbabilitySnapshot::Kind::BarlowBeestonLitePoisson;
+      out.throwIfInfLlh = false;
+    }
     else if( typeid(probability_) == typeid(BarlowBeestonBanff2022) ){
       const auto& barlow = static_cast<const BarlowBeestonBanff2022&>(probability_);
       out.kind = JointProbabilitySnapshot::Kind::BarlowBeeston2022;
