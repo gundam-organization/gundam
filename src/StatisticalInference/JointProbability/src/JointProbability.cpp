@@ -9,6 +9,8 @@
 #include "LeastSquares.h"
 #include "ChiSquared.h"
 #include "BarlowBeeston.h"
+#include "BarlowBeestonLiteGaussian.h"
+#include "BarlowBeestonLitePoisson.h"
 #include "BarlowBeestonBanff2020.h"
 #include "BarlowBeestonBanff2022.h"
 #include "BarlowBeestonBanff2022Sfgd.h"
@@ -78,7 +80,13 @@ namespace JointProbability{
       case JointProbabilityType::LeastSquares:
         out = std::make_unique<LeastSquares>();
         break;
-      case JointProbabilityType::BarlowLLH:
+      case JointProbabilityType::BarlowBeestonLitePoisson:
+        out = std::make_unique<BarlowBeestonLitePoisson>();
+        break;
+      case JointProbabilityType::BarlowBeestonLiteGaussian:
+        out = std::make_unique<BarlowBeestonLiteGaussian>();
+        break;
+      case JointProbabilityType::BarlowBeeston:
         out = std::make_unique<BarlowBeeston>();
         break;
       case JointProbabilityType::BarlowLLH_BANFF_OA2020:
