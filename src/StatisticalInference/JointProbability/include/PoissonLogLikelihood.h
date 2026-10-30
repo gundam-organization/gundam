@@ -16,6 +16,23 @@ namespace JointProbability{
 
   public:
     [[nodiscard]] std::string getType() const override { return "PoissonLogLikelihood"; }
+    [[nodiscard]] double evalPredictionGradient(double data_, double pred_, double err_, int bin_) const override {
+      if( pred_ <= 0 ){ return 0.; }
+      if( data_ <= 0 ){ return 2.; }
+      return 2. * (1. - data_ / pred_);
+    }
+    [[nodiscard]] double evalSqrtSumSqWeightsGradient(double data_, double pred_, double err_, int bin_) const override {
+      return 0.;
+    }
+    [[nodiscard]] double evalPredictionGradient(const SamplePair& samplePair_, int bin_) const override {
+      const double dataVal{samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights};
+      const double predVal{samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights};
+      const double predErr{samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights};
+      return evalPredictionGradient(dataVal, predVal, predErr, bin_);
+    }
+    [[nodiscard]] double evalSqrtSumSqWeightsGradient(const SamplePair& samplePair_, int bin_) const override {
+      return 0.;
+    }
     [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override {
       double predVal = pred_;
       double dataVal = data_;

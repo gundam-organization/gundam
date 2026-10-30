@@ -17,6 +17,7 @@
 #include <vector>
 #include <utility>
 
+class Parameter;
 
 class EventDialCache{
 
@@ -227,6 +228,8 @@ public:
   [[nodiscard]] bool hasVariableResponses() const{ return _hasVariableResponses_; }
 
   void reweightEntry( CacheEntry& entry_);
+  void evalEventWeightGradient(CacheEntry& entry_, const std::vector<Parameter*>& parameterList_,
+                               bool resetGradients_ = true, double gradientScale_ = 1.);
 
 
 private:

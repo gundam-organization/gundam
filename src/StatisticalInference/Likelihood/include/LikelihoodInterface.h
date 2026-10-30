@@ -19,6 +19,7 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 
 
 /// Evaluate the likelihood between data and MC.  The calculation is buffered
@@ -94,6 +95,7 @@ public:
 
   // core
   double evalLikelihood(std::future<bool>& propagation) const;
+  void evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
   double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
@@ -116,6 +118,9 @@ protected:
   void loadModelPropagator();
   void loadDataPropagator();
   void buildSamplePairList();
+  void evalStatLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
+  void evalPenaltyLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
+  void evalPenaltyLikelihoodGradient(ParameterSet& parSet_, const std::vector<Parameter*>& parameterList_);
 
   DataDispenser* getDataDispenser( DatasetDefinition& dataset_ );
 

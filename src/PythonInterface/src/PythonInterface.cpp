@@ -315,6 +315,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getStdDevValue", &Parameter::getStdDevValue)
   .def("getThrowValue", &Parameter::getThrowValue)
   .def("getParameterValue", &Parameter::getParameterValue)
+  .def("getGradient", &Parameter::getGradient)
+  .def("isPenaltyDisabled", &Parameter::isPenaltyDisabled)
   .def("getSummary", &Parameter::getSummary)
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
   .def("setIsFixed", &Parameter::setIsFixed)
@@ -554,9 +556,26 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getMinimizerStatus", &MinimizerBase::getMinimizerStatus)
   .def("checkFlatDirections", &MinimizerBase::checkFlatDirections, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
+  .def("setDisableCalcError", &MinimizerBase::setDisableCalcError)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
        pybind11::return_value_policy::reference_internal)
+  .def("evalFit", [](MinimizerBase& this_, const std::vector<double>& parArray_){
+    return this_.evalFit(parArray_.data());
+  }, pybind11::arg("parArray"))
+  .def("evalFitGradient", pybind11::overload_cast<>(&MinimizerBase::evalFitGradient))
+  .def("evalFitGradient", pybind11::overload_cast<const std::vector<Parameter*>&>(&MinimizerBase::evalFitGradient))
+  .def("evalFitGradient", [](MinimizerBase& this_, const pybind11::list& parameters_){
+    std::vector<Parameter*> parameters;
+    parameters.reserve(parameters_.size());
+    for( const auto& parameter : parameters_ ){
+      auto* pointer = parameter.cast<Parameter*>();
+      if( pointer == nullptr ){ throw pybind11::value_error("Gradient parameters cannot contain None."); }
+      parameters.push_back(pointer);
+    }
+    this_.evalFitGradient(parameters);
+  })
+  .def("getMinimizerFitParameterList", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterList), pybind11::return_value_policy::reference)
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")

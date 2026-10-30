@@ -78,6 +78,8 @@ public:
 
   // Call-local inputs for composed evaluations; no parameter references.
   void setInputValues(std::vector<double> values_);
+  /// Return d(inputBuffer[iInput_])/d(parameterValue) for the current point.
+  [[nodiscard]] double evalInputGradient(int iInput_) const;
 
   // nested getters
   [[nodiscard]] auto& getParameterSet(int iInput_) const{ return _inputParameterReferenceList_[iInput_].getParameterSet(_parSetListPtr_); }

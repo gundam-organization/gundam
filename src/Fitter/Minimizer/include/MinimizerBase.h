@@ -89,6 +89,8 @@ public:
   /// point values and returns the likelihood. The meaning of the parameters is
   /// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
   virtual double evalFit( const double* parArray_ );
+  void evalFitGradient();
+  void evalFitGradient( const std::vector<Parameter*>& parameterList_ );
 
   /// Throw a new parameter point around the post-fit best fit. By default,
   /// minimizers that do not provide post-fit throws leave the parameters
@@ -144,6 +146,8 @@ public:
   // core
   void printParameters();
   [[nodiscard]] int fetchNbDegreeOfFreedom() const { return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
+  std::vector<Parameter *> &getMinimizerFitParameterList(){ return _minimizerParameterPtrList_; }
+  const std::vector<Parameter *> &getMinimizerFitParameterList() const{ return _minimizerParameterPtrList_; }
 
 
 protected:
