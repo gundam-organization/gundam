@@ -11,6 +11,7 @@
 
 
 void DialInputBuffer::invalidateBuffers(){
+  ++_revision_;
   // invalidate buffer
   for( auto& buf : _inputBuffer_ ){ buf = std::nan("unset"); }
 }
@@ -88,6 +89,7 @@ void DialInputBuffer::update(){
       _inputBuffer_[inputRef.bufferIndex] = tempBuffer;
     }
   }
+  if( _isDialUpdateRequested_ ){ ++_revision_; }
 }
 double DialInputBuffer::evalInputGradient(int iInput_) const{
   LogThrowIf(iInput_ < 0 or iInput_ >= _inputParameterReferenceList_.size(),

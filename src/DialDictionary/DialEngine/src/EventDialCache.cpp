@@ -9,6 +9,8 @@
 
 #include <algorithm>
 
+#include <algorithm>
+
 
 void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
@@ -119,6 +121,32 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
             dialCollectionList_.at(dialIndex.collectionIndex)
             .getDialInterfaceList().at(dialIndex.interfaceIndex)
         );
+        const auto& collection = dialCollectionList_.at(dialIndex.collectionIndex);
+        if( collection.getApplyToVariable().empty() ){ continue; }
+        _hasVariableResponses_ = true;
+        cacheEntry.dialResponseCacheList.back().appliesToVariable = true;
+        auto& variables = cacheEntry.event->getVariables();
+        int variableIndex = variables.findVarIndex(collection.getApplyToVariable());
+        auto& responses = cacheEntry.variableResponseCacheList;
+        auto target = std::find_if(responses.begin(), responses.end(), [&](const VariableResponseCache& response_){
+          return response_.variableIndex == variableIndex;
+        });
+        if( target == responses.end() ){
+          responses.emplace_back();
+          target = responses.end() - 1;
+          target->variableIndex = variableIndex;
+          target->referenceValue = variables.getVarList()[variableIndex].getVarAsDouble();
+        }
+        auto responseIndex = cacheEntry.dialResponseCacheList.size() - 1;
+        auto mode = collection.getVariableResponseMode();
+        if( mode == DialCollection::VariableResponseMode::Multiply ){ target->multiplyDials.push_back(responseIndex); }
+        else if( mode == DialCollection::VariableResponseMode::Add ){ target->addDials.push_back(responseIndex); }
+        else{
+          LogThrowIf(target->overrideDial != std::size_t(-1),
+                     "Multiple Override dials for variable \"" << collection.getApplyToVariable()
+                     << "\" on event " << *cacheEntry.event);
+          target->overrideDial = responseIndex;
+        }
       }
     }
   }
@@ -163,6 +191,7 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
 
   // calculate the dial responses
   for( auto& dialResponseCache : entry_.dialResponseCacheList ){
+    if( dialResponseCache.appliesToVariable ){ continue; }
     tempReweight *= dialResponseCache.getResponse();
   }
 
@@ -171,6 +200,17 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
 
   entry_.event->getWeights().resetCurrentWeight(); // reset to the base weight
   entry_.event->getWeights().current *= tempReweight; // apply the reweight factor
+}
+
+void EventDialCache::applyVariableResponses(CacheEntry& entry_){
+  for( auto& target : entry_.variableResponseCacheList ){
+    double value = target.overrideDial == std::size_t(-1) ? target.referenceValue
+        : entry_.dialResponseCacheList[target.overrideDial].getResponse();
+    for( auto index : target.multiplyDials ){ value *= entry_.dialResponseCacheList[index].getResponse(); }
+    for( auto index : target.addDials ){ value += entry_.dialResponseCacheList[index].getResponse(); }
+    // Dial responses are continuous values, including when the source branch was integral.
+    entry_.event->getVariables().getVarList()[target.variableIndex].set(value);
+  }
 }
 
 void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
