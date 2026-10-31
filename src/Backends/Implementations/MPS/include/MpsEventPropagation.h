@@ -2,6 +2,7 @@
 #define GUNDAM_MPS_EVENT_PROPAGATION_H
 
 #include "DevicePropagationModel.h"
+#include "GradientTypes.h"
 #include "EventStateCache.h"
 #include "PropagationResult.h"
 
@@ -26,6 +27,7 @@ namespace Backends {
     [[nodiscard]] std::string getExecutionState() const;
     [[nodiscard]] const std::map<std::string, double>& getDiagnosticStageGpuSeconds() const { return _diagnosticStageGpuSeconds_; }
     void build(const PropagationView& model_, const LikelihoodView& likelihood_ = {});
+    std::vector<double> getLikelihoodGradient(const EngineView& view_);
     void materializeHistograms(PropagationResult& result_, BackendTimingSummary& timing_);
     void clear();
     void invalidate(){ _cache_.invalidate(); _valid_ = false; }
@@ -42,9 +44,9 @@ namespace Backends {
       EventWeights, BinCounts, BinPositions, BinContributions, ChunkOffsets, Chunks,
       PartialSums, PartialSquares, HistogramSums, HistogramSquares, ReadbackSums, ReadbackSquares,
       ReadbackVariables, ReadbackBins, ReadbackCounts, ReadbackContributions, ReadbackWeights, FormulaPrograms, FormulaInstructions, FormulaConstants,
-      ProgramInputs, CompositePrograms, CompositeInstructions, ProgramScratch, LikelihoodBins, LikelihoodCount, LikelihoodPartials, LikelihoodTotal, LikelihoodReadback, Count
+      ProgramInputs, CompositePrograms, CompositeInstructions, ProgramScratch, LikelihoodBins, LikelihoodCount, LikelihoodPartials, LikelihoodTotal, LikelihoodReadback, GradientDials, GradientEvents, GradientBins, GradientPayloads, GradientIndices, GradientOffsets, GradientOccurrences, GradientResponses, GradientScales, GradientContributions, GradientTotal, GradientReadback, GradientWork, Count
     };
-    enum class Kernel { Dials, Events, Binning, ClearCounts, CountContributions, IndexChunks, Scatter, Reduce, Finish, ReduceParallel, LikelihoodPartials, LikelihoodFinish, Count };
+    enum class Kernel { Dials, Events, Binning, ClearCounts, CountContributions, IndexChunks, Scatter, Reduce, Finish, ReduceParallel, LikelihoodPartials, LikelihoodFinish, GradientDials, GradientBins, GradientEvents, GradientReduce, Count };
     id<MTLBuffer> buffer(Buffer buffer_) const { return _buffers_[std::size_t(buffer_)]; }
     struct DialGroup { std::size_t dependency, first, count; bool external; };
     struct MultiDialGroup { std::vector<std::size_t> parameters; std::size_t first, count; };
@@ -67,6 +69,7 @@ namespace Backends {
     bool _valid_{false};
     bool _deviceLikelihood_{false};
     LikelihoodWorkLayout _likelihoodWork_{};
+    GradientWork<ObservableScalar> _gradientWork_{};
     bool _lastUpdatedPrediction_{true};
     bool _enableDiagnosticStageProfiling_{false};
     bool _enableDialCache_{true};

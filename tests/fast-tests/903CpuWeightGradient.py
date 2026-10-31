@@ -14,7 +14,7 @@ import_module('005PythonSetup-utils').requireVenv(__file__)
 helpers = import_module('230CompositeDials')
 
 
-def check_threads(threads):
+def check_threads(threads, backend_name="CPU"):
     import GUNDAM
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(threads)
@@ -183,7 +183,7 @@ def check_threads(threads):
                              for i, p in enumerate(pars)]
                     reference = check(engine, point)
                     manager = engine.getBackendsManager()
-                    manager.activate('CPU')
+                    manager.activate(backend_name)
                     manager.setEnableAutoMaterialize(False)
                     actual = check(engine, point)
                     for a, b in zip(actual, reference): close(a, b)
@@ -192,7 +192,7 @@ def check_threads(threads):
                     for a, b in zip(check(engine, point), reference): close(a, b)
         # Unsupported CPU likelihoods fail explicitly, without host fallback.
         engine = build(least_squares, False, False)
-        engine.getBackendsManager().activate('CPU')
+        engine.getBackendsManager().activate(backend_name)
         try:
             engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
         except RuntimeError as error:
@@ -200,21 +200,25 @@ def check_threads(threads):
         else:
             raise AssertionError('Unsupported backend likelihood gradient was accepted')
         for configuration, message in ((least_squares, 'BarlowBeestonLiteGaussian'),
-                                       (unsupported, 'Unsupported CPU backend gradient dial')):
+                                       (unsupported, 'Unsupported')):
             try:
-                build(configuration, False, False, backend='CPU', analytic=True)
+                build(configuration, False, False, backend=backend_name, analytic=True)
             except RuntimeError as error:
                 assert message in str(error), str(error)
             else:
                 raise AssertionError('Incompatible analytic backend configuration initialized')
 
 
-    print(f'SUCCESS: Gaussian BB CPU gradients, fit coordinates, eigenvectors, zero products and freshness ({threads} threads)')
+    print(f'SUCCESS: Gaussian BB CPU gradients, fit coordinates, eigenvectors, zero products and freshness ({threads} threads, backend={backend_name})')
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--backend', choices=['CPU', 'MPS', 'CUDA'], default='CPU')
+    args = parser.parse_args()
     for threads in (1, 4):
-        check_threads(threads)
+        check_threads(threads, args.backend)
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 #include "MpsBackend.h"
 
 #include "MpsBackendInternal.h"
+#include "GradientModel.h"
 #include "LikelihoodModel.h"
 #include "Semantics/BackendHostPropagation.h"
 
@@ -35,6 +36,7 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
   out.supportsObservableTransforms = true;
   out.supportsEventWeights = true;
   out.supportsHistograms = true;
+  out.supportsLikelihoodGradient = _impl_->isAvailable;
   out.supportsLikelihood = true;
   // The resident executor preserves float pairs through event products and
   // histogram readback. The packed weight executor still publishes float32.
@@ -45,6 +47,7 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
 
 void Backends::MpsBackend::build(const EngineView& engineView_) {
   _impl_->isBuilt = false;
+  _impl_->gradientValidated = false;
   _impl_->engineView = engineView_;
   _impl_->lastResult = MpsBackendImpl::Result();
   _impl_->buildTiming = BackendTimingSummary();
@@ -403,4 +406,24 @@ Backends::BackendResourceUsage Backends::MpsBackend::getResourceUsage() const {
   usage.allocatedBytes = _impl_->device.currentAllocatedSize;
   usage.recommendedDeviceBytes = _impl_->device.recommendedMaxWorkingSetSize;
   return usage;
+}
+
+void Backends::MpsBackend::validateLikelihoodGradient() const {
+  LogThrowIf(not _impl_->isBuilt or not _impl_->useEventPropagation, "MPS gradient requires a built resident likelihood model.");
+  if( not _impl_->gradientValidated ){
+    validateDeviceGradient(_impl_->engineView);
+    _impl_->gradientValidated = true;
+  }
+}
+std::vector<double> Backends::MpsBackend::getLikelihoodGradient(const PropagationToken& token_) {
+  LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MPS gradient propagation token.");
+  validateLikelihoodGradient();
+  LogThrowIf(not std::isfinite(getLikelihood(token_)), "Cannot differentiate a non-finite MPS likelihood.");
+  try{ return _impl_->eventPropagation->getLikelihoodGradient(_impl_->engineView); }
+  catch(...){
+    _impl_->eventPropagation->invalidate();
+    _impl_->lastResult.token.isValid = false;
+    _impl_->lastResult.status.backend = BackendStatus::Failed;
+    throw;
+  }
 }

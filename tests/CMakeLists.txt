@@ -132,6 +132,7 @@ if( WITH_GOOGLE_TEST )
 
   if(WITH_BACKENDS AND GUNDAM_CUDA_ENABLED)
     add_executable(gundamGTest_cudaBackend.exe
+        GTests/unitTest_CpuBackendGradient.cpp
         GTests/unitTest_CudaBackendPrograms.cpp
         GTests/unitTest_BackendLikelihood.cpp
         GTests/unitTest_CudaBackendDevice.cpp
@@ -147,6 +148,7 @@ if( WITH_GOOGLE_TEST )
         BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
     # Register without discovery: building must work without an allocated GPU.
     add_test(NAME cuda-backend-programs COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPrograms.*)
+    add_test(NAME cuda-backend-gradient COMMAND gundamGTest_cudaBackend.exe --gtest_filter=DeviceGradient.Cuda*:DeviceGradient.Portable*:CpuBackendGradient.*)
     add_test(NAME cuda-backend-likelihood COMMAND gundamGTest_cudaBackend.exe --gtest_filter=BackendLikelihood.*)
     add_test(NAME cuda-backend-skeleton COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendDevice.*)
     add_test(NAME cuda-backend-propagation COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPropagation.*)

@@ -8,6 +8,7 @@
 
 namespace Backends {
   struct CudaWeightModel;
+  struct EngineView;
   struct PropagationView;
   struct PropagationInputs;
   struct EventState;
@@ -28,6 +29,7 @@ namespace Backends {
     void build(const CudaWeightModel& model_, const PropagationView& original_, const LikelihoodView& likelihood_, unsigned int likelihoodBlockSize_);
     void propagate(const PropagationInputs& inputs_, bool recomputeResponses_, bool reusePrediction_, BackendTimingSummary& timing_);
     double readLikelihood();
+    std::vector<double> readGradient(const EngineView& view_);
     void readWeights(std::vector<double>& weights_);
     void readHistograms(std::vector<double>& sums_, std::vector<double>& sumSquares_,
                         std::vector<double>& outsideSums_, std::vector<double>& outsideSquares_);

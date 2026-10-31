@@ -534,3 +534,50 @@ TEST(BackendFitCovariance, CpuAnalyticGradientMatchesOriginalNumericalFitAndHess
   GTEST_SKIP() << "Built without backends";
 #endif
 }
+
+#if defined(__APPLE__) && defined(GUNDAM_USING_BACKENDS)
+TEST(BackendFitCovariance, MetalAnalyticGradientMatchesCpuFitAndHesse) {
+  FitEnvironment environment;
+  FitInput input;
+  for( bool normalized : {false, true} ){
+    const auto reference = fit(input, "CPU", "", "eventMajor", "BarlowBeestonLiteGaussian", true, normalized);
+    for( const char* mode : {"cachedResponses", "recomputeResponses"} ){
+      const auto actual = fit(input, "MPS", mode, "eventMajor", "BarlowBeestonLiteGaussian", true, normalized);
+      SCOPED_TRACE(::testing::Message() << mode << ", normalized=" << normalized);
+      EXPECT_EQ(actual.status, 0);
+      EXPECT_EQ(actual.covarianceStatus, 3);
+      EXPECT_LT(actual.edm, actual.targetEdm);
+      EXPECT_NEAR(actual.likelihood, reference.likelihood, 1e-8);
+      for( std::size_t i = 0; i < parameterCount; ++i ){
+        EXPECT_NEAR(actual.values[i], reference.values[i], 2e-4*reference.errors[i]);
+        EXPECT_NEAR(actual.errors[i], reference.errors[i], 2e-4*reference.errors[i]);
+        for( std::size_t j = 0; j < parameterCount; ++j )
+          EXPECT_NEAR(actual.covariance(i,j), reference.covariance(i,j), 5e-4*reference.errors[i]*reference.errors[j]);
+      }
+    }
+  }
+}
+#endif
+TEST_P(CudaFitCovariance, AnalyticGradientMatchesCpuFitAndHesse) {
+#ifdef GUNDAM_USING_BACKENDS
+  FitEnvironment environment;
+  FitInput input;
+  for( bool normalized : {false, true} ){
+    const auto reference = fit(input, "CPU", "", "eventMajor", "BarlowBeestonLiteGaussian", true, normalized);
+    for( const char* layout : {"eventMajor", "warpInterleaved"} ){
+      const auto actual = fit(input, "CUDA", GetParam(), layout, "BarlowBeestonLiteGaussian", true, normalized);
+      SCOPED_TRACE(::testing::Message() << GetParam() << ", " << layout << ", normalized=" << normalized);
+      EXPECT_EQ(actual.status, 0);
+      EXPECT_EQ(actual.covarianceStatus, 3);
+      EXPECT_LT(actual.edm, actual.targetEdm);
+      EXPECT_NEAR(actual.likelihood, reference.likelihood, 1e-8);
+      for( std::size_t i = 0; i < parameterCount; ++i ){
+        EXPECT_NEAR(actual.values[i], reference.values[i], 1e-4*reference.errors[i]);
+        EXPECT_NEAR(actual.errors[i], reference.errors[i], 1e-4*reference.errors[i]);
+        for( std::size_t j = 0; j < parameterCount; ++j )
+          EXPECT_NEAR(actual.covariance(i,j), reference.covariance(i,j), 3e-4*reference.errors[i]*reference.errors[j]);
+      }
+    }
+  }
+#endif
+}

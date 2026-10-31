@@ -1,4 +1,12 @@
 #include "CpuBackend.h"
+#ifdef __APPLE__
+#include "MpsBackend.h"
+#endif
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+#include "CudaBackend.h"
+#endif
+#include "GradientModel.h"
+#include "Semantics/BackendDeviceGradient.h"
 #include "Semantics/BackendDialGradient.h"
 #include "Graph.h"
 #include "CompactSpline.h"
@@ -52,7 +60,7 @@ namespace {
     return view;
   }
 
-  void compareGradient(CpuBackend& backend_, const std::vector<double>& point_) {
+  void compareGradient(Backend& backend_, const std::vector<double>& point_, double absoluteTolerance_ = 1e-14) {
     PropagationInputs inputs;
     inputs.parameters.values = point_;
     const auto token = backend_.requestPropagation(inputs);
@@ -67,9 +75,9 @@ namespace {
       inputs.parameters.values[i] -= 2*h;
       const double down = backend_.getLikelihood(backend_.requestPropagation(inputs));
       const double numeric = (up-down)/(2*h);
-      EXPECT_NEAR(gradient[i], numeric, 3e-5 * std::max(1e-20, std::abs(numeric)) + 1e-14);
+      EXPECT_NEAR(gradient[i], numeric, 3e-5 * std::max(1e-20, std::abs(numeric)) + absoluteTolerance_);
     }
-    EXPECT_THROW(backend_.getLikelihoodGradient(token), std::exception);
+    EXPECT_THROW(static_cast<void>(backend_.getLikelihoodGradient(token)), std::exception);
   }
 }
 
@@ -152,3 +160,127 @@ TEST(CpuBackendGradient, RejectsUnsupportedLikelihoodAndSmoothing) {
   EXPECT_THROW(backend.validateLikelihoodGradient(), std::exception);
 
 }
+
+namespace {
+  struct HostGradientMath : Backends::LikelihoodSemantics::DoubleMath {
+    static double remainder(double a_, double b_) { return std::fmod(a_, b_); }
+    static int integer(double x_) { return int(x_); }
+  };
+}
+TEST(DeviceGradient, PortableDialDerivativesMatchCpuReference) {
+  std::vector<DialUtils::DialPoint> points{{-2., .7, .15}, {-1., .9, .15}, {0., 1., .15}, {1., 1.25, .15}, {2., 1.4, .15}};
+  CompactSpline compact; compact.buildDial(points);
+  UniformSpline uniform; uniform.buildDial(points);
+  MonotonicSpline monotonic; monotonic.buildDial(points);
+  GeneralSpline general; general.buildDial(points);
+  Graph graph; graph.buildDial(points);
+  const std::vector<std::pair<BackendDialType, std::vector<double>>> cases{
+      {BackendDialType::CompactSpline, compact.getDialData()}, {BackendDialType::UniformSpline, uniform.getDialData()},
+      {BackendDialType::MonotonicSpline, monotonic.getDialData()}, {BackendDialType::GeneralSpline, general.getDialData()},
+      {BackendDialType::Graph, graph.getDialData()}, {BackendDialType::Norm, {}}, {BackendDialType::Shift, {.83}}};
+  for( const auto& item : cases ){
+    SCOPED_TRACE(unsigned(item.first));
+    for( bool mirror : {false, true} ) for( bool extrapolate : {false, true} ){
+      auto view = gradientModel(1.);
+      auto& model = view.propagation;
+      model.dials.resize(1);
+      auto& dial = model.dials[0];
+      dial.type = item.first; dial.payloadSize = item.second.size(); dial.allowExtrapolation = extrapolate;
+      model.dialPayloads = item.second;
+      model.dialInputs[0] = {0, mirror, -2., 4.};
+      model.events.clear(); model.eventWeights.clear(); model.eventDialIndices.clear();
+      GradientModel<double> packed; packed.build(view);
+      for( double x : {-6.7, -2.5, -2., -.27, .31, 1.61, 2., 2.7, 6.3} ){
+        const auto actual = GradientSemantics::evaluateDial<HostGradientMath>(packed.dials[0], item.second.data(), x);
+        const double expected = Semantics::evalDialResponse(dial, model.dialInputs.data(), item.second.data(), &x);
+        const double slope = item.first == BackendDialType::Shift ? 0. : Semantics::evalWeightDialGradient(dial, model.dialInputs[0], item.second.data(), x);
+        EXPECT_NEAR(actual.value, expected, 3e-13*std::max(1., std::abs(expected)));
+        EXPECT_NEAR(actual.derivative, slope, 3e-13*std::max(1., std::abs(slope)));
+      }
+    }
+  }
+}
+
+#ifdef __APPLE__
+TEST(DeviceGradient, MetalMatchesCpuWithResidentBinsAndRejectsStaleTokens) {
+  for( const char* mode : {"cachedResponses", "recomputeResponses"} ){
+    MpsBackend backend;
+    if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+    backend.configure(ConfigReader(JsonType{{"propagationMode", mode}}));
+    for( double rate : {1e-8, 1., 1e8} ){
+      auto view = gradientModel(rate);
+      backend.build(view);
+      for( auto point : {std::vector<double>{.8, 1.1}, {0., .9}, {0., 0.}} ){
+        SCOPED_TRACE(::testing::Message() << mode << ", rate=" << rate << ", p=" << point[0]);
+        compareGradient(backend, point, 2e-7);
+        CpuBackend cpu; cpu.build(view);
+        PropagationInputs inputs; inputs.parameters.values = point;
+        const auto reference = cpu.getLikelihoodGradient(cpu.requestPropagation(inputs));
+        const auto actual = backend.getLikelihoodGradient(backend.requestPropagation(inputs));
+        for( std::size_t i = 0; i < actual.size(); ++i ) EXPECT_NEAR(actual[i], reference[i], 1e-14 + 3e-8*std::abs(reference[i]));
+      }
+      view.propagation.hasReweightCap = true; view.propagation.maxReweight = .5;
+      backend.build(view);
+      compareGradient(backend, {1.2, 1.3}, 2e-7);
+    }
+  }
+}
+#endif
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(DeviceGradient, CudaMatchesCpuWithResidentBinsAndRejectsStaleTokens) {
+  for( const char* mode : {"cachedResponses", "recomputeResponses"} ) for( const char* layout : {"eventMajor", "warpInterleaved"} ){
+    CudaBackend backend;
+    backend.configure(ConfigReader(JsonType{{"propagationMode", mode}, {"weightLayout", layout}}));
+    for( double rate : {1e-12, 1., 1e8} ){
+      auto view = gradientModel(rate); backend.build(view);
+      for( auto point : {std::vector<double>{.8, 1.1}, {0., .9}, {0., 0.}} ){
+        compareGradient(backend, point);
+        CpuBackend cpu; cpu.build(view);
+        PropagationInputs inputs; inputs.parameters.values = point;
+        auto reference = cpu.getLikelihoodGradient(cpu.requestPropagation(inputs));
+        auto actual = backend.getLikelihoodGradient(backend.requestPropagation(inputs));
+        for( std::size_t i = 0; i < actual.size(); ++i ) EXPECT_NEAR(actual[i], reference[i], 1e-14 + 3e-12*std::abs(reference[i]));
+      }
+      view.propagation.hasReweightCap = true; view.propagation.maxReweight = .5;
+      backend.build(view); compareGradient(backend, {1.2, 1.3});
+    }
+  }
+}
+#endif
+
+#ifdef __APPLE__
+TEST(DeviceGradient, MetalGraphSplinesAndResponseClampsMatchCpu) {
+  std::vector<DialUtils::DialPoint> points{{-2., .7, .15}, {-1., .9, .15}, {0., 1., .15}, {1., 1.25, .15}, {2., 1.4, .15}};
+  CompactSpline compact; compact.buildDial(points);
+  UniformSpline uniform; uniform.buildDial(points);
+  MonotonicSpline monotonic; monotonic.buildDial(points);
+  GeneralSpline general; general.buildDial(points);
+  Graph graph; graph.buildDial(points);
+  const std::vector<std::pair<BackendDialType, std::vector<double>>> cases{
+      {BackendDialType::CompactSpline, compact.getDialData()}, {BackendDialType::UniformSpline, uniform.getDialData()},
+      {BackendDialType::MonotonicSpline, monotonic.getDialData()}, {BackendDialType::GeneralSpline, general.getDialData()},
+      {BackendDialType::Graph, graph.getDialData()}, {BackendDialType::Shift, {.83}}};
+  MpsBackend gpu;
+  if( !gpu.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  for( const auto& item : cases ) for( bool extrapolate : {false, true} ) for( bool clamp : {false, true} ) for( bool mirror : {false, true} ){
+    auto view = gradientModel(1.);
+    auto& model = view.propagation;
+    model.dials.resize(1); model.dialPayloads = item.second;
+    model.dialInputs[0] = {0, mirror, -2., 4.};
+    auto& dial = model.dials[0];
+    dial.type = item.first; dial.payloadSize = item.second.size(); dial.allowExtrapolation = extrapolate;
+    dial.hasMinResponse = dial.hasMaxResponse = clamp; dial.minResponse = .95; dial.maxResponse = 1.2;
+    for( auto& index : model.eventDialIndices ) index = 0;
+    gpu.build(view);
+    CpuBackend cpu; cpu.build(view);
+    for( double point : {.31, 2.7, -2.7} ){
+      SCOPED_TRACE(::testing::Message() << unsigned(item.first) << ", extrapolate=" << extrapolate << ", clamp=" << clamp << ", point=" << point);
+      PropagationInputs inputs; inputs.parameters.values = {point, 1.};
+      auto expected = cpu.getLikelihoodGradient(cpu.requestPropagation(inputs));
+      auto actual = gpu.getLikelihoodGradient(gpu.requestPropagation(inputs));
+      for( std::size_t i = 0; i < actual.size(); ++i ) EXPECT_NEAR(actual[i], expected[i], 1e-13 + 3e-8*std::abs(expected[i]));
+      compareGradient(gpu, inputs.parameters.values, 2e-7);
+    }
+  }
+}
+#endif

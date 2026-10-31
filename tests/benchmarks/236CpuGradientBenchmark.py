@@ -60,7 +60,7 @@ def main():
     parser.add_argument('--events', type=int, default=12000)
     parser.add_argument('--bins', type=int, default=12)
     parser.add_argument('--threads', type=int, default=4)
-    parser.add_argument('--backend', choices=['Original', 'CPU'], default='Original')
+    parser.add_argument('--backend', choices=['Original', 'CPU', 'MPS', 'CUDA'], default='Original')
     parser.add_argument('--strategy', type=int, choices=[0, 1, 2], default=1)
     parser.add_argument('--trials', type=int, default=3)
     parser.add_argument('--output', type=Path, required=True)
@@ -93,6 +93,8 @@ def main():
             point = [.2*math.sin(i+.4) for i in range(args.bins+2)]
             # Equal value/gradient workloads, with all initialization outside the timers.
             minimizer.evalFit(point)
+            # Warm lazy device gradient buffers/uploads outside the timed probes.
+            minimizer.evalFitGradientAt(point)
             started = time.perf_counter()
             for _ in range(8): minimizer.evalFit(point)
             value_ms = (time.perf_counter()-started)*1000/8

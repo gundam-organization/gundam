@@ -2,6 +2,7 @@
 #include "CudaWeightModel.h"
 #include "PropagationResult.h"
 #include "LikelihoodModel.h"
+#include "GradientModel.h"
 #include "Semantics/BackendHostPropagation.h"
 
 #ifdef GUNDAM_USING_CUDA
@@ -25,6 +26,7 @@ struct Backends::CudaBackendImpl {
   PropagationResult result{};
   EventState eventState{};
   bool hasEventState{false};
+  mutable bool gradientValidated{false};
   bool hasSmoothedBinning{false};
   BackendTimingSummary timing{};
   BackendTimingSummary buildTiming{};
@@ -109,6 +111,7 @@ Backends::BackendCapabilities Backends::CudaBackend::getCapabilities() const {
   out.supportsEventWeights = isCompiled();
   out.supportsHistograms = isCompiled();
   out.supportsLikelihood = isCompiled();
+  out.supportsLikelihoodGradient = isCompiled();
   out.supportsObservableTransforms = isCompiled();
   out.supportsDynamicBinning = isCompiled();
   out.deviceName = isCompiled() ? "CUDA not initialized" : "CUDA support not compiled";
@@ -126,6 +129,7 @@ const Backends::EngineView& Backends::CudaBackend::getEngineView() const {
 void Backends::CudaBackend::build(const EngineView& engineView_) { buildShared(std::make_shared<EngineView>(engineView_)); }
 
 void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engineView_) {
+  _impl_->gradientValidated = false;
   invalidateResult();
   _impl_->engineView.reset();
   _impl_->hasEventState = false;
@@ -383,4 +387,22 @@ Backends::BackendResourceUsage Backends::CudaBackend::getResourceUsage() const {
   if( _impl_->context ){ return _impl_->context->getResourceUsage(); }
 #endif
   return {};
+}
+
+void Backends::CudaBackend::validateLikelihoodGradient() const {
+  if( !_impl_->gradientValidated ){
+    validateDeviceGradient(getEngineView());
+    _impl_->gradientValidated = true;
+  }
+}
+std::vector<double> Backends::CudaBackend::getLikelihoodGradient(const PropagationToken& token_) {
+  requireToken(token_);
+  validateLikelihoodGradient();
+  if( !std::isfinite(getLikelihood(token_)) ) throw std::runtime_error("Cannot differentiate a non-finite CUDA likelihood.");
+#ifdef GUNDAM_USING_CUDA
+  try{ return _impl_->context->readGradient(getEngineView()); }
+  catch(...){ invalidateResult(); throw; }
+#else
+  throw std::runtime_error("CUDA support not compiled.");
+#endif
 }

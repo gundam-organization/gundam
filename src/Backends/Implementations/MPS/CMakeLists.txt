@@ -38,6 +38,15 @@ endforeach()
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Model/include/LikelihoodTypes.h MPS_LIKELIHOOD_TYPES)
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Execution/include/Semantics/BackendLikelihood.h MPS_LIKELIHOOD_SEMANTICS)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsLikelihood.metal MPS_LIKELIHOOD_KERNELS)
+foreach(GRADIENT_FILE
+    ${BACKENDS_SOURCE_DIR}/Common/Model/include/GradientTypes.h
+    ${BACKENDS_SOURCE_DIR}/Common/Execution/include/Semantics/BackendDeviceGradient.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsGradient.metal)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${GRADIENT_FILE})
+endforeach()
+file(READ ${BACKENDS_SOURCE_DIR}/Common/Model/include/GradientTypes.h MPS_GRADIENT_TYPES)
+file(READ ${BACKENDS_SOURCE_DIR}/Common/Execution/include/Semantics/BackendDeviceGradient.h MPS_GRADIENT_SEMANTICS)
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsGradient.metal MPS_GRADIENT_KERNELS)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsDialPrograms.metal MPS_DIAL_PROGRAMS)
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Formula/include/DeviceMath/SharedFormulaOperations.h MPS_FORMULA_OPERATIONS)
 string(REPLACE "#include \"DeviceMath/SharedFormulaOperations.h\"" "${MPS_FORMULA_OPERATIONS}" MPS_DIAL_PROGRAMS "${MPS_DIAL_PROGRAMS}")

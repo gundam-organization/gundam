@@ -108,6 +108,7 @@ namespace Backends {
     std::string deviceModelFallbackReason{};
     std::uint64_t nextTokenId{1};
     bool isBuilt{false};
+    mutable bool gradientValidated{false};
     uint32_t cachedDialCount{0};
     uint32_t compactCachedDialCount{0};
     uint32_t uniformCachedDialCount{0};

@@ -1,6 +1,8 @@
 namespace Backends::LikelihoodSemantics {
   struct MetalMath {
     using Scalar = ObservableScalar;
+    static Scalar remainder(Scalar a_, Scalar b_) { return GundamDeviceMath::remainder(a_, b_); }
+    static int integer(Scalar x_) { return int(x_); }
     static Scalar sqrt(Scalar x_) { return FormulaMath::sqrt(x_); }
     static Scalar log(Scalar x_) { return FormulaMath::log(x_); }
     static Scalar log1p(Scalar x_) {

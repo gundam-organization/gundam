@@ -34,6 +34,8 @@ ENUM_FIELD( warpInterleaved )
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
     [[nodiscard]] const EngineView& getEngineView() const override;
 
+    void validateLikelihoodGradient() const override;
+    [[nodiscard]] std::vector<double> getLikelihoodGradient(const PropagationToken& token_) override;
     void build(const EngineView& engineView_) override;
     void buildShared(std::shared_ptr<const EngineView> engineView_) override;
     PropagationToken requestPropagation(const PropagationInputs& inputs_) override;

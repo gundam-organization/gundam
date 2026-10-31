@@ -1,5 +1,6 @@
 #include "MpsEventPropagation.h"
 #include "MpsBackendInternal.h"
+#include "GradientModel.h"
 #include "DialDependencyGroups.h"
 #include "LikelihoodModel.h"
 
@@ -10,7 +11,7 @@
 
 namespace {
 const char* const kDiagnosticKernelNames[]{"evaluate_propagation_dials", "propagate_event_state", "rebin_events", "clear_contribution_counts",
-    "count_bin_contributions", "index_histogram_chunks", "scatter_bin_contributions", "reduce_histogram_chunks", "finish_dynamic_histograms", "reduce_histogram_chunks_parallel", "evaluate_likelihood_partials", "finish_likelihood"};
+    "count_bin_contributions", "index_histogram_chunks", "scatter_bin_contributions", "reduce_histogram_chunks", "finish_dynamic_histograms", "reduce_histogram_chunks_parallel", "evaluate_likelihood_partials", "finish_likelihood", "gradient_dials", "gradient_bins", "gradient_events", "gradient_reduce"};
 }
 
 Backends::MpsEventPropagation::MpsEventPropagation(id<MTLDevice> device_, id<MTLCommandQueue> queue_, id<MTLLibrary> library_)
@@ -242,7 +243,7 @@ void Backends::MpsEventPropagation::dispatch(id<MTLComputeCommandEncoder> encode
   [encoder_ setComputePipelineState:pipeline];
   NSUInteger index{0};
   for( auto slot : buffers_ ){ [encoder_ setBuffer:buffer(slot) offset:0 atIndex:index++]; }
-  NSUInteger width = kernel_ == Kernel::LikelihoodFinish ? GUNDAM_LIKELIHOOD_REDUCTION_WIDTH
+  NSUInteger width = (kernel_ == Kernel::LikelihoodFinish or kernel_ == Kernel::GradientReduce) ? GUNDAM_LIKELIHOOD_REDUCTION_WIDTH
       : std::min<NSUInteger>(256, pipeline.maxTotalThreadsPerThreadgroup);
   LogThrowIf(width > pipeline.maxTotalThreadsPerThreadgroup, "Metal likelihood reduction threadgroup is unsupported.");
   [encoder_ dispatchThreads:MTLSizeMake(count_, 1, 1) threadsPerThreadgroup:MTLSizeMake(width, 1, 1)];
@@ -511,7 +512,7 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   out["contributionCapacity"] = _packed_.contributionCapacity;
   out["histogramChunkCapacity"] = _packed_.histogramChunkCapacity;
   out["buffers"] = JsonType::array();
-  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights", "FormulaPrograms", "FormulaInstructions", "FormulaConstants", "ProgramInputs", "CompositePrograms", "CompositeInstructions", "ProgramScratch", "LikelihoodBins", "LikelihoodCount", "LikelihoodPartials", "LikelihoodTotal", "LikelihoodReadback"};
+  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights", "FormulaPrograms", "FormulaInstructions", "FormulaConstants", "ProgramInputs", "CompositePrograms", "CompositeInstructions", "ProgramScratch", "LikelihoodBins", "LikelihoodCount", "LikelihoodPartials", "LikelihoodTotal", "LikelihoodReadback", "GradientDials", "GradientEvents", "GradientBins", "GradientPayloads", "GradientIndices", "GradientOffsets", "GradientOccurrences", "GradientResponses", "GradientScales", "GradientContributions", "GradientTotal", "GradientReadback", "GradientWork"};
   static_assert(sizeof(names) / sizeof(*names) == std::size_t(Buffer::Count));
   for( std::size_t i = 0; i < _buffers_.size(); ++i ){
     auto value = _buffers_[i];
@@ -528,4 +529,64 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
       {"staticThreadgroupMemoryBytes", pipeline.staticThreadgroupMemoryLength}});
   }
   return out.dump();
+}
+
+std::vector<double> Backends::MpsEventPropagation::getLikelihoodGradient(const EngineView& view_) {
+  LogThrowIf(not _valid_, "MPS gradient has no valid propagation.");
+  if( buffer(Buffer::GradientWork) == nil ){
+    GradientModel<ObservableScalar> model;
+    model.build(view_);
+    _gradientWork_ = model.work;
+    auto upload = [&](Buffer slot_, const auto& data_){
+      _buffers_[std::size_t(slot_)] = data_.empty() ? makePrivateEmptyBuffer(_device_, 8)
+          : makePrivateBuffer(_device_, _queue_, data_);
+      LogThrowIf(buffer(slot_) == nil, "MPS gradient upload failed.");
+    };
+    auto allocate = [&](Buffer slot_, std::size_t bytes_, bool shared_ = false){
+      bytes_ = std::max(std::size_t(8), bytes_);
+      _buffers_[std::size_t(slot_)] = shared_ ? makeSharedEmptyBuffer(_device_, bytes_) : makePrivateEmptyBuffer(_device_, bytes_);
+      LogThrowIf(buffer(slot_) == nil, "MPS gradient allocation failed.");
+    };
+    try{
+      upload(Buffer::GradientDials, model.dials); upload(Buffer::GradientEvents, model.events);
+      upload(Buffer::GradientBins, model.bins); upload(Buffer::GradientPayloads, model.payloads);
+      upload(Buffer::GradientIndices, model.indices); upload(Buffer::GradientOffsets, model.parameterOffsets);
+      upload(Buffer::GradientOccurrences, model.parameterOccurrences);
+      allocate(Buffer::GradientResponses, model.dials.size()*2*sizeof(ObservableScalar));
+      allocate(Buffer::GradientScales, model.bins.size()*2*sizeof(ObservableScalar));
+      allocate(Buffer::GradientContributions, model.indices.size()*sizeof(ObservableScalar));
+      allocate(Buffer::GradientTotal, model.work.parameters*sizeof(ObservableScalar));
+      allocate(Buffer::GradientReadback, model.work.parameters*sizeof(ObservableScalar), true);
+      // Publish the completed layout only after all other allocations succeeded.
+      upload(Buffer::GradientWork, std::vector<GradientWork<ObservableScalar>>{model.work});
+    }
+    catch(...){
+      for( std::size_t i = std::size_t(Buffer::GradientDials); i < std::size_t(Buffer::Count); ++i ) releaseBuffer(_buffers_[i]);
+      throw;
+    }
+  }
+  auto command = [_queue_ commandBuffer];
+  auto encoder = [command computeCommandEncoder];
+  dispatch(encoder, Kernel::GradientDials, _gradientWork_.dials,
+      {Buffer::GradientDials, Buffer::GradientPayloads, Buffer::Parameters, Buffer::GradientResponses, Buffer::GradientWork});
+  dispatch(encoder, Kernel::GradientBins, _gradientWork_.bins,
+      {Buffer::GradientBins, Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::GradientScales, Buffer::GradientWork});
+  dispatch(encoder, Kernel::GradientEvents, _gradientWork_.events,
+      {Buffer::GradientEvents, Buffer::GradientIndices, Buffer::GradientResponses, Buffer::GradientScales,
+       Buffer::EventWeights, Buffer::GradientContributions, Buffer::GradientWork});
+  dispatch(encoder, Kernel::GradientReduce, std::size_t(_gradientWork_.parameters)*128,
+      {Buffer::GradientOffsets, Buffer::GradientOccurrences, Buffer::GradientContributions, Buffer::GradientTotal});
+  [encoder endEncoding];
+  auto blit = [command blitCommandEncoder];
+  if( _gradientWork_.parameters ) copy(blit, Buffer::GradientTotal, Buffer::GradientReadback, _gradientWork_.parameters*sizeof(ObservableScalar));
+  [blit endEncoding];
+  [command commit]; [command waitUntilCompleted];
+  LogThrowIf(command.status != MTLCommandBufferStatusCompleted, "MPS gradient command failed.");
+  const auto* values = static_cast<const ObservableScalar*>(buffer(Buffer::GradientReadback).contents);
+  std::vector<double> gradient(_gradientWork_.parameters);
+  for( std::size_t i = 0; i < gradient.size(); ++i ){
+    gradient[i] = double(values[i].high) + values[i].low;
+    LogThrowIf(not std::isfinite(gradient[i]), "Non-finite MPS likelihood gradient.");
+  }
+  return gradient;
 }

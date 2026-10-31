@@ -38,6 +38,8 @@ ENUM_FIELD( recomputeResponses )
     [[nodiscard]] std::string getDiagnosticEventPropagationState() const;
     [[nodiscard]] std::string getDiagnosticStageGpuSeconds() const;
 
+    void validateLikelihoodGradient() const override;
+    [[nodiscard]] std::vector<double> getLikelihoodGradient(const PropagationToken& token_) override;
     void build(const EngineView& engineView_) override;
     PropagationToken requestPropagation(const PropagationInputs& inputs_) override;
 
