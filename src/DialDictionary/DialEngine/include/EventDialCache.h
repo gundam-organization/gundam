@@ -81,6 +81,9 @@ public:
     Event* event;
     std::vector<DialResponseCache> dialResponseCacheList{};
     std::vector<VariableResponseCache> variableResponseCacheList{};
+    // Stable ownership for event-specific formulas and composites. Ordinary interfaces
+    // continue to belong to their DialCollection.
+    std::vector<std::shared_ptr<DialInterface>> boundDialInterfaces{};
 
     [[nodiscard]] std::string getSummary(bool shallow_ = true) const {
       std::stringstream ss;

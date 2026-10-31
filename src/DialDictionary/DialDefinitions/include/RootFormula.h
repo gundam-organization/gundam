@@ -6,8 +6,7 @@
 #define GUNDAM_ROOTFORMULA_H
 
 #include "DialBase.h"
-
-#include "TFormula.h"
+#include "FormulaEvaluator.h"
 
 #include <string>
 
@@ -23,12 +22,15 @@ public:
   [[nodiscard]] std::string getSummary() const override;
 
   void setFormulaStr(const std::string& formulaStr_);
+  void setInputNames(const std::vector<std::string>& names_, const std::vector<std::string>& constantNames_ = {});
+  [[nodiscard]] int getInputCount() const{ return _evaluator_.getInputCount(); }
 
-  TFormula& getFormula(){ return _formula_; }
+  TFormula& getFormula(){ return _evaluator_.getFormula(); }
+  const TFormula& getFormula() const{ return _evaluator_.getFormula(); }
 
 
 private:
-  TFormula _formula_{};
+  FormulaEvaluator _evaluator_{};
 
 };
 

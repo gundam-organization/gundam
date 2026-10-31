@@ -91,6 +91,15 @@ void DialInputBuffer::update(){
   }
   if( _isDialUpdateRequested_ ){ ++_revision_; }
 }
+void DialInputBuffer::setInputValues(std::vector<double> values_){
+  LogThrowIf(not _inputParameterReferenceList_.empty(), "Cannot replace parameter-backed dial inputs");
+  _inputBuffer_ = std::move(values_);
+  _inputArraySize_ = int(_inputBuffer_.size());
+  _isInitialized_ = true;
+  _isDialUpdateRequested_ = true;
+  ++_revision_;
+}
+
 double DialInputBuffer::evalInputGradient(int iInput_) const{
   LogThrowIf(iInput_ < 0 or iInput_ >= _inputParameterReferenceList_.size(),
              "Invalid input index " << iInput_ << " for buffer size " << _inputParameterReferenceList_.size());
