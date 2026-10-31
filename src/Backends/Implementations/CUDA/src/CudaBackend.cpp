@@ -175,7 +175,7 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   initializeDevice();
 #ifdef GUNDAM_USING_CUDA
   const auto uploadStart = Clock::now();
-  _impl_->context->build(packed, engineView_->propagation, engineView_->likelihood, likelihoodBlockSize, int(_eventWeightMode_), _eventWeightSparseFraction_);
+  _impl_->context->build(packed, engineView_->propagation, engineView_->likelihood, likelihoodBlockSize, static_cast<int>(_eventWeightMode_.value), _eventWeightSparseFraction_);
   _impl_->buildTiming.buildBufferUploadSeconds = elapsed(uploadStart);
 #endif
   _impl_->engineView = std::move(engineView_);
