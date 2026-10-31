@@ -45,6 +45,10 @@ public:
   void setEnableSimplexBeforeMinimize(bool enableSimplexBeforeMinimize_){ _preFitWithSimplex_ = enableSimplexBeforeMinimize_; }
 
   // const getters
+  [[nodiscard]] bool isUsingAnalyticGradient() const { return _useAnalyticGradient_; }
+  [[nodiscard]] unsigned int getNbFunctionCalls() const { return _rootMinimizer_ ? _rootMinimizer_->NCalls() : 0; }
+  [[nodiscard]] double getEdm() const { return _rootMinimizer_ ? _rootMinimizer_->Edm() : std::nan("unset"); }
+  [[nodiscard]] std::size_t getNbGradientCalls() const { return _nbGradientCalls_; }
   [[nodiscard]] bool hasConverged() const { return _fitHasConverged_; }
   [[nodiscard]] bool isMinimizeDone() const { return _minimizeDone_; }
   [[nodiscard]] double getTargetEdm() const;
@@ -66,6 +70,7 @@ protected:
 
 private:
   void updateFitParameterFixedStates();
+  void setMinimizerFunction();
 
   // Dump the Math::Minimizer table of parameter settings.  This is mostly
   // useful for debugging.
@@ -76,6 +81,8 @@ private:
   void dumpMinuit2State();
 
   // Parameters
+  bool _useAnalyticGradient_{false};
+  std::size_t _nbGradientCalls_{0};
   bool _preFitWithSimplex_{false};
   bool _restoreStepSizeBeforeHesse_{false};
   bool _generatedPostFitParBreakdown_{false};
@@ -106,6 +113,7 @@ private:
   /// A functor that can be called by Minuit or anybody else.  This wraps
   /// evalFit.
   ROOT::Math::Functor _functor_{};
+  ROOT::Math::GradFunctor _gradientFunctor_{};
   std::unique_ptr<ROOT::Math::Minimizer> _rootMinimizer_{nullptr};
 
   struct PostfitCache{

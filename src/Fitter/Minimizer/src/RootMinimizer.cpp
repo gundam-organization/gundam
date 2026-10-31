@@ -37,6 +37,7 @@ void RootMinimizer::configureImpl(){
 
   _config_.defineFields({
     {"monitorGradientDescent"},
+    {"useAnalyticGradient"},
     {"minimizer"},
     {"algorithm"},
     {"strategy"},
@@ -58,6 +59,11 @@ void RootMinimizer::configureImpl(){
   });
   _config_.checkConfiguration();
 
+  if( const auto* option = _config_.getJsonEntry("useAnalyticGradient") ){
+    LogThrowIf(not option->is_boolean(), "useAnalyticGradient must be a boolean.");
+  }
+  _useAnalyticGradient_ = false;
+  _config_.fillValue(_useAnalyticGradient_, "useAnalyticGradient");
   _config_.fillValue(gradientDescentMonitor.isEnabled, "monitorGradientDescent");
   _config_.fillValue(_minimizerType_, "minimizer");
   _config_.fillValue(_minimizerAlgo_, "algorithm");
@@ -88,8 +94,21 @@ void RootMinimizer::configureImpl(){
   _config_.fillValue(_restoreStepSizeBeforeHesse_, "restoreStepSizeBeforeHesse");
 
 }
+void RootMinimizer::setMinimizerFunction(){
+  if( _useAnalyticGradient_ ){ _rootMinimizer_->SetFunction(_gradientFunctor_); }
+  else { _rootMinimizer_->SetFunction(_functor_); }
+}
+
 void RootMinimizer::initializeImpl(){
   MinimizerBase::initializeImpl();
+  _nbGradientCalls_ = 0;
+  if( _useAnalyticGradient_ ){
+    LogThrowIf(_minimizerType_ != "Minuit2", "useAnalyticGradient currently requires Minuit2.");
+#ifdef GUNDAM_USING_BACKENDS
+    LogThrowIf(getOwner().getBackendsManager().hasBackend(), "useAnalyticGradient requires the original CPU engine; deactivate the backend.");
+#endif
+    getLikelihoodInterface().validateWeightGradient();
+  }
 
   if( gradientDescentMonitor.isEnabled ){
     _monitor_.convergenceMonitor.defineNewQuantity({ "LastStep", "Last step descent", [&](GenericToolbox::VariableMonitor& v){
@@ -135,7 +154,17 @@ void RootMinimizer::initializeImpl(){
   }
 
   _functor_ = ROOT::Math::Functor(this, &RootMinimizer::evalFit, getMinimizerFitParameterPtr().size());
-  _rootMinimizer_->SetFunction( _functor_ );
+  if( _useAnalyticGradient_ ){
+    _gradientFunctor_ = ROOT::Math::GradFunctor(
+        [this](const double* parameters_){ return evalFit(parameters_); },
+        getMinimizerFitParameterPtr().size(),
+        [this](const double* parameters_, double* gradient_){
+          ++_nbGradientCalls_;
+          evalFitGradientAt(parameters_, gradient_);
+        });
+    LogInfo << "Minuit2 will use the supplied CPU likelihood gradient." << std::endl;
+  }
+  setMinimizerFunction();
   _rootMinimizer_->SetStrategy(_strategy_);
   _rootMinimizer_->SetPrintLevel(_printLevel_);
   _rootMinimizer_->SetTolerance(_tolerance_);
@@ -287,6 +316,7 @@ void RootMinimizer::minimize(){
   minimizationStopWatch.start();
 
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
+  const auto nbGradientCallOffset = _nbGradientCalls_;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   dumpFitParameterSettings();
@@ -308,7 +338,7 @@ void RootMinimizer::minimize(){
     simplexOptions.SetMinimizerType(_minimizerType_.c_str());
     simplexOptions.SetMinimizerAlgorithm("Simplex");
     _rootMinimizer_->SetOptions(simplexOptions); // Includes objective function precision.
-    _rootMinimizer_->SetFunction(_functor_);
+    setMinimizerFunction();
     _rootMinimizer_->SetMaxFunctionCalls(_simplexMaxFcnCalls_);
     _rootMinimizer_->SetTolerance(_tolerance_ * _simplexToleranceLoose_);
     _rootMinimizer_->SetStrategy(_simplexStrategy_);
@@ -376,6 +406,9 @@ void RootMinimizer::minimize(){
 
   LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
+  if( _useAnalyticGradient_ ){
+    LogInfo << "Supplied gradient calls: " << _nbGradientCalls_ - nbGradientCallOffset << std::endl;
+  }
   if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogInfo << "Status code: " << GundamUtils::minuitStatusCodeStr.at(postfitCache.status) << std::endl;
   else LogInfo << "Status code: " << postfitCache.status << std::endl;
   if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogInfo << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(postfitCache.covarianceStatus) << std::endl;
@@ -865,6 +898,7 @@ void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
 
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("minimizerType", _minimizerType_.c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("minimizerAlgo", _minimizerAlgo_.c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("useAnalyticGradient", std::to_string(_useAnalyticGradient_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("strategy", std::to_string(_strategy_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("printLevel", std::to_string(_printLevel_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("targetEDM", std::to_string(this->getTargetEdm()).c_str()) );

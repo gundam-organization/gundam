@@ -16,6 +16,7 @@ namespace JointProbability{
 
   public:
     [[nodiscard]] std::string getType() const override { return "PoissonLogLikelihood"; }
+    [[nodiscard]] bool hasAnalyticBinGradient() const override { return true; }
     [[nodiscard]] double evalPredictionGradient(double data_, double pred_, double err_, int bin_) const override {
       if( pred_ <= 0 ){ return 0.; }
       if( data_ <= 0 ){ return 2.; }

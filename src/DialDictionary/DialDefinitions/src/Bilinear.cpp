@@ -81,8 +81,11 @@ double Bilinear::evalResponse(const DialInputBuffer& input_) const {
 double Bilinear::evalGradient(const DialInputBuffer& input_, int iInput_) const {
     if( iInput_ < 0 or iInput_ > 1 ){ return 0.; }
 
-    const auto call = this->prepareBilinearCall(input_, true);
-    if( not call.valid ){ return 0.; }
+    const double coordinate = input_.getInputBuffer()[iInput_];
+    if( not _allowExtrapolation_ and
+        (coordinate <= _splineBounds_[iInput_].min or coordinate >= _splineBounds_[iInput_].max) ){ return 0.; }
+    // Clamp the other coordinate while retaining this coordinate's derivative.
+    const auto call = this->prepareBilinearCall(input_, false);
 
     return CalculateBilinearInterpolationGradient(
         call.input0, call.input1, iInput_, -1E20, 1E20,
