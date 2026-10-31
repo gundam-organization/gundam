@@ -17,6 +17,7 @@
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
+#include <functional>
 #include <string>
 #include <memory>
 #include <vector>
@@ -99,6 +100,10 @@ public:
   /// Repropagate the current original-engine point and fill physical-parameter gradients.
   /// Supported scope: analytic weight dials, fixed unsmoothed bins, no external constraints.
   void evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
+  // Complete a caller-evaluated likelihood using a statistical gradient provider.
+  // The provider fills physical Parameter gradients; projection/penalties stay here.
+  void evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_,
+      const std::function<void(const std::vector<Parameter*>&)>& statGradientEvaluator_);
   double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
