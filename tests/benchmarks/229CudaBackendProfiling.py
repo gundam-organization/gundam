@@ -206,7 +206,31 @@ def compare_events(left_dir, right_dir, left, right, relative, absolute):
     return maximum, mismatches
 
 
-def evaluate_pass(args, engine, sequence, scenario, calls, seed):
+class CudaProfiler:
+    """Explicit capture gates; imported only for a requested hardware profile."""
+    def __init__(self, library, device):
+        import ctypes
+        import ctypes.util
+        self.runtime = ctypes.CDLL(library or ctypes.util.find_library('cudart') or 'libcudart.so')
+        for name in ('cudaProfilerStart', 'cudaProfilerStop'):
+            getattr(self.runtime, name).restype = ctypes.c_int
+            getattr(self.runtime, name).argtypes = []
+        self.runtime.cudaSetDevice.argtypes = [ctypes.c_int]
+        self.check(self.runtime.cudaSetDevice(device), 'cudaSetDevice')
+
+    @staticmethod
+    def check(code, action):
+        if code:
+            raise RuntimeError(f'{action} failed with CUDA error {code}')
+
+    def start(self):
+        self.check(self.runtime.cudaProfilerStart(), 'cudaProfilerStart')
+
+    def stop(self):
+        self.check(self.runtime.cudaProfilerStop(), 'cudaProfilerStop')
+
+
+def evaluate_pass(args, engine, sequence, scenario, calls, seed, *, capture=False):
     sequence.reset()
     engine.evaluateLikelihood()  # Identical center and primed cache in every trial.
     rng, digest, rows = random.Random(seed), hashlib.sha256(), []
@@ -217,8 +241,16 @@ def evaluate_pass(args, engine, sequence, scenario, calls, seed):
         start = time.perf_counter()
         changed = sequence.apply(scenario, rng, call, digest)
         update_seconds = time.perf_counter() - start
+        selected = capture and call == args.profile_call
+        if selected:
+            progress(f'NCU capture: {args.worker}/{scenario}, call {call}, coordinates {indices}')
+            args.profiler.start()
         start = time.perf_counter()
-        engine.evaluateLikelihood()
+        try:
+            engine.evaluateLikelihood()
+        finally:
+            if selected:
+                args.profiler.stop()
         elapsed = time.perf_counter() - start
         value = engine.getLikelihoodInterface().getLastLikelihood()
         timing = manager.getLastTimingSummary()
@@ -236,7 +268,7 @@ def evaluate_pass(args, engine, sequence, scenario, calls, seed):
         rows.append({'seconds': seconds, 'counts': counts, 'likelihood': value,
                      'statLikelihood': engine.getLikelihoodInterface().getLastStatLikelihood(),
                      'changedFitCoordinates': changed, 'coordinateIndices': indices,
-                     'sequenceDigest': digest.hexdigest()})
+                     'sequenceDigest': digest.hexdigest(), 'hardwareProfiled': selected})
         if time.monotonic() - last_progress >= 5:
             progress(f'{args.worker}/{scenario}: {call + 1}/{calls} evaluations')
             last_progress = time.monotonic()
@@ -265,9 +297,11 @@ def measure(args, engine=None, sequence=None):
     result = {'complete': False, 'case': args.worker, 'pythonModule': GUNDAM.__file__,
               'pythonModuleSha256': hashlib.sha256(Path(GUNDAM.__file__).read_bytes()).hexdigest(),
               'parameters': manifest, 'executionMode': args.execution_mode, 'pid': os.getpid(),
-              'scenarios': {}}
+              'scenarios': {}, 'hardwareProfile': getattr(args, 'profile_capture', False)}
     if args.worker != 'CPU':
         result['model'] = json.loads(engine.getBackendsManager().getDiagnosticCuda())
+        if getattr(args, 'require_weight_inventory', False) and 'weightInventory' not in result['model']:
+            raise RuntimeError('Rebuild/reinstall the CUDA Python module: weightInventory is missing')
         if getattr(args, 'require_device_likelihood', False) and result['model'].get('likelihoodExecution') != 'device':
             raise RuntimeError('This benchmark requires PoissonLLH or Barlow-Beeston 2022 resident on CUDA')
         if getattr(args, 'require_v100', False) and 'V100' not in result['model'].get('device', ''):
@@ -282,7 +316,10 @@ def measure(args, engine=None, sequence=None):
         trials = []
         for trial in range(args.trials):
             progress(f'{args.worker}/{scenario}: trial {trial + 1}/{args.trials}, {calls} calls')
-            measurement = evaluate_pass(args, engine, sequence, scenario, calls, args.seed + trial)
+            capture = getattr(args, 'profile_capture', False) and trial == 0 and args.worker != 'CPU'
+            if capture and args.profile_call >= calls:
+                raise RuntimeError(f'--profile-call {args.profile_call} exceeds {calls} calls for {scenario}')
+            measurement = evaluate_pass(args, engine, sequence, scenario, calls, args.seed + trial, capture=capture)
             write_json(args.output / f'{scenario}-trial{trial + 1}.json', measurement)
             trials.append(measurement)
         rows = [row for trial in trials for row in trial['rows']]
@@ -327,6 +364,8 @@ def measure_resident(args, state=None):
     import GUNDAM
     if not hasattr(GUNDAM.BackendManager, 'activate'):
         raise RuntimeError('Rebuild/reinstall the Python interface: activate is unavailable')
+    if getattr(args, 'profile_capture', False):
+        args.profiler = CudaProfiler(args.cuda_runtime, args.device_index)
     root = args.output
     engine, sequence, config = state if state is not None else (None, None, None)
     for case in args.cases:
@@ -548,6 +587,7 @@ def main():
                         help='Recompute weights/histograms/LLH even when responses are cached and unchanged')
     parser.add_argument('--likelihood', choices=['configured', 'PoissonLLH', 'BarlowLLH_BANFF_OA2021'], default='configured')
     parser.add_argument('--require-device-likelihood', action='store_true')
+    parser.add_argument('--require-weight-inventory', action='store_true')
     parser.add_argument('--require-v100', action='store_true')
     parser.add_argument('--threads', type=int, default=4)
     parser.add_argument('--calls', type=int, default=30)
@@ -568,9 +608,19 @@ def main():
     parser.add_argument('--output', type=Path,
                         default=Path(f'benchmark-{Path(__file__).stem}-{time.strftime("%Y%m%d%H%M%S")}'),
                         help='Output directory (default: ./benchmark-<script-name>-YYYYMMDDHHmmss)')
+    parser.add_argument('--profile-capture', action='store_true',
+                        help='Gate Nsight Compute around one call per CUDA case/scenario, after warmup; timings are perturbed')
+    parser.add_argument('--profile-call', type=int, default=0, help='Zero-based measured call to capture in first trial')
+    parser.add_argument('--cuda-runtime', help='Path to the matching libcudart.so for profiler gates')
     parser.add_argument('--execution-mode', choices=['resident', 'isolated'], default='resident')
     parser.add_argument('--worker', choices=(*CASES, 'resident'), help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.profile_call < 0:
+        parser.error('--profile-call must be nonnegative')
+    if args.profile_capture and (args.execution_mode != 'resident' or args.worker not in (None, 'resident')):
+        parser.error('--profile-capture requires resident execution')
+    if args.profile_capture and not args.warmup:
+        parser.error('--profile-capture requires at least one warmup call')
     if min(args.threads, args.calls, args.global_calls, args.trials) <= 0 or min(args.warmup, args.device_index) < 0:
         parser.error('Counts must be positive; warmup and device-index may be zero')
     for name in ('step_scale', 'relative_tolerance', 'absolute_tolerance'):

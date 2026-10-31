@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <stdexcept>
 #include <utility>
 
@@ -197,6 +198,37 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
       {"packedEventDialIndices", packed.eventDialIndices.size()},
       {"packedEventDialIndexBytes", packed.eventDialIndices.size() * sizeof(std::uint32_t)},
       {"device", getCapabilities().deviceName}};
+  // Inventory is built once, outside propagation and evaluation timers.
+  JsonType types = JsonType::object();
+  const char* typeNames[] = {"Norm", "Shift", "CompactSpline", "UniformSpline", "MonotonicSpline",
+      "GeneralSpline", "Graph", "ExternalWeight", "Bilinear", "Bicubic", "Tabulated", "Kriged", "Composite", "Formula"};
+  std::map<BackendDialType, std::map<std::size_t, std::size_t>> payloadSizes;
+  std::map<BackendDialType, std::size_t> occurrences;
+  const auto& original = getEngineView().propagation;
+  for( auto index : original.eventDialIndices ){ ++occurrences[original.dials[index].type]; }
+  for( const auto& dial : packed.dials ){ ++payloadSizes[dial.type][dial.payloadSize]; }
+  for( const auto& entry : payloadSizes ){
+    JsonType sizes = JsonType::array();
+    std::size_t count = 0, elements = 0;
+    for( const auto& size : entry.second ){
+      sizes.push_back({{"elements", size.first}, {"dials", size.second}});
+      count += size.second; elements += size.first * size.second;
+    }
+    types[typeNames[static_cast<unsigned>(entry.first)]] = {
+        {"uniqueDials", count}, {"eventOccurrences", occurrences[entry.first]},
+        {"payloadSizeDistribution", sizes}, {"referencedPayloadBytes", elements * sizeof(double)}};
+  }
+  std::map<std::size_t, std::size_t> eventSizes;
+  for( const auto& event : original.eventWeights ){ ++eventSizes[event.dialCount]; }
+  JsonType counts = JsonType::array();
+  for( const auto& entry : eventSizes ){ counts.push_back({{"dialsPerEvent", entry.first}, {"events", entry.second}}); }
+  _impl_->diagnostics["weightInventory"] = {
+      {"dialTypes", types}, {"dialsPerEventDistribution", counts},
+      {"payloadBufferBytes", packed.payloads.size() * sizeof(double)},
+      {"dialDescriptorBytes", packed.dials.size() * sizeof(BackendDialDescriptor)},
+      {"inputDescriptorBytes", packed.inputs.size() * sizeof(BackendDialInputDescriptor)},
+      {"responseBufferBytes", packed.dials.size() * sizeof(double)},
+      {"note", "Referenced payload bytes count shared ranges repeatedly; payloadBufferBytes is allocated storage. Event occurrences exclude observable-only references."}};
   _impl_->timing = _impl_->buildTiming;
 }
 
