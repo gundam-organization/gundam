@@ -47,9 +47,12 @@ def check_threads(threads):
         {'name': 'q', 'parameterIndex': 1, 'priorValue': 1., 'dialSetDefinitions': [{'dialType': 'Normalization'}]},
         {'name': 'r', 'parameterIndex': 2, 'priorValue': 1., 'dialSetDefinitions': [{'dialType': 'Normalization', 'applyCondition': 'X < 1.5'}]}])
 
-    def build(configuration, normalized, eigen):
+    def build(configuration, normalized, eigen, backend=None, analytic=False):
         cfg = copy.deepcopy(configuration)
-        cfg['minimizerConfig'] = {'useNormalizedFitSpace': normalized, 'writeLlhHistory': False}
+        cfg['minimizerConfig'] = {'useNormalizedFitSpace': normalized, 'writeLlhHistory': False,
+                                  'useAnalyticGradient': analytic}
+        if backend is not None:
+            cfg['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend}
         cfg['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['enableEigenDecomp'] = eigen
         engine = GUNDAM.FitterEngine()
         engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(cfg))))
@@ -168,14 +171,43 @@ def check_threads(threads):
         else:
             raise AssertionError('Unsupported binning/observable gradient was accepted')
     if hasattr(engine, 'getBackendsManager'):
-        engine = build(config, False, False)
+        for normalized in (False, True):
+            for eigen in (False, True):
+                for configuration in (config, splines, mixed):
+                    if configuration is mixed and not eigen:
+                        continue
+                    engine = build(configuration, normalized, eigen)
+                    minimizer = engine.getMinimizer()
+                    pars = list(minimizer.getMinimizerFitParameterList())
+                    point = [.07*(i+1) if normalized else p.getParameterValue()+.07*p.getStdDevValue()
+                             for i, p in enumerate(pars)]
+                    reference = check(engine, point)
+                    manager = engine.getBackendsManager()
+                    manager.activate('CPU')
+                    manager.setEnableAutoMaterialize(False)
+                    actual = check(engine, point)
+                    for a, b in zip(actual, reference): close(a, b)
+                    # Switching engines must not reuse a stale gradient result.
+                    manager.deactivateBackend()
+                    for a, b in zip(check(engine, point), reference): close(a, b)
+        # Unsupported CPU likelihoods fail explicitly, without host fallback.
+        engine = build(least_squares, False, False)
         engine.getBackendsManager().activate('CPU')
         try:
             engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
         except RuntimeError as error:
-            assert 'Deactivate the backend' in str(error), str(error)
+            assert 'BarlowBeestonLiteGaussian' in str(error), str(error)
         else:
-            raise AssertionError('CPU callback used while a backend was active')
+            raise AssertionError('Unsupported backend likelihood gradient was accepted')
+        for configuration, message in ((least_squares, 'BarlowBeestonLiteGaussian'),
+                                       (unsupported, 'Unsupported CPU backend gradient dial')):
+            try:
+                build(configuration, False, False, backend='CPU', analytic=True)
+            except RuntimeError as error:
+                assert message in str(error), str(error)
+            else:
+                raise AssertionError('Incompatible analytic backend configuration initialized')
+
 
     print(f'SUCCESS: Gaussian BB CPU gradients, fit coordinates, eigenvectors, zero products and freshness ({threads} threads)')
 

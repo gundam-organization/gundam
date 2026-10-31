@@ -42,6 +42,7 @@ ENUM_FIELD( Unavailable )
     bool supportsEventWeights{false};
     bool supportsHistograms{false};
     bool supportsLikelihood{false};
+    bool supportsLikelihoodGradient{false};
     bool supportsDynamicBinning{false};
     bool supportsObservableTransforms{false};
     // Relative objective-function precision recommended to numerical fitters.

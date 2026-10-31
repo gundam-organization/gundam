@@ -313,16 +313,21 @@ void MinimizerBase::evalFitGradient(){
 }
 void MinimizerBase::evalFitGradient( const std::vector<Parameter*>& parameterList_ ){
 #ifdef GUNDAM_USING_BACKENDS
-  LogThrowIf(getOwner().getBackendsManager().hasBackend(), "Deactivate the backend before requesting CPU weight gradients.");
+  auto& manager = getOwner().getBackendsManager();
+  if( manager.hasBackend() ){
+    manager.validateLikelihoodGradient();
+    getLikelihoodInterface().validateWeightGradient();
+    getOwner().evaluateLikelihood();
+    getLikelihoodInterface().evalLikelihoodGradient(parameterList_,
+        [&manager](const auto& parameters_){ manager.evalStatLikelihoodGradient(parameters_); });
+    return;
+  }
 #endif
   getLikelihoodInterface().evalLikelihoodGradient(parameterList_);
 }
 
 void MinimizerBase::evalFitGradientAt(const double* parArray_, double* gradient_){
   LogThrowIf(parArray_ == nullptr or gradient_ == nullptr, "Null gradient callback buffer.");
-#ifdef GUNDAM_USING_BACKENDS
-  LogThrowIf(getOwner().getBackendsManager().hasBackend(), "Deactivate the backend before requesting CPU weight gradients.");
-#endif
   LogThrowIf(not setFitParameterValues(parArray_), "Invalid parameter point for CPU gradient.");
   evalFitGradient();
   std::vector<double> result;

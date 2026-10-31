@@ -213,9 +213,12 @@ namespace {
   };
 
   FitResult fit(const FitInput& input_, const std::string& backend_, const std::string& mode_,
-                const std::string& layout_ = "eventMajor", const std::string& probability_ = "") {
+                const std::string& layout_ = "eventMajor", const std::string& probability_ = "",
+                bool analytic_ = false, bool normalized_ = false) {
     FitterEngine engine;
     auto config = makeConfig(input_, backend_, mode_, layout_);
+    config["minimizerConfig"]["useAnalyticGradient"] = analytic_;
+    config["minimizerConfig"]["useNormalizedFitSpace"] = normalized_;
     if( !probability_.empty() ){
       config["likelihoodInterfaceConfig"]["jointProbabilityConfig"] = {{"type", probability_}};
     }
@@ -240,6 +243,7 @@ namespace {
     FitResult result;
     result.initialLikelihood = engine.getLikelihoodInterface().getLastLikelihood();
     engine.fit();
+    EXPECT_EQ(minimizer->getNbGradientCalls() > 0, analytic_);
     engine.evaluateLikelihood();
     const auto& root = *minimizer->getMinimizer();
     if( root.NDim() != parameterCount ){ throw std::runtime_error("Unexpected minimizer dimension."); }
@@ -501,3 +505,32 @@ TEST(BackendFitCovariance, DeviceStatLikelihoodMatchesOriginalFitAndHesse) {
   }
 }
 #endif
+
+TEST(BackendFitCovariance, CpuAnalyticGradientMatchesOriginalNumericalFitAndHesse) {
+#ifdef GUNDAM_USING_BACKENDS
+  FitEnvironment environment;
+  FitInput input;
+  for( bool normalized : {false, true} ){
+    const auto numerical = fit(input, "Original", "", "eventMajor", "BarlowBeestonLiteGaussian", false, normalized);
+    ASSERT_EQ(numerical.status, 0);
+    ASSERT_EQ(numerical.covarianceStatus, 3);
+    for( const char* backend : {"Original", "CPU"} ){
+      const auto analytic = fit(input, backend, "", "eventMajor", "BarlowBeestonLiteGaussian", true, normalized);
+      SCOPED_TRACE(::testing::Message() << backend << ", normalized=" << normalized);
+      EXPECT_EQ(analytic.status, 0);
+      EXPECT_EQ(analytic.covarianceStatus, 3);
+      EXPECT_LT(analytic.edm, analytic.targetEdm);
+      EXPECT_NEAR(analytic.likelihood, numerical.likelihood, 1e-8);
+      for( std::size_t i = 0; i < parameterCount; ++i ){
+        EXPECT_NEAR(analytic.values[i], numerical.values[i], 1e-4 * numerical.errors[i]);
+        EXPECT_NEAR(analytic.errors[i], numerical.errors[i], 1e-4 * numerical.errors[i]);
+        for( std::size_t j = 0; j < parameterCount; ++j ){
+          EXPECT_NEAR(analytic.covariance(i,j), numerical.covariance(i,j), 3e-4*numerical.errors[i]*numerical.errors[j]);
+        }
+      }
+    }
+  }
+#else
+  GTEST_SKIP() << "Built without backends";
+#endif
+}

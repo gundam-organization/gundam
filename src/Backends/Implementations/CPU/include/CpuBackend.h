@@ -50,6 +50,8 @@ ENUM_FIELD( Indexed )
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
     [[nodiscard]] const EngineView& getEngineView() const override { return *_engineView_; }
 
+    void validateLikelihoodGradient() const override;
+    [[nodiscard]] std::vector<double> getLikelihoodGradient(const PropagationToken& token_) override;
     void build(const EngineView& engineView_) override;
     void buildShared(std::shared_ptr<const EngineView> engineView_) override;
     PropagationToken requestPropagation(const PropagationInputs& inputs_) override;
@@ -132,6 +134,7 @@ ENUM_FIELD( Indexed )
     NativeDialProgramModel _nativePrograms_;
     std::shared_ptr<const EngineView> _engineView_{std::make_shared<EngineView>()};
     Result _lastResult_{};
+    mutable bool _isGradientValidated_{false};
     GenericToolbox::ParallelWorker _threadPool_{};
     Result* _activeResult_{nullptr};
     const PropagationInputs* _activeInputs_{nullptr};

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <sstream>
+#include <unordered_set>
 
 std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& timing_) {
   std::stringstream ss;
@@ -444,4 +445,25 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
 
     return result;
   });
+}
+
+void Backends::BackendManager::validateLikelihoodGradient() const {
+  LogThrowIf(not hasBackend(), "No active backend for likelihood gradients.");
+  LogThrowIf(not _activeBackendPtr_->getCapabilities().supportsLikelihoodGradient,
+             _activeBackendName_ << " does not support analytic likelihood gradients.");
+  _activeBackendPtr_->validateLikelihoodGradient();
+}
+
+void Backends::BackendManager::evalStatLikelihoodGradient(const std::vector<Parameter*>& parameterList_) {
+  validateLikelihoodGradient();
+  const auto gradient = _activeBackendPtr_->getLikelihoodGradient(_lastPropagationToken_);
+  const auto& bindings = _backendEngineLayout_->bindings.parameters;
+  LogThrowIf(gradient.size() != bindings.size(), "Backend gradient dimension mismatch.");
+  const std::unordered_set<Parameter*> requested(parameterList_.begin(), parameterList_.end());
+  for( std::size_t i = 0; i < bindings.size(); ++i ){
+    auto* parameter = bindings[i].parameter;
+    if( parameter != nullptr and requested.count(parameter) ){
+      parameter->addGradient(gradient[i]);
+    }
+  }
 }

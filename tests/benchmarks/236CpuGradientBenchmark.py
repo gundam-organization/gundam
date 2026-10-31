@@ -60,6 +60,7 @@ def main():
     parser.add_argument('--events', type=int, default=12000)
     parser.add_argument('--bins', type=int, default=12)
     parser.add_argument('--threads', type=int, default=4)
+    parser.add_argument('--backend', choices=['Original', 'CPU'], default='Original')
     parser.add_argument('--strategy', type=int, choices=[0, 1, 2], default=1)
     parser.add_argument('--trials', type=int, default=3)
     parser.add_argument('--output', type=Path, required=True)
@@ -74,13 +75,20 @@ def main():
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(args.threads)
     report = {'events': args.events, 'parameters': args.bins+2, 'threads': args.threads,
-              'strategy': args.strategy, 'module': GUNDAM.__file__, 'complete': False, 'runs': []}
+              'strategy': args.strategy, 'backend': args.backend, 'module': GUNDAM.__file__, 'complete': False, 'runs': []}
     for trial in range(args.trials):
         for analytic in ([False, True] if trial%2 == 0 else [True, False]):
             engine = GUNDAM.FitterEngine()
-            engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(configuration(input_path, args.bins, analytic, args.strategy)))))
+            cfg = configuration(input_path, args.bins, analytic, args.strategy)
+            if args.backend != 'Original':
+                cfg['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': args.backend}
+            engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(cfg))))
             engine.getLikelihoodInterface().setDataType(GUNDAM.LikelihoodInterface.DataType.Asimov)
             engine.initialize()
+            if args.backend != 'Original':
+                manager = engine.getBackendsManager()
+                assert manager.getActiveBackendName() == args.backend
+                manager.setEnableAutoMaterialize(False)
             minimizer = engine.getMinimizer()
             point = [.2*math.sin(i+.4) for i in range(args.bins+2)]
             # Equal value/gradient workloads, with all initialization outside the timers.

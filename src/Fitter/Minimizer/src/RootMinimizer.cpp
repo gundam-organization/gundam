@@ -105,7 +105,7 @@ void RootMinimizer::initializeImpl(){
   if( _useAnalyticGradient_ ){
     LogThrowIf(_minimizerType_ != "Minuit2", "useAnalyticGradient currently requires Minuit2.");
 #ifdef GUNDAM_USING_BACKENDS
-    LogThrowIf(getOwner().getBackendsManager().hasBackend(), "useAnalyticGradient requires the original CPU engine; deactivate the backend.");
+    if( getOwner().getBackendsManager().hasBackend() ){ getOwner().getBackendsManager().validateLikelihoodGradient(); }
 #endif
     getLikelihoodInterface().validateWeightGradient();
   }

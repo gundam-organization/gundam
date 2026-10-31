@@ -50,6 +50,7 @@ Backends::BackendCapabilities Backends::CpuBackend::getCapabilities() const {
   out.supportsEventWeights = true;
   out.supportsHistograms = true;
   out.supportsLikelihood = true;
+  out.supportsLikelihoodGradient = true;
   out.supportsDynamicBinning = true;
   out.supportsObservableTransforms = true;
   out.deviceName = "host";
@@ -62,6 +63,7 @@ void Backends::CpuBackend::build(const EngineView& engineView_) {
 
 void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineView_) {
   _isBuilt_ = false;
+  _isGradientValidated_ = false;
   LogThrowIf(engineView_ == nullptr, "CpuBackend requires a model.");
   _engineView_ = std::move(engineView_);
   LogThrowIf(_engineView_->propagation.eventWeights.size() != _engineView_->propagation.events.size(),

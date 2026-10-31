@@ -22,6 +22,15 @@ namespace Backends {
     [[nodiscard]] virtual PropagationStatus getStatus(const PropagationToken& token_) const = 0;
     [[nodiscard]] virtual const EngineView& getEngineView() const = 0;
 
+    // Gradient is statistical only, in physical model parameter order.
+    // Implementations must reject unsupported models and stale propagation tokens.
+    virtual void validateLikelihoodGradient() const {
+      throw std::runtime_error(getName() + " does not support analytic likelihood gradients.");
+    }
+    [[nodiscard]] virtual std::vector<double> getLikelihoodGradient(const PropagationToken&) {
+      throw std::runtime_error(getName() + " does not support analytic likelihood gradients.");
+    }
+
     virtual void build(const EngineView& engineView_) = 0;
     // Shared immutable model; implementations may retain it or use their own packing.
     virtual void buildShared(std::shared_ptr<const EngineView> engineView_) { build(*engineView_); }

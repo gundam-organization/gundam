@@ -2,6 +2,7 @@ set(LIB_NAME GundamBackendsCPU)
 
 set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CpuBackend.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/CpuBackendGradient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CpuBackendProfiler.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CpuWeightProbe.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/CpuBackendBinning.cpp
