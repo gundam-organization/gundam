@@ -106,6 +106,11 @@ namespace {
     DeviceBuffer<Backends::BackendDialDescriptor> dials, compactDialPolicies;
     DeviceBuffer<std::uint32_t> compactDialFields;
     std::size_t dialCount{0};
+    Backends::CudaEventUpdateIndex eventUpdateIndex;
+    Backends::CudaEventUpdatePlan eventUpdatePlan;
+    DeviceBuffer<std::uint32_t> selectedEventGroups;
+    int eventWeightMode{0};
+    double eventWeightSparseFraction{0.25};
     DeviceBuffer<Backends::BackendDialInputDescriptor> inputs;
     DeviceBuffer<double> payloads, parameters, responses, previousInputs, previousSecondInputs, weights, sums, sumSquares;
     DeviceBuffer<std::uint32_t> dialIndices, parameterDialIndices;
@@ -494,12 +499,16 @@ namespace {
     }
   }
 
-  template<bool interleaved_>
+  template<bool interleaved_, bool selected_ = false>
   __global__ void reweightEvents(const Backends::BackendEventWeightDescriptor* events_, std::size_t count_,
                                  const std::uint32_t* indices_, const double* responses_, double* weights_,
-                                 bool capped_, double cap_, int* error_) {
-    for( std::size_t i = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
-         i < count_; i += std::size_t(blockDim.x) * gridDim.x ){
+                                 bool capped_, double cap_, int* error_,
+                                 const std::uint32_t* groups_, std::size_t groupCount_) {
+    const auto workCount = selected_ ? groupCount_ * 32 : count_;
+    for( std::size_t slot = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
+         slot < workCount; slot += std::size_t(blockDim.x) * gridDim.x ){
+      const std::size_t i = selected_ ? std::size_t(groups_[slot / 32]) * 32 + slot % 32 : slot;
+      if( i >= count_ ){ continue; }
       const auto& event = events_[i];
       double response = 1.;
       for( std::size_t j = 0; j < event.dialCount; ++j ){
@@ -662,7 +671,7 @@ Backends::CudaDeviceContext::CudaDeviceContext(int deviceIndex_) : _impl_(std::m
 Backends::CudaDeviceContext::~CudaDeviceContext() = default;
 const std::string& Backends::CudaDeviceContext::getDeviceName() const { return _impl_->deviceName; }
 
-void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const PropagationView& original_, const LikelihoodView& likelihood_, unsigned int likelihoodBlockSize_) {
+void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const PropagationView& original_, const LikelihoodView& likelihood_, unsigned int likelihoodBlockSize_, int eventWeightMode_, double eventWeightSparseFraction_) {
   DeviceScope scope(_impl_->deviceIndex);
   _impl_->buffers.reset();
   auto buffers = std::make_unique<WeightBuffers>();
@@ -670,6 +679,14 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
   try{
     b.events.upload(model_.events, _impl_->stream);
     b.dialCount = model_.dials.size();
+    b.eventUpdateIndex = model_.eventUpdateIndex;
+    b.eventWeightMode = eventWeightMode_;
+    b.eventWeightSparseFraction = eventWeightSparseFraction_;
+    if( b.eventUpdateIndex.available() ){
+      b.selectedEventGroups.allocate(b.eventUpdateIndex.groupCount);
+      b.eventUpdatePlan.masks.resize(b.eventUpdateIndex.groupCount, 0);
+      b.eventUpdatePlan.groups.reserve(b.eventUpdateIndex.groupCount);
+    }
     if( model_.compactDialFields.empty() ){ b.dials.upload(model_.dials, _impl_->stream); }
     else{
       b.compactDialFields.upload(model_.compactDialFields, _impl_->stream);
@@ -810,10 +827,43 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     // update or failed/unprimed cache forces fresh weights and histograms.
     const bool updatePrediction = not reusePrediction_ or not reuse or updateState
         or inputs_.forceBinningUpdate or candidates != 0 or b.externalUpdatePlan.dialCount != 0;
+    bool sparseEvents = false;
+    const auto selectionStart = std::chrono::steady_clock::now();
+    if( b.eventUpdateIndex.available() and reuse and reusePrediction_ and not updateState
+        and not inputs_.forceBinningUpdate and (b.eventWeightMode == 1 or sparse) ){
+      const auto maxGroups = b.eventWeightMode == 1 ? b.eventUpdateIndex.groupCount
+          : std::size_t(b.eventWeightSparseFraction * double(b.eventUpdateIndex.groupCount));
+      b.eventUpdatePlan.select(b.eventUpdateIndex, b.previousParameters, parameters_, maxGroups);
+      if( b.eventUpdatePlan.complete ){
+        timing_.eventWeightCoverageKnown = 1;
+        timing_.eventWeightCandidateCount = b.eventUpdatePlan.affectedEvents;
+        timing_.eventWeightGroupCount = b.eventUpdatePlan.groups.size();
+        sparseEvents = b.eventWeightMode == 2 and b.eventUpdatePlan.groups.size() < b.eventUpdateIndex.groupCount;
+        if( sparseEvents ){ std::sort(b.eventUpdatePlan.groups.begin(), b.eventUpdatePlan.groups.end()); }
+      }
+    }
+    if( b.eventUpdateIndex.available() ){
+      timing_.eventSelectionSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - selectionStart).count();
+    }
+    if( updatePrediction ){
+      timing_.eventWeightsRecomputedCount = b.events.size;
+      if( sparseEvents ){
+        timing_.sparseEventWeightsUsed = 1;
+        timing_.eventWeightsRecomputedCount = b.eventUpdatePlan.groups.size() * 32;
+        const auto tail = b.events.size % 32;
+        if( tail and not b.eventUpdatePlan.groups.empty() and b.eventUpdatePlan.groups.back() == b.events.size / 32 ){
+          timing_.eventWeightsRecomputedCount -= 32 - tail;
+        }
+      }
+    }
     timing_.cacheCandidateCount = candidates + b.externalUpdatePlan.dialCount;
     timing_.cachePreparationSeconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - preparationStart).count();
     record(0);
+    if( sparseEvents and updatePrediction and not b.eventUpdatePlan.groups.empty() ){
+      checkCuda(cudaMemcpyAsync(b.selectedEventGroups.data, b.eventUpdatePlan.groups.data(),
+          b.eventUpdatePlan.groups.size() * sizeof(std::uint32_t), cudaMemcpyHostToDevice, stream), "selected event groups upload");
+    }
     if( sparse and not b.updatePlan.ranges.empty() ){
       checkCuda(cudaMemcpyAsync(b.responseUpdates.data, b.updatePlan.ranges.data(),
           b.updatePlan.ranges.size() * sizeof(CudaResponseUpdate), cudaMemcpyHostToDevice, stream), "response update ranges");
@@ -879,14 +929,23 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     }
     record(2);
     if( updatePrediction and b.events.size ){
-      if( b.interleavedEventDials ){
-        reweightEvents<true><<<gridSize(b.events.size), blockSize, 0, stream>>>(b.events.data, b.events.size,
-            b.dialIndices.data, b.responses.data, b.weights.data, b.hasReweightCap, b.maxReweight, b.error.data);
-      }
-      else{
-        reweightEvents<false><<<gridSize(b.events.size), blockSize, 0, stream>>>(b.events.data, b.events.size,
-            b.dialIndices.data, b.responses.data, b.weights.data, b.hasReweightCap, b.maxReweight, b.error.data);
-      }
+      auto launchWeights = [&](auto interleavedTag_){
+        constexpr bool interleaved = decltype(interleavedTag_)::value;
+        if( sparseEvents ){
+          if( not b.eventUpdatePlan.groups.empty() ){
+            reweightEvents<interleaved, true><<<gridSize(b.eventUpdatePlan.groups.size() * 32), blockSize, 0, stream>>>(
+                b.events.data, b.events.size, b.dialIndices.data, b.responses.data, b.weights.data,
+                b.hasReweightCap, b.maxReweight, b.error.data, b.selectedEventGroups.data, b.eventUpdatePlan.groups.size());
+          }
+        }
+        else{
+          reweightEvents<interleaved><<<gridSize(b.events.size), blockSize, 0, stream>>>(
+              b.events.data, b.events.size, b.dialIndices.data, b.responses.data, b.weights.data,
+              b.hasReweightCap, b.maxReweight, b.error.data, nullptr, 0);
+        }
+      };
+      if( b.interleavedEventDials ){ launchWeights(std::true_type{}); }
+      else{ launchWeights(std::false_type{}); }
       checkCuda(cudaGetLastError(), "event weight kernel launch");
     }
     record(3);
@@ -1157,7 +1216,7 @@ Backends::BackendResourceUsage Backends::CudaDeviceContext::getResourceUsage() c
       b.likelihoodBins, b.likelihoodPartials, b.likelihoodTotal,
       b.formulaPrograms, b.formulaInstructions, b.formulaConstants, b.formulaInputs,
       b.compositePrograms, b.compositeInstances, b.compositeNodeData, b.compositeInstructions, b.compositeInputs, b.programScratchOffsets, b.programScratch,
-      b.events, b.dials, b.compactDialFields, b.compactDialPolicies, b.inputs, b.payloads, b.parameters,
+      b.selectedEventGroups, b.events, b.dials, b.compactDialFields, b.compactDialPolicies, b.inputs, b.payloads, b.parameters,
       b.responses, b.previousInputs, b.previousSecondInputs, b.weights, b.sums,
       b.sumSquares, b.dialIndices, b.parameterDialIndices, b.responseUpdates, b.externalResponseUpdates,
       b.tableTerms, b.externalBlocks, b.externalWeights, b.binOffsets, b.binEvents,

@@ -36,10 +36,12 @@ def write_json(path, value):
 def scenario_calls(args, scenario, parameter_count=None):
     if scenario == 'global':
         return min(args.calls, args.global_calls)
-    if scenario in ('local1', 'local2'):
+    if scenario in ('local1', 'local2', 'derivative1', 'derivative2'):
         if parameter_count is None:
             return None  # Resolved from the actual fit coordinate list after loading.
-        coverage_calls = parameter_count if scenario == 'local1' else (parameter_count + 1) // 2
+        coverage_calls = {'local1': parameter_count, 'local2': (parameter_count + 1) // 2,
+                          'derivative1': 4 * parameter_count,
+                          'derivative2': 5 * ((parameter_count + 1) // 2)}[scenario]
         return max(args.calls, coverage_calls)
     return args.calls
 

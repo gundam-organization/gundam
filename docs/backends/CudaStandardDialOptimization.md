@@ -456,6 +456,29 @@ For small local calls, the new capture supports a different priority: measure ev
 | ROOT test-runner and host-callback `NaN` fixes | Separate from descriptor compaction |
 | Production default changed | No |
 | Complete-fit speedup measured | No |
-| Selective event propagation implemented and benchmarked | No; proposed next experiment |
+| Selective event propagation | Optional prototype prepared; host checks pass; V100 correctness and performance pending |
 
 The established result is the speedup from compact descriptors. Selective event propagation remains a proposal to measure and validate.
+
+
+## Prepared follow-up: resident local-update benchmark
+
+An opt-in event-group prototype and coverage diagnostics are now available in
+benchmark 236. See the [run instructions and counter definitions](CudaWeightBenchmark.md#selective-event-updates-for-migradhesse-workloads).
+
+| Variant | Purpose |
+|---|---|
+| Compact + dense weights | Performance baseline |
+| Compact + exact coverage | Measure affected events/groups without changing weight execution |
+| Compact + sparse groups | Test selective weight updates with dense fallback |
+
+The prototype retains full histogram and LLH evaluation, ordered event products,
+and the current error/rebuild invalidation rules. The initial 25% group threshold
+is experimental. New one- and two-coordinate stencil scenarios exercise returns
+to the center and bounded coordinates. They approximate derivative propagation
+patterns; they do not establish MIGRAD/HESSE wall-time gains or validate Hessian
+accuracy. Production defaults remain unchanged.
+
+The next external measurement is the production-eigen run, followed optionally
+by the same matrix without eigen. No further speedup is claimed until the new
+CUDA path has passed the CC tests and benchmark comparisons.

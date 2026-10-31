@@ -16,6 +16,7 @@
 #include <map>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
 namespace {
   using Clock = std::chrono::steady_clock;
@@ -57,10 +58,12 @@ void Backends::CudaBackend::configureImpl() {
   _likelihoodBlockSize_ = 0;
   _reusePrediction_ = true;
   _compactDials_ = false;
+  _eventWeightMode_ = CudaEventWeightMode::dense;
+  _eventWeightSparseFraction_ = 0.25;
   _propagationMode_ = CudaPropagationMode::cachedResponses;
   _weightLayout_ = CudaWeightLayout::warpInterleaved;
   _config_.clearFields();
-  _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}, {"weightLayout"}, {"likelihoodBlockSize"}, {"reusePrediction"}, {"compactDials"}});
+  _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}, {"weightLayout"}, {"likelihoodBlockSize"}, {"reusePrediction"}, {"compactDials"}, {"eventWeightMode"}, {"eventWeightSparseFraction"}});
   _config_.checkConfiguration();
   // fillValue tolerates conversion errors; explicit device/mode selections must
   // not silently fall back to defaults when they are malformed.
@@ -84,6 +87,21 @@ void Backends::CudaBackend::configureImpl() {
   if( const auto* compact = _config_.getJsonEntry("compactDials") ){
     if( not compact->is_boolean() ){ throw std::runtime_error("CudaBackend: compactDials must be a boolean."); }
   }
+  if( const auto* mode = _config_.getJsonEntry("eventWeightMode") ){
+    if( not mode->is_string() ){ throw std::runtime_error("CudaBackend: eventWeightMode must be a string."); }
+  }
+  _config_.fillEnum(_eventWeightMode_, "eventWeightMode");
+  if( _eventWeightMode_ != CudaEventWeightMode::dense and _eventWeightMode_ != CudaEventWeightMode::coverage
+      and _eventWeightMode_ != CudaEventWeightMode::sparseGroups ){
+    throw std::runtime_error("CudaBackend: eventWeightMode must be dense, coverage or sparseGroups.");
+  }
+  if( const auto* fraction = _config_.getJsonEntry("eventWeightSparseFraction") ){
+    if( not fraction->is_number() or not std::isfinite(fraction->get<double>())
+        or fraction->get<double>() <= 0. or fraction->get<double>() > 1. ){
+      throw std::runtime_error("CudaBackend: eventWeightSparseFraction must be in (0,1].");
+    }
+  }
+  _config_.fillValue(_eventWeightSparseFraction_, "eventWeightSparseFraction");
   _config_.fillValue(_compactDials_, "compactDials");
   _config_.fillValue(_likelihoodBlockSize_, "likelihoodBlockSize");
   _config_.fillValue(_reusePrediction_, "reusePrediction");
@@ -147,7 +165,7 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->diagnostics = {{"available", false}};
   if( not engineView_ ){ throw std::runtime_error("CudaBackend requires a model."); }
   const auto start = Clock::now();
-  const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved, _compactDials_);
+  const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved, _compactDials_, _eventWeightMode_ != CudaEventWeightMode::dense);
   _impl_->buildTiming.buildCompatibilityScanSeconds = elapsed(start);
   // Smaller blocks expose more independent work for short binned likelihoods.
   // This is a starting policy, not a V100 performance claim; benchmark overrides
@@ -157,7 +175,7 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   initializeDevice();
 #ifdef GUNDAM_USING_CUDA
   const auto uploadStart = Clock::now();
-  _impl_->context->build(packed, engineView_->propagation, engineView_->likelihood, likelihoodBlockSize);
+  _impl_->context->build(packed, engineView_->propagation, engineView_->likelihood, likelihoodBlockSize, int(_eventWeightMode_), _eventWeightSparseFraction_);
   _impl_->buildTiming.buildBufferUploadSeconds = elapsed(uploadStart);
 #endif
   _impl_->engineView = std::move(engineView_);
@@ -165,10 +183,24 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->hasSmoothedBinning = packed.hasSmoothedBinning;
   _impl_->result.outsideSums.assign(packed.samples.size(), 0.);
   _impl_->result.outsideSumSquares.assign(packed.samples.size(), 0.);
+  std::vector<std::size_t> parameterEventGroupCounts;
+  if( packed.eventUpdateIndex.available() ){
+    const auto& offsets = packed.eventUpdateIndex.offsets;
+    parameterEventGroupCounts.reserve(offsets.size() - 1);
+    for( std::size_t i = 1; i < offsets.size(); ++i ){ parameterEventGroupCounts.push_back(offsets[i] - offsets[i - 1]); }
+  }
   _impl_->diagnostics = {
       {"likelihoodExecution", hasPortableLikelihood(getEngineView().likelihood) ? "device" : "host"},
       {"requestedLikelihoodBlockSize", _likelihoodBlockSize_}, {"likelihoodBlockSize", likelihoodBlockSize},
       {"likelihoodReduction", "parallel256"}, {"reusePrediction", _reusePrediction_},
+      {"eventWeightMode", _eventWeightMode_.toString()},
+      {"eventWeightSparseFraction", _eventWeightSparseFraction_},
+      {"eventUpdateIndexAvailable", packed.eventUpdateIndex.available()},
+      {"eventUpdateIndexBytes", packed.eventUpdateIndex.bytes()},
+      {"eventUpdateIndexBuildSeconds", packed.eventUpdateIndex.buildSeconds},
+      {"parameterEventGroupCounts", parameterEventGroupCounts},
+      {"eventUpdateIndexFallback", packed.eventUpdateIndex.fallback},
+      {"parameterEventCounts", packed.eventUpdateIndex.parameterEventCounts},
       {"requestedCompactDials", _compactDials_},
       {"compactDials", not packed.compactDialFields.empty()},
       {"compactDialFallback", packed.compactDialFallback},

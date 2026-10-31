@@ -26,7 +26,7 @@ namespace Backends {
     CudaDeviceContext& operator=(const CudaDeviceContext&) = delete;
 
     [[nodiscard]] const std::string& getDeviceName() const;
-    void build(const CudaWeightModel& model_, const PropagationView& original_, const LikelihoodView& likelihood_, unsigned int likelihoodBlockSize_);
+    void build(const CudaWeightModel& model_, const PropagationView& original_, const LikelihoodView& likelihood_, unsigned int likelihoodBlockSize_, int eventWeightMode_ = 0, double eventWeightSparseFraction_ = 0.25);
     void propagate(const PropagationInputs& inputs_, bool recomputeResponses_, bool reusePrediction_, BackendTimingSummary& timing_);
     double readLikelihood();
     std::vector<double> readGradient(const EngineView& view_);

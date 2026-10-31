@@ -30,9 +30,10 @@ sbatch --export=ALL tests/benchmarks/236CudaWeightBenchmark.sbatch \
   --output "$OA_WORK/weights-baseline"
 ```
 
-Le benchmark compare par défaut CPU, CUDA cached/recompute avec layout
-`warpInterleaved`, chacun en référence puis avec descripteurs compacts, dans le
-même moteur résident. Les anciens cas `eventMajor` restent disponibles. `--cases` permet
+Le benchmark compare maintenant par défaut CPU et trois variantes CUDA compactes
+avec layout `warpInterleaved` : poids denses, couverture exacte et groupes sparse.
+Tous partagent le même moteur résident. Les anciens cas génériques, recompute et
+`eventMajor` restent disponibles via `--cases`. `--cases` permet
 de réduire cette liste. Les scénarios constant/local1/local2/global sont exécutés
 après échauffement ; local1 couvre **toutes** les coordonnées libres, même si
 leur nombre dépasse `--calls`. `--parameter-match` sélectionne des coordonnées
@@ -188,3 +189,105 @@ Validation locale de la préparation : compilation C++ hôte des sources CUDA
 modifiées et des tests, tests de packing/sémantique sans GPU, tests Python de
 capture/CLI et test de rechargement à chaud du benchmark réussis. NVCC et les
 tests device restent à exécuter au CC ; le build Mac ne compile pas le `.cu`.
+
+## Selective event updates for MIGRAD/HESSE workloads
+
+The default benchmark matrix now contains the following cases, all within one
+loaded engine:
+
+| Case suffix | CUDA option | Purpose |
+|---|---|---|
+| `-compact` | `eventWeightMode: dense` | Current compact baseline |
+| `-compact-coverage` | `eventWeightMode: coverage` | Measure exact affected events/groups; still recompute all weights |
+| `-compact-sparse` | `eventWeightMode: sparseGroups` | Recompute selected groups, with dense fallback |
+| `CPU` | CPU backend | Numerical reference |
+
+The event index maps physical parameters to groups of 32 result slots and exact
+32-bit event masks. It handles overlapping dependencies and repeated dial
+references without counting an event twice. Selecting complete groups preserves
+the warp-interleaved index layout. Selected events recompute the full ordered
+product; unchanged weights remain resident. Caps, negative/zero products and
+error invalidation retain their existing semantics. Histograms and device LLH
+still use full reductions. No ratio or atomic delta update is introduced.
+
+| Control | Initial value or behavior |
+|---|---|
+| Production default | `eventWeightMode: dense` |
+| `eventWeightSparseFraction` | `0.25`, an experimental threshold, not a measured optimum |
+| CLI override for indexed cases | `--event-weight-sparse-fraction 0.25` |
+| Sparse selection | Stop early once selected groups exceed the threshold |
+| Coverage selection | Complete exact union even for broad updates; includes diagnostic overhead |
+| Index storage budget | 256 MiB for stored CSR arrays; temporary construction and selection buffers are additional |
+| Unsupported models | Observable/dynamic event state or nonstandard dials: dense fallback |
+| Other dense fallbacks | Initial/rebuilt/invalidated cache, forced updates, prediction reuse disabled, recompute mode, or broad response updates |
+
+The benchmark rejects an indexed case when no index was built. Inspect
+`eventUpdateIndexFallback` for unsupported features or budget exhaustion.
+
+New scenarios exercise propagation patterns relevant to numerical derivatives:
+
+| Scenario | Sequence | Coverage per trial |
+|---|---|---|
+| `derivative1` | Displacement → center → opposite displacement → center | At least 4 calls per fit coordinate |
+| `derivative2` | Four neighboring two-coordinate stencil points → center | At least 5 calls per adjacent coordinate pair |
+
+Stencil displacements default to `1e-3` parameter standard deviations, controlled
+by `--derivative-step-scale`, independently of the ordinary `--step-scale`.
+When a coordinate is on a bound, an in-domain one-sided stencil is used.
+`parameters.json` records the exact stencil values. These are reproducible
+propagation workloads, not a complete MIGRAD/HESSE execution, exhaustive Hessian
+pair coverage, or a derivative-accuracy test. Existing constant/local1/local2/
+global scenarios remain available. The defaults are constant/local1/derivative1/
+derivative2/global; use `--scenarios` to change them.
+
+### Run on the production eigen configuration first
+
+After rebuilding and reinstalling GUNDAM in the matching CUDA/Python environment:
+
+```bash
+sbatch --export=ALL "$GUNDAM_REPO/tests/benchmarks/236CudaWeightBenchmark.sbatch" \
+  --mode benchmark --work-dir "$OA_WORK" --config configOA2024.yaml \
+  --override override/v13Prod.yaml \
+  --python-module-dir "$GUNDAM_MODULE" \
+  --test-executable "$GUNDAM_BUILD/tests/gundamGTest_cudaBackend.exe" \
+  --output "$OA_WORK/benchmark-weights-local-$(date +%Y%m%d-%H%M%S)"
+```
+
+The test gate includes event-index host tests and device propagation tests before
+the expensive dataset load. A second independent job can append
+`override/noEigen.yaml` after the production override and use a different output
+directory. Each job still loads its inputs only once. Keep the production eigen
+run as the primary MIGRAD/HESSE reference.
+
+### Read the new counters
+
+| Output | Interpretation |
+|---|---|
+| `eventWeightCoverageKnown` | 1 only when the affected-event/group union is exact |
+| `eventWeightCandidateCount` | Exact affected events when coverage is known |
+| `eventWeightGroupCount` | Exact affected groups when coverage is known |
+| `eventWeightsRecomputedCount` | Events actually recomputed by the CUDA weight kernel |
+| `sparseEventWeightsUsed` | 1 when a selective update was used |
+| `eventSelectionSeconds` | Host selection time, already included in cache preparation |
+| `eventUpdateIndexBuildSeconds` | One-time index construction time in `model.json` |
+| `eventUpdateIndexBytes` | Stored host CSR bytes |
+| `parameterEventCounts` / `parameterEventGroupCounts` | Static coverage by physical model parameter index, not effective fit-coordinate index |
+
+Zero candidate/group counts with `eventWeightCoverageKnown=0` mean **unknown**,
+not zero affected events. Early dense fallback deliberately avoids completing
+an expensive diagnostic union. The coverage case provides exact unions for
+primed, reusable evaluations. CUDA-specific counters remain zero on CPU.
+
+`local1-coordinate-costs.json` and `derivative1-coordinate-costs.json` contain the
+new counters by effective fit coordinate, including eigen coordinates. Raw rows
+retain each stencil point, changed coordinates, likelihood and coverage state.
+Use the coverage case to interpret locality, then compare **dense compact versus
+sparse compact** for performance. Coverage mode is not the speed reference.
+
+Add `--event-variables` to compare all final weights and bin indices outside
+measurement timers; snapshots on OA2024 are large. Dedicated device tests compare
+individual weights and histograms after local, multi-parameter, return-to-center,
+constant, forced, error/recovery and rebuilt-cache updates, for both layouts.
+Local validation covers C++ host index tests, Python stencil/CLI tests and real
+CPU resident-engine smoke tests. NVCC and the new sparse device kernel still
+require validation on the CC GPU.

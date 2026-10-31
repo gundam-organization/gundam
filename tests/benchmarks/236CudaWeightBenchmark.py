@@ -57,7 +57,7 @@ def main(argv=None):
         executable = own.test_executable.resolve()
         if not executable.is_file():
             parser.error(f'CUDA test executable does not exist: {executable}')
-        subprocess.run([str(executable), '--gtest_filter=CudaCompactDialModel.*:CudaBackendPropagation.*'],
+        subprocess.run([str(executable), '--gtest_filter=CudaCompactDialModel.*:CudaEventUpdates.*:CudaBackendPropagation.*'],
                        env=environment, check=True)
     if '--execution-mode' in forwarded or '--worker' in forwarded:
         parser.error('This entry point manages resident execution; do not pass --execution-mode or --worker')
@@ -65,9 +65,10 @@ def main(argv=None):
                 '--require-weight-inventory',
                 '--threads', '4', '--calls', '100', '--global-calls', '40', '--trials', '3', '--warmup', '8']
     if own.mode == 'benchmark':
-        defaults += ['--cases', 'CPU', 'CUDA-cachedResponses-interleaved',
-                     'CUDA-cachedResponses-interleaved-compact', 'CUDA-recomputeResponses-interleaved',
-                     'CUDA-recomputeResponses-interleaved-compact']
+        defaults += ['--cases', 'CPU', 'CUDA-cachedResponses-interleaved-compact',
+                     'CUDA-cachedResponses-interleaved-compact-coverage',
+                     'CUDA-cachedResponses-interleaved-compact-sparse',
+                     '--scenarios', 'constant', 'local1', 'derivative1', 'derivative2', 'global']
         command = [sys.executable, '-u', str(profile), *defaults, *forwarded, '--output', str(own.output.resolve())]
     else:
         if not shutil.which(own.ncu):

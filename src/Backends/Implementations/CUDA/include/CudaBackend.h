@@ -19,6 +19,13 @@ ENUM_FIELD( eventMajor, 0 ) \
 ENUM_FIELD( warpInterleaved )
 #include "GenericToolbox.MakeEnum.h"
 
+#define ENUM_NAME CudaEventWeightMode
+#define ENUM_FIELDS \
+ENUM_FIELD( dense, 0 ) \
+ENUM_FIELD( coverage ) \
+ENUM_FIELD( sparseGroups )
+#include "GenericToolbox.MakeEnum.h"
+
   struct CudaBackendImpl;
 
   // Resident native-double executor for weight/observable dials and strict bins.
@@ -72,6 +79,8 @@ ENUM_FIELD( warpInterleaved )
     unsigned int _likelihoodBlockSize_{0}; // Zero selects the conservative automatic policy.
     bool _reusePrediction_{true};
     bool _compactDials_{false};
+    CudaEventWeightMode _eventWeightMode_{CudaEventWeightMode::dense};
+    double _eventWeightSparseFraction_{0.25};
     CudaPropagationMode _propagationMode_{CudaPropagationMode::cachedResponses};
     CudaWeightLayout _weightLayout_{CudaWeightLayout::warpInterleaved};
     std::uint64_t _nextTokenId_{1};

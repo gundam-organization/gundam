@@ -25,6 +25,35 @@ def main():
         device_index=0))['options'][0]
     assert options['compactDials'] and options['weightLayout'] == 'warpInterleaved'
     assert options['propagationMode'] == 'cachedResponses'
+    options = profiling.backend_config(SimpleNamespace(worker='CUDA-cachedResponses-interleaved-compact-sparse',
+        device_index=0))['options'][0]
+    assert options['compactDials'] and options['eventWeightMode'] == 'sparseGroups'
+    assert options['eventWeightSparseFraction'] == .25
+    class Parameter:
+        def __init__(self, name, value): self.name, self.value = name, value
+        def getFullTitle(self): return self.name
+        def isInDomain(self, value): return 0 <= value <= 2
+        def setParameterValue(self, value):
+            assert self.isInDomain(value)
+            self.value = value
+    import hashlib
+    sequence = profiling.DerivativeSequence.__new__(profiling.DerivativeSequence)
+    sequence.entries = [(Parameter('central', 1.), 1., .1, 'original'),
+                        (Parameter('bounded', 0.), 0., .1, 'original')]
+    sequence.reset()
+    assert sequence.manifest()[1]['derivativeStencil']['kind'] == 'forward'
+    for scenario, calls in [('derivative1', 8), ('derivative2', 5)]:
+        args_for_calls = SimpleNamespace(calls=1, global_calls=1)
+        assert profiling.scheduling.scenario_calls(args_for_calls, scenario, 2) == calls
+        digests = []
+        for repeat in range(2):
+            sequence.reset()
+            digest = hashlib.sha256()
+            for call in range(calls):
+                sequence.apply(scenario, None, call, digest)
+            assert sequence.current == [1., 0.]
+            digests.append(digest.hexdigest())
+        assert digests[0] == digests[1]
     events = []
     timing = SimpleNamespace(**{field: 0 for field in (*profiling.SECONDS_FIELDS, *profiling.COUNT_FIELDS)})
     manager = SimpleNamespace(getLastTimingSummary=lambda: timing, getLastPreparationSeconds=lambda: 0.)

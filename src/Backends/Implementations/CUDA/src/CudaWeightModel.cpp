@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <chrono>
 #include <map>
 #include <numeric>
 #include <cmath>
@@ -102,7 +103,7 @@ namespace {
   }
 }
 
-Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_, bool compactDials_) {
+Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_, bool compactDials_, bool indexEventUpdates_) {
   static_assert(std::is_trivially_copyable<CudaFormulaProgram>::value);
   static_assert(std::is_trivially_copyable<FormulaInstruction>::value);
   static_assert(std::is_trivially_copyable<FormulaInput>::value);
@@ -541,6 +542,7 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
       }
     }
   }
+  if( indexEventUpdates_ ){ out.eventUpdateIndex.build(model, out.hasEventState); }
   return out;
 }
 
@@ -593,4 +595,82 @@ void Backends::CudaResponseUpdatePlan::selectExternal(const std::vector<CudaExte
     dialCount += count;
     blockCount += (count - 1) / cudaResponseBlockSize + 1;
   }
+}
+
+
+void Backends::CudaEventUpdateIndex::build(const PropagationView& model_, bool hasEventState_, std::size_t maxBytes_) {
+  *this = {};
+  struct BuildTimer {
+    double& output;
+    std::chrono::steady_clock::time_point start{std::chrono::steady_clock::now()};
+    ~BuildTimer() { output = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count(); }
+  } timer{buildSeconds};
+  if( hasEventState_ ) { fallback = "observable or dynamic event state"; return; }
+  if( model_.eventWeights.size() > UINT32_MAX or model_.parameterCount > UINT32_MAX ){
+    fallback = "event or parameter count exceeds uint32 range"; return;
+  }
+  for( const auto& dial : model_.dials ){
+    if( dial.type > BackendDialType::Graph ){ fallback = "nonstandard dial dependencies"; return; }
+  }
+  eventCount = model_.eventWeights.size();
+  groupCount = eventCount / 32 + (eventCount % 32 != 0);
+  const auto baseBytes = (2 * model_.parameterCount + 1) * sizeof(std::size_t);
+  if( baseBytes > maxBytes_ ){ fallback = "event index budget exceeded"; return; }
+  std::vector<std::vector<CudaEventGroupDependency>> rows(model_.parameterCount);
+  std::vector<std::uint32_t> masks(model_.parameterCount, 0), touched;
+  std::size_t records = 0;
+  for( std::size_t first = 0; first < eventCount; first += 32 ){
+    touched.clear();
+    for( std::size_t i = first; i < std::min(first + 32, eventCount); ++i ){
+      const auto& event = model_.eventWeights[i];
+      for( std::size_t j = 0; j < event.dialCount; ++j ){
+        const auto& dial = model_.dials[model_.eventDialIndices[event.firstDial + j]];
+        if( dial.type == BackendDialType::Shift ){ continue; }
+        const auto parameter = model_.dialInputs[dial.firstInput].parameterIndex;
+        if( masks[parameter] == 0 ){ touched.push_back(std::uint32_t(parameter)); }
+        masks[parameter] |= std::uint32_t(1) << (i - first);
+      }
+    }
+    for( auto parameter : touched ){
+      if( records >= (maxBytes_ - baseBytes) / sizeof(CudaEventGroupDependency) ){
+        fallback = "event index budget exceeded"; return;
+      }
+      rows[parameter].push_back({std::uint32_t(first / 32), masks[parameter]});
+      masks[parameter] = 0;
+      ++records;
+    }
+  }
+  offsets.reserve(model_.parameterCount + 1);
+  dependencies.reserve(records);
+  parameterEventCounts.resize(model_.parameterCount, 0);
+  for( std::size_t p = 0; p < model_.parameterCount; ++p ){
+    offsets.push_back(dependencies.size());
+    for( const auto& group : rows[p] ){
+      dependencies.push_back(group);
+      parameterEventCounts[p] += std::size_t(__builtin_popcount(group.mask));
+    }
+  }
+  offsets.push_back(dependencies.size());
+}
+
+void Backends::CudaEventUpdatePlan::select(const CudaEventUpdateIndex& index_,
+    const std::vector<double>& previous_, const std::vector<double>& current_, std::size_t maxGroups_) {
+  for( auto group : groups ){ masks[group] = 0; }
+  groups.clear(); affectedEvents = 0; complete = false;
+  if( not index_.available() ){ return; }
+  if( previous_.size() != index_.parameterEventCounts.size() or current_.size() != previous_.size() ){
+    throw std::runtime_error("CudaBackend: event selection parameter count mismatch.");
+  }
+  masks.resize(index_.groupCount, 0);
+  for( std::size_t p = 0; p < current_.size(); ++p ){
+    if( previous_[p] == current_[p] ){ continue; }
+    for( auto i = index_.offsets[p]; i < index_.offsets[p + 1]; ++i ){
+      const auto& entry = index_.dependencies[i];
+      if( masks[entry.group] == 0 ){ groups.push_back(entry.group); }
+      masks[entry.group] |= entry.mask;
+      if( groups.size() > maxGroups_ ){ return; }
+    }
+  }
+  for( auto group : groups ){ affectedEvents += std::size_t(__builtin_popcount(masks[group])); }
+  complete = true;
 }

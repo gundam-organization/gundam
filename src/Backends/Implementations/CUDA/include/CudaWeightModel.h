@@ -2,6 +2,7 @@
 #define GUNDAM_CUDA_WEIGHT_MODEL_H
 
 #include "EngineView.h"
+#include "CudaEventUpdates.h"
 #include "NativeDialProgramModel.h"
 #include "Semantics/BackendSemanticsQualifiers.h"
 
@@ -73,6 +74,7 @@ namespace Backends {
   // the original event traversal order, independently of those result slots.
   struct CudaWeightModel {
     std::vector<BackendEventWeightDescriptor> events{};
+    CudaEventUpdateIndex eventUpdateIndex{};
     std::vector<BackendDialDescriptor> dials{};
     std::vector<std::uint32_t> compactDialFields{};
     std::vector<BackendDialDescriptor> compactDialPolicies{};
@@ -128,7 +130,7 @@ namespace Backends {
 
   // Reject unsupported features and malformed layouts before allocating CUDA
   // buffers. This also makes model validation testable without a toolkit.
-  [[nodiscard]] CudaWeightModel makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_ = false, bool compactDials_ = false);
+  [[nodiscard]] CudaWeightModel makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_ = false, bool compactDials_ = false, bool indexEventUpdates_ = false);
 
   inline constexpr std::size_t cudaResponseBlockSize = 256;
   struct CudaResponseUpdate {

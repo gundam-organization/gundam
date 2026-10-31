@@ -448,3 +448,136 @@ TEST(CudaBackendPropagation, CompactDialsMatchCpuAcrossSparseDenseAndReuse) {
     }
   }
 }
+
+namespace {
+  EngineView eventUpdateModel() {
+    EngineView view;
+    auto& model = view.propagation;
+    model.parameterCount = 4;
+    model.totalBins = 3;
+    model.hasReweightCap = true;
+    model.maxReweight = 1.1;
+    model.dialInputs = {{0}, {1}, {2}};
+    for( unsigned i = 0; i < 123; ++i ){
+      BackendDialDescriptor dial;
+      dial.type = BackendDialType::Norm;
+      dial.firstInput = i % 3; dial.inputCount = 1;
+      model.dials.push_back(dial);
+    }
+    model.events.resize(105); model.eventWeights.resize(105);
+    for( std::size_t i = 0; i < 105; ++i ){
+      model.events[i].resultIndex = i;
+      model.events[i].globalBinIndex = int(i % 3);
+      auto& event = model.eventWeights[i];
+      event.baseWeight = i % 5 == 0 ? 0. : (i % 3 == 0 ? -.5 : 1.);
+      event.firstDial = model.eventDialIndices.size();
+      std::vector<std::uint32_t> dials = i < 32 ? std::vector<std::uint32_t>{0, 0}
+          : i < 64 ? std::vector<std::uint32_t>{1}
+          : i < 96 ? std::vector<std::uint32_t>{0, 1} : std::vector<std::uint32_t>{2};
+      event.dialCount = dials.size();
+      model.eventDialIndices.insert(model.eventDialIndices.end(), dials.begin(), dials.end());
+    }
+    return view;
+  }
+}
+
+TEST(CudaEventUpdates, ExactMasksOverlapTailAndSelectionRecovery) {
+  const auto view = eventUpdateModel();
+  CudaEventUpdateIndex index;
+  index.build(view.propagation, false);
+  ASSERT_TRUE(index.available());
+  EXPECT_EQ(index.parameterEventCounts, (std::vector<std::size_t>{64, 64, 9, 0}));
+  EXPECT_EQ(index.groupCount, 4);
+  CudaEventUpdatePlan plan;
+  const std::vector<double> center{1., 1., 1., 1.};
+  plan.select(index, center, {2., 2., 1., 1.}, 4);
+  ASSERT_TRUE(plan.complete);
+  EXPECT_EQ(plan.groups.size(), 3);
+  EXPECT_EQ(plan.affectedEvents, 96);
+  plan.select(index, center, {2., 1., 1., 1.}, 1);
+  EXPECT_FALSE(plan.complete);
+  plan.select(index, center, {1., 1., 2., 1.}, 1);
+  ASSERT_TRUE(plan.complete);
+  EXPECT_EQ(plan.groups, (std::vector<std::uint32_t>{3}));
+  EXPECT_EQ(plan.affectedEvents, 9);
+  plan.select(index, center, center, 4);
+  EXPECT_TRUE(plan.complete); EXPECT_TRUE(plan.groups.empty());
+  EXPECT_EQ(plan.affectedEvents, 0);
+  plan.select(index, center, {1., 1., 1., 2.}, 4);
+  EXPECT_TRUE(plan.complete); EXPECT_TRUE(plan.groups.empty());
+}
+
+TEST(CudaEventUpdates, RejectsUnsupportedModelsBudgetsAndConfiguration) {
+  auto view = eventUpdateModel();
+  CudaEventUpdateIndex index;
+  index.build(view.propagation, true);
+  EXPECT_FALSE(index.available());
+  index.build(view.propagation, false, 1);
+  EXPECT_FALSE(index.available());
+  index.build(view.propagation, false, 80);
+  EXPECT_FALSE(index.available());
+  view.propagation.dials[0].type = BackendDialType::Formula;
+  index.build(view.propagation, false);
+  EXPECT_FALSE(index.available());
+  CudaBackend backend;
+  EXPECT_NO_THROW(backend.configure(ConfigReader(JsonType{{"eventWeightMode", "coverage"}})));
+  EXPECT_NO_THROW(backend.configure(ConfigReader(JsonType{{"eventWeightMode", "sparseGroups"}, {"eventWeightSparseFraction", 1.}})));
+  for( const auto& value : {JsonType(0), JsonType(-1), JsonType(1.1), JsonType(".25")} ){
+    EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"eventWeightSparseFraction", value}})), std::runtime_error);
+  }
+  EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"eventWeightMode", "unknown"}})), std::exception);
+}
+
+TEST(CudaBackendPropagation, SparseEventGroupsPreserveProductsAcrossUpdatesAndErrors) {
+  const auto view = eventUpdateModel();
+  for( const auto* layout : {"eventMajor", "warpInterleaved"} ){
+    for( const auto* mode : {"coverage", "sparseGroups"} ){
+      CpuBackend cpu; cpu.build(view);
+      CudaBackend cuda;
+      cuda.configure(ConfigReader(JsonType{{"compactDials", true}, {"weightLayout", layout},
+          {"eventWeightMode", mode}, {"eventWeightSparseFraction", .5}}));
+      cuda.build(view);
+      bool sawSparse = false, sawDense = false;
+      for( const auto& values : std::vector<std::vector<double>>{
+          {1., 1., 1., 1.}, {1., 1., 1.2, 1.}, {1., 1., 1., 1.},
+          {1., 1., -.5, 1.}, {1., 1., 1., 1.}, {.8, 1., 1., 1.},
+          {.8, .7, 1.2, 1.}, {1., 1., 1., 1.}, {1., 1., 1., 1.}, {1., 1., 1., 2.}} ){
+        PropagationInputs inputs; inputs.parameters.values = values;
+        const auto reference = cpu.requestPropagation(inputs);
+        const auto token = cuda.requestPropagation(inputs);
+        expectClose(cuda.getEventWeightsHostView(token), cpu.getEventWeightsHostView(reference));
+        expectClose(cuda.getHistogramSumsHostView(token), cpu.getHistogramSumsHostView(reference));
+        expectClose(cuda.getHistogramSumSquaresHostView(token), cpu.getHistogramSumSquaresHostView(reference));
+        const auto timing = cuda.getLastTimingSummary();
+        sawSparse |= timing.sparseEventWeightsUsed != 0;
+        sawDense |= timing.eventWeightsRecomputedCount == 105;
+        if( timing.eventWeightCoverageKnown ){
+          EXPECT_LE(timing.eventWeightCandidateCount, timing.eventWeightsRecomputedCount);
+          EXPECT_LE(timing.eventWeightCandidateCount, 32 * timing.eventWeightGroupCount);
+        }
+        if( timing.sparseEventWeightsUsed ){
+          EXPECT_TRUE(timing.eventWeightCoverageKnown);
+          EXPECT_LE(timing.eventWeightCandidateCount, timing.eventWeightsRecomputedCount);
+          EXPECT_LT(timing.eventWeightsRecomputedCount, 105);
+        }
+      }
+      EXPECT_TRUE(sawDense);
+      EXPECT_EQ(sawSparse, std::string(mode) == "sparseGroups");
+      PropagationInputs inputs; inputs.parameters.values = {1., 1., std::numeric_limits<double>::infinity(), 1.};
+      EXPECT_THROW(cuda.requestPropagation(inputs), std::runtime_error);
+      inputs.parameters.values = {1., 1., 1., 1.};
+      const auto reference = cpu.requestPropagation(inputs);
+      const auto token = cuda.requestPropagation(inputs);
+      EXPECT_EQ(cuda.getLastTimingSummary().eventWeightsRecomputedCount, 105);
+      expectClose(cuda.getEventWeightsHostView(token), cpu.getEventWeightsHostView(reference));
+      inputs.forceBinningUpdate = true;
+      cuda.requestPropagation(inputs);
+      EXPECT_EQ(cuda.getLastTimingSummary().eventWeightsRecomputedCount, 105);
+      cuda.build(view);
+      inputs.forceBinningUpdate = false;
+      const auto rebuilt = cuda.requestPropagation(inputs);
+      EXPECT_EQ(cuda.getLastTimingSummary().eventWeightsRecomputedCount, 105);
+      expectClose(cuda.getEventWeightsHostView(rebuilt), cpu.getEventWeightsHostView(reference));
+    }
+  }
+}

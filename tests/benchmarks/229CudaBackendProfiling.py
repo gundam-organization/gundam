@@ -17,6 +17,7 @@ import platform
 import random
 import re
 import statistics
+import struct
 import subprocess
 import sys
 import threading
@@ -31,15 +32,18 @@ spec.loader.exec_module(scheduling)
 progress, write_json = scheduling.progress, scheduling.write_json
 CASES = ('CUDA-cachedResponses', 'CUDA-recomputeResponses', 'CPU',
          'CUDA-cachedResponses-interleaved', 'CUDA-recomputeResponses-interleaved',
-         'CUDA-cachedResponses-interleaved-compact', 'CUDA-recomputeResponses-interleaved-compact')
+         'CUDA-cachedResponses-interleaved-compact', 'CUDA-recomputeResponses-interleaved-compact',
+         'CUDA-cachedResponses-interleaved-compact-coverage',
+         'CUDA-cachedResponses-interleaved-compact-sparse')
 SECONDS_FIELDS = ('parameterUploadSeconds', 'cachedDialStageSeconds',
-                  'cachePreparationSeconds',
+                  'cachePreparationSeconds', 'eventSelectionSeconds',
                   'eventWeightsStageSeconds', 'variableStageSeconds', 'binningStageSeconds',
                   'histogramStageSeconds', 'externalWeightUploadSeconds',
                   'devicePropagationSeconds', 'histogramReadbackSeconds',
                   'likelihoodHostSeconds', 'likelihoodDeviceSeconds', 'eventWeightReadbackSeconds')
 COUNT_FIELDS = ('histogramReadbackBytes', 'eventWeightReadbackBytes', 'eventStateReadbackBytes',
-                'cacheCandidateCount', 'rebinnedEventCount', 'binCandidateCount',
+                'eventWeightCandidateCount', 'eventWeightGroupCount', 'eventWeightsRecomputedCount',
+                'eventWeightCoverageKnown', 'sparseEventWeightsUsed', 'cacheCandidateCount', 'rebinnedEventCount', 'binCandidateCount',
                 'binContributionCount', 'contributionBufferBytes', 'externalWeightUploadBytes',
                 'externalWeightUploadBlocks', 'likelihoodReadbackBytes')
 
@@ -69,16 +73,82 @@ def outside_histogram(engine):
             if sample.getHistogram().isBinningResponseEnabled()]
 
 
+class DerivativeSequence(scheduling.ParameterSequence):
+    """Propagation stencils, not numerical derivative accuracy tests or a fit replay."""
+    def points(self, index):
+        if not hasattr(self, '_points'):
+            self._points = {}
+        parameter, center, scale, _ = self.entries[index]
+        scale *= getattr(self, 'derivative_step_ratio', 1.)
+        name = parameter.getFullTitle()
+        if name not in self._points:
+            for _ in range(60):
+                low, high = center - scale, center + scale
+                if low != center and high != center and math.isfinite(low) and math.isfinite(high) and parameter.isInDomain(low) and parameter.isInDomain(high):
+                    self._points[name] = (low, high, 'central')
+                    break
+                forward, backward = center + 2 * scale, center - 2 * scale
+                if high != center and forward != high and math.isfinite(forward) and parameter.isInDomain(high) and parameter.isInDomain(forward):
+                    self._points[name] = (high, forward, 'forward')
+                    break
+                if low != center and backward != low and math.isfinite(backward) and parameter.isInDomain(low) and parameter.isInDomain(backward):
+                    self._points[name] = (low, backward, 'backward')
+                    break
+                scale *= .5
+            else:
+                raise RuntimeError('Cannot form a derivative stencil: ' + name)
+        return self._points[name]
+
+    def manifest(self):
+        result = super().manifest()
+        for i, entry in enumerate(result):
+            low, high, kind = self.points(i)
+            entry['derivativeStencil'] = dict(kind=kind, first=low, second=high)
+        return result
+
+    def coordinates(self, scenario, call):
+        if scenario == 'derivative1':
+            return [(call // 4) % len(self.entries)]
+        if scenario == 'derivative2':
+            first = (2 * (call // 5)) % len(self.entries)
+            return [first, (first + 1) % len(self.entries)]
+        return super().coordinates(scenario, call)
+
+    def apply(self, scenario, rng, call, digest):
+        if scenario not in ('derivative1', 'derivative2'):
+            return super().apply(scenario, rng, call, digest)
+        indices = self.coordinates(scenario, call)
+        changed = 0
+        for slot, index in enumerate(indices):
+            parameter, center, _, _ = self.entries[index]
+            low, high, _ = self.points(index)
+            if scenario == 'derivative1':
+                value = (high, center, low, center)[call % 4]
+            else:
+                phase = call % 5
+                value = center if phase == 4 else (low, high)[(phase // 2) if slot == 0 else (phase % 2)]
+            changed += value != self.current[index]
+            parameter.setParameterValue(value)
+            self.current[index] = value
+            digest.update(struct.pack('<Qd', index, value))
+        return changed
+
+
 def parameter_sequence(args, engine):
-    sequence = scheduling.ParameterSequence(engine, args.step_scale)
+    sequence_type = DerivativeSequence if any(x in args.scenarios for x in ('derivative1', 'derivative2')) else scheduling.ParameterSequence
+    sequence = sequence_type(engine, args.step_scale)
+    if isinstance(sequence, DerivativeSequence):
+        sequence.derivative_step_ratio = getattr(args, 'derivative_step_scale', 1e-3) / args.step_scale
     if args.parameter_match:
         pattern = re.compile(args.parameter_match)
         sequence.entries = [entry for entry in sequence.entries if pattern.search(entry[0].getFullTitle())]
         if not sequence.entries:
             raise RuntimeError(f'No eligible effective fit coordinate matches {args.parameter_match!r}')
         sequence.current = [center for _, center, _, _ in sequence.entries]
-    if 'local2' in args.scenarios and len(sequence.entries) < 2:
-        raise RuntimeError('local2 needs two coordinates; use --scenarios constant local1 for a single parameter')
+    if not sequence.entries and any(x in args.scenarios for x in ('derivative1', 'derivative2')):
+        raise RuntimeError('Derivative scenarios require variable fit coordinates')
+    if any(x in args.scenarios for x in ('local2', 'derivative2')) and len(sequence.entries) < 2:
+        raise RuntimeError('local2/derivative2 need two coordinates; use constant local1 derivative1 for one parameter')
     progress(f'{args.worker}: {len(sequence.entries)} selected fit coordinates')
     if args.parameter_match:
         for entry in sequence.manifest():
@@ -98,8 +168,11 @@ def backend_config(args):
         'weightLayout': 'warpInterleaved' if '-interleaved' in args.worker else 'eventMajor',
         'likelihoodBlockSize': getattr(args, 'likelihood_block_size', 0),
         'reusePrediction': not getattr(args, 'disable_prediction_reuse', False)}
-    if args.worker.endswith('-compact'):
+    if '-compact' in args.worker:
         options['compactDials'] = True
+    if args.worker.endswith('-coverage') or args.worker.endswith('-sparse'):
+        options['eventWeightMode'] = 'coverage' if args.worker.endswith('-coverage') else 'sparseGroups'
+        options['eventWeightSparseFraction'] = getattr(args, 'event_weight_sparse_fraction', .25)
     return {'isEnabled': True, 'useBackend': backend_type,
         'options': [{'name': backend_type, **options}]}
 
@@ -303,7 +376,7 @@ def measure(args, engine=None, sequence=None):
               'scenarios': {}, 'hardwareProfile': getattr(args, 'profile_capture', False)}
     if args.worker != 'CPU':
         result['model'] = json.loads(engine.getBackendsManager().getDiagnosticCuda())
-        if args.worker.endswith('-compact') and not result['model'].get('compactDials', False):
+        if '-compact' in args.worker and not result['model'].get('compactDials', False):
             raise RuntimeError('Compact CUDA dials were requested but are inactive: ' + result['model'].get('compactDialFallback', 'rebuild the module'))
         if getattr(args, 'require_weight_inventory', False) and 'weightInventory' not in result['model']:
             raise RuntimeError('Rebuild/reinstall the CUDA Python module: weightInventory is missing')
@@ -311,6 +384,8 @@ def measure(args, engine=None, sequence=None):
             raise RuntimeError('This benchmark requires PoissonLLH or Barlow-Beeston 2022 resident on CUDA')
         if getattr(args, 'require_v100', False) and 'V100' not in result['model'].get('device', ''):
             raise RuntimeError('Selected CUDA device is not a V100: ' + result['model'].get('device', 'unknown'))
+        if args.worker.endswith(('-coverage', '-sparse')) and not result['model'].get('eventUpdateIndexAvailable', False):
+            raise RuntimeError('Event update index unavailable: ' + result['model'].get('eventUpdateIndexFallback', 'rebuild module'))
         write_json(args.output / 'model.json', result['model'])
         progress(f"{args.worker}: weight layout {result['model']['weightLayout']}, "
                  f"{result['model']['packedEventDialIndexBytes']} index bytes")
@@ -340,7 +415,7 @@ def measure(args, engine=None, sequence=None):
                  'gpuStageRanking': gpu_ranking if args.worker != 'CPU' else [],
                  'counts': count_summary(rows),
                  'coordinateCostsFile': None}
-        if scenario == 'local1':
+        if scenario in ('local1', 'derivative1'):
             grouped = [[] for _ in sequence.entries]
             for row in rows:
                 grouped[row['coordinateIndices'][0]].append(row)
@@ -348,7 +423,7 @@ def measure(args, engine=None, sequence=None):
                       'medianResponseCandidates': statistics.median(row['counts']['cacheCandidateCount'] for row in group),
                       'timings': summarize(group), 'counts': count_summary(group)} for index, group in enumerate(grouped)]
             costs.sort(key=lambda row: row['timings']['evaluationSeconds']['medianMs'], reverse=True)
-            entry['coordinateCostsFile'] = 'local1-coordinate-costs.json'
+            entry['coordinateCostsFile'] = f'{scenario}-coordinate-costs.json'
             write_json(args.output / entry['coordinateCostsFile'], costs)
         if args.require_rebinning and scenario != 'constant' and not any(
                 row['counts']['rebinnedEventCount'] > 0 for row in rows):
@@ -529,6 +604,17 @@ def write_report(output, cases):
             lines.append(f"| {case} | {model.get('requestedCompactDials', False)} | {model.get('compactDials', False)} | "
                          f"{model.get('deviceDialDescriptorBytes', 'unknown')} | {model.get('compactDialPolicies', 0)} | "
                          f"{model.get('compactDialFallback', '')} |")
+    lines.extend(['', 'Event selection is host time included in cache preparation. Coverage counts are exact only when coverageKnown=1.',
+                  'Coverage mode always recomputes dense weights; sparse mode may stop selection early and report coverageKnown=0.', '',
+                  '| Case | Scenario | Coverage known (median) | Affected events (median) | Groups (median) | Recomputed events (median) | Sparse used (median) | Selection ms |',
+                  '|---|---|---:|---:|---:|---:|---:|---:|'])
+    for case in cases:
+        data = json.loads((output / case / 'summary.json').read_text())
+        for scenario, entry in data['scenarios'].items():
+            counts = entry['counts']
+            cells = [str(counts[name]['median']) for name in ('eventWeightCoverageKnown', 'eventWeightCandidateCount',
+                     'eventWeightGroupCount', 'eventWeightsRecomputedCount', 'sparseEventWeightsUsed')]
+            lines.append('| ' + ' | '.join([case, scenario, *cells, f"{entry['timings']['eventSelectionSeconds']['medianMs']:.4f}"]) + ' |')
     (output / 'report.md').write_text('\n'.join(lines))
 
 
@@ -593,6 +679,7 @@ def main():
     parser.add_argument('--work-dir', type=Path, default=Path.cwd())
     parser.add_argument('--cases', nargs='+', choices=CASES,
                         default=['CUDA-cachedResponses-interleaved', 'CUDA-recomputeResponses-interleaved'])
+    parser.add_argument('--event-weight-sparse-fraction', type=float, default=.25)
     parser.add_argument('--device-index', type=int, default=0)
     parser.add_argument('--likelihood-block-size', type=int, choices=[0, 32, 64, 128, 256], default=0,
                         help='CUDA likelihood block size; zero selects the automatic policy')
@@ -609,10 +696,12 @@ def main():
     parser.add_argument('--warmup', type=int, default=5)
     parser.add_argument('--seed', type=int, default=12345)
     parser.add_argument('--step-scale', type=float, default=.1)
+    parser.add_argument('--derivative-step-scale', type=float, default=1e-3,
+                        help='Stencil displacement in parameter standard deviations, independent of --step-scale')
     parser.add_argument('--parameter-match', help='Regex selecting effective fit coordinates by full title')
     parser.add_argument('--require-rebinning', action='store_true',
                         help='Require at least one measured rebin in every nonconstant scenario/case')
-    parser.add_argument('--scenarios', nargs='+', choices=['constant', 'local1', 'local2', 'global'],
+    parser.add_argument('--scenarios', nargs='+', choices=['constant', 'local1', 'local2', 'global', 'derivative1', 'derivative2'],
                         default=['constant', 'local1', 'local2', 'global'])
     parser.add_argument('--event-variables', nargs='*', default=None,
                         help='Compare all event weights, exact bin indices and these variables outside timers')
@@ -628,6 +717,8 @@ def main():
     parser.add_argument('--execution-mode', choices=['resident', 'isolated'], default='resident')
     parser.add_argument('--worker', choices=(*CASES, 'resident'), help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if not math.isfinite(args.event_weight_sparse_fraction) or not 0 < args.event_weight_sparse_fraction <= 1:
+        parser.error('--event-weight-sparse-fraction must be in (0,1]')
     if args.profile_call < 0:
         parser.error('--profile-call must be nonnegative')
     if args.profile_capture and (args.execution_mode != 'resident' or args.worker not in (None, 'resident')):
@@ -636,7 +727,7 @@ def main():
         parser.error('--profile-capture requires at least one warmup call')
     if min(args.threads, args.calls, args.global_calls, args.trials) <= 0 or min(args.warmup, args.device_index) < 0:
         parser.error('Counts must be positive; warmup and device-index may be zero')
-    for name in ('step_scale', 'relative_tolerance', 'absolute_tolerance'):
+    for name in ('step_scale', 'derivative_step_scale', 'relative_tolerance', 'absolute_tolerance'):
         if not math.isfinite(getattr(args, name)) or getattr(args, name) <= 0:
             parser.error(f'{name} must be finite and positive')
     if args.parameter_match:
