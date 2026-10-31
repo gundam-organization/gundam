@@ -1,5 +1,6 @@
 #include "CpuBackend.h"
 #include "LikelihoodModel.h"
+#include "Semantics/BackendHostPropagation.h"
 #include "Semantics/BackendLikelihood.h"
 #include "JointProbability.h"
 #include "JointProbabilitySnapshot.h"
@@ -579,3 +580,20 @@ TEST(BackendLikelihood, CudaLiteEmptyAndLowRateBinsStayResident) {
 }
 #endif
 #endif
+
+TEST(BackendLikelihood, HostCallbackRejectsNanAndRetainsInfinityBarriers) {
+  Backends::LikelihoodView likelihood;
+  Backends::LikelihoodSampleView sample;
+  sample.dataSums = {1., 2.};
+  auto values = std::make_shared<std::array<double, 2>>(std::array<double, 2>{{1., 2.}});
+  sample.evalBin = [values](double, double, double, int bin_){ return (*values)[bin_]; };
+  likelihood.samples.push_back(sample);
+  const std::vector<double> sums{1., 2.}, squares{1., 4.};
+  EXPECT_DOUBLE_EQ(Backends::Semantics::calculateLikelihood(likelihood, sums, squares), 3.);
+  (*values)[0] = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(Backends::Semantics::calculateLikelihood(likelihood, sums, squares), std::runtime_error);
+  (*values)[0] = std::numeric_limits<double>::infinity();
+  EXPECT_EQ(Backends::Semantics::calculateLikelihood(likelihood, sums, squares), std::numeric_limits<double>::infinity());
+  (*values)[1] = -std::numeric_limits<double>::infinity();
+  EXPECT_THROW(Backends::Semantics::calculateLikelihood(likelihood, sums, squares), std::runtime_error);
+}

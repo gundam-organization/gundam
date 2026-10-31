@@ -13,7 +13,7 @@ sys.dont_write_bytecode = True
 import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
-def run_scan(executable, root, threads, scan_migration):
+def run_scan(executable, root, threads, scan_migration, cache_manager_cli=True):
     work = Path.cwd()
     tag = f"{threads}-{'migration' if scan_migration else 'flux'}"
     commands_path = work / f"220ExternalWeightScan-{tag}-commands.jsonl"
@@ -72,7 +72,7 @@ def run(command_):
     with log_path.open("w") as output:
         result = subprocess.run([
             executable, "-c", str(config_path), "-a", "-d", "--scan", str(points),
-            "--light-mode", "--cache-manager", "off", "-t", str(threads),
+            "--light-mode", *(["--cache-manager", "off"] if cache_manager_cli else []), "-t", str(threads),
             "-o", str(work / f"220ExternalWeightScan-{tag}.root"),
         ], stdout=output, stderr=subprocess.STDOUT, timeout=120)
     # Concurrent progress output may interleave UTF-8 characters. The scan
@@ -138,9 +138,12 @@ def main():
     with uproot.recreate(root) as output:
         tree = output.mktree("events", {"X": "float64"})
         tree.extend({"X": np.array([.2, .8, 1.2, 1.8])})
+    help_result = subprocess.run([executable, "--help"], stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, text=True, timeout=30)
+    cache_manager_cli = "--cache-manager" in help_result.stdout
     for threads in [1, 4]:
-        run_scan(executable, root, threads, scan_migration=False)
-        run_scan(executable, root, threads, scan_migration=True)
+        run_scan(executable, root, threads, scan_migration=False, cache_manager_cli=cache_manager_cli)
+        run_scan(executable, root, threads, scan_migration=True, cache_manager_cli=cache_manager_cli)
     print("SUCCESS: unrelated eigen scans reuse Python responses; related scans evaluate and restore them.")
 
 

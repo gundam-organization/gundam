@@ -215,6 +215,7 @@ def check_threads(threads, backend_name="CPU"):
 def main():
     import argparse
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('testDirectory', nargs='?', help=argparse.SUPPRESS)
     parser.add_argument('--backend', choices=['CPU', 'MPS', 'CUDA'], default='CPU')
     args = parser.parse_args()
     for threads in (1, 4):

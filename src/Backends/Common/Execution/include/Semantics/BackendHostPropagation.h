@@ -57,7 +57,9 @@ namespace Backends::Semantics {
         const double pred = histSums_.at(globalBin);
         const double predErr = std::sqrt(histSumSquares_.at(globalBin));
         if( sample.portableOptions.kind == LikelihoodKind::Host ){
-          likelihoodValue += sample.evalBin(sample.dataSums[iBin], pred, predErr, iBin);
+          const double value = sample.evalBin(sample.dataSums[iBin], pred, predErr, iBin);
+          if( std::isnan(value) ){ throw std::runtime_error("Invalid host statistical likelihood."); }
+          likelihoodValue += value;
         }
         else{
           // Preserve the reference sqrt(sumSquares) -> error^2 conversion.
@@ -71,6 +73,9 @@ namespace Backends::Semantics {
       }
     }
 
+    // Individual infinities remain valid likelihood barriers; an undefined
+    // aggregate (for example +inf plus -inf) must never be published.
+    if( std::isnan(likelihoodValue) ){ throw std::runtime_error("Invalid statistical likelihood total."); }
     return likelihoodValue;
   }
 
