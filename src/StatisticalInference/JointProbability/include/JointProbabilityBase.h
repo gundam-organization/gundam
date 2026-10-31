@@ -68,16 +68,6 @@ namespace JointProbability{
       return evalGradientByFiniteDifference(binContent.sqrtSumSqWeights, [&](double){ return eval(samplePair_, bin_); });
     }
 
-    [[nodiscard]] virtual double evalPredictionGradient( const SamplePair& samplePair_, int bin_ ) const {
-      auto& binContent = samplePair_.model->getHistogram().getBinContentList()[bin_];
-      return evalGradientByFiniteDifference(binContent.sumWeights, [&](double){ return eval(samplePair_, bin_); });
-    }
-
-    [[nodiscard]] virtual double evalSqrtSumSqWeightsGradient( const SamplePair& samplePair_, int bin_ ) const {
-      auto& binContent = samplePair_.model->getHistogram().getBinContentList()[bin_];
-      return evalGradientByFiniteDifference(binContent.sqrtSumSqWeights, [&](double){ return eval(samplePair_, bin_); });
-    }
-
     [[nodiscard]] virtual bool hasAnalyticBinGradient() const { return false; }
 
     struct BinGradient {
