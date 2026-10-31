@@ -73,7 +73,7 @@ namespace {
     }
     void TearDown() override { std::remove(_path_.c_str()); }
 
-    void initializeEngine(FitterEngine& engine_) {
+    void initializeEngine(FitterEngine& engine_, const std::string& likelihood_ = "LeastSquares") {
       auto config = JsonType::parse(R"({
         "enablePca": false, "scaleParStepWithChi2Response": false,
         "generateSamplePlots": false, "generateOneSigmaPlots": false,
@@ -96,6 +96,7 @@ namespace {
               ]}]} }
         }
       })");
+      config["likelihoodInterfaceConfig"]["jointProbabilityConfig"]["type"] = likelihood_;
       auto& definitions = config["likelihoodInterfaceConfig"]["propagatorConfig"]
                                ["parametersManagerConfig"]["parameterSetList"][0]["parameterDefinitions"];
       for( auto& parameter : definitions ){
@@ -178,4 +179,38 @@ TEST_F(RootMinimizerSimplex, RestoresMainMinimizerAfterAnObjectiveException) {
   EXPECT_EQ(minimizer.getMinimizer().get(), original);
   EXPECT_EQ(original->Precision(), 1e-6);
   EXPECT_EQ(original->Options().MinimizerAlgorithm(), "Migrad");
+}
+
+
+TEST_F(RootMinimizerSimplex, AnalyticGradientIsOptInAndValidatesConfiguration) {
+  FitterEngine engine;
+  initializeEngine(engine);
+  auto* root = dynamic_cast<RootMinimizer*>(&engine.getMinimizer());
+  ASSERT_NE(root, nullptr);
+  EXPECT_FALSE(root->isUsingAnalyticGradient());
+  EXPECT_EQ(root->getNbGradientCalls(), 0u);
+  RecordingMinimizer invalid(&engine);
+  EXPECT_THROW(invalid.configure(ConfigReader(JsonType{{"useAnalyticGradient", "true"}})), std::exception);
+  invalid.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}, {"minimizer", "Minuit"}}));
+  EXPECT_THROW(invalid.initialize(), std::exception);
+  auto& sample = engine.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList()[0];
+  sample.setUseDynamicBinning(true);
+  invalid.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}, {"minimizer", "Minuit2"}}));
+  EXPECT_THROW(invalid.initialize(), std::exception);
+}
+
+
+TEST_F(RootMinimizerSimplex, UnsupportedLikelihoodStopsAnalyticGradientInitialization) {
+  FitterEngine engine;
+  initializeEngine(engine, "BarlowLLH_BANFF_OA2021");
+  RecordingMinimizer minimizer(&engine);
+  minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}}));
+  try {
+    minimizer.initialize();
+    FAIL() << "Unsupported likelihood was accepted with an analytic gradient";
+  }
+  catch( const std::exception& error ){
+    EXPECT_NE(std::string(error.what()).find("Analytic bin gradients are unsupported for likelihood"), std::string::npos);
+  }
+  EXPECT_EQ(minimizer.getNbGradientCalls(), 0u);
 }

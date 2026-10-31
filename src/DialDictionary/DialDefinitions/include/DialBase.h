@@ -40,6 +40,8 @@ public:
   /// Evaluate d(response)/d(input[iInput_]) at the current input point.
   [[nodiscard]] virtual double evalGradient(const DialInputBuffer& input_, int iInput_) const;
 
+  [[nodiscard]] virtual bool hasAnalyticGradient() const { return false; }
+
   /// Allow extrapolation of the data. The default should be to forbid extrapolation.
   virtual void setAllowExtrapolation(bool allow_){}
   [[nodiscard]] virtual bool getAllowExtrapolation() const {return false;}

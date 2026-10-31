@@ -21,6 +21,7 @@ namespace JointProbability{
 
   public:
     [[nodiscard]] std::string getType() const override { return "PluginJointProbability"; }
+    [[nodiscard]] bool hasAnalyticBinGradient() const override { return true; }
     [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override;
     [[nodiscard]] double evalPredictionGradient(double data_, double pred_, double err_, int bin_) const override;
     [[nodiscard]] double evalSqrtSumSqWeightsGradient(double data_, double pred_, double err_, int bin_) const override { return 0.; }

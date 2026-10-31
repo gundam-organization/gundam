@@ -13,6 +13,7 @@
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Wrappers.h"
+#include "GenericToolbox.Thread.h"
 
 #include <vector>
 #include <utility>
@@ -206,6 +207,10 @@ public:
   void fillCacheEntries(const SampleSet& sampleSet_);
 
   void reweightEntry( CacheEntry& entry_);
+  /// Bulk CPU gradient: independent thread-local sums, followed by an ordered reduction.
+  std::vector<double> evalEventWeightGradients(const std::vector<Parameter*>& parameterList_,
+                                              const std::vector<double>& eventScales_,
+                                              GenericToolbox::ParallelWorker& workers_);
   void evalEventWeightGradient(CacheEntry& entry_, const std::vector<Parameter*>& parameterList_,
                                bool resetGradients_ = true, double gradientScale_ = 1.);
 

@@ -2051,7 +2051,11 @@ void DataDispenser::loadEvent(int iThread_){
       // ***** from this point, the TChain reader is waiting *****
 
       // check if the reader has nothing else to do / end of the loop
-      if( threadSharedData.isDoneReading.getValue() ){ break; }
+      if( threadSharedData.isDoneReading.getValue() ){
+        // Publish shutdown before releasing the reader's handshake.
+        threadSharedData.isEventFillerReady.setValue(false);
+        break;
+      }
 
       // leafFormIndexingList is modified by the TChain reader
       for( size_t iVar = 0 ; iVar < threadSharedData.buffer.varIndexingList.size() ; iVar++ ){
@@ -2332,7 +2336,8 @@ void DataDispenser::loadEvent(int iThread_){
         LogAlertIf(iThread_ == 0) << "debugNbMaxEventsToLoad: Event number cap reached (";
         LogAlertIf(iThread_ == 0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
         threadSharedData.isDoneReading.setValue( true );
-        return;
+        // Drain the reader's next entry through the normal handshake. Returning
+        // here can leave it waiting forever on isEntryBufferReady.
       }
     }
 

@@ -511,6 +511,14 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("evalFit", [](MinimizerBase& this_, const std::vector<double>& parArray_){
     return this_.evalFit(parArray_.data());
   }, pybind11::arg("parArray"))
+  .def("evalFitGradientAt", [](MinimizerBase& this_, const std::vector<double>& parameters_){
+    if( parameters_.size() != this_.getMinimizerFitParameterPtr().size() ){
+      throw pybind11::value_error("Gradient point dimension does not match the fit parameter count.");
+    }
+    std::vector<double> gradient(parameters_.size());
+    this_.evalFitGradientAt(parameters_.data(), gradient.data());
+    return gradient;
+  }, pybind11::arg("parameters"))
   .def("evalFitGradient", pybind11::overload_cast<>(&MinimizerBase::evalFitGradient))
   .def("evalFitGradient", pybind11::overload_cast<const std::vector<Parameter*>&>(&MinimizerBase::evalFitGradient))
   .def("evalFitGradient", [](MinimizerBase& this_, const pybind11::list& parameters_){
@@ -529,6 +537,11 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
   .def("getFunctionPrecision", &RootMinimizer::getFunctionPrecision)
   .def("updateFitParameterSettings", &RootMinimizer::updateFitParameterSettings)
+  .def("getFunctionPrecision", &RootMinimizer::getFunctionPrecision)
+  .def("isUsingAnalyticGradient", &RootMinimizer::isUsingAnalyticGradient)
+  .def("getNbFunctionCalls", &RootMinimizer::getNbFunctionCalls)
+  .def("getEdm", &RootMinimizer::getEdm)
+  .def("getNbGradientCalls", &RootMinimizer::getNbGradientCalls)
   .def("hasConverged", &RootMinimizer::hasConverged)
   .def("isMinimizeDone", &RootMinimizer::isMinimizeDone)
   .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)

@@ -7,6 +7,9 @@
 
 #include "Logger.h"
 
+#include <algorithm>
+#include <cmath>
+
 void MinimizerBase::configureImpl(){
 
   _config_.defineFields({
@@ -328,7 +331,28 @@ void MinimizerBase::evalFitGradient(){
   this->evalFitGradient(_minimizerParameterPtrList_);
 }
 void MinimizerBase::evalFitGradient( const std::vector<Parameter*>& parameterList_ ){
+#ifdef GUNDAM_USING_BACKENDS
+  LogThrowIf(getOwner().getBackendsManager().hasBackend(), "Deactivate the backend before requesting CPU weight gradients.");
+#endif
   getLikelihoodInterface().evalLikelihoodGradient(parameterList_);
+}
+
+void MinimizerBase::evalFitGradientAt(const double* parArray_, double* gradient_){
+  LogThrowIf(parArray_ == nullptr or gradient_ == nullptr, "Null gradient callback buffer.");
+#ifdef GUNDAM_USING_BACKENDS
+  LogThrowIf(getOwner().getBackendsManager().hasBackend(), "Deactivate the backend before requesting CPU weight gradients.");
+#endif
+  LogThrowIf(not setFitParameterValues(parArray_), "Invalid parameter point for CPU gradient.");
+  evalFitGradient();
+  std::vector<double> result;
+  result.reserve(_minimizerParameterPtrList_.size());
+  for( const auto* parameter : _minimizerParameterPtrList_ ){
+    const double scale = _useNormalizedFitSpace_ ? ParameterSet::toRealParRange(1., *parameter) : 1.;
+    const double value = parameter->getGradient() * scale;
+    LogThrowIf(not std::isfinite(value), "Non-finite gradient in fit coordinates.");
+    result.push_back(value);
+  }
+  std::copy(result.begin(), result.end(), gradient_);
 }
 
 void MinimizerBase::setParameterValidity(const std::string& validity) {

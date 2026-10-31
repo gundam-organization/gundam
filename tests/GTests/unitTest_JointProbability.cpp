@@ -601,3 +601,26 @@ TEST(jointProbability, LitePoissonLimitsAndStability) {
     // Infinite MC-statistics limit.
     EXPECT_NEAR(Lite::evaluate(10, 2, 1.e-100).value, 2*(2-10+10*std::log(5)), 1.e-11);
 }
+
+
+TEST(jointProbability, LiteGaussianCombinedGradientPreservesIgnoredBins) {
+    Sample model, data;
+    configurePredictionSample(model, "model");
+    configurePredictionSample(data, "data");
+    SamplePair pair{&model, &data};
+    JointProbability::BarlowBeestonLiteGaussian probability;
+    probability.configure(ConfigReader(JsonType{{"ignoreBinsWithZeroPredictionAtPrior", true}}));
+    model.getHistogram().getBinContentList()[0].sumWeights = 0.;
+    probability.updateZeroPredictionBinsAtPriorFlag({pair});
+    model.getHistogram().getBinContentList()[0].sumWeights = 8.;
+    model.getHistogram().getBinContentList()[0].sqrtSumSqWeights = 2.;
+    data.getHistogram().getBinContentList()[0].sumWeights = 10.;
+    const auto ignored = probability.evalBinGradient(pair, 0);
+    EXPECT_DOUBLE_EQ(ignored.prediction, 0.);
+    EXPECT_DOUBLE_EQ(ignored.uncertainty, 0.);
+    probability.configure(ConfigReader(JsonType{{"ignoreBinsWithZeroPredictionAtPrior", false}}));
+    const auto gradient = probability.evalBinGradient(pair, 0);
+    const auto expected = JointProbability::BarlowBeestonLiteGaussian::evaluate(10., 8., 2.);
+    EXPECT_DOUBLE_EQ(gradient.prediction, expected.predictionGradient);
+    EXPECT_DOUBLE_EQ(gradient.uncertainty, expected.uncertaintyGradient);
+}

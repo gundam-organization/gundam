@@ -18,6 +18,7 @@ public:
   // mandatory overrides
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<Norm>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"Norm"}; }
+  [[nodiscard]] bool hasAnalyticGradient() const override { return true; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override { return input_.getInputBuffer()[0]; }
   [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override { return iInput_ == 0 ? 1. : 0.; }
 

@@ -93,6 +93,9 @@ public:
 
   // core
   double evalLikelihood(std::future<bool>& propagation) const;
+  void validateWeightGradient() const;
+  /// Repropagate the current original-engine point and fill physical-parameter gradients.
+  /// Supported scope: analytic weight dials, fixed unsmoothed bins, no external constraints.
   void evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
   double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;

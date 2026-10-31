@@ -28,7 +28,7 @@ namespace {
   }
 
   bool isEigenProjectedOriginalParameter(const Parameter& parameter_){
-    return parameter_.isEnabled() and not parameter_.isPenaltyDisabled();
+    return ParameterSet::isValidCorrelatedParameter(parameter_);
   }
 }
 
@@ -186,7 +186,30 @@ double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const
   _buffer_.updateTotal();
   return _buffer_.totalLikelihood;
 }
+void LikelihoodInterface::validateWeightGradient() const {
+  LogThrowIf(not _jointProbabilityPtr_->hasAnalyticBinGradient(),
+             "Analytic bin gradients are unsupported for likelihood " << _jointProbabilityPtr_->getType());
+  LogThrowIf(_externalConstraints_.isEnabled() and not _externalConstraints_.getGaussianConstraintList().empty(),
+             "CPU weight gradients do not yet support external constraints.");
+  LogThrowIf(_modelPropagator_.getEventDialCache().hasVariableResponses(),
+             "CPU weight gradients do not support observable-response dials.");
+  for( const auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
+    LogThrowIf(sample.isUseDynamicBinning() or sample.getHistogram().isBinningResponseEnabled(),
+               "CPU weight gradients require fixed, unsmoothed bins.");
+  }
+  for( const auto& entry : _modelPropagator_.getEventDialCache().getCache() ){
+    for( const auto& response : entry.dialResponseCacheList ){
+      const auto* dial = response.dialInterface->getDialBaseRef();
+      LogThrowIf(not dial->hasAnalyticGradient(), "CPU weight gradient is unsupported for dial " << dial->getDialTypeName());
+    }
+  }
+}
+
 void LikelihoodInterface::evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_) {
+  validateWeightGradient();
+  // Always evaluate the requested current parameter state; preserve the likelihood buffers.
+  propagateAndEvalLikelihood();
+  LogThrowIf(not _buffer_.isValid(), "Cannot differentiate a non-finite likelihood.");
   std::vector<Parameter*> statGradientParameterList{parameterList_};
 
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
@@ -230,7 +253,7 @@ void LikelihoodInterface::evalLikelihoodGradient(const std::vector<Parameter*>& 
       int iOrig{0};
       for( auto& par : parSet.getParameterList() ){
         if( not isEigenProjectedOriginalParameter(par) ){ continue; }
-        eigenGradient += par.getGradient() * (*parSet.getEigenVectors())[iEigen][iOrig++];
+        eigenGradient += par.getGradient() * (*parSet.getEigenVectors())[iOrig++][iEigen];
       }
       eigenPar.addGradient(eigenGradient);
     }
@@ -243,6 +266,9 @@ void LikelihoodInterface::evalLikelihoodGradient(const std::vector<Parameter*>& 
   }
 
   this->evalPenaltyLikelihoodGradient(parameterList_);
+  for( const auto* parameter : parameterList_ ){
+    LogThrowIf(parameter != nullptr and not std::isfinite(parameter->getGradient()), "Non-finite CPU likelihood gradient.");
+  }
 }
 double LikelihoodInterface::evalStatLikelihood(std::future<bool>& propagation) const {
   if (propagation.valid()) static_cast<void>(propagation.get());
@@ -258,7 +284,6 @@ void LikelihoodInterface::evalStatLikelihoodGradient(const std::vector<Parameter
     double sqrtSumSqWeightsOverError{0};
   };
 
-  _buffer_.statLikelihood = 0.;
   std::vector<std::vector<BinGradientScale>> binGradientScaleList(
       _modelPropagator_.getSampleSet().getSampleList().size()
   );
@@ -276,16 +301,22 @@ void LikelihoodInterface::evalStatLikelihoodGradient(const std::vector<Parameter
     for( int iBin = 0 ; iBin < hist.getNbBins() ; iBin++ ){
       const auto& binContent = hist.getBinContentList()[iBin];
       auto& gradientScale = sampleGradientScaleList[iBin];
-      gradientScale.sumWeights = _jointProbabilityPtr_->evalPredictionGradient(samplePair, iBin);
+      const auto derivatives = _jointProbabilityPtr_->evalBinGradient(samplePair, iBin);
+      LogThrowIf(not std::isfinite(derivatives.prediction) or not std::isfinite(derivatives.uncertainty),
+                 "Non-finite likelihood bin gradient in bin " << iBin);
+      gradientScale.sumWeights = derivatives.prediction;
       if( binContent.sqrtSumSqWeights > 0 ){
         gradientScale.sqrtSumSqWeightsOverError =
-            _jointProbabilityPtr_->evalSqrtSumSqWeightsGradient(samplePair, iBin)
+            derivatives.uncertainty
             / binContent.sqrtSumSqWeights;
       }
     }
   }
 
-  for( auto& cacheEntry : _modelPropagator_.getEventDialCache().getCache() ){
+  auto& cache = _modelPropagator_.getEventDialCache();
+  std::vector<double> eventScales(cache.getCache().size(), 0.);
+  for( std::size_t i = 0; i < cache.getCache().size(); ++i ){
+    const auto& cacheEntry = cache.getCache()[i];
     if( cacheEntry.event == nullptr ){ continue; }
 
     const int sampleIndex{cacheEntry.event->getIndices().sample};
@@ -300,9 +331,11 @@ void LikelihoodInterface::evalStatLikelihoodGradient(const std::vector<Parameter
     };
     if( eventGradientScale == 0 ){ continue; }
 
-    _modelPropagator_.getEventDialCache().evalEventWeightGradient(
-        cacheEntry, parameterList_, false, eventGradientScale
-    );
+    eventScales[i] = eventGradientScale;
+  }
+  const auto gradient = cache.evalEventWeightGradients(parameterList_, eventScales, _modelPropagator_.getThreadPool());
+  for( std::size_t i = 0; i < parameterList_.size(); ++i ){
+    if( parameterList_[i] != nullptr ){ parameterList_[i]->addGradient(gradient[i]); }
   }
 }
 double LikelihoodInterface::evalPenaltyLikelihood() const {

@@ -78,6 +78,17 @@ namespace JointProbability{
       return evalGradientByFiniteDifference(binContent.sqrtSumSqWeights, [&](double){ return eval(samplePair_, bin_); });
     }
 
+    [[nodiscard]] virtual bool hasAnalyticBinGradient() const { return false; }
+
+    struct BinGradient {
+      double prediction{0};
+      double uncertainty{0};
+    };
+    [[nodiscard]] virtual BinGradient evalBinGradient(const SamplePair& samplePair_, int bin_) const {
+      if( isBinIgnored(samplePair_, bin_) ){ return {}; }
+      return {evalPredictionGradient(samplePair_, bin_), evalSqrtSumSqWeightsGradient(samplePair_, bin_)};
+    }
+
     // classic binned llh. Could be overriden to introduce correlations for instance.
     [[nodiscard]] virtual double eval( const SamplePair& samplePair_ ) const{
       double out{0};
