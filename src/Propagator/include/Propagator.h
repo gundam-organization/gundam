@@ -11,6 +11,7 @@
 #include "ParametersManager.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
+#include "EventVariableResponseCache.h"
 #include "SampleSet.h"
 
 #include "GenericToolbox.Time.h"
@@ -19,6 +20,9 @@
 #include <vector>
 #include <map>
 #include <future>
+#include <memory>
+#include <string>
+#include <utility>
 
 class Propagator : public JsonBaseClass {
 
@@ -45,9 +49,12 @@ public:
   [[nodiscard]] auto& getSampleSet() const { return _sampleSet_; }
   [[nodiscard]] auto& getDialManager() const { return _dialManager_; }
   [[nodiscard]] auto& getEventDialCache() const { return _eventDialCache_; }
+  [[nodiscard]] const EventVariableResponseCache& getEventVariableResponseCache() const { return _eventVariableResponseCache_; }
   [[nodiscard]] auto& getParametersManager() const { return _parManager_; }
   [[nodiscard]] auto& getDialCollectionList() const{ return _dialManager_.getDialCollectionList(); }
   [[nodiscard]] auto& getParameterInjectorMc() const { return _parameterInjectorMc_; }
+
+  [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const;
 
   // mutable getters
   auto& getSampleSet(){ return _sampleSet_; }
@@ -65,8 +72,8 @@ public:
   /// Event-to-dial associations are preserved.
   void updateEventSampleBinning();
 
-  /// Apply the current parameters and wait for it to finish.  This reweights
-  /// the events, and refills the histograms.  This is a convenience wrapper
+  /// Apply the current parameters and wait for it to finish. This updates
+  /// event variables and bin contributions before reweighting and filling histograms.  This is a convenience wrapper
   /// around applyParameters().get().
   void propagateParameters();
 
@@ -78,8 +85,14 @@ public:
   /// may cause a wait.  The future will be valid if the calculation was
   /// successfully started, true if the calculation has completed correctly,
   /// and false if the calculation started correctly, but failed.
+  /// Backends which own observable propagation pass false to retain the
+  /// prepared parameter/dial inputs without running host variable/bin updates.
+  void preparePropagation(bool updateEventVariables_ = true);
+  void invalidateVariableResponses(){ _eventVariableResponseCache_.invalidateState(); }
   std::future<bool> applyParameters();
 
+  /// With updateDials=true, also update variable responses and dynamic binning.
+  /// With false, the caller must have prepared the dial and variable state.
   void reweightEvents(bool updateDials = true);
 
   // misc
@@ -127,6 +140,7 @@ private:
   // Sub-layers
   SampleSet _sampleSet_{};
   EventDialCache _eventDialCache_{};
+  EventVariableResponseCache _eventVariableResponseCache_{};
   ParametersManager _parManager_{};
   DialManager _dialManager_{};
 

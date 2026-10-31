@@ -17,6 +17,16 @@
 #include "ConfigUtils.h"
 #include "GundamApp.h"
 
+#ifdef GUNDAM_USING_BACKENDS
+#include "CpuBackend.h"
+#ifdef GUNDAM_USING_CUDA
+#include "CudaBackend.h"
+#endif
+#ifdef __APPLE__
+#include "MpsBackend.h"
+#endif
+#endif
+
 #include "GenericToolbox.Fs.h"
 #include "GenericToolbox.Os.h"
 
@@ -296,11 +306,17 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getName", &Parameter::getName)
   .def("getFullTitle", &Parameter::getFullTitle)
   .def("isEnabled", &Parameter::isEnabled)
+  .def("isFixed", &Parameter::isFixed)
+  .def("isPenaltyDisabled", &Parameter::isPenaltyDisabled)
+  .def("isInDomain", &Parameter::isInDomain, pybind11::arg("value"), pybind11::arg("verbose") = false)
+  .def("isFree", &Parameter::isFree)
   .def("getStepSize", &Parameter::getStepSize)
   .def("getPriorValue", &Parameter::getPriorValue)
   .def("getStdDevValue", &Parameter::getStdDevValue)
   .def("getThrowValue", &Parameter::getThrowValue)
   .def("getParameterValue", &Parameter::getParameterValue)
+  .def("getGradient", &Parameter::getGradient)
+  .def("isPenaltyDisabled", &Parameter::isPenaltyDisabled)
   .def("getSummary", &Parameter::getSummary)
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
   .def("setIsFixed", &Parameter::setIsFixed)
@@ -324,11 +340,14 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<ParameterSet>(module, "ParameterSet")
   .def(pybind11::init())
+  .def("isEnabled", &ParameterSet::isEnabled)
   .def("isEnableEigenDecomp", &ParameterSet::isEnableEigenDecomp)
   .def("getName", &ParameterSet::getName)
   .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
   .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
-  .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCovarianceMatrix, pybind11::const_))
+  .def("getEffectiveParameterList", pybind11::overload_cast<>(&ParameterSet::getEffectiveParameterList), pybind11::return_value_policy::reference_internal)
+  .def("getPriorCorrelationMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCorrelationMatrix, pybind11::const_))
+  .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::generatePriorCovarianceMatrix, pybind11::const_))
   .def("getPriorFullCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorFullCovarianceMatrix, pybind11::const_))
   .def("propagateOriginalToEigen", &ParameterSet::propagateOriginalToEigen)
   .def("propagateEigenToOriginal", &ParameterSet::propagateEigenToOriginal)
@@ -371,6 +390,16 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getSummary", &Bin::getSummary, pybind11::arg("shallow") = true)
   ;
 
+  pybind11::class_<BinningResponse::BinFraction>(module, "BinFraction")
+  .def_readonly("binIndex", &BinningResponse::BinFraction::binIndex)
+  .def_readonly("fraction", &BinningResponse::BinFraction::fraction)
+  ;
+
+  pybind11::class_<BinningResponse::EventResponse>(module, "EventBinningResponse")
+  .def_readonly("binFractions", &BinningResponse::EventResponse::binFractions)
+  .def_readonly("outsideFraction", &BinningResponse::EventResponse::outsideFraction)
+  ;
+
   pybind11::class_<Histogram::BinContent>(module, "HistogramBinContent")
   .def(pybind11::init())
   .def_readwrite("sumWeights", &Histogram::BinContent::sumWeights)
@@ -390,6 +419,11 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<Histogram>(module, "Histogram")
   .def("getNbBins", &Histogram::getNbBins)
+  .def("isBinningResponseEnabled", &Histogram::isBinningResponseEnabled)
+  .def("evaluateBinningResponse", &Histogram::evaluateBinningResponse)
+  .def("evaluateEventBinningResponse", &Histogram::evaluateEventBinningResponse)
+  .def("getOutsideBinContent", pybind11::overload_cast<>(&Histogram::getOutsideBinContent), pybind11::return_value_policy::reference_internal)
+  .def("refillHistogram", &Histogram::refillHistogram, pybind11::arg("iThread") = -1)
   .def("getBinContentList", pybind11::overload_cast<>(&Histogram::getBinContentList),
        pybind11::return_value_policy::reference_internal)
   .def("getBinContextList", pybind11::overload_cast<>(&Histogram::getBinContextList),
@@ -470,12 +504,31 @@ PYBIND11_MODULE(GUNDAM, module) {
   dataTypeClass.attr("Toy") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::Toy));
   dataTypeClass.attr("RealData") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::RealData));
 
+  pybind11::class_<GaussianConstraint>(module, "GaussianConstraint")
+  .def("getName", &GaussianConstraint::getName)
+  .def("isEnabled", &GaussianConstraint::isEnabled)
+  .def("getFormula", &GaussianConstraint::getFormula)
+  .def("getMean", &GaussianConstraint::getMean)
+  .def("getStdDev", &GaussianConstraint::getStdDev)
+  .def("evalFormula", &GaussianConstraint::evalFormula)
+  .def("evalResidual", &GaussianConstraint::evalResidual)
+  .def("eval", &GaussianConstraint::eval)
+  ;
+
+  pybind11::class_<ExternalConstraints>(module, "ExternalConstraints")
+  .def("isEnabled", &ExternalConstraints::isEnabled)
+  .def("getGaussianConstraintList", &ExternalConstraints::getGaussianConstraintList, pybind11::return_value_policy::reference_internal)
+  .def("eval", &ExternalConstraints::eval)
+  ;
+
   likelihoodInterfaceClass
   .def(pybind11::init())
   .def("getSummary", &LikelihoodInterface::getSummary, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getSampleBreakdownTable", &LikelihoodInterface::getSampleBreakdownTable, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood)
   .def("getLastLikelihood", &LikelihoodInterface::getLastLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getExternalConstraints", &LikelihoodInterface::getExternalConstraints, pybind11::return_value_policy::reference_internal)
   .def("getLastStatLikelihood", &LikelihoodInterface::getLastStatLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
@@ -501,19 +554,194 @@ PYBIND11_MODULE(GUNDAM, module) {
   })
   .def("minimize", &MinimizerBase::minimize)
   .def("getMinimizerStatus", &MinimizerBase::getMinimizerStatus)
+  .def("checkFlatDirections", &MinimizerBase::checkFlatDirections, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
+  .def("setDisableCalcError", &MinimizerBase::setDisableCalcError)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
        pybind11::return_value_policy::reference_internal)
+  .def("evalFit", [](MinimizerBase& this_, const std::vector<double>& parArray_){
+    return this_.evalFit(parArray_.data());
+  }, pybind11::arg("parArray"))
+  .def("evalFitGradientAt", [](MinimizerBase& this_, const std::vector<double>& parameters_){
+    if( parameters_.size() != this_.getMinimizerFitParameterPtr().size() ){
+      throw pybind11::value_error("Gradient point dimension does not match the fit parameter count.");
+    }
+    std::vector<double> gradient(parameters_.size());
+    this_.evalFitGradientAt(parameters_.data(), gradient.data());
+    return gradient;
+  }, pybind11::arg("parameters"))
+  .def("evalFitGradient", pybind11::overload_cast<>(&MinimizerBase::evalFitGradient))
+  .def("evalFitGradient", pybind11::overload_cast<const std::vector<Parameter*>&>(&MinimizerBase::evalFitGradient))
+  .def("evalFitGradient", [](MinimizerBase& this_, const pybind11::list& parameters_){
+    std::vector<Parameter*> parameters;
+    parameters.reserve(parameters_.size());
+    for( const auto& parameter : parameters_ ){
+      auto* pointer = parameter.cast<Parameter*>();
+      if( pointer == nullptr ){ throw pybind11::value_error("Gradient parameters cannot contain None."); }
+      parameters.push_back(pointer);
+    }
+    this_.evalFitGradient(parameters);
+  })
+  .def("getMinimizerFitParameterList", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterList), pybind11::return_value_policy::reference)
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
+  .def("updateFitParameterSettings", &RootMinimizer::updateFitParameterSettings)
   .def("getFunctionPrecision", &RootMinimizer::getFunctionPrecision)
   .def("updateFitParameterSettings", &RootMinimizer::updateFitParameterSettings)
+  .def("getFunctionPrecision", &RootMinimizer::getFunctionPrecision)
+  .def("isUsingAnalyticGradient", &RootMinimizer::isUsingAnalyticGradient)
+  .def("getNbFunctionCalls", &RootMinimizer::getNbFunctionCalls)
+  .def("getEdm", &RootMinimizer::getEdm)
+  .def("getNbGradientCalls", &RootMinimizer::getNbGradientCalls)
   .def("hasConverged", &RootMinimizer::hasConverged)
   .def("isMinimizeDone", &RootMinimizer::isMinimizeDone)
   .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)
   ;
+
+#ifdef GUNDAM_USING_BACKENDS
+  module.def("probeCpuWeightCounters", [](){
+    Backends::CpuWeightProbe probe;
+    probe.begin();
+    probe.end();
+    return probe.report().dump();
+  });
+  pybind11::class_<Backends::BackendTimingSummary>(module, "BackendTimingSummary")
+  .def_readonly("parameterUploadSeconds", &Backends::BackendTimingSummary::parameterUploadSeconds)
+  .def_readonly("commandEncodeSeconds", &Backends::BackendTimingSummary::commandEncodeSeconds)
+  .def_readonly("deviceWaitSeconds", &Backends::BackendTimingSummary::deviceWaitSeconds)
+  .def_readonly("histogramReadbackSeconds", &Backends::BackendTimingSummary::histogramReadbackSeconds)
+  .def_readonly("eventWeightReadbackSeconds", &Backends::BackendTimingSummary::eventWeightReadbackSeconds)
+  .def_readonly("eventStateReadbackSeconds", &Backends::BackendTimingSummary::eventStateReadbackSeconds)
+  .def_readonly("likelihoodReadbackBytes", &Backends::BackendTimingSummary::likelihoodReadbackBytes)
+  .def_readonly("likelihoodDeviceSeconds", &Backends::BackendTimingSummary::likelihoodDeviceSeconds)
+  .def_readonly("likelihoodHostSeconds", &Backends::BackendTimingSummary::likelihoodHostSeconds)
+  .def_readonly("histogramReadbackBytes", &Backends::BackendTimingSummary::histogramReadbackBytes)
+  .def_readonly("devicePropagationSeconds", &Backends::BackendTimingSummary::devicePropagationSeconds)
+  .def_readonly("propagationWallSeconds", &Backends::BackendTimingSummary::propagationWallSeconds)
+  .def_readonly("eventStateReadbackBytes", &Backends::BackendTimingSummary::eventStateReadbackBytes)
+  .def_readonly("eventWeightReadbackBytes", &Backends::BackendTimingSummary::eventWeightReadbackBytes)
+  .def_readonly("contributionBufferBytes", &Backends::BackendTimingSummary::contributionBufferBytes)
+  .def_readonly("variableStageSeconds", &Backends::BackendTimingSummary::variableStageSeconds)
+  .def_readonly("binningStageSeconds", &Backends::BackendTimingSummary::binningStageSeconds)
+  .def_readonly("rebinnedEventCount", &Backends::BackendTimingSummary::rebinnedEventCount)
+  .def_readonly("binCandidateCount", &Backends::BackendTimingSummary::binCandidateCount)
+  .def_readonly("binContributionCount", &Backends::BackendTimingSummary::binContributionCount)
+  .def_readonly("eventWeightsStageSeconds", &Backends::BackendTimingSummary::eventWeightsStageSeconds)
+  .def_readonly("cachedDialStageSeconds", &Backends::BackendTimingSummary::cachedDialStageSeconds)
+  .def_readonly("cachePreparationSeconds", &Backends::BackendTimingSummary::cachePreparationSeconds)
+  .def_readonly("cacheExecutionSeconds", &Backends::BackendTimingSummary::cacheExecutionSeconds)
+  .def_readonly("cacheCandidateCount", &Backends::BackendTimingSummary::cacheCandidateCount)
+  .def_readonly("cacheInputTransformCount", &Backends::BackendTimingSummary::cacheInputTransformCount)
+  .def_readonly("sharedCacheInputs", &Backends::BackendTimingSummary::sharedCacheInputs)
+  .def_readonly("linearCacheTraversal", &Backends::BackendTimingSummary::linearCacheTraversal)
+  .def_readonly("likelihoodHostSeconds", &Backends::BackendTimingSummary::likelihoodHostSeconds)
+  .def_readonly("histogramStageSeconds", &Backends::BackendTimingSummary::histogramStageSeconds)
+  .def_readonly("externalWeightUploadSeconds", &Backends::BackendTimingSummary::externalWeightUploadSeconds)
+  .def_readonly("externalWeightUploadBytes", &Backends::BackendTimingSummary::externalWeightUploadBytes)
+  .def_readonly("externalWeightUploadBlocks", &Backends::BackendTimingSummary::externalWeightUploadBlocks)
+  ;
+  pybind11::class_<Backends::BackendManager>(module, "BackendManager")
+  .def("hasBackend", &Backends::BackendManager::hasBackend)
+  .def("getType", &Backends::BackendManager::getType)
+  .def("getLastPreparationSeconds", &Backends::BackendManager::getLastPreparationSeconds)
+  .def("setEnableAutoMaterialize", &Backends::BackendManager::setEnableAutoMaterialize)
+#ifdef GUNDAM_USING_CUDA
+  .def("getDiagnosticCuda", [](const Backends::BackendManager& manager_){
+    auto* cuda = dynamic_cast<const Backends::CudaBackend*>(manager_.getBackend());
+    LogThrowIf(cuda == nullptr, "CUDA diagnostics require a CUDA backend.");
+    return cuda->getDiagnostics();
+  })
+#endif
+  .def("getActiveBackendName", &Backends::BackendManager::getActiveBackendName)
+  .def("getAvailableBackendNames", &Backends::BackendManager::getAvailableBackendNames)
+  .def("deactivateBackend", &Backends::BackendManager::deactivateBackend)
+  .def("activate", [](Backends::BackendManager& manager_, const std::string& name_, const pybind11::object& config_){
+    if( config_.is_none() ){ manager_.activate(name_); }
+    else { manager_.activate(name_, ConfigReader(config_.cast<JsonType>())); }
+  }, pybind11::arg("name"), pybind11::arg("config") = pybind11::none())
+  .def("replaceBackend", [](Backends::BackendManager& manager_, const std::string& type_, const JsonType& config_){
+    manager_.replaceBackend(type_, ConfigReader(config_));
+  }, pybind11::arg("type"), pybind11::arg("backendConfig") = JsonType::object())
+  .def("materialize", [](Backends::BackendManager& manager_, const std::string& output_){
+    manager_.materialize(Backends::OutputRequest::toEnum(output_));
+  })
+  .def("getMonitorLine", [](const Backends::BackendManager& manager_){
+    return manager_.hasBackend() ? manager_.getBackend()->getMonitorLine() : std::string{};
+  })
+  .def("getLastTimingSummary", [](const Backends::BackendManager& manager_){
+    LogThrowIf(not manager_.hasBackend(), "No backend initialized.");
+    return manager_.getBackend()->getLastTimingSummary();
+  })
+#ifdef __APPLE__
+  .def("setDiagnosticMpsStageProfiling", [](Backends::BackendManager& manager_, bool enabled_){
+    auto* mps = dynamic_cast<Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "MPS stage diagnostics require an MPS backend.");
+    mps->setDiagnosticStageProfiling(enabled_);
+  })
+  .def("getDiagnosticMpsEventPropagationState", [](const Backends::BackendManager& manager_){
+    auto* mps = dynamic_cast<const Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "Event propagation diagnostics require an MPS backend.");
+    return mps->getDiagnosticEventPropagationState();
+  })
+  .def("getDiagnosticMpsStageGpuSeconds", [](const Backends::BackendManager& manager_){
+    const auto* mps = dynamic_cast<const Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "MPS diagnostics require an MPS backend.");
+    return mps->getDiagnosticStageGpuSeconds();
+  })
+  .def("getDiagnosticMps", [](const Backends::BackendManager& manager_){
+    const auto* mps = dynamic_cast<const Backends::MpsBackend*>(manager_.getBackend());
+    LogThrowIf(mps == nullptr, "MPS diagnostics require an MPS backend.");
+    return mps->getDiagnostics();
+  })
+#endif
+  .def("getDiagnosticCpuWeightLocality", [](const Backends::BackendManager& manager_){
+    const auto* cpu = dynamic_cast<const Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Weight locality diagnostics require a CPU backend.");
+    return cpu->getWeightLocalityDiagnostics().dump();
+  })
+  .def("setDiagnosticCpuWeightInterleaving", [](Backends::BackendManager& manager_, bool enabled_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Weight interleaving diagnostics require a CPU backend.");
+    cpu->setDiagnosticWeightInterleaving(enabled_);
+  })
+  .def("getDiagnosticCpuWeightScheduling", [](const Backends::BackendManager& manager_){
+    const auto* cpu = dynamic_cast<const Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Weight worker diagnostics require a CPU backend.");
+    return cpu->getWeightSchedulingDiagnostics().dump();
+  })
+  .def("setDiagnosticCpuWeightCounters", [](Backends::BackendManager& manager_, bool enabled_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Weight hardware counters require a CPU backend.");
+    cpu->setDiagnosticWeightCounters(enabled_);
+  })
+  .def("setDiagnosticCpuWeightWorkers", [](Backends::BackendManager& manager_, std::size_t workers_, bool timing_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Weight worker diagnostics require a CPU backend.");
+    cpu->setDiagnosticWeightWorkers(workers_, timing_);
+    return cpu->getWeightSchedulingDiagnostics().dump();
+  })
+  .def("setDiagnosticCpuWeightScheduling", [](Backends::BackendManager& manager_, const std::string& mode_, std::size_t factor_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "CPU weight scheduling diagnostics require an initialized CPU backend.");
+    cpu->setDiagnosticWeightScheduling(Backends::CpuWeightScheduling::toEnum(mode_), factor_);
+    return cpu->getWeightSchedulingDiagnostics().dump();
+  })
+  .def("setDiagnosticCpuCacheTraversal", [](Backends::BackendManager& manager_, const std::string& mode_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Cache traversal diagnostics require an initialized CPU backend.");
+    cpu->setDiagnosticCacheTraversal(Backends::CpuCacheTraversal::toEnum(mode_));
+    return cpu->getWeightSchedulingDiagnostics().dump();
+  })
+  .def("setDiagnosticCpuInputEvaluation", [](Backends::BackendManager& manager_, const std::string& mode_){
+    auto* cpu = dynamic_cast<Backends::CpuBackend*>(manager_.getBackend());
+    LogThrowIf(cpu == nullptr, "Input evaluation diagnostics require an initialized CPU backend.");
+    cpu->setDiagnosticInputEvaluation(Backends::CpuInputEvaluation::toEnum(mode_));
+    return cpu->getWeightSchedulingDiagnostics().dump();
+  })
+  ;
+#endif
 
   pybind11::class_<FitterEngine>(module, "FitterEngine")
   .def(pybind11::init())
@@ -521,6 +749,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("setSaveDir", pybind11::overload_cast<GundamApp&, const std::string&>(&FitterEngine::setSaveDir))
   .def("setConfig", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::setConfig))
   .def("setDoAllParamVariations", &FitterEngine::setDoAllParamVariations)
+  .def("setIsDryRun", &FitterEngine::setIsDryRun)
   .def("configure", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::configure))
   .def("configure", pybind11::overload_cast<>(&FitterEngine::configure))
   .def("initialize", &FitterEngine::initialize)
@@ -530,5 +759,9 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getLikelihoodInterface", pybind11::overload_cast<>(&FitterEngine::getLikelihoodInterface), pybind11::return_value_policy::reference)
   .def("getParameterScanner", pybind11::overload_cast<>(&FitterEngine::getParameterScanner), pybind11::return_value_policy::reference)
   .def("getTFilePath", &FitterEngine::getTFilePath)
+  .def("evaluateLikelihood", &FitterEngine::evaluateLikelihood)
+#ifdef GUNDAM_USING_BACKENDS
+  .def("getBackendsManager", pybind11::overload_cast<>(&FitterEngine::getBackendsManager), pybind11::return_value_policy::reference_internal)
+#endif
   ;
 }

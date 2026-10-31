@@ -117,6 +117,10 @@ if [ ! -x ./gundam-tests.sh ]; then
     exit 1
 fi
 
+# ROOT interpolation tests include headers from the source checkout. Set this
+# from the runner location rather than depending on the caller's environment.
+export GUNDAM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 is_test_runnable() {
     local test_path=$1
     if [ -x "${test_path}" ]; then

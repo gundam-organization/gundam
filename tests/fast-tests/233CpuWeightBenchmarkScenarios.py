@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""Exercise benchmark workloads, deterministic comparisons and eigen coordinates."""
+import json
+import os
+import subprocess
+import sys
+from importlib import import_module
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import_module('005PythonSetup-utils').requireVenv(__file__)
+
+
+def main():
+    import GUNDAM
+    if not hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
+        print('SKIP: GUNDAM was built without backends')
+        return
+    base = Path.cwd() / '233CpuWeightBenchmarkScenarios'
+    base.mkdir(exist_ok=True)
+    root = base / 'input.root'
+    # Event-specific curves create many distinct responses with just a few
+    # equivalent inputs, exercising actual sharing rather than its fallback.
+    macro = base / 'input.C'
+    macro.write_text(r'''#include <TFile.h>
+#include <TTree.h>
+#include <TGraph.h>
+#include <TSystem.h>
+{
+  TFile file(OUTPUT, "RECREATE");
+  TTree tree("tree_mc", "tree_mc");
+  double coordinate;
+  TGraph curve(3);
+  TGraph* graph = &curve;
+  tree.Branch("X", &coordinate, "X/D");
+  tree.Branch("graph", "TGraph", &graph, 32000, 0);
+  for (int event = 0; event < 180; ++event) {
+    coordinate = event % 2 ? -.5 : .5;
+    for (int point = 0; point < 3; ++point) {
+      double x = .5 + .5 * point;
+      curve.SetPoint(point, x, 1. + .001 * (event + 1) * (x - 1.) + .002 * (x - 1.) * (x - 1.));
+    }
+    tree.Fill();
+  }
+  tree.Write();
+  file.Close();
+  gSystem->Exit(0);
+}
+'''.replace('OUTPUT', json.dumps(str(root))))
+    subprocess.run(['root', '-n', '-l', '-b', '-q', str(macro)], check=True)
+    benchmark = Path(__file__).resolve().parents[1] / 'benchmarks' / '222CpuWeightSchedulingBenchmark.py'
+    for eigen in (False, True):
+        definitions = [dict(name=f'p{i}', priorValue=1., stdDev=.1 * (i + 1),
+                            dialSetDefinitions=[{'dialType': 'Graph', 'dialBranchData': 'graph'}]) for i in range(3)]
+        definitions += [dict(name='fixed', priorValue=1., stdDev=.1, isFixed=True,
+                             dialSetDefinitions=[{'dialType': 'Graph', 'dialBranchData': 'graph'}])]
+        if not eigen:
+            definitions[0]['parameterLimits'] = [0.999, 1.001]
+        config = {'fitterEngineConfig': {'likelihoodInterfaceConfig': {
+            'jointProbabilityConfig': {'type': 'PoissonLLH'},
+            'dataSetList': [{'name': 'sample', 'model': {'tree': 'tree_mc', 'filePathList': [str(root)]}}],
+            'propagatorConfig': {
+                'sampleSetConfig': {'sampleList': [{'name': 'X', 'dataSets': ['sample'],
+                    'binning': {'binningDefinition': [{'name': 'X', 'edges': [-1, 0, 1]}]}}]},
+                'parametersManagerConfig': {'parameterSetList': [{'name': 'test', 'isEnabled': True,
+                    'enableEigenDecomp': eigen, 'parameterDefinitions': definitions}]}}}}}
+        path = base / f'config-{eigen}.json'
+        path.write_text(json.dumps(config))
+        output = base / f'results-{eigen}-{os.getpid()}'
+        with (base / f'benchmark-{eigen}.log').open('w') as log:
+            subprocess.run([sys.executable, str(benchmark), '--config', str(path), '--threads', '4',
+                            '--factors', '2', '5', '10', '--calls', '7', '--global-calls', '3', '--warmup', '3',
+                            '--trials', '2', '--rounds', '2', '--output', str(output)],
+                           stdout=log, stderr=subprocess.STDOUT, check=True)
+        summary = json.loads((output / 'summary.json').read_text())
+        assert len(summary) == 32
+        settings = json.loads((output / 'settings.json').read_text())
+        assert settings['callsByScenario'] == {'constant': 7, 'local1': 7, 'local2': 7, 'global': 3}
+        assert len({r['pid'] for r in summary}) == 1  # Same loaded engine for all workloads/layouts.
+        manifest = json.loads((output / 'parameters-t4.json').read_text())
+        # The fit uses four eigen coordinates here; an original-space fixed
+        # flag does not imply one particular eigen coordinate is fixed.
+        assert len(manifest) == (4 if eigen else 3)
+        assert {p['space'] for p in manifest} == {'eigen' if eigen else 'original'}
+        signatures = {}
+        for result in summary:
+            assert result['autoMaterializeDuringTiming'] is False
+            scenario = result['scenario']
+            assert result['callsPerTrial'] == (3 if scenario == 'global' else 7)
+            assert result['histogramsAgree'] and result['likelihoodsAgree']
+            assert result['weightSpeedupVsFixed'] > 0 and result['evaluationSpeedupVsFixed'] > 0
+            expected_count = {'constant': 0, 'local1': 1, 'local2': 2, 'global': len(manifest)}[scenario]
+            for trial in result['trials']:
+                assert trial['changedFitCoordinates'] == [expected_count]
+            signature = [t['sequenceDigest'] for t in result['trials']]
+            assert signature == signatures.setdefault(scenario, signature)
+        constant_histogram = json.loads((output / 'round1-t4-constant-Fixed.json').read_text())['histogram']
+        for case_path in output.glob('round*.json'):
+            if case_path.name.endswith('-coordinate-costs.json'):
+                continue
+            result = json.loads(case_path.read_text())
+            if result['scenario'] != 'constant':
+                assert result['histogram'] != constant_histogram
+            for raw in result['raw']:
+                assert len(raw['likelihoods']) == (3 if result['scenario'] == 'global' else 7)
+                spread = max(raw['likelihoods']) - min(raw['likelihoods'])
+                assert spread == 0 if result['scenario'] == 'constant' else spread > 1e-12
+        assert not list(output.glob('*.partial.json'))
+        cache_output = base / f'cache-results-{eigen}-{os.getpid()}'
+        with (base / f'cache-benchmark-{eigen}.log').open('w') as log:
+            subprocess.run([sys.executable, str(benchmark), '--benchmark', 'cache', '--config', str(path),
+                            '--threads', '4', '--calls', '7', '--global-calls', '3', '--warmup', '3',
+                            '--trials', '2', '--rounds', '2', '--output', str(cache_output)],
+                           stdout=log, stderr=subprocess.STDOUT, check=True)
+        cache_summary = json.loads((cache_output / 'summary.json').read_text())
+        assert len(cache_summary) == 16
+        assert len({r['pid'] for r in cache_summary}) == 1
+        for cache_path in cache_output.glob('round*.json'):
+            if cache_path.name.endswith('-coordinate-costs.json'):
+                continue
+            result = json.loads(cache_path.read_text())
+            assert result['mode'] == 'Dynamic' and result['blocksPerThread'] == 2
+            assert result['histogramsAgree'] and result['likelihoodsAgree']
+            for trial in result['raw']:
+                if result['cacheTraversal'] == 'Indexed' or result['scenario'] == 'constant':
+                    assert not any(trial['linearCacheTraversal'])
+                elif result['scenario'] == 'global':
+                    assert all(trial['linearCacheTraversal'])
+                for prep, execution, total in zip(trial['cachePreparationSeconds'],
+                                                  trial['cacheExecutionSeconds'], trial['cacheSeconds']):
+                    assert 0 <= prep + execution <= total + 1e-9
+        assert all(r['cacheSpeedupVsIndexed'] > 0 for r in cache_summary)
+        input_output = base / f'input-results-{eigen}-{os.getpid()}'
+        with (base / f'input-benchmark-{eigen}.log').open('w') as log:
+            subprocess.run([sys.executable, str(benchmark), '--benchmark', 'inputs', '--config', str(path),
+                            '--threads', '4', '--calls', '7', '--global-calls', '3', '--warmup', '3',
+                            '--trials', '2', '--rounds', '2', '--output', str(input_output)],
+                           stdout=log, stderr=subprocess.STDOUT, check=True)
+        input_summary = json.loads((input_output / 'summary.json').read_text())
+        assert len(input_summary) == 16
+        assert len({r['pid'] for r in input_summary}) == 1
+        for result in input_summary:
+            assert result['cacheInputGroups'] == 4
+            assert result['cacheSpeedupVsPerDial'] > 0 and result['likelihoodsAgree'] and result['histogramsAgree']
+            for trial in result['trials']:
+                expected_calls = result['callsPerTrial'] if result['inputEvaluation'] == 'Shared' else 0
+                assert trial['sharedInputCalls'] == expected_calls
+                if result['scenario'] == 'global':
+                    if result['inputEvaluation'] == 'Shared':
+                        assert trial['inputTransformsMedian'] <= 4
+                    else:
+                        assert trial['inputTransformsMedian'] >= 540
+        coverage_output = base / f'coverage-results-{eigen}-{os.getpid()}'
+        with (base / f'coverage-benchmark-{eigen}.log').open('w') as log:
+            subprocess.run([sys.executable, str(benchmark), '--benchmark', 'inputs', '--config', str(path),
+                            '--threads', '4', '--scenarios', 'local1', 'local2', '--calls', '1',
+                            '--warmup', '1', '--trials', '1', '--rounds', '1', '--output', str(coverage_output)],
+                           stdout=log, stderr=subprocess.STDOUT, check=True)
+        coverage_summary = json.loads((coverage_output / 'summary.json').read_text())
+        assert len(coverage_summary) == 4
+        for result in coverage_summary:
+            assert result['coordinateCoverageComplete']
+            assert result['testedFitCoordinates'] == len(manifest)
+            expected_calls = len(manifest) if result['scenario'] == 'local1' else (len(manifest) + 1) // 2
+            assert result['callsPerTrial'] == expected_calls
+            assert result['likelihoodsAgree'] and result['histogramsAgree']
+            if result['scenario'] == 'local1':
+                costs = json.loads((coverage_output / result['coordinateCostsFile']).read_text())
+                assert [r['name'] for r in costs] == [p['name'] for p in manifest]
+                assert all(r['samples'] == 1 and r['cacheMedianMs'] >= 0 for r in costs)
+            else:
+                assert result['coordinateCostsFile'] is None
+            case = next(r for r in coverage_output.glob('round*.json')
+                        if not r.name.endswith('-coordinate-costs.json')
+                        and json.loads(r.read_text())['scenario'] == result['scenario']
+                        and json.loads(r.read_text())['inputEvaluation'] == result['inputEvaluation'])
+            raw = json.loads(case.read_text())['raw'][0]
+            assert {i for indices in raw['coordinateIndices'] for i in indices} == set(range(len(manifest)))
+    scaling = benchmark.with_name('223CpuWeightScalingBenchmark.py')
+    scaling_output = base / f'scaling-results-{os.getpid()}'
+    with (base / 'scaling-benchmark.log').open('w') as log:
+        subprocess.run([sys.executable, str(scaling), '--config', str(base / 'config-False.json'),
+                        '--threads', '4', '--workers', '1', '2', '4', '--calls', '2',
+                        '--warmup', '1', '--trials', '1', '--rounds', '2', '--probe-calls', '2', '--hardware-counters',
+                        '--locality-probe', '--output', str(scaling_output)],
+                       stdout=log, stderr=subprocess.STDOUT, check=True)
+    assert (scaling_output / 'counter-preflight.json').exists()
+    locality = json.loads((scaling_output / 'locality.json').read_text())
+    assert locality['supported'] and locality['references'] > 0
+    assert locality['references'] == locality['reusePrefixReferences']
+    assert locality['current']['idealLru'][0]['misses'] >= locality['current']['prefixColdLines']
+    locality_output = base / f'locality-results-{os.getpid()}'
+    with (base / 'locality-benchmark.log').open('w') as log:
+        subprocess.run([sys.executable, str(scaling), '--config', str(base / 'config-False.json'),
+                        '--threads', '4', '--workers', '4', '--locality-only',
+                        '--output', str(locality_output)], stdout=log, stderr=subprocess.STDOUT, check=True)
+    assert (locality_output / 'locality.json').exists()
+    assert not (locality_output / 'summary.json').exists()
+    scaling_summary = json.loads((scaling_output / 'summary.json').read_text())
+    assert [r['workers'] for r in scaling_summary] == [1, 2, 4, 4, 2, 1]
+    for result in scaling_summary:
+        assert result['likelihoodsAgree'] and result['histogramsExactlyAgree']
+        assert result['weightSpeedupVsOneWorker'] > 0
+        case = json.loads((scaling_output / f"round{result['round']}-w{result['workers']}.json").read_text())
+        assert case['layout']['weightWorkers'] == result['workers']
+        assert case['layout']['threads'] == 4
+        assert not case['layout']['workerTimingEnabled']
+        assert len(case['raw'][0]['weights']) == 2 and len(case['probes']) == 2
+        for probe in case['probes']:
+            assert len(probe['workers']) == result['workers']
+            assert sum(w['events'] for w in probe['workers']) == 180
+            assert sum(w['dialReferences'] for w in probe['workers']) == 720
+            assert all(w['wallSeconds'] >= 0 for w in probe['workers'])
+            for worker in probe['workers']:
+                hardware = worker['weightProbe']
+                assert hardware['measured'] and hardware['wallSeconds'] >= 0
+                assert len(hardware['events']) == 6
+                for event in hardware['events'].values():
+                    assert event['scaledCount'] is None or event['scaledCount'] >= 0
+                    assert event['runningFraction'] is None or 0 < event['runningFraction'] <= 1
+                if sys.platform != 'linux':
+                    assert not hardware['platformSupported']
+                    assert all(e['scaledCount'] is None for e in hardware['events'].values())
+        assert result['hardware']['workerSamples'] == 2 * result['workers']
+    assert not list(scaling_output.glob('*.partial.json'))
+    single = benchmark.with_name('224CpuSingleThreadBenchmark.py')
+    single_output = base / f'single-results-{os.getpid()}'
+    with (base / 'single-benchmark.log').open('w') as log:
+        subprocess.run([sys.executable, str(single), '--config', str(base / 'config-False.json'),
+                        '--calls', '3', '--warmup', '1', '--probe-calls', '2', '--hardware-counters',
+                        '--output', str(single_output)],
+                       stdout=log, stderr=subprocess.STDOUT, check=True)
+    single_summary = json.loads((single_output / 'summary.json').read_text())
+    assert len(single_summary) == 1
+    assert single_summary[0]['workers'] == single_summary[0]['poolThreads'] == 1
+    assert {'weights', 'cache', 'histograms', 'likelihood', 'variables', 'binning',
+            'hostPreparation', 'evaluation'} == set(single_summary[0]['timings'])
+    assert single_summary[0]['histogramsExactlyAgree'] and single_summary[0]['likelihoodsAgree']
+    missing_perf_output = base / f'missing-perf-{os.getpid()}'
+    environment = os.environ.copy()
+    environment['PATH'] = ''
+    missing = subprocess.run([sys.executable, str(single), '--config', str(base / 'does-not-exist.json'),
+                              '--perf-record', '--output', str(missing_perf_output)],
+                             env=environment, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    assert missing.returncode != 0
+    status = json.loads((missing_perf_output / 'perf-status.json').read_text())
+    assert not status['available'] and status['phase'] == 'preflight'
+    assert 'stopped before loading' in missing.stdout
+    assert not (missing_perf_output / 'native.log').exists()
+    print('SUCCESS: workload replay, traversals and shared input evaluations preserve predictions.')
+
+
+if __name__ == '__main__':
+    main()

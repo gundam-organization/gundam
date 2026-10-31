@@ -33,12 +33,19 @@
 #include <TClass.h>
 #include <TGraph.h>
 
+#include <algorithm>
+#include <chrono>
+#include <fstream>
+#include <future>
+#include <limits>
+#include <stdexcept>
 #include <unordered_map>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 #include <sstream>
+#include <sys/stat.h>
 
 namespace {
 
@@ -461,21 +468,8 @@ namespace {
       const std::string& formulaStr_,
       const std::vector<std::string>& eventVariableNameList_
   ){
-    eventFormula_.expr = FormulaUtils::convertBareVariablesToFormulaParameters(formulaStr_);
-    eventFormula_.formula = TFormula(eventFormula_.expr.c_str(), eventFormula_.expr.c_str());
-    LogExitIf(not eventFormula_.formula.IsValid(), "\"" << formulaStr_ << "\" -> \"" << eventFormula_.expr << "\": could not be parsed as event-buffer formula.");
-
-    eventFormula_.varIndexList.clear();
-    eventFormula_.varIndexList.reserve(eventFormula_.formula.GetNpar());
-    for( int iPar = 0 ; iPar < eventFormula_.formula.GetNpar() ; iPar++ ){
-      auto varIndex = GenericToolbox::findElementIndex(eventFormula_.formula.GetParName(iPar), eventVariableNameList_);
-      LogExitIf(
-          varIndex == -1,
-          "Formula \"" << formulaStr_ << "\" requires event variable \"" << eventFormula_.formula.GetParName(iPar)
-                       << "\", but it is not available in the event buffer."
-      );
-      eventFormula_.varIndexList.emplace_back(varIndex);
-    }
+    eventFormula_.evaluator.setFormulaStr(FormulaUtils::convertBareVariablesToFormulaParameters(formulaStr_));
+    eventFormula_.evaluator.setInputNames(eventVariableNameList_);
   }
 
   void compileRuntimeFormula(
@@ -760,6 +754,7 @@ void DataDispenser::load(Propagator& propagator_){
   LogExitIf(not propagator_.isInitialized(), "Can't load while propagator_ is not initialized.");
 
   _cache_.clear();
+  _nbThreadsForLoad_ = 0;
   _cache_.propagatorPtr = &propagator_;
 
   if( not _parameters_.overridePropagatorConfig.empty() ){
@@ -803,6 +798,7 @@ void DataDispenser::load(Propagator& propagator_){
     }
   }
 
+  this->selectLoadThreadCount();
   this->parseStringParameters();
   this->fetchRequestedLeaves();
   this->doEventSelection();
@@ -965,6 +961,16 @@ void DataDispenser::fetchRequestedLeaves(){
     for( auto& dialCollection : _cache_.propagatorPtr->getDialCollectionList() ){
       if( not dialCollection.isEnabled() ){ continue; }
       if( not dialCollection.isDatasetValid( _owner_->getName() ) ){ continue; }
+      bool parentValid = true;
+      for( int parent = dialCollection.getCompositeParentIndex() ; parent >= 0 ; ){
+        const auto& parentCollection = _cache_.propagatorPtr->getDialCollectionList().at(parent);
+        if( not parentCollection.isEnabled() or not parentCollection.isDatasetValid(_owner_->getName()) ){
+          parentValid = false;
+          break;
+        }
+        parent = parentCollection.getCompositeParentIndex();
+      }
+      if( not parentValid ){ continue; }
       _cache_.dialCollectionsRefList.emplace_back( &dialCollection );
     }
   }
@@ -972,6 +978,13 @@ void DataDispenser::fetchRequestedLeaves(){
   if( not _cache_.dialCollectionsRefList.empty() ) {
     std::vector<std::string> indexRequests;
     for( auto& dialCollection : _cache_.dialCollectionsRefList ) {
+      if( const auto& definition = dialCollection->getEventFormulaDefinition() ){
+        for( const auto& name : definition->eventVariables ){
+          std::set<std::string> variableDictStack;
+          addVariableDictRequestedByName(_cache_, name, _parameters_.variableDict, _parameters_.variableDictTransform, variableDictStack);
+          GenericToolbox::addIfNotInVector(name, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
+        }
+      }
       auto applyConditionFormulaStr = dialCollection->getApplyConditionStr();
       if( not applyConditionFormulaStr.empty() ) {
         addVariablesRequestedByFormula(_cache_, applyConditionFormulaStr, _parameters_.variableDict, _parameters_.variableDictTransform, false);
@@ -997,6 +1010,12 @@ void DataDispenser::fetchRequestedLeaves(){
     }
   }
 
+  // Variable dial targets must be available even when they are not binning axes.
+  for( const auto& name : _cache_.propagatorPtr->getSampleSet().getEventVariableNameList() ){
+    std::set<std::string> variableDictStack;
+    addVariableDictRequestedByName(_cache_, name, _parameters_.variableDict, _parameters_.variableDictTransform, variableDictStack);
+  }
+
   // Sample binning variables are also stored when dynamic binning is enabled.
   {
     std::vector<std::string> varForIndexingListBuffer{};
@@ -1004,7 +1023,7 @@ void DataDispenser::fetchRequestedLeaves(){
       for (const auto& binContext : sample.getHistogram().getBinContextList()) {
         for (const auto& edges : binContext.bin.getEdgesList()) {
           GenericToolbox::addIfNotInVector(edges.varName, varForIndexingListBuffer);
-          if( sample.isUseDynamicBinning() ){
+          if( sample.isUseDynamicBinning() or sample.getHistogram().isBinningResponseEnabled() ){
             GenericToolbox::addIfNotInVector(edges.varName, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
           }
         }
@@ -1178,7 +1197,8 @@ void DataDispenser::preAllocateMemory(){
     LogScopeIndent;
     nDialsMaxPerEvent += 1;
 
-    if (dialCollection->isEventByEvent()) {
+    // Branch dials grow on demand in storeEventDial, according to unique count.
+    if (dialCollection->isEventByEvent() and not dialCollection->hasDialBranchData()) {
       // Only increase the size.  It's probably zero before
       // starting, but add the original size... just in case.
       dialCollection->getDialInterfaceList().resize(
@@ -1228,6 +1248,20 @@ void DataDispenser::readAndFill(){
     threadSharedDataList.resize(1);
     this->runEventFillThreads(-1); // for better debug breakdown
   }
+
+  // All reader and event-filler threads have joined. The events and dials now
+  // own their data, so the ROOT readers are no longer needed for propagation.
+  LogInfo << "Releasing ROOT readers and loading buffers..." << std::endl;
+  for( auto& threadSharedData : threadSharedDataList ){
+    if( threadSharedData.treeChain == nullptr ){ continue; }
+    // Disconnect ROOT while TreeBuffer's branch storage and notifier are alive.
+    // ResetBranchAddresses also disconnects the friend trees.
+    threadSharedData.treeChain->SetNotify(nullptr);
+    threadSharedData.treeChain->ResetBranchAddresses();
+  }
+  // TreeBuffer/formulas are destroyed before their TChain (member order in
+  // ThreadSharedData), which also releases the owned friend chains and files.
+  std::vector<ThreadSharedData>{}.swap(threadSharedDataList);
 
   LogInfo << "Shrinking lists..." << std::endl;
   for( size_t iSample = 0 ; iSample < _cache_.samplesToFillList.size() ; iSample++ ){
@@ -1297,6 +1331,14 @@ void DataDispenser::loadFromHistContent(){
     auto* histObj = fHist->Get( sampleHistDef->hist.c_str() );
     LogExitIf( histObj == nullptr, "Could not find TObject \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
 
+    if( sample->getHistogram().isBinningResponseEnabled() ){
+      // Imported bin contents already define the data histogram. Dummy events
+      // retain their assigned bin; they must not undergo another binning response.
+      LogInfo << "Disabling binning response for sample \"" << sample->getName()
+              << "\" loaded from histogram content." << std::endl;
+      sample->getHistogram().configureBinningResponse(ConfigReader(JsonType{{"isEnabled", false}}));
+    }
+
     if( histObj->InheritsFrom("THnD") ){
       auto* hist = (THnD*) histObj;
       int nBins = 1;
@@ -1319,6 +1361,11 @@ void DataDispenser::loadFromHistContent(){
         }
         sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
         sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+
+        // Every dummy event needs a cache entry, even without attached dials.
+        auto* eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
+        eventDialCacheEntry->event.sampleIndex = std::size_t(sample->getIndex());
+        eventDialCacheEntry->event.eventIndex = _cache_.sampleIndexOffsetList[sample->getIndex()]++;
       }
     }
     else if(histObj->InheritsFrom("TH1D")){
@@ -1353,8 +1400,188 @@ void DataDispenser::loadFromHistContent(){
   fHist->Close();
 }
 
+void DataDispenser::selectLoadThreadCount(){
+  const int maxThreads = getNbParallelCpu();
+  if( maxThreads <= 2 ){
+    _nbThreadsForLoad_ = maxThreads;
+    LogInfo << "Using " << maxThreads << " reader(s) for event selection and loading; skipping raw I/O probe"
+            << " (at most two readers allowed)." << std::endl;
+    return;
+  }
+  if( _owner_->isDevSingleThreadEventSelection() and _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
+    return;
+  }
+
+  // TODO: disable this test?
+  return;
+
+  // File metadata is sufficient for small inputs; do not read payload data just
+  // to decide how to read it. Include enabled friends and count each file once.
+  constexpr Long64_t probeSizeThreshold{500LL * 1000 * 1000}; // 500 MB
+  std::set<std::string> filePaths;
+  for( const auto& fileEntry : _parameters_.filePathList ){
+    if( not fileEntry.isEnabled ){ continue; }
+    filePaths.insert(resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath).filePath);
+    for( const auto& friendEntry : fileEntry.friendList ){
+      if( not friendEntry.isEnabled ){ continue; }
+      filePaths.insert(resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath).filePath);
+    }
+  }
+
+  struct InputFile{
+    std::string path;
+    Long64_t size;
+  };
+  std::vector<InputFile> inputFiles;
+  std::set<std::pair<dev_t, ino_t>> fileIds;
+  Long64_t totalBytes{0};
+  for( const auto& filePath : filePaths ){
+    struct stat fileInfo{};
+    // Unknown sizes retain the configured limit rather than treating them as zero.
+    if( ::stat(filePath.c_str(), &fileInfo) != 0 or not S_ISREG(fileInfo.st_mode) or fileInfo.st_size < 0 ){
+      LogWarning << "Cannot determine input size for " << filePath
+                 << "; keeping the configured loading thread limit." << std::endl;
+      return;
+    }
+    // A friend may share a physical file with the main tree or another friend.
+    if( not fileIds.emplace(fileInfo.st_dev, fileInfo.st_ino).second ){ continue; }
+    if( fileInfo.st_size > std::numeric_limits<Long64_t>::max() - totalBytes ){ return; }
+    totalBytes += fileInfo.st_size;
+    if( fileInfo.st_size > 0 ){ inputFiles.push_back({filePath, fileInfo.st_size}); }
+  }
+
+  if( totalBytes < probeSizeThreshold ){
+    _nbThreadsForLoad_ = 2;
+    LogInfo << "Input files total " << totalBytes
+            << " bytes (< 500 MB): using two readers for event selection and loading; skipping raw I/O probe."
+            << std::endl;
+    return;
+  }
+
+  // Keep at least two readers to overlap I/O with decompression and processing.
+  std::vector<int> candidates;
+  for( int nReaders = 2; nReaders <= std::min(4, maxThreads); ++nReaders ){
+    candidates.push_back(nReaders);
+  }
+  // Above four readers, try 6, 8, 12, 16, 24, ... and the exact limit.
+  for( Long64_t scale = 4; candidates.back() < maxThreads; scale *= 2 ){
+    candidates.push_back(int(std::min(Long64_t(maxThreads), scale + scale / 2)));
+    if( candidates.back() < maxThreads ){
+      candidates.push_back(int(std::min(Long64_t(maxThreads), 2 * scale)));
+    }
+  }
+
+  // Each candidate gets a separate part of every physical file, including
+  // friends. Four rounds use 1 + 2 + 4 + 8 slots: no probe range is read twice.
+  // This reduces warming by our own reads, but cannot bypass an existing OS cache.
+  constexpr Long64_t initialProbeBytes{16LL * 1024 * 1024};
+  constexpr int maxProbeAttempts{4};
+  constexpr Long64_t slotsPerCandidate{(1LL << maxProbeAttempts) - 1};
+  const Long64_t slots = slotsPerCandidate * Long64_t(candidates.size());
+  const Long64_t baseBytes = std::min(initialProbeBytes, totalBytes / slots);
+  LogInfo << "Benchmarking raw input I/O across " << inputFiles.size()
+          << " physical files (main and enabled friends), " << totalBytes << " bytes." << std::endl;
+
+  using Clock = std::chrono::steady_clock;
+  const auto probeStart = Clock::now();
+  std::vector<double> rates(candidates.size());
+  try{
+    for( int round = 0; round < maxProbeAttempts; ++round ){
+      LogInfo << "Raw I/O probe attempt " << round + 1 << "/" << maxProbeAttempts << std::endl;
+      const Long64_t roundSlots = 1LL << round;
+      const Long64_t roundOffset = roundSlots - 1;
+      const Long64_t targetBytes = baseBytes * roundSlots;
+      double shortestSeconds = std::numeric_limits<double>::max();
+      for( size_t iCandidate = 0; iCandidate < candidates.size(); ++iCandidate ){
+        const int nReaders = candidates[iCandidate];
+        const auto start = Clock::now();
+        std::vector<std::future<Long64_t>> readers;
+        // Open independent streams just like the independent TChains used by
+        // the real loader. Every reader also reads its share of the friend files.
+        for( int iReader = 0; iReader < nReaders; ++iReader ){
+          readers.emplace_back(std::async(std::launch::async, [&, iReader]{
+            std::vector<char> buffer(1024 * 1024);
+            Long64_t bytesRead{0};
+            for( const auto& file : inputFiles ){
+              const Long64_t bytes = Long64_t(
+                  static_cast<long double>(targetBytes) * file.size / totalBytes / nReaders
+              );
+              if( bytes == 0 ){ continue; }
+              const long double slot = slotsPerCandidate * iCandidate + roundOffset
+                                       + static_cast<long double>(roundSlots) * iReader / nReaders;
+              const auto offset = static_cast<std::streamoff>(file.size * slot / slots);
+              std::ifstream stream(file.path, std::ios::binary);
+              stream.seekg(offset);
+              Long64_t remaining = bytes;
+              while( remaining > 0 ){
+                const auto chunk = static_cast<std::streamsize>(
+                    std::min(remaining, Long64_t(buffer.size()))
+                );
+                stream.read(buffer.data(), chunk);
+                if( stream.gcount() != chunk ){
+                  throw std::runtime_error("Raw I/O probe could not read " + file.path);
+                }
+                remaining -= chunk;
+              }
+              bytesRead += bytes;
+            }
+            return bytesRead;
+          }));
+        }
+        Long64_t bytesRead{0};
+        // Join every reader before propagating failures (all lambdas reference
+        // the current candidate's locals).
+        std::exception_ptr failure;
+        for( auto& reader : readers ){
+          try{ bytesRead += reader.get(); }
+          catch(...){ if( not failure ){ failure = std::current_exception(); } }
+        }
+        if( failure ){ std::rethrow_exception(failure); }
+        const double seconds = std::chrono::duration<double>(Clock::now() - start).count();
+        shortestSeconds = std::min(shortestSeconds, seconds);
+        rates[iCandidate] = seconds > 0 ? double(bytesRead) / seconds : 0.;
+        LogInfo << "Raw I/O probe: " << nReaders << " reader(s), " << bytesRead
+                << " bytes in " << seconds << " s, " << rates[iCandidate] / 1.e6 << " MB/s." << std::endl;
+      }
+      // Repeat with equal, larger byte budgets for every candidate when reads
+      // were too short. The total bytes are bounded, even on slow storage.
+      if( shortestSeconds >= 0.2
+          or std::chrono::duration<double>(Clock::now() - probeStart).count() >= 2. ){
+        break;
+      }
+      if( round + 1 < maxProbeAttempts ){
+        LogInfo << "Raw I/O probe measurements are shorter than 200 ms; data may be in the filesystem cache"
+                << " (or storage may be very fast). Retrying in different file regions with a larger read volume."
+                << std::endl;
+      }
+      else{
+        LogInfo << "Raw I/O probe reached the maximum of " << maxProbeAttempts
+                << " attempts; short measurements may still be influenced by the filesystem cache." << std::endl;
+      }
+    }
+  }
+  catch( const std::exception& error ){
+    LogWarning << "Raw I/O probe failed: " << error.what()
+               << "; keeping the configured loading thread limit." << std::endl;
+    return;
+  }
+
+  const double threshold = 0.9;
+  const double bestRate = *std::max_element(rates.begin(), rates.end());
+  if( bestRate <= 0 ){ return; }
+  for( size_t iCandidate = 0; iCandidate < candidates.size(); ++iCandidate ){
+    if( rates[iCandidate] < threshold * bestRate ){ continue; }
+    _nbThreadsForLoad_ = candidates[iCandidate];
+    break;
+  }
+  LogInfo << "Raw I/O probe selected " << _nbThreadsForLoad_
+          << " reader(s) for event selection and loading (at least " << threshold*100
+          << "% of best measured throughput)." << std::endl;
+}
+
 int DataDispenser::getNbParallelCpu() const{
-  return GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
+  int nThreads = GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
+  return _nbThreadsForLoad_ > 0 ? std::min(nThreads, _nbThreadsForLoad_) : nThreads;
 }
 const std::string& DataDispenser::getVariableExpression(const std::string& variable_) const {
   return ::getVariableExpression(_cache_, _parameters_.variableDict, variable_);
@@ -1839,7 +2066,7 @@ void DataDispenser::runEventFillThreads(int iThread_){
 
         int cpuPercent = int(GenericToolbox::getCpuUsageByProcess());
         ssProgressBar << " / CPU efficiency: " << GenericToolbox::padString(std::to_string(cpuPercent/nThreads), 3,' ')
-                      << "% / RAM: " << GenericToolbox::parseSizeUnits( double(GenericToolbox::getProcessMemoryUsage()) ) << std::endl;
+                      << "% / RAM: " << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
 
         ssProgressBar << LogInfo.getPrefixString() << "Data size per entry: " << GenericToolbox::parseSizeUnits(readSpeed.getLastValue());
         ssProgressBar << " / Using " << nThreads << " threads" << std::endl;
@@ -1886,12 +2113,14 @@ void DataDispenser::loadEvent(int iThread_){
   auto& threadSharedData = threadSharedDataList[iThread_];
 
   // local
+  // Snapshot conditions while the reader still owns this entry's tree buffers.
+  std::vector<bool> dialApplyConditionList(_cache_.dialCollectionsRefList.size(), true);
   Event eventIndexingBuffer;
   eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
 
   eventIndexingBuffer.getVariables().setVarNameList(_cache_.varsRequestedForIndexing);
 
-  std::unordered_map<int, DialBase*> eventByEventDialBuffer{};
+  std::unordered_map<int, size_t> eventByEventDialBuffer{};
   eventByEventDialBuffer.reserve(_cache_.dialCollectionsRefList.size());
 
   if(iThread_ == 0){
@@ -2051,7 +2280,11 @@ void DataDispenser::loadEvent(int iThread_){
       // ***** from this point, the TChain reader is waiting *****
 
       // check if the reader has nothing else to do / end of the loop
-      if( threadSharedData.isDoneReading.getValue() ){ break; }
+      if( threadSharedData.isDoneReading.getValue() ){
+        // Publish shutdown before releasing the reader's handshake.
+        threadSharedData.isEventFillerReady.setValue(false);
+        break;
+      }
 
       // leafFormIndexingList is modified by the TChain reader
       for( size_t iVar = 0 ; iVar < threadSharedData.buffer.varIndexingList.size() ; iVar++ ){
@@ -2102,7 +2335,7 @@ void DataDispenser::loadEvent(int iThread_){
         sampleBinIdxList.emplace_back(eventIndexingBuffer.getIndices().bin);
 
         // No bin found -> warning
-        if( sampleBinIdxList.back() == -1 and not eventSample.isUseDynamicBinning() ){
+        if( sampleBinIdxList.back() == -1 and not (eventSample.isUseDynamicBinning() or eventSample.getHistogram().isBinningResponseEnabled()) ){
           const int unbinnedEventThrottle = 5;
           if( this->_unbinnedEvents_++ < unbinnedEventThrottle ){
 
@@ -2138,7 +2371,7 @@ void DataDispenser::loadEvent(int iThread_){
         }
 
         hasSampleToFill = hasSampleToFill or (
-            (sampleBinIdxList.back() != -1 or eventSample.isUseDynamicBinning())
+            (sampleBinIdxList.back() != -1 or eventSample.isUseDynamicBinning() or eventSample.getHistogram().isBinningResponseEnabled())
             and sampleWeightList.back() != 0 );
       }
 
@@ -2152,6 +2385,11 @@ void DataDispenser::loadEvent(int iThread_){
         dialCloneArrayIndex = static_cast<int>(threadSharedData.buffer.dialIndexFormula.eval(eventIndexingBuffer));
       }
 
+      for( size_t iCollection = 0 ; iCollection < dialApplyConditionList.size() ; ++iCollection ){
+        auto& condition = threadSharedData.buffer.dialApplyConditionFormulaList[iCollection];
+        dialApplyConditionList[iCollection] = not condition.isEnabled() or condition.eval(eventIndexingBuffer) != 0;
+      }
+
       // only load event-by-event dials, binned dials etc. will be processed later
       for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
         auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
@@ -2159,12 +2397,7 @@ void DataDispenser::loadEvent(int iThread_){
         // if not event-by-event dial -> leave
         if( not dialCollectionRef->hasDialBranchData() ){ continue; }
 
-        if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
-          if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
-            // next dialSet
-            continue;
-          }
-        }
+        if( not dialApplyConditionList[iDialCollection] ){ continue; }
 
         if( not dialCollectionRef->getDialParameterValuesBranch().empty() ){
           const auto* parameterValues = readArray(dialCollectionRef->getDialParameterValuesBranch());
@@ -2178,7 +2411,9 @@ void DataDispenser::loadEvent(int iThread_){
             graph.SetPoint(iPoint, parameterValues->GetAt(iPoint), responses->GetAt(iPoint));
           }
           auto dial = dialCollectionRef->makeDial(&graph);
-          eventByEventDialBuffer[dialCollectionRef->getIndex()] = dial.release();
+          if( dial != nullptr ){
+            eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialCollectionRef->storeEventDial(std::move(dial));
+          }
           continue;
         }
 
@@ -2197,7 +2432,9 @@ void DataDispenser::loadEvent(int iThread_){
         }
 
         auto dial = dialCollectionRef->makeDial(dialObjectPtr);
-        eventByEventDialBuffer[dialCollectionRef->getIndex()] = dial.release();
+        if( dial != nullptr ){
+          eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialCollectionRef->storeEventDial(std::move(dial));
+        }
       }
 
     }
@@ -2208,7 +2445,8 @@ void DataDispenser::loadEvent(int iThread_){
     for( int iSample = 0 ; iSample < int(sampleIdxList.size()) ; iSample++ ){
       if( sampleWeightList[iSample] == 0. ){ continue; }
       if( sampleBinIdxList[iSample] == -1
-          and not _cache_.samplesToFillList[sampleIdxList[iSample]]->isUseDynamicBinning() ){ continue; }
+          and not (_cache_.samplesToFillList[sampleIdxList[iSample]]->isUseDynamicBinning()
+                  or _cache_.samplesToFillList[sampleIdxList[iSample]]->getHistogram().isBinningResponseEnabled()) ){ continue; }
 
       // update for this specific sample
       eventIndexingBuffer.getIndices().sample = _cache_.samplesToFillList[sampleIdxList[iSample]]->getIndex();
@@ -2242,34 +2480,17 @@ void DataDispenser::loadEvent(int iThread_){
         // leave if event-by-event -> already loaded
         if( dialCollectionRef->hasDialBranchData() ){
 
-          // dialBase is valid -> store it
-          if( eventByEventDialBuffer[dialCollectionRef->getIndex()] != nullptr ){
-            size_t freeSlotDial = dialCollectionRef->getNextDialFreeSlot();
-
-            if( iSample == 0 ) {
-              dialCollectionRef->getDialInterfaceList()[freeSlotDial].getDial().dialPtr
-                = std::unique_ptr<DialBase>(eventByEventDialBuffer[dialCollectionRef->getIndex()]);
-            }
-            else {
-              // cloning the dial ptr, otherwise the ownership will be lost
-              dialCollectionRef->getDialInterfaceList()[freeSlotDial].getDial().dialPtr
-                = std::unique_ptr<DialBase>(eventByEventDialBuffer[dialCollectionRef->getIndex()]->clone());
-            }
-
+          const auto dial = eventByEventDialBuffer.find(dialCollectionRef->getIndex());
+          if( dial != eventByEventDialBuffer.end() ){
             dialEntryPtr->collectionIndex = dialCollectionRef->getIndex();
-            dialEntryPtr->interfaceIndex = freeSlotDial;
+            dialEntryPtr->interfaceIndex = dial->second;
             dialEntryPtr++;
           }
 
           continue; // skip the rest
         }
 
-        if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
-          if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
-            // next dialSet
-            continue;
-          }
-        }
+        if( not dialApplyConditionList[iDialCollection] ){ continue; }
 
         int iCollection = dialCollectionRef->getIndex();
 
@@ -2332,7 +2553,8 @@ void DataDispenser::loadEvent(int iThread_){
         LogAlertIf(iThread_ == 0) << "debugNbMaxEventsToLoad: Event number cap reached (";
         LogAlertIf(iThread_ == 0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
         threadSharedData.isDoneReading.setValue( true );
-        return;
+        // Drain the reader's next entry through the normal handshake. Returning
+        // here can leave it waiting forever on isEntryBufferReady.
       }
     }
 

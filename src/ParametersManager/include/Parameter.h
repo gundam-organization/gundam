@@ -18,12 +18,6 @@ class ParameterSet;
 class Parameter : public JsonBaseClass {
 
 public:
-#define ENUM_NAME PriorType
-#define ENUM_FIELDS \
-  ENUM_FIELD(Unset, -1) \
-  ENUM_FIELD(Gaussian) \
-  ENUM_FIELD(Flat)
-#include "GenericToolbox.MakeEnum.h"
   static void prepareConfig(ConfigReader& config_);
 
 protected:
@@ -37,18 +31,19 @@ public:
 
   void setOwner(const ParameterSet *owner_){ _owner_ = owner_; }
   void setName(const std::string &name){ _name_ = name; }
-  void setPriorType(PriorType priorType){ _priorType_ = priorType; }
   void setIsEnabled(bool isEnabled){ _isEnabled_ = isEnabled; }
   void setIsPenaltyDisabled(bool isPenaltyDisabled){ _isPenaltyDisabled_ = isPenaltyDisabled; }
   void setIsFixed(bool isFixed){_isFixed_ = isFixed; }
   void setIsEigen(bool isEigen){ _isEigen_ = isEigen; }
-  void setIsFree(bool isFree){ _isFree_ = isFree; }
   void setIsThrown(bool isThrown){ _isThrown_ = isThrown; }
   void setParameterIndex(int parameterIndex){ _parameterIndex_ = parameterIndex; }
   void setStepSize(double stepSize){ _stepSize_ = stepSize; }
   void setPriorValue(double priorValue){ _priorValue_ = priorValue; }
   void setThrowValue(double throwValue){ _throwValue_ = throwValue; }
   void setStdDevValue(double stdDevValue){ _stdDevValue_ = stdDevValue; }
+  void setGradient(double gradient){ _gradient_ = gradient; }
+  void addGradient(double gradient){ _gradient_ += gradient; }
+  void resetGradient(){ _gradient_ = 0; }
   void setDialSetConfig(const std::vector<ConfigReader>& dialDefinitionsList_){ _dialDefinitionsList_ = dialDefinitionsList_; }
 
   /// Set the limits for this parameter.  Parameter values less than
@@ -91,7 +86,7 @@ public:
   void setParameterValue(double parameterValue, bool force=false);
 
   /// The parameter has no constrains applied.
-  [[nodiscard]] auto isFree() const{ return _isFree_; }
+  [[nodiscard]] auto isFree() const{ return std::isnan(_stdDevValue_); }
 
   /// The parameter penalty is disabled and does not enter into the penalty
   /// term.  Although it is removed from the covariance and its value is used
@@ -137,9 +132,11 @@ public:
   /// thrown.
   [[nodiscard]] auto getThrowValue() const{ return _throwValue_; }
 
+  /// Release correlations with other parameters while retaining the Gaussian constraint.
+  [[nodiscard]] auto getReleasePriorCorrelations() const{ return _releasePriorCorrelations_; }
   [[nodiscard]] auto getStdDevValue() const{ return _stdDevValue_; }
+  [[nodiscard]] auto getGradient() const{ return _gradient_; }
   [[nodiscard]] auto getOwner() const{ return _owner_; }
-  [[nodiscard]] auto getPriorType() const{ return _priorType_; }
   [[nodiscard]] auto& getParameterLimits() const{ return _parameterLimits_; }
   [[nodiscard]] auto& getMirrorRange() const{ return _mirrorRange_; }
   [[nodiscard]] auto& getCyclicRange() const{ return _cyclicRange_; }
@@ -235,8 +232,8 @@ private:
   bool _isEnabled_{true};
   bool _isPenaltyDisabled_{false};
   bool _isFixed_{false};
+  bool _releasePriorCorrelations_{false};
   bool _isEigen_{false};
-  bool _isFree_{false};
   bool _isThrown_{true};
   bool _gotUpdated_{false};
   int _parameterIndex_{-1}; // to get the right definition in the json config (in case "name" is not specified)
@@ -244,6 +241,7 @@ private:
   double _priorValue_{std::nan("unset")};
   double _throwValue_{std::nan("unset")};
   double _stdDevValue_{std::nan("unset")};
+  double _gradient_{0};
 
   GenericToolbox::Range _parameterLimits_;
   GenericToolbox::Range _throwLimits_;
@@ -259,7 +257,6 @@ private:
 
   // Internals
   const ParameterSet* _owner_{nullptr};
-  PriorType _priorType_{PriorType::Gaussian};
 
   /// A set of flags used to define if the parameter set has valid parameter
   /// values.

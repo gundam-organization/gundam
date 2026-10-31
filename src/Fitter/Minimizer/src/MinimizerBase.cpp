@@ -1,11 +1,11 @@
 #include "MinimizerBase.h"
 #include "FitterEngine.h"
-
-#ifdef GUNDAM_USING_CACHE_MANAGER
-#include "CacheManager.h"
-#endif
+#include "GundamUtils.h"
 
 #include "Logger.h"
+
+#include <algorithm>
+#include <cmath>
 
 void MinimizerBase::configureImpl(){
 
@@ -109,7 +109,7 @@ void MinimizerBase::minimize(){
 
   this->printParameters();
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  getOwner().evaluateLikelihood();
   LogInfo << "Initial likelihood state:" << std::endl;
   LogInfo << getLikelihoodInterface().getSummary() << std::endl;
 
@@ -193,7 +193,10 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   }
 
   // Propagate the parameters
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  {
+    auto propagationTime = _monitor_.propagationTimer.scopeTime();
+    getOwner().evaluateLikelihood();
+  }
   _monitor_.evalLlhTimer.stop();
 
   // Monitor if enabled
@@ -213,49 +216,30 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       ssHeader << std::endl << GenericToolbox::getNowDateString("%Y.%m.%d %H:%M:%S");
       ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
       ssHeader << std::endl << _monitor_.stateTitleMonitor << " / Nb of parameters to fit: " << nbValidPars;
-      ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
+      ssHeader << std::endl << "RAM: " << GundamUtils::getProcessMemoryUsageSummary();
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
       ssHeader << " / CPU: " << cpuPercent << "% / " << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency";
+      const auto backendLine = getOwner().getBackendMonitorLine();
+      if( not backendLine.empty() ){ ssHeader << std::endl << backendLine; }
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 
+      const auto additionalColumns = getOwner().getMonitorColumns();
       GenericToolbox::TablePrinter t;
-
       t << "" << GenericToolbox::TablePrinter::NextColumn;
-      t << "Propagator" << GenericToolbox::TablePrinter::NextColumn;
-
-      t << "Dial Update" << GenericToolbox::TablePrinter::NextColumn;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      if( Cache::Manager::Get() != nullptr ){
-        t << "Cache::Fill" << GenericToolbox::TablePrinter::NextColumn;
-        t << "Pull from device" << GenericToolbox::TablePrinter::NextColumn;
+      t << getOwner().getPropagationMonitorTitle() << GenericToolbox::TablePrinter::NextColumn;
+      t << "Propagation + LLH" << GenericToolbox::TablePrinter::NextColumn;
+      for( const auto& column : additionalColumns ){
+        t << column.first << GenericToolbox::TablePrinter::NextColumn;
       }
-      else{
-#endif
-        t << "Re-weight" << GenericToolbox::TablePrinter::NextColumn;
-        t << "histograms fill" << GenericToolbox::TablePrinter::NextColumn;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      }
-#endif
       t << _monitor_.minimizerTitle << GenericToolbox::TablePrinter::NextLine;
 
       t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
       t << _monitor_.iterationCounterClock.evalTickSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
-
-      t << getModelPropagator().getDialManager().getUpdateTimer() << GenericToolbox::TablePrinter::NextColumn;
-
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      if( Cache::Manager::Get() != nullptr ){
-        t << Cache::Manager::GetCacheFillTimer() << GenericToolbox::TablePrinter::NextColumn;
-        t << Cache::Manager::GetPullFromDeviceTimer() << GenericToolbox::TablePrinter::NextColumn;
+      t << _monitor_.propagationTimer << GenericToolbox::TablePrinter::NextColumn;
+      for( const auto& column : additionalColumns ){
+        t << column.second << GenericToolbox::TablePrinter::NextColumn;
       }
-      else{
-#endif
-        t << getModelPropagator().reweightTimer << GenericToolbox::TablePrinter::NextColumn;
-        t << getModelPropagator().refillHistogramTimer << GenericToolbox::TablePrinter::NextColumn;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      }
-#endif
       t << _monitor_.externalTimer << GenericToolbox::TablePrinter::NextLine;
 
       ssHeader << t.generateTableString();
@@ -324,6 +308,38 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   _monitor_.externalTimer.start();
   return getLikelihoodInterface().getLastLikelihood();
 }
+void MinimizerBase::evalFitGradient(){
+  this->evalFitGradient(_minimizerParameterPtrList_);
+}
+void MinimizerBase::evalFitGradient( const std::vector<Parameter*>& parameterList_ ){
+#ifdef GUNDAM_USING_BACKENDS
+  auto& manager = getOwner().getBackendsManager();
+  if( manager.hasBackend() ){
+    manager.validateLikelihoodGradient();
+    getLikelihoodInterface().validateWeightGradient();
+    getOwner().evaluateLikelihood();
+    getLikelihoodInterface().evalLikelihoodGradient(parameterList_,
+        [&manager](const auto& parameters_){ manager.evalStatLikelihoodGradient(parameters_); });
+    return;
+  }
+#endif
+  getLikelihoodInterface().evalLikelihoodGradient(parameterList_);
+}
+
+void MinimizerBase::evalFitGradientAt(const double* parArray_, double* gradient_){
+  LogThrowIf(parArray_ == nullptr or gradient_ == nullptr, "Null gradient callback buffer.");
+  LogThrowIf(not setFitParameterValues(parArray_), "Invalid parameter point for CPU gradient.");
+  evalFitGradient();
+  std::vector<double> result;
+  result.reserve(_minimizerParameterPtrList_.size());
+  for( const auto* parameter : _minimizerParameterPtrList_ ){
+    const double scale = _useNormalizedFitSpace_ ? ParameterSet::toRealParRange(1., *parameter) : 1.;
+    const double value = parameter->getGradient() * scale;
+    LogThrowIf(not std::isfinite(value), "Non-finite gradient in fit coordinates.");
+    result.push_back(value);
+  }
+  std::copy(result.begin(), result.end(), gradient_);
+}
 
 void MinimizerBase::setParameterValidity(const std::string& validity) {
   if (validity.empty()) return;
@@ -361,8 +377,8 @@ void MinimizerBase::printParameters(){
       else if( par.isPenaltyDisabled() )  { statusStr = "Fixed (penalty not applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else if( par.isFixed() )  { statusStr = "Fixed (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else                      {
-        statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
-        if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueLightText;
+        statusStr = par.isFree() ? "Free" : "Gaussian Prior";
+        if(par.isFree()) colorStr = GenericToolbox::ColorCodes::blueLightText;
       }
 
 #ifdef NOCOLOR

@@ -7,13 +7,13 @@
 
 #include "Propagator.h"
 #include "EventVarTransformLib.h"
+#include "FormulaEvaluator.h"
 
 #include "GenericToolbox.Wrappers.h"
 #include "GenericToolbox.Root.h"
 
 #include "TChain.h"
 #include "TTreeFormula.h"
-#include "TFormula.h"
 
 
 #include "string"
@@ -139,16 +139,12 @@ struct ThreadSharedData{
   // buffer
   struct VariableBuffer{
     struct EventFormula{
-      std::string expr{};
-      TFormula formula{};
-      std::vector<int> varIndexList{};
+      FormulaEvaluator evaluator{};
 
       double eval(const Event& event_) const{
-        std::vector<double> parArray(formula.GetNpar());
-        for( int iPar = 0 ; iPar < formula.GetNpar() ; iPar++ ){
-          parArray[iPar] = event_.getVariables().getVarList()[varIndexList[iPar]].getVarAsDouble();
-        }
-        return formula.EvalPar(nullptr, parArray.empty() ? nullptr : parArray.data());
+        return evaluator.evalWithInputs([&](int index_){
+          return event_.getVariables().getVarList()[index_].getVarAsDouble();
+        });
       }
     };
 

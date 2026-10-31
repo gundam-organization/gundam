@@ -4,6 +4,7 @@
 
 #include "FitterEngine.h"
 #include "GundamGlobals.h"
+#include "GundamUtils.h"
 #include "RootMinimizer.h"
 #include "SimpleMcmc.h"
 
@@ -94,6 +95,13 @@ void FitterEngine::configureImpl(){
   }
   _config_.fillValue(_likelihoodInterface_.getConfig(), "likelihoodInterfaceConfig");
   _likelihoodInterface_.configure();
+#ifdef GUNDAM_USING_BACKENDS
+  if( _likelihoodInterface_.getConfig().hasField("backendManagerConfig") ){
+    _backendsManager_.setConfig(_likelihoodInterface_.getConfig().fetchValue<ConfigReader>("backendManagerConfig"));
+  }
+  else { _backendsManager_.setConfig(ConfigReader()); }
+  _backendsManager_.configure();
+#endif
 
   if( getLikelihoodInterface().getModelPropagator().getConfig().hasField("scanConfig") ){
     _parameterScanner_.setConfig( getLikelihoodInterface().getModelPropagator().getConfig().fetchValue<ConfigReader>("scanConfig") );
@@ -152,6 +160,10 @@ void FitterEngine::initializeImpl(){
   }
 
   getLikelihoodInterface().initialize();
+#ifdef GUNDAM_USING_BACKENDS
+  _backendsManager_.setLikelihoodInterfacePtr(&getLikelihoodInterface());
+  _backendsManager_.initialize();
+#endif
 
   _parameterScanner_.setLikelihoodInterfacePtr( &getLikelihoodInterface() );
   _parameterScanner_.initialize();
@@ -173,7 +185,7 @@ void FitterEngine::initializeImpl(){
   _minimizer_->initialize();
 
   // Make sure parameters are fully propagated
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
   if( _saveDir_ != nullptr ) {
     // Write data
@@ -226,20 +238,20 @@ void FitterEngine::initializeImpl(){
     for( auto& parSet : getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
 
-      auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-          parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix"
-      );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
-          GenericToolbox::toCorrelationMatrix(parSet.getPriorCovarianceMatrix().get()),
-          "correlationMatrix"
-      );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-          parSet.getInverseCovarianceMatrix().get(), "invCovarianceMatrix"
-      );
+    auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        parSet.generatePriorCovarianceMatrix().get(), "priorCovarianceMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
+        parSet.getPriorCorrelationMatrix().get(),
+        "priorCorrelationMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        parSet.getInversePriorCorrelationMatrix().get(), "priorCorrelationMatrixInv"
+    );
 
       auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
       for( auto& par : parSet.getParameterList() ){
@@ -253,7 +265,7 @@ void FitterEngine::initializeImpl(){
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "index", std::to_string( par.getParameterIndex() ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( par.getPriorValue() ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( par.getStdDevValue() ).c_str() ) );
-        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( par.getPriorType().value ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( par.isFree() ? 1 : 0 ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( par.getParameterLimits().min ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( par.getParameterLimits().max ).c_str() ) );
       }
@@ -271,7 +283,7 @@ void FitterEngine::initializeImpl(){
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "index", std::to_string( eigen.getParameterIndex() ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( eigen.getPriorValue() ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( eigen.getStdDevValue() ).c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( eigen.getPriorType().value ).c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( eigen.isFree() ? 1 : 0 ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( eigen.getParameterLimits().min ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( eigen.getParameterLimits().max ).c_str() ) );
         }
@@ -316,9 +328,74 @@ void FitterEngine::initializeImpl(){
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
 
+  // Loading, PCA and output serialization can leave large freed allocations
+  // resident. Return unused allocator pages once, before scans/minimization.
+  LogInfo << "RAM before releasing unused allocator pages: "
+          << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
+  GundamUtils::releaseUnusedMemory();
+  LogInfo << "RAM after releasing unused allocator pages: "
+          << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
+
+}
+
+void FitterEngine::evaluateLikelihood(){
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    auto backendResult = _backendsManager_.propagate();
+    if( backendResult.valid() ){
+      auto result = backendResult.get();
+      if( result.isValid ){
+        getLikelihoodInterface().evalPenaltyLikelihood();
+        if( result.hasStatLikelihood ){
+          if( not _backendsManager_.willAutoMaterialize(Backends::OutputRequest::StatLikelihood) ){
+            _backendsManager_.materialize(Backends::OutputRequest::StatLikelihood);
+          }
+        }
+        else{
+          std::future<bool> invalidPropagation;
+          getLikelihoodInterface().evalStatLikelihood(invalidPropagation);
+        }
+        getLikelihoodInterface().getBuffer().updateTotal();
+        if( GundamGlobals::isDebug() ){
+          LogInfo << Backends::formatBackendTimingSummary(
+              _backendsManager_.getBackend()->getLastTimingSummary()
+          ) << std::endl;
+        }
+        return;
+      }
+    }
+    getLikelihoodInterface().getModelPropagator().getDialManager().invalidateInputBuffers();
+    LogWarning << "Propagation backend did not produce a valid result. Falling back to the standard propagation path." << std::endl;
+  }
+#endif
+
+  getLikelihoodInterface().propagateAndEvalLikelihood();
 }
 
 // Core
+std::string FitterEngine::getPropagationMonitorTitle() const {
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    return "Backend (" + _backendsManager_.getBackend()->getName() + ")";
+  }
+#endif
+  return "Propagator";
+}
+
+std::string FitterEngine::getBackendMonitorLine() const {
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){ return _backendsManager_.getBackend()->getMonitorLine(); }
+#endif
+  return {};
+}
+
+std::vector<std::pair<std::string, std::string>> FitterEngine::getMonitorColumns() const {
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){ return _backendsManager_.getBackend()->getMonitorColumns(); }
+#endif
+  return _likelihoodInterface_.getModelPropagator().getMonitorColumns();
+}
+
 void FitterEngine::fit(){
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf( not isInitialized() );
@@ -385,7 +462,7 @@ void FitterEngine::fit(){
           auto& parList = parSet.getParameterList();
           double pushVal =
               parList[parIndex].getParameterValue()
-              + parList[parIndex].getStdDevValue()
+              + ParameterSet::toRealParRange(1., parList[parIndex])
                 * GenericToolbox::Json::fetchValue<double>(entry, "nbSigmaAway");
 
           LogAlert << "Pushing #" << parIndex << " to " << pushVal << std::endl;
@@ -406,7 +483,7 @@ void FitterEngine::fit(){
 
 
     LogInfo << "Current LLH state:" << std::endl;
-    getLikelihoodInterface().propagateAndEvalLikelihood();
+    this->evaluateLikelihood();
 
     LogInfo << getLikelihoodInterface().getSummary() << std::endl;
   }
@@ -419,6 +496,8 @@ void FitterEngine::fit(){
 
   // Leaving now?
   if( _isDryRun_ ){
+    LogThrowIf(_minimizer_->checkFlatDirections() > 0,
+               "Cannot start fit: flat LLH directions were detected. Check the reported fit parameters.");
     LogAlert << "Dry run requested. Leaving before the minimization." << std::endl;
     return;
   }
@@ -428,13 +507,23 @@ void FitterEngine::fit(){
   // individual weight
   bool origCopy = Cache::Manager::SetIsEventWeightCopyEnabled( false );
 #endif
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    _backendsManager_.setEnableAutoMaterialize(false);
+  }
+#endif
 
   LogInfo << "Minimizing LLH..." << std::endl;
   this->_minimizer_->minimize();
 
   // re-evaluating since the minimizer might not have triggered an eval of the
   // LLH.  And guarantee that the weights were copied if that was enabled.
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    _backendsManager_.setEnableAutoMaterialize(true);
+  }
+#endif
+  this->evaluateLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsBuilt() ){
@@ -499,9 +588,21 @@ void FitterEngine::fit(){
       // individual weight
       bool origCopy = Cache::Manager::SetIsEventWeightCopyEnabled( false );
 #endif
+#ifdef GUNDAM_USING_BACKENDS
+      if( _backendsManager_.hasBackend() ){
+        _backendsManager_.setEnableAutoMaterialize(false);
+      }
+#endif
 
       LogInfo << "Computing post-fit errors..." << std::endl;
       _minimizer_->calcErrors();
+
+#ifdef GUNDAM_USING_BACKENDS
+      if( _backendsManager_.hasBackend() ){
+        _backendsManager_.setEnableAutoMaterialize(true);
+      }
+#endif
+      this->evaluateLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::IsBuilt() ){
@@ -515,13 +616,26 @@ void FitterEngine::fit(){
     }
   }
 
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    const auto totals = _backendsManager_.getBackend()->getTimingTotals();
+    if( totals.propagationCount > 0 ){
+      LogInfo << "Backend accumulated timing since build: calls=" << totals.propagationCount
+              << ", propagation=" << totals.propagationSeconds << "s"
+              << ", dialCache=" << totals.cachedDialSeconds << "s"
+              << ", eventWeights=" << totals.eventWeightsSeconds << "s"
+              << ", histograms=" << totals.histogramSeconds << "s"
+              << ", statLikelihood=" << totals.likelihoodSeconds << "s" << std::endl;
+    }
+  }
+#endif
   LogInfo << "Fit is done." << std::endl;
 }
 
 // protected
 void FitterEngine::runPcaCheck(){
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
   LogAlert << "Using PCA method: " << _pcaMethod_.toString() << " / threshold = " << _pcaThreshold_ << std::endl;
 
@@ -570,12 +684,12 @@ void FitterEngine::runPcaCheck(){
 
       if( par.isEnabled() and not par.isPenaltyDisabled() ){
         double currentParValue = par.getParameterValue();
-        par.setParameterValue( currentParValue + par.getStdDevValue() );
+        par.setParameterValue( currentParValue + ParameterSet::toRealParRange(1., par) );
 
         ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
 
-        getLikelihoodInterface().propagateAndEvalLikelihood();
+        this->evaluateLikelihood();
 
         double criteria{0};
 
@@ -634,12 +748,12 @@ void FitterEngine::runPcaCheck(){
   }
 
   // comeback to old values
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 }
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
   double baseLlhPull = getLikelihoodInterface().getLastPenaltyLikelihood();
   double baseLlh = getLikelihoodInterface().getLastLikelihood();
 
@@ -651,9 +765,9 @@ void FitterEngine::rescaleParametersStepSize(){
       if( not par.isEnabled() ){ continue; }
 
       double currentParValue = par.getParameterValue();
-      par.setParameterValue( currentParValue + par.getStdDevValue() );
+      par.setParameterValue( currentParValue + ParameterSet::toRealParRange(1., par) );
 
-      getLikelihoodInterface().propagateAndEvalLikelihood();
+      this->evaluateLikelihood();
 
       double deltaChi2 = getLikelihoodInterface().getLastLikelihood() - baseLlh;
       double deltaChi2Pulls = getLikelihoodInterface().getLastPenaltyLikelihood() - baseLlhPull;
@@ -669,18 +783,18 @@ void FitterEngine::rescaleParametersStepSize(){
               << " -> σ x " << _parStepGain_ << " x " << stepSize
               << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)";
 
-      stepSize *= par.getStdDevValue() * _parStepGain_;
+      stepSize *= ParameterSet::toRealParRange(1., par) * _parStepGain_;
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );
-      getLikelihoodInterface().propagateAndEvalLikelihood();
+      this->evaluateLikelihood();
       LogInfo << " -> Δχ²(step) = " << getLikelihoodInterface().getLastLikelihood() - baseLlh << std::endl;
       par.setParameterValue( currentParValue );
     }
 
   }
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 }
 bool FitterEngine::checkNumericalAccuracy(){
   LogAlert << __METHOD_NAME__ << std::endl;
@@ -718,8 +832,7 @@ bool FitterEngine::checkNumericalAccuracy(){
           parSet.getParameterList()[iPar].setParameterValue( throws[iThrow][iParSet][iPar] );
         }
       }
-      std::future<bool> eventually = getLikelihoodInterface().getModelPropagator().applyParameters();
-      getLikelihoodInterface().evalLikelihood(eventually);
+      this->evaluateLikelihood();
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan
         if (not GundamUtils::almostEqual(

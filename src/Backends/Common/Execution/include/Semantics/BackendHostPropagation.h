@@ -1,0 +1,84 @@
+#ifndef GUNDAM_BACKEND_HOST_PROPAGATION_H
+#define GUNDAM_BACKEND_HOST_PROPAGATION_H
+#include "Semantics/BackendLikelihood.h"
+
+#include "EngineView.h"
+#include "PropagationInputs.h"
+#include "Semantics/BackendDialSemantics.h"
+
+#include <algorithm>
+#include <cmath>
+#include <vector>
+
+namespace Backends::Semantics {
+
+  inline void calculateEventWeights(std::vector<double>& eventWeights_,
+                                    const PropagationView& propagation_,
+                                    const PropagationInputs& inputs_) {
+    eventWeights_.resize(propagation_.events.size());
+    for( const auto& event : propagation_.events ){
+      eventWeights_[event.resultIndex] = evalEventWeight(propagation_, event, inputs_);
+    }
+  }
+
+  inline void calculateHistogramsFromEventWeights(std::vector<double>& histSums_,
+                                                  std::vector<double>& histSumSquares_,
+                                                  const PropagationView& propagation_,
+                                                  const std::vector<double>& eventWeights_) {
+    histSums_.assign(propagation_.totalBins, 0.);
+    histSumSquares_.assign(propagation_.totalBins, 0.);
+
+    for( const auto& event : propagation_.events ){
+      if( event.globalBinIndex < 0 ){ continue; }
+      const double weight = eventWeights_.at(event.resultIndex);
+      histSums_[event.globalBinIndex] += weight;
+      histSumSquares_[event.globalBinIndex] += weight * weight;
+    }
+  }
+
+  inline void calculateHistograms(std::vector<double>& histSums_,
+                                  std::vector<double>& histSumSquares_,
+                                  const PropagationView& propagation_,
+                                  const PropagationInputs& inputs_) {
+    std::vector<double> eventWeights{};
+    calculateEventWeights(eventWeights, propagation_, inputs_);
+    calculateHistogramsFromEventWeights(histSums_, histSumSquares_, propagation_, eventWeights);
+  }
+
+  inline double calculateLikelihood(const LikelihoodView& likelihood_,
+                                    const std::vector<double>& histSums_,
+                                    const std::vector<double>& histSumSquares_) {
+    double likelihoodValue{0};
+
+    for( const auto& sample : likelihood_.samples ){
+      for( int iBin = 0 ; iBin < int(sample.dataSums.size()) ; iBin++ ){
+        if( iBin < int(sample.ignoredBins.size()) and sample.ignoredBins[iBin] ){ continue; }
+        const int globalBin = sample.binOffset + iBin;
+        const double pred = histSums_.at(globalBin);
+        const double predErr = std::sqrt(histSumSquares_.at(globalBin));
+        if( sample.portableOptions.kind == LikelihoodKind::Host ){
+          const double value = sample.evalBin(sample.dataSums[iBin], pred, predErr, iBin);
+          if( std::isnan(value) ){ throw std::runtime_error("Invalid host statistical likelihood."); }
+          likelihoodValue += value;
+        }
+        else{
+          // Preserve the reference sqrt(sumSquares) -> error^2 conversion.
+          const double variance = sample.portableOptions.useNominalVariance
+              ? sample.nominalVariances.at(iBin) : predErr * predErr;
+          const double value = LikelihoodSemantics::evaluate<LikelihoodSemantics::DoubleMath>(
+              sample.dataSums[iBin], pred, variance, sample.portableOptions);
+          if( std::isnan(value) ){ throw std::runtime_error("Invalid portable statistical likelihood."); }
+          likelihoodValue += value;
+        }
+      }
+    }
+
+    // Individual infinities remain valid likelihood barriers; an undefined
+    // aggregate (for example +inf plus -inf) must never be published.
+    if( std::isnan(likelihoodValue) ){ throw std::runtime_error("Invalid statistical likelihood total."); }
+    return likelihoodValue;
+  }
+
+}
+
+#endif // GUNDAM_BACKEND_HOST_PROPAGATION_H

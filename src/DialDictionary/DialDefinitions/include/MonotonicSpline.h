@@ -24,13 +24,17 @@ public:
   // mandatory overrides
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<MonotonicSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"MonotonicSpline"}; }
+  [[nodiscard]] bool hasAnalyticGradient() const override { return true; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override;
 
   // other overrides
   void setAllowExtrapolation(bool allowExtrapolation) override{ _allowExtrapolation_ = allowExtrapolation; }
   [[nodiscard]] bool getAllowExtrapolation() const override { return _allowExtrapolation_; }
 
   // methods
+  [[nodiscard]] const GenericToolbox::Range& getSplineBounds() const { return _splineBounds_; }
+
   void buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_);
 
   [[nodiscard]] const std::vector<double>& getDialData() const override {return _splineData_;}

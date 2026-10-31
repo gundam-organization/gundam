@@ -47,7 +47,9 @@ if( ROOT_FOUND )
   # that uses them, but they all use them, so put them here. This keeps the
   # symmetry when root-config (if find_package didn't work)
   link_libraries(${ROOT_LIBRARIES})
-  include_directories(${ROOT_INCLUDE_DIRS})
+  # Match ROOT's imported targets: otherwise toolbox modules that do not link
+  # ROOT can pick its bundled JSON before the selected nlohmann_json headers.
+  include_directories(SYSTEM ${ROOT_INCLUDE_DIRS})
 
   if (ROOT_VERSION VERSION_GREATER_EQUAL 6.30.00)
     set(ROOT_minuit2_FOUND "yes")
@@ -192,38 +194,7 @@ endif( NOT GTest_FOUND )
 # CUDA (optional)
 ####################
 
-# Check for the availability of CUDA
-if( WITH_CUDA_LIB )
-  cmessage( STATUS "WITH_CUDA_LIB=ON: Checking for CUDA support...")
-  cmake_minimum_required( VERSION 3.12 FATAL_ERROR )
-  include( CheckLanguage )
-  check_language( CUDA )
-  if( CMAKE_CUDA_COMPILER )
-    cmessage( STATUS "CUDA support enabled." )
-    enable_language(CUDA)
-    if( NOT DEFINED CMAKE_CUDA_ARCHITECTURES )
-      # The default is taken from the CUDAARCHS environment
-      # variable.  If it isn't set, then set it to the earliest
-      # non-deprecated architecture.
-      #   2022: architectures before 52 are deprecated.
-      if( ${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.23 )
-        # After cmake 3.23, this can be set to all or all-major
-        set( CMAKE_CUDA_ARCHITECTURES all )
-      else()
-        cmessage( WARNING "Force CUDA architecture to 52 (deprecated)")
-        set( CMAKE_CUDA_ARCHITECTURES 52 )
-      endif()
-    endif()
-    cmessage( STATUS "CUDA compilation architectures: \"${CMAKE_CUDA_ARCHITECTURES}\"")
-    cmessage( ALERT "Running with \"--gpu\" option will require a GPU" )
-  else( CMAKE_CUDA_COMPILER )
-    cmessage( FATAL_ERROR "Option WITH_CUDA_LIB=ON: CUDA not present." )
-  endif( CMAKE_CUDA_COMPILER )
-else( WITH_CUDA_LIB )
-  if( WITH_CACHE_MANAGER )
-    cmessage( STATUS "WITH_CACHE_MANAGER=ON: CUDA support disabled. Use -D WITH_CUDA_LIB=ON if needed." )
-  endif()
-endif( WITH_CUDA_LIB )
+include(${CMAKE_CURRENT_LIST_DIR}/cuda.cmake)
 
 ####################
 # FetchContent packages.

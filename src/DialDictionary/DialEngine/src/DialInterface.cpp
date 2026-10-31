@@ -3,10 +3,19 @@
 //
 
 #include "DialInterface.h"
+#include "CompositeDial.h"
+#include "RootFormula.h"
 #include "GundamGlobals.h"
 
 #include "Logger.h"
 
+
+double DialInterface::evalGradient(int iInput_) const {
+  const double rawResponse{_dial_->evalResponse(*_inputBufferPtr_)};
+  const double processedResponse{_responseSupervisorPtr_->process(rawResponse)};
+  if( processedResponse != rawResponse ){ return 0.; }
+  return _dial_->evalGradient(*_inputBufferPtr_, iInput_);
+}
 
 std::string DialInterface::getSummary(bool shallow_) const {
   std::stringstream ss;
@@ -25,7 +34,13 @@ std::string DialInterface::getSummary(bool shallow_) const {
     ss << " supervisor(" << _responseSupervisorPtr_->getSummary(shallow_) << ")";
   }
 
-  ss << " response=" << this->evalResponse();
+  const auto* composite = dynamic_cast<const CompositeDial*>(_dial_.get());
+  const auto* formula = dynamic_cast<const RootFormula*>(_dial_.get());
+  if( _inputBufferPtr_ != nullptr and _responseSupervisorPtr_ != nullptr
+      and (composite == nullptr or composite->isBound())
+      and (formula == nullptr or formula->getInputCount() == _inputBufferPtr_->getInputBuffer().size()) ){
+    ss << " response=" << this->evalResponse();
+  }
 
   if( not shallow_ ){
     ss << std::endl;

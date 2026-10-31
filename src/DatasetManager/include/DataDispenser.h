@@ -63,6 +63,7 @@ protected:
   void loadFromHistContent();
 
   // utils
+  void selectLoadThreadCount();
   [[nodiscard]] int getNbParallelCpu() const;
   [[nodiscard]] const std::string& getVariableExpression(const std::string& variable_) const;
   [[nodiscard]] std::shared_ptr<TChain> openChain(bool verbose_ = false) const;
@@ -88,6 +89,7 @@ private:
   const PlotGenerator* _plotGeneratorPtr_{nullptr};
 
   // multi-threading
+  int _nbThreadsForLoad_{0}; // zero keeps the configured thread limit
   GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
 
 };

@@ -7,8 +7,11 @@
 #include "Logger.h"
 #include "GundamBacktrace.h"
 
+#include <cmath>
+
 
 void DialInputBuffer::invalidateBuffers(){
+  ++_revision_;
   // invalidate buffer
   for( auto& buf : _inputBuffer_ ){ buf = std::nan("unset"); }
 }
@@ -86,6 +89,36 @@ void DialInputBuffer::update(){
       _inputBuffer_[inputRef.bufferIndex] = tempBuffer;
     }
   }
+  if( _isDialUpdateRequested_ ){ ++_revision_; }
+}
+void DialInputBuffer::setInputValues(std::vector<double> values_){
+  LogThrowIf(not _inputParameterReferenceList_.empty(), "Cannot replace parameter-backed dial inputs");
+  _inputBuffer_ = std::move(values_);
+  _inputArraySize_ = int(_inputBuffer_.size());
+  _isInitialized_ = true;
+  _isDialUpdateRequested_ = true;
+  ++_revision_;
+}
+
+double DialInputBuffer::evalInputGradient(int iInput_) const{
+  LogThrowIf(iInput_ < 0 or iInput_ >= _inputParameterReferenceList_.size(),
+             "Invalid input index " << iInput_ << " for buffer size " << _inputParameterReferenceList_.size());
+
+  const auto& inputRef{_inputParameterReferenceList_[iInput_]};
+  if( std::isnan(inputRef.mirrorEdges.minValue) ){ return 1.; }
+
+  const double range{inputRef.mirrorEdges.range};
+  if( range == 0 or std::isnan(range) ){ return 0.; }
+
+  const double raw{std::fmod(
+      inputRef.getParameter(_parSetListPtr_).getParameterValue() - inputRef.mirrorEdges.minValue,
+      2. * range
+  )};
+  const double sign{raw < 0 ? -1. : 1.};
+  const double folded{std::abs(raw)};
+
+  if( folded > range ){ return -sign; }
+  return sign;
 }
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
   LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");

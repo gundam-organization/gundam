@@ -6,6 +6,7 @@
 #define GUNDAM_DIALCOLLECTION_H
 
 #include "DialBase.h"
+#include "EventFormula.h"
 #include "DialUtils.h"
 #include "DialInterface.h"
 #include "DialInputBuffer.h"
@@ -18,6 +19,8 @@
 #include <string>
 #include <memory>
 #include <sstream>
+#include <mutex>
+#include <unordered_map>
 
 class DialCollection : public JsonBaseClass {
 
@@ -33,13 +36,22 @@ public:
   ENUM_FIELD( CompiledLibDial ) \
   ENUM_FIELD( Tabulated ) \
   ENUM_FIELD( Kriged ) \
-  ENUM_FIELD( ExternalWeight )
+  ENUM_FIELD( ExternalWeight ) \
+  ENUM_FIELD( Composite )
 #define ENUM_DICT \
    ENUM_DICT_ENTRY("Normalization", "Norm") \
    ENUM_DICT_ENTRY("RootFormula", "Formula") \
    ENUM_DICT_ENTRY("ExternalWeightResponse", "ExternalWeight")
 #include "GenericToolbox.MakeEnum.h"
   MAKE_ENUM_JSON_INTERFACE(DialType);
+
+#define ENUM_NAME VariableResponseMode
+#define ENUM_FIELDS \
+  ENUM_FIELD( Multiply ) \
+  ENUM_FIELD( Add ) \
+  ENUM_FIELD( Override )
+#include "GenericToolbox.MakeEnum.h"
+  MAKE_ENUM_JSON_INTERFACE(VariableResponseMode);
 
   static void prepareConfig(ConfigReader &config_);
 
@@ -59,6 +71,8 @@ public:
   void setIndex(int index){ _index_ = index; }
   void setSupervisedParameterIndex(int supervisedParameterIndex){ _supervisedParameterIndex_ = supervisedParameterIndex; }
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex){ _supervisedParameterSetIndex_ = supervisedParameterSetIndex; }
+  void setIsCompositeNode(bool isCompositeNode_){ _isCompositeNode_ = isCompositeNode_; }
+  void setCompositeParentIndex(int index_){ _compositeParentIndex_ = index_; }
 
   // const getters
   auto getSupervisedParameterSetIndex() const{ return _supervisedParameterSetIndex_; }
@@ -70,6 +84,12 @@ public:
 
   // Check if the dial is enabled during this run
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] const auto& getEventFormulaDefinition() const{ return _eventFormulaDefinition_; }
+  [[nodiscard]] DialInputBuffer::ParameterReference::MirrorEdges getEventInputMirrorEdges() const{
+    return {_useMirrorDial_ ? _mirrorLowEdge_ : std::nan("unset"), _mirrorRange_};
+  }
+  [[nodiscard]] bool isCompositeNode() const{ return _isCompositeNode_; }
+  [[nodiscard]] int getCompositeParentIndex() const{ return _compositeParentIndex_; }
 
   // Check if the DialBase should be allowed to calculate an extrapolation out
   // outside of the defined parameter bounds.
@@ -98,6 +118,9 @@ public:
 
   [[nodiscard]] auto& getDialType() const{ return _dialType_; }
   [[nodiscard]] auto& getDialOptions() const{ return _dialOptions_; }
+
+  [[nodiscard]] const std::string& getApplyToVariable() const{ return _applyToVariable_; }
+  [[nodiscard]] VariableResponseMode getVariableResponseMode() const{ return _variableResponseMode_; }
 
   // mutable getters
   BinSet &getDialBinSet(){ return _dialBinSet_; }
@@ -132,6 +155,9 @@ public:
   // DialCollection has changed to fix any pointer issues.
   void setupDialInterfaceReferences();
 
+  // Keep one interface per bin while sharing identical immutable curves.
+  void deduplicateBinnedDials();
+
   // Update the dial collection.  Most dial collections don't need an update,
   // but this provides a handle for collections that precalculate values prior
   // to doing the event reweighting.  An example of that would be the
@@ -151,8 +177,11 @@ public:
   // reweight calculation has been "frozen".
   void updateInputBuffers();
 
-  // Return the next slot in the DialBaseList that can b filled. Its
-  // thread safe, so multiple threads can fill the list.
+  // Loading only: store a branch dial, reusing an identical lightweight dial.
+  // Returns an interface index; no interface pointers may be retained while loading.
+  size_t storeEventDial(std::unique_ptr<DialBase> dial_);
+
+  // Return the next preallocated slot. Thread safe for event dial factories.
   size_t getNextDialFreeSlot(){ return _dialFreeSlot_++; }
   size_t getDialFreeSlotIndex() const { return _dialFreeSlot_.getValue(); }
 
@@ -173,19 +202,22 @@ public:
   // methods to generate dials with factory
   std::unique_ptr<DialBase> makeDial() const;
   std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_) const;
+  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_, const Bin* bin_ = nullptr) const;
 
 protected:
   void configureImpl() override;
   void initializeImpl() override;
 
+  void prepareCompositeInputs(ConfigReader& config_);
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
-  bool initializeDialsWithBinningFile(const ConfigReader& dialsDefinition);
+  bool initializeBinnedDials(const ConfigReader& dialsDefinition);
   bool initializeDialsWithTabulation(const ConfigReader& dialsDefinition);
   bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
   bool initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition);
 
+  void readVariableResponseConfig(const ConfigReader& config_);
+  void readResponseSupervisorConfig(const ConfigReader& config_);
   void readParametersFromConfig(const ConfigReader &config_);
   ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;
 
@@ -201,13 +233,14 @@ protected:
 private:
   // parameters
   bool _isEventByEvent_{false};
+  bool _isCompositeNode_{false};
+  int _compositeParentIndex_{-1};
   bool _isEnabled_{true};
   bool _useMirrorDial_{false};
   bool _enableDialsSummary_{false};
   bool _allowDialExtrapolation_{true};
   int _index_{-1};
-  double _minDialResponse_{std::nan("unset")};
-  double _maxDialResponse_{std::nan("unset")};
+  DialResponseSupervisor _responseSupervisor_{};
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};
@@ -215,6 +248,9 @@ private:
   std::string _dialLeafName_{};
   std::string _dialParameterValuesBranch_{};
   std::string _dialResponsesBranch_{};
+
+  std::string _applyToVariable_{};
+  VariableResponseMode _variableResponseMode_{VariableResponseMode::Multiply};
 
   DialType _dialType_{DialType::Norm}; // Graph, Spline...
   std::string _dialOptions_{}; // monotonic, catmull-rom...
@@ -241,6 +277,7 @@ private:
   // set of parameters for each DialBase (i.e. the number of DialInputBuffer
   // objects is 1, or _dialBaseList_.size()).  set, but for
   std::vector<DialInputBuffer> _dialInputBufferList_{};
+  std::shared_ptr<const EventFormula::Definition> _eventFormulaDefinition_{};
 
   // The response supervisors (which apply an upper and lower clamp).  There
   // is a single supervisor for all the interfaces, or one for each
@@ -249,6 +286,9 @@ private:
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
 
   GenericToolbox::Atomic<size_t> _dialFreeSlot_{0};
+  GenericToolbox::NoCopyWrapper<std::mutex> _eventDialMutex_{};
+  std::unordered_multimap<size_t, size_t> _eventDialIndex_{};
+  size_t _reusedEventDials_{0};
 
   // A pointer to dial specific data
   std::vector<std::shared_ptr<DialCollection::CollectionData>>  _dialCollectionData_;

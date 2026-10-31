@@ -10,6 +10,9 @@
 #include "LikelihoodInterface.h"
 #include "MinimizerBase.h"
 #include "GundamApp.h"
+#ifdef GUNDAM_USING_BACKENDS
+#include "BackendManager.h"
+#endif
 
 
 #include "GenericToolbox.Utils.h"
@@ -22,6 +25,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <utility>
 
 
 class FitterEngine : public JsonBaseClass {
@@ -85,9 +89,18 @@ public:
   GenericToolbox::TFilePath getTFilePath(){ return GenericToolbox::TFilePath(_saveDir_); }
   bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
   bool& getDoAllParamVariations(){ return _doAllParamVariations_; }
+#ifdef GUNDAM_USING_BACKENDS
+  Backends::BackendManager& getBackendsManager(){ return _backendsManager_; }
+  [[nodiscard]] const Backends::BackendManager& getBackendsManager() const { return _backendsManager_; }
+#endif
+
+  [[nodiscard]] std::string getPropagationMonitorTitle() const;
+  [[nodiscard]] std::string getBackendMonitorLine() const;
+  [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const;
 
   // Core
   void fit();
+  void evaluateLikelihood();
   void runPcaCheck();
   void rescaleParametersStepSize();
   bool checkNumericalAccuracy();
@@ -121,6 +134,9 @@ private:
   TDirectory* _saveDir_{nullptr};
   LikelihoodInterface _likelihoodInterface_{};
   ParameterScanner _parameterScanner_{};
+#ifdef GUNDAM_USING_BACKENDS
+  Backends::BackendManager _backendsManager_{};
+#endif
   MinimizerType _minimizerType_{};
   std::unique_ptr<MinimizerBase> _minimizer_{}; // a virtual class in charge of driving the LikelihoodInterface
 

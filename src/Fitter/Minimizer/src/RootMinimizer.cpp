@@ -10,6 +10,7 @@
 #include "GundamUtils.h"
 #include "RootUtils.h"
 
+#include "GenericToolbox.Map.h"
 #include "GenericToolbox.Root.h"
 #include "Logger.h"
 
@@ -22,6 +23,11 @@
 #include "Minuit2/MinuitParameter.h"
 #include "TLegend.h"
 
+#include <cmath>
+#include <iomanip>
+#include <limits>
+#include <sstream>
+
 
 void RootMinimizer::configureImpl(){
   LogDebugIf(GundamGlobals::isDebug()) << "Configuring RootMinimizer..." << std::endl;
@@ -31,6 +37,7 @@ void RootMinimizer::configureImpl(){
 
   _config_.defineFields({
     {"monitorGradientDescent"},
+    {"useAnalyticGradient"},
     {"minimizer"},
     {"algorithm"},
     {"strategy"},
@@ -52,6 +59,11 @@ void RootMinimizer::configureImpl(){
   });
   _config_.checkConfiguration();
 
+  if( const auto* option = _config_.getJsonEntry("useAnalyticGradient") ){
+    LogThrowIf(not option->is_boolean(), "useAnalyticGradient must be a boolean.");
+  }
+  _useAnalyticGradient_ = false;
+  _config_.fillValue(_useAnalyticGradient_, "useAnalyticGradient");
   _config_.fillValue(gradientDescentMonitor.isEnabled, "monitorGradientDescent");
   _config_.fillValue(_minimizerType_, "minimizer");
   _config_.fillValue(_minimizerAlgo_, "algorithm");
@@ -82,8 +94,21 @@ void RootMinimizer::configureImpl(){
   _config_.fillValue(_restoreStepSizeBeforeHesse_, "restoreStepSizeBeforeHesse");
 
 }
+void RootMinimizer::setMinimizerFunction(){
+  if( _useAnalyticGradient_ ){ _rootMinimizer_->SetFunction(_gradientFunctor_); }
+  else { _rootMinimizer_->SetFunction(_functor_); }
+}
+
 void RootMinimizer::initializeImpl(){
   MinimizerBase::initializeImpl();
+  _nbGradientCalls_ = 0;
+  if( _useAnalyticGradient_ ){
+    LogThrowIf(_minimizerType_ != "Minuit2", "useAnalyticGradient currently requires Minuit2.");
+#ifdef GUNDAM_USING_BACKENDS
+    if( getOwner().getBackendsManager().hasBackend() ){ getOwner().getBackendsManager().validateLikelihoodGradient(); }
+#endif
+    getLikelihoodInterface().validateWeightGradient();
+  }
 
   if( gradientDescentMonitor.isEnabled ){
     _monitor_.convergenceMonitor.defineNewQuantity({ "LastStep", "Last step descent", [&](GenericToolbox::VariableMonitor& v){
@@ -129,7 +154,17 @@ void RootMinimizer::initializeImpl(){
   }
 
   _functor_ = ROOT::Math::Functor(this, &RootMinimizer::evalFit, getMinimizerFitParameterPtr().size());
-  _rootMinimizer_->SetFunction( _functor_ );
+  if( _useAnalyticGradient_ ){
+    _gradientFunctor_ = ROOT::Math::GradFunctor(
+        [this](const double* parameters_){ return evalFit(parameters_); },
+        getMinimizerFitParameterPtr().size(),
+        [this](const double* parameters_, double* gradient_){
+          ++_nbGradientCalls_;
+          evalFitGradientAt(parameters_, gradient_);
+        });
+    LogInfo << "Minuit2 will use the supplied CPU likelihood gradient." << std::endl;
+  }
+  setMinimizerFunction();
   _rootMinimizer_->SetStrategy(_strategy_);
   _rootMinimizer_->SetPrintLevel(_printLevel_);
   _rootMinimizer_->SetTolerance(_tolerance_);
@@ -273,11 +308,15 @@ void RootMinimizer::minimize(){
   // calling the common routine
   this->MinimizerBase::minimize();
   updateFitParameterFixedStates();
+  LogAlertIf(checkFlatDirections() > 0)
+  << "Check the reported parameters: flat LLH directions were detected, the fit might fail."
+  << std::endl;
 
   GenericToolbox::Time::Timer minimizationStopWatch;
   minimizationStopWatch.start();
 
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
+  const auto nbGradientCallOffset = _nbGradientCalls_;
   LogInfo << "Fit call offset: " << nbFitCallOffset << std::endl;
 
   dumpFitParameterSettings();
@@ -299,7 +338,7 @@ void RootMinimizer::minimize(){
     simplexOptions.SetMinimizerType(_minimizerType_.c_str());
     simplexOptions.SetMinimizerAlgorithm("Simplex");
     _rootMinimizer_->SetOptions(simplexOptions); // Includes objective function precision.
-    _rootMinimizer_->SetFunction(_functor_);
+    setMinimizerFunction();
     _rootMinimizer_->SetMaxFunctionCalls(_simplexMaxFcnCalls_);
     _rootMinimizer_->SetTolerance(_tolerance_ * _simplexToleranceLoose_);
     _rootMinimizer_->SetStrategy(_simplexStrategy_);
@@ -367,6 +406,9 @@ void RootMinimizer::minimize(){
 
   LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
+  if( _useAnalyticGradient_ ){
+    LogInfo << "Supplied gradient calls: " << _nbGradientCalls_ - nbGradientCallOffset << std::endl;
+  }
   if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogInfo << "Status code: " << GundamUtils::minuitStatusCodeStr.at(postfitCache.status) << std::endl;
   else LogInfo << "Status code: " << postfitCache.status << std::endl;
   if(_minimizerType_ == "Minuit" or _minimizerType_ == "Minuit2") LogInfo << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(postfitCache.covarianceStatus) << std::endl;
@@ -375,6 +417,19 @@ void RootMinimizer::minimize(){
   // Make sure we are on the right spot
   updateCacheToBestfitPoint();
   updateBestfitCovCache();
+
+#ifdef GUNDAM_USING_BACKENDS
+  // Reporting below reads host events and histograms, while the fit may have
+  // kept its propagated state exclusively in the backend.
+  auto& backendsManager = getOwner().getBackendsManager();
+  if( backendsManager.hasBackend() ){
+    if( backendsManager.getEngineView().propagation.requiresEventBinning() ){
+      backendsManager.materialize(Backends::OutputRequest::EventState);
+    }
+    backendsManager.materialize(Backends::OutputRequest::EventWeights);
+    backendsManager.materialize(Backends::OutputRequest::Histograms);
+  }
+#endif
 
   // export bf point
   if( getOwner().getSaveDir() != nullptr ) {
@@ -498,6 +553,11 @@ void RootMinimizer::calcErrors(){
 
   LogThrowIf(not isInitialized(), "not initialized");
 
+  // Probe the point reported by the minimizer, independently of its last FCN call.
+  updateBestfitPointCache();
+  updateCacheToBestfitPoint();
+  checkFlatDirections();
+
   LogInfo << std::endl << GenericToolbox::addUpDownBars("Calling calcErrors()...") << std::endl;
 
   int nbFitCallOffset = getMonitor().nbEvalLikelihoodCalls;
@@ -563,8 +623,17 @@ void RootMinimizer::calcErrors(){
     LogInfo << "Error calculation took: " << GenericToolbox::toString(errorStopWatch.eval()) << std::endl;
 
     LogInfo << "Hesse ended after " << getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset << " calls." << std::endl;
-    LogInfo << "HESSE status code: " << GundamUtils::hesseStatusCodeStr.at(postfitCache.status) << std::endl;
-    LogInfo << "Covariance matrix status code: " << GundamUtils::covMatrixStatusCodeStr.at(postfitCache.covarianceStatus) << std::endl;
+    // Minuit2 adds 100 * hesseStatus to the minimization status.
+    int hesseStatus = postfitCache.status;
+    if( _minimizerType_ == "Minuit2" and hesseStatus >= 0 ){ hesseStatus = (hesseStatus / 100) % 10; }
+    auto hesseStatusIt = GundamUtils::hesseStatusCodeStr.find(hesseStatus);
+    LogInfo << "HESSE status code: " << postfitCache.status << " - "
+            << (hesseStatusIt != GundamUtils::hesseStatusCodeStr.end() ? hesseStatusIt->second : "Unknown HESSE status")
+            << std::endl;
+    auto covStatusIt = GundamUtils::covMatrixStatusCodeStr.find(postfitCache.covarianceStatus);
+    LogInfo << "Covariance matrix status code: "
+            << (covStatusIt != GundamUtils::covMatrixStatusCodeStr.end() ? covStatusIt->second : std::to_string(postfitCache.covarianceStatus))
+            << std::endl;
 
     // Make sure we are on the right spot
     updateCacheToBestfitPoint();
@@ -603,6 +672,106 @@ void RootMinimizer::calcErrors(){
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
   }
 }
+int RootMinimizer::checkFlatDirections(){
+  if( not isInitialized() or _rootMinimizer_ == nullptr ){
+    LogAlert << "Cannot check LLH flat directions before minimizer initialization." << std::endl;
+    return 0;
+  }
+  LogInfo << "Checking LLH flat directions..." << std::endl;
+  const auto evaluate = [this](){
+    getOwner().evaluateLikelihood();
+    return getLikelihoodInterface().getLastLikelihood();
+  };
+
+  double reference;
+  try{ reference = evaluate(); }
+  catch( const std::exception& error ){
+    LogAlert << "Cannot check LLH flat directions: " << error.what() << std::endl;
+    return 0;
+  }
+  if( not std::isfinite(reference) ){
+    LogAlert << "Cannot check LLH flat directions at non-finite LLH = " << reference << std::endl;
+    return 0;
+  }
+
+  int nFlatDirections{0};
+  const double tolerance = 32 * std::numeric_limits<double>::epsilon() * std::max(1., std::abs(reference));
+  for( size_t iPar = 0; iPar < getMinimizerFitParameterPtr().size(); ++iPar ){
+    auto& par = *getMinimizerFitParameterPtr()[iPar];
+    if( not par.isEnabled() or par.isFixed() or _rootMinimizer_->IsFixedVariable(iPar) ){ continue; }
+    const double value = par.getParameterValue();
+    const auto& bounds = par.getParameterLimits();
+    double step = std::abs(par.getStepSize() * _stepSizeScaling_) * 0.01;
+    if( not std::isfinite(step) or step <= 0 ){
+      LogAlert << "Cannot check LLH flat direction for " << par.getFullTitle()
+               << ": value = " << value << ", invalid step = " << step << std::endl;
+      continue;
+    }
+
+    try{
+      // Confirm small variations at two scales, to avoid mistaking roundoff
+      // at a single tiny step for a flat direction.
+      for( int iScale = 0; iScale < 2; ++iScale ){
+        double h = step * (iScale == 0 ? 1. : 10.);
+        double x1, x2;
+        const double below = bounds.hasLowerBound() ? value - bounds.min : std::numeric_limits<double>::infinity();
+        const double above = bounds.hasUpperBound() ? bounds.max - value : std::numeric_limits<double>::infinity();
+        if( below >= h and above >= h ){ x1 = value - h; x2 = value + h; }
+        else{
+          // Near a limit, use two inward points and a one-sided quadratic fit.
+          const double direction = above >= below ? 1. : -1.;
+          h = std::min(h, (direction > 0 ? above : below) / 2.);
+          x1 = value + direction * h;
+          x2 = value + direction * 2 * h;
+        }
+        if( x1 == value or x2 == value or x1 == x2 or h <= 0 ){
+          LogAlert << "Cannot resolve LLH probe steps for " << par.getFullTitle() << ": value = " << value << std::endl;
+          break;
+        }
+        par.setParameterValue(x1, true);
+        const double f1 = evaluate();
+        par.setParameterValue(x2, true);
+        const double f2 = evaluate();
+        par.setParameterValue(value, true);
+
+        if( not std::isfinite(f1) or not std::isfinite(f2) ){
+          LogAlert << "Non-finite LLH probe for " << par.getFullTitle() << ": value = " << value
+                   << ", f0 = " << reference << ", f1 = " << f1 << ", f2 = " << f2 << std::endl;
+          break;
+        }
+        const double slope1 = (f1 - reference) / (x1 - value);
+        const double slope2 = (f2 - reference) / (x2 - value);
+        const double secondDerivative = 2 * (slope2 - slope1) / (x2 - x1);
+        const double firstDerivative = slope1 - 0.5 * secondDerivative * (x1 - value);
+        if( std::abs(f1 - reference) > tolerance or std::abs(f2 - reference) > tolerance ){ break; }
+        if( iScale == 0 ){ continue; }
+
+        std::ostringstream message;
+        message << std::setprecision(std::numeric_limits<double>::max_digits10)
+                << "Flat LLH direction: " << par.getFullTitle() << ", value = " << value
+                << ", first derivative = " << firstDerivative << ", second derivative = " << secondDerivative
+                << ", x1 = " << x1 << ", x2 = " << x2
+                << ", f0 = " << reference << ", f1 = " << f1 << ", f2 = " << f2;
+        ++nFlatDirections;
+        if( firstDerivative == 0. and secondDerivative == 0. ){ LogError << message.str() << std::endl; }
+        else{ LogAlert << message.str() << std::endl; }
+      }
+    }
+    catch( const std::exception& error ){
+      par.setParameterValue(value, true);
+      LogAlert << "Could not check LLH flat direction for " << par.getFullTitle()
+               << ": value = " << value << ", " << error.what() << std::endl;
+    }
+  }
+  // Restore the propagated model and likelihood buffers, not just parameter
+  // values. These evaluations bypass fit counters/monitors.
+  try{ evaluate(); }
+  catch( const std::exception& error ){
+    LogAlert << "Could not restore LLH after checking flat directions: " << error.what() << std::endl;
+  }
+  return nFlatDirections;
+}
+
 void RootMinimizer::scanParameters( TDirectory* saveDir_ ){
   LogThrowIf(not isInitialized());
 
@@ -729,6 +898,7 @@ void RootMinimizer::saveMinimizerSettings( TDirectory* saveDir_) const {
 
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("minimizerType", _minimizerType_.c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("minimizerAlgo", _minimizerAlgo_.c_str()) );
+  GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("useAnalyticGradient", std::to_string(_useAnalyticGradient_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("strategy", std::to_string(_strategy_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("printLevel", std::to_string(_printLevel_).c_str()) );
   GenericToolbox::writeInTFileWithObjTypeExt( saveDir_, TNamed("targetEDM", std::to_string(this->getTargetEdm()).c_str()) );
@@ -1037,7 +1207,8 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
           for( auto& iPar : *parList ){
             int jParIdx{0};
             for( auto& jPar : *parList ){
-              (*globalPassageMatrix)[blocOffset + iPar.getParameterIndex()][blocOffset + jPar.getParameterIndex()] = (*parSet.getEigenVectors())[iParIdx][jParIdx];
+              (*globalPassageMatrix)[blocOffset + iPar.getParameterIndex()][blocOffset + jPar.getParameterIndex()] =
+                (*parSet.getEigenVectors())[iParIdx][jParIdx];
               jParIdx++;
             }
             iParIdx++;
@@ -1068,13 +1239,15 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
               if( iMinimizerIndex != -1 and jMinimizerIndex != -1 ){
                 // Use the fit-constrained value
-                (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] = postfitCovarianceMatrix[iMinimizerIndex][jMinimizerIndex];
+                (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] =
+                  postfitCovarianceMatrix[iMinimizerIndex][jMinimizerIndex];
               }
               else{
                 // Inherit from the prior in eigen -> only diagonal are non 0
                 if( &iParSet == &jParSet and iParSet.isEnableEigenDecomp() ){
                   if( iPar.getParameterIndex() == jPar.getParameterIndex() ){
-                    (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] = iPar.getStdDevValue()*iPar.getStdDevValue();
+                    (*unstrippedCovMatrix)[iOffset + iPar.getParameterIndex()][jOffset + jPar.getParameterIndex()] =
+                      iPar.getStdDevValue()*iPar.getStdDevValue();
                   }
                 }
               }
@@ -1136,7 +1309,8 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
     // Rescale the post-fit values:
     for(int iRow = 0 ; iRow < postfitCovarianceMatrix.GetNrows() ; iRow++ ){
       for(int iCol = 0 ; iCol < postfitCovarianceMatrix.GetNcols() ; iCol++ ){
-        postfitCovarianceMatrix[iRow][iCol] *= (getMinimizerFitParameterPtr()[iRow]->getStdDevValue()) * (getMinimizerFitParameterPtr()[iCol]->getStdDevValue());
+        postfitCovarianceMatrix[iRow][iCol] *= ParameterSet::toRealParRange(1., *getMinimizerFitParameterPtr()[iRow])
+                                             * ParameterSet::toRealParRange(1., *getMinimizerFitParameterPtr()[iCol]);
       }
     }
 
@@ -1340,7 +1514,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
             }
           }
 
-          if(parSet_.getPriorCovarianceMatrix() != nullptr ){
+          if(parSet_.getPriorCorrelationMatrix() != nullptr ){
             gStyle->GetCanvasPreferGL() ? preFitErrorHist->SetFillColorAlpha(kRed-9, 0.7) : preFitErrorHist->SetFillColor(kRed-9);
           }
 
@@ -1466,15 +1640,12 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
 
       // restore the original size of the matrix
       covMatrix = std::make_unique<TMatrixD>(int(parList->size()), int(parList->size()));
-      int iStripped{-1};
-      for( auto& iPar : *parList ){
-        if( iPar.isPenaltyDisabled() or not iPar.isEnabled() ) continue;
-        iStripped++;
-        int jStripped{-1};
-        for( auto& jPar : *parList ){
-          if( jPar.isPenaltyDisabled() or not jPar.isEnabled() ) continue;
-          jStripped++;
-          (*covMatrix)[iPar.getParameterIndex()][jPar.getParameterIndex()] = (*originalStrippedCovMatrix)[iStripped][jStripped];
+      for( int iPar = 0; iPar < parSet.getNbCorrelatedParameters() ; ++iPar ){
+        for( int jPar = 0; jPar < parSet.getNbCorrelatedParameters() ; ++jPar ) {
+          (*covMatrix)
+            [parSet.getCorrelatedParameterList()[iPar]->getParameterIndex()]
+            [parSet.getCorrelatedParameterList()[jPar]->getParameterIndex()]
+            = (*originalStrippedCovMatrix)[iPar][jPar];
         }
       }
 
@@ -1567,20 +1738,14 @@ void RootMinimizer::saveGradientSteps(){
   nPointsPerStep = std::min(nPointsPerStep, maxNbPoints/int(gradientDescentMonitor.stepPointList.size()));
   if( nPointsPerStep <= 1 ){ nPointsPerStep = 2; }
 
-  // make sure the parameter states get restored as we leave
+  const auto progressPrefix = LogInfo.getPrefixString();
+  Logger::ScopedMute muteLogger;
+
+  // Restore parameter values before the mute guard restores the logging state.
   auto currentParState = getModelPropagator().getParametersManager().exportParameterInjectorConfig();
   GenericToolbox::ScopedGuard g{
-      [&](){
-        ParametersManager::muteLogger();
-        ParameterSet::muteLogger();
-        ParameterScanner::muteLogger();
-      },
-      [&](){
-        getModelPropagator().getParametersManager().injectParameterValues( currentParState );
-        ParametersManager::unmuteLogger();
-        ParameterSet::unmuteLogger();
-        ParameterScanner::unmuteLogger();
-      }
+      [](){},
+      [&](){ getModelPropagator().getParametersManager().injectParameterValues(currentParState); }
   };
 
   // load starting point
@@ -1588,13 +1753,11 @@ void RootMinimizer::saveGradientSteps(){
 
   std::vector<ParameterScanner::GraphEntry> globalGraphList;
   for(size_t iGradStep = 0 ; iGradStep < gradientDescentMonitor.stepPointList.size() ; iGradStep++ ){
-    GenericToolbox::displayProgressBar(iGradStep, gradientDescentMonitor.stepPointList.size(), LogInfo.getPrefixString() + "Saving gradient steps...");
+    GenericToolbox::displayProgressBar(iGradStep, gradientDescentMonitor.stepPointList.size(), progressPrefix + "Saving gradient steps...");
 
-    // why do we need to remute the logger at each loop??
-    ParameterSet::muteLogger(); Propagator::muteLogger(); ParametersManager::muteLogger();
     getModelPropagator().getParametersManager().injectParameterValues(gradientDescentMonitor.stepPointList[iGradStep].parState );
 
-    getLikelihoodInterface().propagateAndEvalLikelihood();
+    getOwner().evaluateLikelihood();
 
     if( not GundamGlobals::isLightOutputMode() and gradientDescentMonitor.writeGradientSteps ) {
       auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/steps/step_%i", int(iGradStep)));

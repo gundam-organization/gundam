@@ -55,6 +55,7 @@ protected:
     std::string stateTitleMonitor{};
 
     GenericToolbox::Time::AveragedTimer<10> evalLlhTimer{};
+    GenericToolbox::Time::Timer propagationTimer{};
     GenericToolbox::Time::AveragedTimer<10> externalTimer{};
     GenericToolbox::Time::AveragedTimer<1> iterationCounterClock{};
 
@@ -74,6 +75,8 @@ public:
   /// should either be skipped, or the covariance can be filled using
   /// information from the posterior.
   virtual void calcErrors();
+  /// Diagnose locally flat fit parameters and return their count.
+  virtual int checkFlatDirections() { return 0; }
 
   /// A virtual method that should scan the parameters used by the minimizer.
   /// This provides a view of the parameters seen by the minimizer, which may
@@ -86,6 +89,11 @@ public:
   /// point values and returns the likelihood. The meaning of the parameters is
   /// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
   virtual double evalFit( const double* parArray_ );
+  void evalFitGradient();
+  void evalFitGradient( const std::vector<Parameter*>& parameterList_ );
+  /// CPU-only gradient callback in exactly the same coordinates as evalFit().
+  /// Prepared for GradFunctor; it is not registered with Minuit yet.
+  void evalFitGradientAt(const double* parArray_, double* gradient_);
 
   /// Throw a new parameter point around the post-fit best fit. By default,
   /// minimizers that do not provide post-fit throws leave the parameters
@@ -141,6 +149,8 @@ public:
   // core
   void printParameters();
   [[nodiscard]] int fetchNbDegreeOfFreedom() const { return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
+  std::vector<Parameter *> &getMinimizerFitParameterList(){ return _minimizerParameterPtrList_; }
+  const std::vector<Parameter *> &getMinimizerFitParameterList() const{ return _minimizerParameterPtrList_; }
 
 
 protected:

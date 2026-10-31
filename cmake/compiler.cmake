@@ -76,6 +76,13 @@ if(CMAKE_CXX_STANDARD LESS 17)
   cmessage(FATAL_ERROR "GUNDAM requires C++17 or newer. Use a ROOT build with C++17 or newer.")
 endif()
 
+# Keep host and device code on the same standard, including ROOT headers.
+if(GUNDAM_CUDA_ENABLED)
+  set(CMAKE_CUDA_STANDARD ${CMAKE_CXX_STANDARD})
+  set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+  set(CMAKE_CUDA_EXTENSIONS OFF)
+endif()
+
 if(CXX_MARCH_FLAG)
 endif()
 

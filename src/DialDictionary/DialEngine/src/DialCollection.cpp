@@ -7,6 +7,7 @@
 #include "TabulatedDialFactory.h"
 #include "KrigedDialFactory.h"
 #include "ExternalWeightDialFactory.h"
+#include "CompositeDial.h"
 
 #include "RootFormula.h"
 #include "Shift.h"
@@ -27,7 +28,14 @@
 
 #include "Logger.h"
 
+#include <TBranch.h>
+#include <TClass.h>
+#include <TLeaf.h>
+
+#include <algorithm>
+#include <cmath>
 #include <sstream>
+#include <typeinfo>
 
 void DialCollection::prepareConfig(ConfigReader &config_){
   config_.clearFields();
@@ -38,36 +46,104 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"dialInputList"},
       {"printDialSummary", {"printDialsSummary"}},
       {"dialType", {"type", "dialsType"}},
-      {"options", {"dialSubType"}},
+      {"options", {"dialSubType", "dialConfig"}},
       {"dialBranchData", {"dialLeafName", "treeExpression"}},
       {"minDialResponse", {"minimumSplineResponse"}},
       {"maxDialResponse"},
+      {"dialResponseLimits"},
+      {"enableResponseSmoothing"},
+      {"dialResponseSmoothingWidth"},
       {"useMirrorDial"},
       {"mirrorLowEdge"},
       {"mirrorHighEdge"},
       {"allowDialExtrapolation"},
       {"applyCondition"},
+      {"applyToVariable"},
+      {"variableResponseMode"},
       {"definitionRange"},
       {"knotResponseLimits"},
       {"mirrorDefinitionRange"},
       {"applyConditions"},
       {"parametersBinningPath"},
       {"binning", {"binningFilePath"}},
+      {"binnedDialsPath"},
       {"dialsFilePath"},
       {"dialsList"},
       {"dialsTreePath"},
+      {"dialsBranch"},
+      {"dialsBinningDefinition"},
       {"dialsDefinitions"},
       {"tableConfig"},
       {FieldFlag::DEPRECATED, "parameterLimits", "\"parameterLimits\" should be set in the parameter definition section. Not the dial definition. Support has been removed."},
     });
   config_.checkConfiguration();
 }
+void DialCollection::prepareCompositeInputs(ConfigReader& config_){
+  prepareConfig(config_);
+  LogThrowIf(config_.hasField("dialInputList"),
+             "Composite: declare parameterName or parameterIndex in nodes, without an outer dialInputList");
+  auto options = config_.fetchValue<ConfigReader>("options");
+  options.defineFields({{"nodes"}, {"output"}});
+  options.checkConfiguration();
+  auto nodes = options.fetchValue<ConfigReader>("nodes");
+  JsonType normalizedNodes = JsonType::array();
+  JsonType parameters = JsonType::array();
+  // Infer a stable, deduplicated buffer layout for cache invalidation. Nested
+  // graphs expose their inferred dependencies to their enclosing graph.
+  for( auto node : nodes.loop() ){
+    prepareConfig(node);
+    if( node.fetchValue<DialType>("dialType") == DialType::Composite ){
+      prepareCompositeInputs(node);
+    }
+    auto inputs = node.fetchValue<JsonType>("dialInputList");
+    LogThrowIf(not inputs.is_array(), "Composite node dialInputList must be a list");
+    for( auto& input : inputs ){
+      LogThrowIf(input.contains("inputIndex"),
+                 "Composite: inputIndex has been removed; use parameterName or parameterIndex");
+      const int sources = int(input.contains("parameterName")) + int(input.contains("parameterIndex"))
+                          + int(input.contains("dialResponse")) + int(input.contains("eventVariable"));
+      LogThrowIf(sources != 1,
+                 "Composite input: specify exactly one of parameterName, parameterIndex, dialResponse and eventVariable");
+      if( not input.contains("parameterName") and not input.contains("parameterIndex") ){ continue; }
+      auto* parameterSet = getSupervisedParameterSet();
+      std::string name;
+      if( input.contains("parameterIndex") ){
+        const auto& index = input.at("parameterIndex");
+        LogThrowIf(not index.is_number_integer() or index < 0 or index >= parameterSet->getParameterList().size(),
+                   "Composite: parameterIndex outside the supervised parameter set");
+        name = parameterSet->getParameterList().at(index.get<int>()).getName();
+        input.erase("parameterIndex");
+      }
+      else{
+        name = input.at("parameterName").get<std::string>();
+        LogThrowIf(parameterSet->getParameterPtr(name) == nullptr, "Could not find parameter: " << name);
+      }
+      input["parameterName"] = name;
+      const JsonType reference = {{"parameterName", name}};
+      if( std::find(parameters.begin(), parameters.end(), reference) == parameters.end() ){
+        parameters.emplace_back(reference);
+      }
+    }
+    node.getConfig()["dialInputList"] = std::move(inputs);
+    normalizedNodes.emplace_back(node.getConfig());
+  }
+  options.getConfig()["nodes"] = std::move(normalizedNodes);
+  config_.getConfig()[config_.getConfigEntry("options").first] = options.getConfig();
+  config_.getConfig()["dialInputList"] = std::move(parameters);
+}
+
 void DialCollection::configureImpl() {
   prepareConfig(_config_);
 
   _config_.fillValue(_dataSetNameList_, "applyOnDataSets");
   _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ){ return; }
+
+  if( not _isCompositeNode_ and _config_.fetchValue<DialType>("dialType", DialType::Unset) == DialType::Composite ){
+    prepareCompositeInputs(_config_);
+  }
+
+  readVariableResponseConfig(_config_);
 
   // Dials are directly defined with a binning file?
   if     ( initializeNormDialsWithParBinning() ){}
@@ -86,13 +162,45 @@ void DialCollection::configureImpl() {
     _dialInputBufferList_.emplace_back();
     _dialInputBufferList_.back().setParSetRef( _parameterSetListPtr_ );
 
+    auto formulaDefinition = std::make_shared<EventFormula::Definition>();
+
     // add the ref of each selected parameter
     for( auto& dialInput : dialInputList.getConfig() ){
+      EventFormula::Input source;
+      if( _dialType_ == DialType::Formula ){
+        const int sourceCount = int(dialInput.contains("parameterName")) + int(dialInput.contains("parameterIndex"))
+                                + int(dialInput.contains("eventVariable"));
+        LogThrowIf(sourceCount != 1,
+                   "Formula input must specify exactly one of parameterName, parameterIndex and eventVariable");
+      }
+      if( GenericToolbox::Json::doKeyExist(dialInput, "eventVariable") ){
+        LogThrowIf(_dialType_ != DialType::Formula, "eventVariable inputs are only supported by Formula dials");
+        auto name = GenericToolbox::Json::fetchValue<std::string>(dialInput, "eventVariable");
+        name = GenericToolbox::trimString(name, " ");
+        if( name.size() >= 2 and name.front() == '[' and name.back() == ']' ){
+          name = name.substr(1, name.size() - 2);
+        }
+        LogThrowIf(name.empty(), "Formula eventVariable must not be empty");
+        GenericToolbox::addIfNotInVector(name, formulaDefinition->eventVariables);
+        source.eventIndex = GenericToolbox::findElementIndex(name, formulaDefinition->eventVariables);
+        formulaDefinition->inputs.emplace_back(source);
+        continue;
+      }
+      source.parameterIndex = int(_dialInputBufferList_.back().getInputSize());
+      formulaDefinition->inputs.emplace_back(source);
       DialInputBuffer::ParameterReference p;
       p.parSetIndex = _supervisedParameterSetIndex_;
 
-      if( GenericToolbox::Json::doKeyExist(dialInput, "name") ){
-        auto parName = GenericToolbox::Json::fetchValue<std::string>(dialInput, "name");
+      const std::string parameterKey = dialInput.contains("parameterName") ? "parameterName" : "name";
+      if( dialInput.contains("parameterIndex") ){
+        const auto& index = dialInput.at("parameterIndex");
+        LogThrowIf(not index.is_number_integer() or index < 0
+                   or index >= _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
+                   "Dial input: parameterIndex outside the supervised parameter set");
+        p.parIndex = index.get<int>();
+      }
+      else if( GenericToolbox::Json::doKeyExist(dialInput, parameterKey) ){
+        auto parName = GenericToolbox::Json::fetchValue<std::string>(dialInput, parameterKey);
         auto* parPtr{_parameterSetListPtr_->at( _supervisedParameterSetIndex_ ).getParameterPtr( parName )};
         LogThrowIf(parPtr == nullptr, "Could not find parameter: " << parName);
         p.parIndex = parPtr->getParameterIndex();
@@ -100,6 +208,7 @@ void DialCollection::configureImpl() {
 
       _dialInputBufferList_.back().addParameterReference( p );
     }
+    if( not formulaDefinition->eventVariables.empty() ){ _eventFormulaDefinition_ = std::move(formulaDefinition); }
 
   }
 
@@ -113,6 +222,7 @@ void DialCollection::initializeImpl() {
     }
   }
 
+  this->deduplicateBinnedDials();
   this->setupDialInterfaceReferences();
 }
 
@@ -148,6 +258,7 @@ std::string DialCollection::getSummary(bool shallow_) const{
     ss << " / dialBranchData:{parameterValuesTArray:" << _dialParameterValuesBranch_
        << ", weightValuesTArray:" << _dialResponsesBranch_ << "}";
   }
+  if( not _applyToVariable_.empty() ){ ss << " / variable:" << _applyToVariable_ << " / mode:" << _variableResponseMode_; }
   if( _definitionRange_.hasBound() ){ ss << " / definitionRange:" << _definitionRange_; }
   if( _knotResponseLimits_.hasBound() ){ ss << " / knotResponseLimits:" << _knotResponseLimits_; }
   if( _mirrorDefinitionRange_.hasBound() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
@@ -179,13 +290,142 @@ ParameterSet* DialCollection::getSupervisedParameterSet() const{
 }
 
 // core
+namespace {
+  bool isAffine(const std::vector<DialUtils::DialPoint>& points_, bool checkSlopes_){
+    if( points_.size() < 2 or not (points_.back().x > points_.front().x) ){ return false; }
+    const double slope = DialUtils::getSlope(points_.front(), points_.back());
+    if( not std::isfinite(slope) ){ return false; }
+    auto equal = [](double lhs_, double rhs_){
+      return std::isfinite(lhs_) and std::isfinite(rhs_)
+          and std::abs(lhs_ - rhs_) <= 64 * std::numeric_limits<double>::epsilon()
+              * std::max(1.0, std::max(std::abs(lhs_), std::abs(rhs_)));
+    };
+    for( const auto& point : points_ ){
+      if( not equal(point.y, points_.front().y + slope * (point.x - points_.front().x)) ){ return false; }
+      if( checkSlopes_ and not equal(point.slope, slope) ){ return false; }
+    }
+    return true;
+  }
+
+  // Include all evaluation state, including the exact upper bound (which can
+  // differ from the value reconstructed from a uniform grid's rounded step).
+  template<typename T> bool appendSplineSignature(const DialBase& dial_, std::vector<double>& signature_){
+    const auto* spline = dynamic_cast<const T*>(&dial_);
+    if( spline == nullptr ){ return false; }
+    signature_ = spline->getDialData();
+    signature_.push_back(spline->getSplineBounds().min);
+    signature_.push_back(spline->getSplineBounds().max);
+    return true;
+  }
+
+  bool getDialSignature(const DialBase& dial_, std::vector<double>& signature_){
+    if( appendSplineSignature<CompactSpline>(dial_, signature_)
+        or appendSplineSignature<MonotonicSpline>(dial_, signature_)
+        or appendSplineSignature<UniformSpline>(dial_, signature_)
+        or appendSplineSignature<GeneralSpline>(dial_, signature_) ){ return true; }
+    if( dynamic_cast<const Graph*>(&dial_) != nullptr ){
+      signature_ = dial_.getDialData();
+      return true;
+    }
+    if( const auto* shift = dynamic_cast<const Shift*>(&dial_) ){
+      signature_ = {shift->getShiftValue()};
+      return true;
+    }
+    return dynamic_cast<const Norm*>(&dial_) != nullptr;
+  }
+
+  size_t getDialSignatureHash(const DialBase& dial_, const std::vector<double>& signature_){
+    size_t hash = typeid(dial_).hash_code();
+    auto combineHash = [&](size_t value_){ hash ^= value_ + 0x9e3779b9 + (hash << 6) + (hash >> 2); };
+    combineHash(std::hash<bool>{}(dial_.getAllowExtrapolation()));
+    for( double value : signature_ ){ combineHash(std::hash<double>{}(value)); }
+    return hash;
+  }
+
+  bool matchesDialSignature(const DialBase& candidate_, const DialBase& dial_,
+                            const std::vector<double>& signature_){
+    if( typeid(candidate_) != typeid(dial_)
+        or candidate_.getAllowExtrapolation() != dial_.getAllowExtrapolation() ){ return false; }
+    std::vector<double> candidateSignature;
+    return getDialSignature(candidate_, candidateSignature) and candidateSignature == signature_;
+  }
+}
+
+void DialCollection::deduplicateBinnedDials(){
+  if( isEventByEvent() or _dialBinSet_.getBinList().empty() ){ return; }
+  std::unordered_multimap<size_t, size_t> index;
+  std::vector<double> signature;
+  size_t reused{0};
+  for( size_t iDial = 0; iDial < _dialInterfaceList_.size(); ++iDial ){
+    auto& interface = _dialInterfaceList_[iDial];
+    const auto* dial = interface.getDialBaseRef();
+    signature.clear();
+    if( dial == nullptr or not getDialSignature(*dial, signature) ){ continue; }
+    const auto hash = getDialSignatureHash(*dial, signature);
+    const auto matches = index.equal_range(hash);
+    bool found{false};
+    for( auto match = matches.first; match != matches.second; ++match ){
+      const auto& candidate = _dialInterfaceList_[match->second];
+      if( matchesDialSignature(*candidate.getDialBaseRef(), *dial, signature) ){
+        interface.shareDial(candidate);
+        ++reused;
+        found = true;
+        break;
+      }
+    }
+    if( not found ){ index.emplace(hash, iDial); }
+  }
+  if( reused != 0 ){
+    LogInfo << getTitle() << ": shared " << reused << " binned dial definitions; kept "
+            << _dialInterfaceList_.size() << " bin interfaces." << std::endl;
+  }
+}
+
+size_t DialCollection::storeEventDial(std::unique_ptr<DialBase> dial_){
+  LogThrowIf(dial_ == nullptr, "Cannot store a null event dial");
+  std::vector<double> signature;
+  // Interface sharing is only valid when every interface uses the same inputs
+  // and response supervisor. ROOT splines and event-dependent factories stay unique.
+  bool canShare = _dialInputBufferList_.size() == 1
+      and _dialResponseSupervisorList_.size() == 1
+      and getDialSignature(*dial_, signature);
+  const size_t hash = getDialSignatureHash(*dial_, signature);
+
+  std::unique_lock<std::mutex> lock(_eventDialMutex_);
+  if( canShare ){
+    auto matches = _eventDialIndex_.equal_range(hash);
+    for( auto match = matches.first; match != matches.second; ++match ){
+      const auto* candidate = _dialInterfaceList_[match->second].getDialBaseRef();
+      if( matchesDialSignature(*candidate, *dial_, signature) ){
+        ++_reusedEventDials_;
+        return match->second;
+      }
+    }
+  }
+  const size_t index = getNextDialFreeSlot();
+  if( _dialInterfaceList_.size() <= index ){ _dialInterfaceList_.resize(index + 1); }
+  _dialInterfaceList_[index].getDial().dialPtr = std::move(dial_);
+  if( canShare ){ _eventDialIndex_.emplace(hash, index); }
+  return index;
+}
+
 void DialCollection::clear(){
   _dialInterfaceList_.clear();
   _dialInterfaceList_.shrink_to_fit();
   _dialFreeSlot_.setValue(0);
+  _eventDialIndex_.clear();
+  _eventDialIndex_.rehash(0);
+  _reusedEventDials_ = 0;
 }
 
 void DialCollection::resizeContainers(){
+  if( _reusedEventDials_ != 0 ){
+    LogInfo << getTitle() << ": reused " << _reusedEventDials_
+            << " event dials; stored " << _dialFreeSlot_.getValue() << " interfaces." << std::endl;
+  }
+  _eventDialIndex_.clear();
+  _eventDialIndex_.rehash(0);
+  _reusedEventDials_ = 0;
   LogDebugIf(GundamGlobals::isDebug()) << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
                                        << _dialInterfaceList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;
 
@@ -295,11 +535,100 @@ void DialCollection::setupDialInterfaceReferences(){
 }
 
 // init protected
+void DialCollection::readVariableResponseConfig(const ConfigReader& config_){
+  if( config_.hasField("applyToVariable") ){
+    _applyToVariable_ = config_.fetchValue<std::string>("applyToVariable");
+  }
+  if( config_.hasField("variableResponseMode") ){
+    LogThrowIf(config_.fetchValue<std::string>("variableResponseMode").empty(), "variableResponseMode must not be empty");
+  }
+  config_.fillEnum(_variableResponseMode_, "variableResponseMode");
+  LogThrowIf(_variableResponseMode_ != VariableResponseMode::Multiply
+             and _variableResponseMode_ != VariableResponseMode::Add
+             and _variableResponseMode_ != VariableResponseMode::Override,
+             "Invalid variableResponseMode: expected Multiply, Add, or Override");
+  LogThrowIf(config_.hasField("applyToVariable") and _applyToVariable_.empty(), "applyToVariable must not be empty");
+  LogThrowIf(config_.hasField("variableResponseMode") and _applyToVariable_.empty(),
+             "variableResponseMode requires applyToVariable");
+}
+
+void DialCollection::readResponseSupervisorConfig(const ConfigReader& config_){
+  // FieldFlag::DEPRECATED rejects configurations. Keep these keys readable
+  // while warning users how to migrate them to the new response range.
+  for( const auto& entry : {std::make_pair("minDialResponse", "min"),
+                           std::make_pair("maxDialResponse", "max")} ){
+    if( not config_.hasField(entry.first) ){ continue; }
+    LogWarning << config_.getParentPath() << ": key \"" << config_.getConfigEntry(entry.first).first
+               << "\" is deprecated. Use \"dialResponseLimits\" with \"" << entry.second << "\" instead. "
+               << "Existing configurations remain supported." << std::endl;
+  }
+  GenericToolbox::Range limits;
+  limits.min = not _isCompositeNode_ and (_applyToVariable_.empty() or _variableResponseMode_ == VariableResponseMode::Multiply)
+      ? 0. : std::nan("unset");
+  if( config_.hasField("dialResponseLimits") ){
+    limits = config_.fetchValue<GenericToolbox::Range>("dialResponseLimits");
+    for( const auto& entry : {std::make_pair("minDialResponse", limits.min),
+                             std::make_pair("maxDialResponse", limits.max)} ){
+      if( not config_.hasField(entry.first) ){ continue; }
+      const double legacyLimit = config_.fetchValue<double>(entry.first);
+      LogThrowIf(legacyLimit != entry.second and not (std::isnan(legacyLimit) and std::isnan(entry.second)),
+                 "dialResponseLimits conflicts with " << entry.first);
+    }
+  }
+  else{
+    if( config_.hasField("minDialResponse") ){ limits.min = config_.fetchValue<double>("minDialResponse"); }
+    if( config_.hasField("maxDialResponse") ){ limits.max = config_.fetchValue<double>("maxDialResponse"); }
+  }
+  LogThrowIf(limits.hasBothBounds() and limits.min > limits.max,
+             "dialResponseLimits: min must not exceed max");
+
+  const bool enableSmoothing = config_.hasField("enableResponseSmoothing")
+      ? config_.fetchValue<bool>("enableResponseSmoothing") : false;
+  GenericToolbox::Range widths;
+  if( config_.hasField("dialResponseSmoothingWidth") ){
+    const auto values = config_.fetchValue<JsonType>("dialResponseSmoothingWidth");
+    auto readWidth = [](const JsonType& value_){
+      LogThrowIf(not value_.is_number(), "dialResponseSmoothingWidth expects numeric widths");
+      const double width = value_.get<double>();
+      LogThrowIf(not std::isfinite(width) or width <= 0.,
+                 "dialResponseSmoothingWidth must be finite and strictly positive. "
+                 "Set enableResponseSmoothing to false to disable smoothing.");
+      return width;
+    };
+    if( values.is_number() ){ widths.min = widths.max = readWidth(values); }
+    else if( values.is_array() ){
+      LogThrowIf(values.size() != 2, "dialResponseSmoothingWidth expects [lowerWidth, upperWidth]");
+      // Unlike a limits range, widths must never be sorted by magnitude.
+      widths.min = readWidth(values.at(0));
+      widths.max = readWidth(values.at(1));
+    }
+    else{
+      LogThrowIf(not values.is_object(), "dialResponseSmoothingWidth expects a scalar or a range");
+      ConfigReader widthConfig(values);
+      widthConfig.defineFields({{"min"}, {"max"}});
+      widthConfig.checkConfiguration();
+      LogThrowIf(not widthConfig.hasField("min") and not widthConfig.hasField("max"),
+                 "dialResponseSmoothingWidth requires min or max");
+      if( widthConfig.hasField("min") ){ widths.min = readWidth(widthConfig.fetchValue<JsonType>("min")); }
+      if( widthConfig.hasField("max") ){ widths.max = readWidth(widthConfig.fetchValue<JsonType>("max")); }
+    }
+  }
+  LogThrowIf(enableSmoothing and not config_.hasField("dialResponseSmoothingWidth"),
+             "enableResponseSmoothing requires dialResponseSmoothingWidth");
+
+  _responseSupervisor_ = DialResponseSupervisor();
+  _responseSupervisor_.setMinResponse(limits.min);
+  _responseSupervisor_.setMaxResponse(limits.max);
+  if( enableSmoothing ){ _responseSupervisor_.setSmoothingWidths(widths.min, widths.max); }
+}
+
 void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
+  readVariableResponseConfig(config_);
   // globals for the dialSet
   config_.fillValue(_enableDialsSummary_, "printDialSummary");
   config_.fillValue(_dialType_, "dialType");
-  if( _dialType_ != DialType::ExternalWeight ){
+  if( _dialType_ != DialType::ExternalWeight and _dialType_ != DialType::Formula
+      and _dialType_ != DialType::CompiledLibDial and _dialType_ != DialType::Composite ){
     config_.fillValue(_dialOptions_, "options");
   }
   if( config_.hasField("dialBranchData") ){
@@ -324,8 +653,7 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
                  "TArray dialBranchData requires dialType Spline or Graph");
     }
   }
-  config_.fillValue(_minDialResponse_, "minDialResponse");
-  config_.fillValue(_maxDialResponse_, "maxDialResponse");
+  readResponseSupervisorConfig(config_);
   config_.fillValue(_useMirrorDial_, "useMirrorDial");
   config_.fillValue(_mirrorLowEdge_, "mirrorLowEdge");
   config_.fillValue(_mirrorHighEdge_, "mirrorHighEdge");
@@ -490,8 +818,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );
-  _dialResponseSupervisorList_[0].setMinResponse( _config_.fetchValue("minDialResponse", double(0.)) );
-  _dialResponseSupervisorList_[0].setMaxResponse( _config_.fetchValue("maxDialResponse", _maxDialResponse_) );
+  _dialResponseSupervisorList_[0] = _responseSupervisor_;
 
   _dialInterfaceList_.reserve( _dialBinSet_.getBinList().size() );
   for(const auto & bin : _dialBinSet_.getBinList()) {
@@ -740,23 +1067,55 @@ bool DialCollection::initializeDialsWithExternalWeight(const ConfigReader& dials
   return true;
 }
 
-bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDefinition) {
-  if( not dialsDefinition.hasField("binning") ){ return false; }
-
-  // A binning file has been provided, so this is a binned dial.  Create
-  // the dials for each bin here.  The dials will be assigned to the
-  // events in DataDispenser.
-  auto binningFilePath = dialsDefinition.fetchValue("binning", ConfigReader());
+bool DialCollection::initializeBinnedDials(const ConfigReader& dialsDefinition) {
+  const bool treeBinning = dialsDefinition.hasField("dialsBinningDefinition");
+  LogThrowIf(treeBinning and dialsDefinition.hasField("binning"),
+             "Specify either binning or dialsBinningDefinition, not both");
+  if( not treeBinning and not dialsDefinition.hasField("binning") ){ return false; }
 
   LogInfo << "Defining binned dials for " << getTitle() << std::endl;
   _dialBinSet_ = BinSet();
   _dialBinSet_.setName("dial binning");
-  _dialBinSet_.configure(binningFilePath);
-  // NOTE: DON'T SORT THE DIALS AS THE ORDERING IS MATCHING THE SPLINE FILE!
+  if( not treeBinning ){
+    _dialBinSet_.configure(dialsDefinition.fetchValue<ConfigReader>("binning"));
+  }
+  // Keep bins and dials in source order.
 
   // Get the filename for a file with the object array of dials (graphs)
   // that will be applied based on the binning.
-  auto filePath = dialsDefinition.fetchValue<std::string>("dialsFilePath");
+  auto filePath = dialsDefinition.fetchValue<std::string>("dialsFilePath", "");
+  auto objPath = dialsDefinition.fetchValue<std::string>("dialsTreePath", "");
+  auto branchName = dialsDefinition.fetchValue<std::string>("dialsBranch", "");
+  LogThrowIf(dialsDefinition.hasField("dialsBranch") and branchName.empty(), "dialsBranch must not be empty");
+
+  // Merge redundant declarations only when they identify the same source.
+  auto mergePath = [](std::string& target_, const std::string& value_, const char* field_){
+    LogThrowIf(value_.empty(), "Empty " << field_ << " in binned dial path");
+    LogThrowIf(not target_.empty() and target_ != value_, "Conflicting " << field_ << " in binned dial definition");
+    target_ = value_;
+  };
+  const auto branchSeparator = objPath.rfind(':');
+  if( branchSeparator != std::string::npos ){
+    mergePath(branchName, objPath.substr(branchSeparator + 1), "dialsBranch");
+    objPath.resize(branchSeparator);
+    LogThrowIf(objPath.empty(), "Empty dialsTreePath in binned dial path");
+  }
+  if( dialsDefinition.hasField("binnedDialsPath") ){
+    const auto path = dialsDefinition.fetchValue<std::string>("binnedDialsPath");
+    const auto lastSeparator = path.rfind(':');
+    const auto treeSeparator = lastSeparator == std::string::npos or lastSeparator == 0
+                               ? std::string::npos : path.rfind(':', lastSeparator - 1);
+    LogThrowIf(treeSeparator == std::string::npos,
+               "binnedDialsPath must use file:tree:branch syntax: " << path);
+    mergePath(filePath, path.substr(0, treeSeparator), "dialsFilePath");
+    mergePath(objPath, path.substr(treeSeparator + 1, lastSeparator - treeSeparator - 1), "dialsTreePath");
+    mergePath(branchName, path.substr(lastSeparator + 1), "dialsBranch");
+  }
+  LogThrowIf(not branchName.empty() and (objPath.empty() or dialsDefinition.hasField("dialsList")),
+             "An explicit binned dial branch requires a tree and cannot be combined with dialsList");
+  LogThrowIf(treeBinning and (objPath.empty() or dialsDefinition.hasField("dialsList")),
+             "dialsBinningDefinition requires a TTree source and cannot be combined with dialsList");
+  LogThrowIf(filePath.empty(), "Missing dialsFilePath or binnedDialsPath for binned dials");
   filePath = GenericToolbox::expandEnvironmentVariables(filePath);
 
   LogThrowIf(not GenericToolbox::doesTFileIsValid(filePath), "Could not open: " << filePath);
@@ -810,72 +1169,131 @@ bool DialCollection::initializeDialsWithBinningFile(const ConfigReader& dialsDef
   }
 
     ///////////////////////////////////////////////////////////////////////
-  else if ( dialsDefinition.hasField("dialsTreePath") ) {
-    // Deprecated: A tree with event binning has been provided, so this is
-    // a binned dial.  Create the dials for each bin here.  The dials will
-    // be assigned to the events in DataDispenser.
-    auto objPath = dialsDefinition.fetchValue<std::string>("dialsTreePath");
-    auto* dialsTTree = (TTree*) dialsTFile->Get(objPath.c_str());
+  else if ( not objPath.empty() ) {
+    auto* dialsTTree = dialsTFile->Get<TTree>(objPath.c_str());
     LogThrowIf(dialsTTree== nullptr, objPath << " within " << filePath << " could not be opened.")
 
-    Int_t kinematicBin;
+    const bool explicitBranch = not branchName.empty();
+    if( not explicitBranch ){
+      // Preserve the historical choice based on dialType.
+      if( _dialType_ == DialType::Spline ){ branchName = "Spline"; }
+      if( _dialType_ == DialType::Graph ){ branchName = "Graph"; }
+      LogWarning << "Implicit binned dial branch selection is deprecated for " << getTitle()
+                 << ". Set dialsBranch explicitly (legacy branch: " << branchName
+                 << "), or use file:tree:branch in binnedDialsPath." << std::endl;
+    }
+    auto* branch = dialsTTree->GetBranch(branchName.c_str());
+    LogThrowIf(branch == nullptr, "Could not find binned dial branch " << branchName << " in " << objPath);
+    auto* branchClass = TClass::GetClass(branch->GetClassName());
+    const bool graphBranch = explicitBranch
+                             ? branchClass != nullptr and branchClass->InheritsFrom(TGraph::Class())
+                             : _dialType_ == DialType::Graph;
+    const bool splineBranch = explicitBranch
+                              ? branchClass != nullptr and branchClass->InheritsFrom(TSpline3::Class())
+                              : _dialType_ == DialType::Spline;
+    LogThrowIf(not graphBranch and not splineBranch,
+               "Binned dial branch " << branchName << " must contain TGraph or TSpline3 objects");
+
     TSpline3* splinePtr = nullptr;
     TGraph* graphPtr = nullptr;
+    // Read only the curve and the explicitly declared binning branches.
+    dialsTTree->SetBranchStatus("*", false);
+    dialsTTree->SetBranchStatus(branchName.c_str(), true);
+    if( branch->GetListOfBranches()->GetEntries() != 0 ){
+      dialsTTree->SetBranchStatus((branchName + ".*").c_str(), true);
+    }
+    const int branchStatus = graphBranch ? dialsTTree->SetBranchAddress(branchName.c_str(), &graphPtr)
+                                         : dialsTTree->SetBranchAddress(branchName.c_str(), &splinePtr);
+    LogThrowIf(branchStatus < 0, "Could not bind binned dial branch " << branchName << " in " << objPath);
 
-    // searching for additional split var
-    std::vector<std::string> splitVarNameList;
-    for( int iKey = 0 ; iKey < dialsTTree->GetListOfLeaves()->GetEntries() ; iKey++ ){
-      std::string leafName = dialsTTree->GetListOfLeaves()->At(iKey)->GetName();
-      if(leafName != "kinematicBin" and leafName != "Spline" and leafName != "Graph"){
-        splitVarNameList.emplace_back(leafName);
+    struct BinningDimension {
+      std::string name;
+      TLeaf* minLeaf{nullptr};
+      TLeaf* maxLeaf{nullptr};
+      bool isValue{false};
+    };
+    std::vector<BinningDimension> dimensions;
+    if( treeBinning ){
+      auto definition = dialsDefinition.fetchValue<ConfigReader>("dialsBinningDefinition");
+      LogThrowIf(not definition.getConfig().is_array() or definition.getConfig().empty(),
+                 "dialsBinningDefinition must be a non-empty list");
+      auto getScalarLeaf = [&](const std::string& name_) -> TLeaf* {
+        auto* scalarBranch = dialsTTree->GetBranch(name_.c_str());
+        LogThrowIf(name_.empty() or scalarBranch == nullptr,
+                   "Could not find binning branch " << name_ << " in " << objPath);
+        LogThrowIf(scalarBranch->GetListOfLeaves()->GetEntries() != 1,
+                   "Binning branch " << name_ << " must contain one numeric scalar");
+        auto* leaf = static_cast<TLeaf*>(scalarBranch->GetListOfLeaves()->At(0));
+        const std::vector<std::string> numericTypes{
+            "Bool_t", "Char_t", "UChar_t", "Short_t", "UShort_t", "Int_t", "UInt_t",
+            "Long_t", "ULong_t", "Long64_t", "ULong64_t", "Float_t", "Double_t", "Float16_t", "Double32_t"};
+        LogThrowIf(leaf->GetLeafCount() != nullptr or leaf->GetLenStatic() != 1
+                   or leaf->InheritsFrom("TLeafC")
+                   or std::find(numericTypes.begin(), numericTypes.end(), leaf->GetTypeName()) == numericTypes.end(),
+                   "Binning branch " << name_ << " must contain one numeric scalar");
+        dialsTTree->SetBranchStatus(name_.c_str(), true);
+        return leaf;
+      };
+      for( auto entry : definition.loop() ){
+        entry.clearFields();
+        entry.defineFields({{"name"}, {"valueBranch"}, {"minValueBranch"}, {"maxBranchValue"}});
+        entry.checkConfiguration();
+        BinningDimension dimension;
+        entry.fillValue(dimension.name, "name");
+        LogThrowIf(dimension.name.empty(), "dialsBinningDefinition requires a non-empty name");
+        LogThrowIf(std::any_of(dimensions.begin(), dimensions.end(), [&](const BinningDimension& other_){
+          return other_.name == dimension.name;
+        }), "Duplicate binning variable " << dimension.name);
+        dimension.isValue = entry.hasField("valueBranch");
+        LogThrowIf(dimension.isValue ? (entry.hasField("minValueBranch") or entry.hasField("maxBranchValue"))
+                                     : (not entry.hasField("minValueBranch") or not entry.hasField("maxBranchValue")),
+                   "Binning variable " << dimension.name
+                   << " requires either valueBranch or both minValueBranch and maxBranchValue");
+        dimension.minLeaf = getScalarLeaf(entry.fetchValue<std::string>(dimension.isValue ? "valueBranch" : "minValueBranch"));
+        dimension.maxLeaf = dimension.isValue ? dimension.minLeaf
+                                             : getScalarLeaf(entry.fetchValue<std::string>("maxBranchValue"));
+        dimensions.emplace_back(dimension);
       }
     }
 
-    // Hooking to the tree
-    std::vector<Int_t> splitVarValueList(splitVarNameList.size(), 0);
-    std::vector<std::pair<int, int>> splitVarBoundariesList(splitVarNameList.size(), std::pair<int, int>());
-    std::vector<std::vector<int>> splitVarValuesList(splitVarNameList.size(), std::vector<int>());
-    dialsTTree->SetBranchAddress("kinematicBin", &kinematicBin);
-    if( _dialType_ == DialType::Spline ) dialsTTree->SetBranchAddress("Spline", &splinePtr);
-    if( _dialType_ == DialType::Graph ) dialsTTree->SetBranchAddress("Graph", &graphPtr);
-    for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
-      dialsTTree->SetBranchAddress(splitVarNameList[iSplitVar].c_str(), &splitVarValueList[iSplitVar]);
+    const Long64_t nEntries = dialsTTree->GetEntries();
+    LogThrowIf(not treeBinning and nEntries != _dialBinSet_.getBinList().size(),
+               getTitle() << ": Number of tree entries (" << nEntries
+               << ") does not match the number of bins " << _dialBinSet_.getBinList().size());
+    std::vector<Bin> activeBins;
+    activeBins.reserve(nEntries);
+    _dialInterfaceList_.reserve(nEntries);
+    LogInfo << "Reading binned dials from " << filePath << ":" << objPath << ":" << branchName << std::endl;
+    for( Long64_t iEntry = 0 ; iEntry < nEntries ; ++iEntry ){
+      LogThrowIf(dialsTTree->GetEntry(iEntry) <= 0, "Could not read binned dial entry " << iEntry);
+      Bin bin;
+      if( treeBinning ){
+        bin.setIndex(int(iEntry));
+        bin.setIsZeroWideRangesTolerated(true);
+        for( const auto& dimension : dimensions ){
+          const double min = dimension.minLeaf->GetValue();
+          const double max = dimension.maxLeaf->GetValue();
+          LogThrowIf(dimension.isValue ? not std::isfinite(min)
+                                      : (std::isnan(min) or std::isnan(max) or min >= max),
+                     "Invalid bin bounds for " << dimension.name << " at tree entry " << iEntry
+                     << ": [" << min << ", " << max << "]");
+          bin.addBinEdge(dimension.name, min, max);
+        }
+      }
+      else{ bin = _dialBinSet_.getBinList().at(iEntry); }
+
+      const TObject* initializer = graphBranch ? static_cast<TObject*>(graphPtr) : static_cast<TObject*>(splinePtr);
+      auto dial = makeDial(initializer);
+      if( dial == nullptr ){ continue; }
+      activeBins.emplace_back(std::move(bin));
+      _dialInterfaceList_.emplace_back();
+      _dialInterfaceList_.back().setDial(DialBaseObject(std::move(dial)));
     }
-
-    Long64_t nSplines = dialsTTree->GetEntries();
-    LogWarning << "Reading dials in \"" << dialsTFile->GetName() << "\"" << std::endl;
-    for( Long64_t iSpline = 0 ; iSpline < nSplines ; iSpline++ ){
-      dialsTTree->GetEntry(iSpline);
-      auto* dialBin = &_dialBinSet_.getBinList()[kinematicBin];
-      dialBin->setIsZeroWideRangesTolerated(true);
-      for( size_t iSplitVar = 0 ; iSplitVar < splitVarNameList.size() ; iSplitVar++ ){
-        if( splitVarBoundariesList.at(iSplitVar).second < splitVarValueList.at(iSplitVar) or iSpline == 0 ){
-          splitVarBoundariesList.at(iSplitVar).second = splitVarValueList.at(iSplitVar);
-        }
-        if( splitVarBoundariesList.at(iSplitVar).first > splitVarValueList.at(iSplitVar) or iSpline == 0 ){
-          splitVarBoundariesList.at(iSplitVar).first = splitVarValueList.at(iSplitVar);
-        }
-        if( not GenericToolbox::doesElementIsInVector(splitVarValueList.at(iSplitVar), splitVarValuesList.at(iSplitVar)) ){
-          splitVarValuesList.at(iSplitVar).emplace_back(splitVarValueList.at(iSplitVar));
-        }
-        dialBin->addBinEdge(splitVarNameList.at(iSplitVar), splitVarValueList.at(iSplitVar), splitVarValueList.at(iSplitVar));
-      }
-
-      TObject* dialInitializer{nullptr};
-      if( _dialType_ == DialType::Spline ){ dialInitializer = splinePtr;}
-      if( _dialType_ == DialType::Graph ){ dialInitializer = graphPtr;}
-
-      auto dial = makeDial(dialInitializer);
-      if( dial != nullptr ){
-        _dialInterfaceList_.emplace_back();
-        DialBaseObject obj;
-        obj.dialPtr = std::move(dial);
-        _dialInterfaceList_.back().setDial( obj );
-      }
-    } // iSpline (in TTree)
+    _dialBinSet_.getBinList() = std::move(activeBins);
+    if( treeBinning ){ _dialBinSet_.checkBinning(); }
   } // Splines in TTree
   else{
-    LogError << "Neither dialsTreePath nor dialsList are provided..." << std::endl;
+    LogError << "Neither binnedDialsPath, dialsTreePath nor dialsList are provided..." << std::endl;
     return false;
   }
   return true;
@@ -899,7 +1317,25 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   this->readParametersFromConfig( ConfigReader(dialsDefinition) );
 
-  if     ( _dialType_ == DialType::Norm ) {
+  LogThrowIf(dialsDefinition.hasField("binning") and dialsDefinition.hasField("dialsBinningDefinition"),
+             "Specify either binning or dialsBinningDefinition, not both");
+  LogThrowIf(dialsDefinition.hasField("dialsBinningDefinition")
+             and _dialType_ != DialType::Graph and _dialType_ != DialType::Spline,
+             "dialsBinningDefinition requires Graph or Spline dials");
+
+  if( _dialType_ == DialType::Composite ){
+    LogThrowIf(dialsDefinition.hasField("binning") or dialsDefinition.hasField("dialsBinningDefinition") or hasDialBranchData(),
+               "Composite: put binning and dialBranchData on individual nodes");
+    std::vector<std::string> parameterNames;
+    for( const auto& input : _config_.fetchValue<JsonType>("dialInputList") ){
+      parameterNames.emplace_back(input.at("parameterName").get<std::string>());
+    }
+    _isEventByEvent_ = false;
+    _dialInterfaceList_.emplace_back();
+    _dialInterfaceList_.back().setDial(DialBaseObject(std::make_unique<CompositeDial>(
+        dialsDefinition.fetchValue<ConfigReader>("options"), parameterNames)));
+  }
+  else if( _dialType_ == DialType::Norm ) {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
     _isEventByEvent_ = false;
@@ -923,12 +1359,13 @@ bool DialCollection::initializeDialsWithDefinition() {
       for( auto& bin : _dialBinSet_.getBinList() ){
 
         _dialInterfaceList_.emplace_back();
-        _dialInterfaceList_.back().setDial( DialBaseObject(makeDial( dialsDefinition )) );
+        _dialInterfaceList_.back().setDial( DialBaseObject(makeDial( dialsDefinition, &bin )) );
 
         for( auto& var : bin.getEdgesList() ){
-          ((RootFormula*) _dialInterfaceList_.back().getDialBaseRef())->getFormula().SetParameter(
-              var.varName.c_str(), var.getCenterValue()
-          );
+          auto& formula = ((RootFormula*) _dialInterfaceList_.back().getDialBaseRef())->getFormula();
+          if( formula.GetParNumber(var.varName.c_str()) >= 0 ){
+            formula.SetParameter(var.varName.c_str(), var.getCenterValue());
+          }
         }
       }
 
@@ -969,14 +1406,13 @@ bool DialCollection::initializeDialsWithDefinition() {
     auto* externalWeight = getCollectionData<ExternalWeightDialFactory>(_dialCollectionData_.size() - 1);
     _isEventByEvent_ = not externalWeight->useBinnedWeights();
   }
-  else if( dialsDefinition.hasField("binning") ) {
+  else if( dialsDefinition.hasField("binning") or dialsDefinition.hasField("dialsBinningDefinition") ) {
     // This dial collection is binned with different weights for each bin.
     // Create the dials here.
     _isEventByEvent_ = false;
 
-      LogThrowIf(not initializeDialsWithBinningFile(dialsDefinition),
-               "Error initializing dials with binning file");
-    }
+    LogThrowIf(not initializeBinnedDials(dialsDefinition), "Error initializing binned dials");
+  }
   else if (hasDialBranchData()) {
     // Branch data defines an event-by-event dial from a ROOT object
     // or a pair of TArray branches.  The generation of the dials will be handled in
@@ -991,13 +1427,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     LogThrow("Invalid dial type");
   }
 
-  _dialResponseSupervisorList_.emplace_back();
-  _dialResponseSupervisorList_.back().setMinResponse(
-      _config_.fetchValue("minDialResponse", double(0.))
-  );
-  _dialResponseSupervisorList_.back().setMaxResponse(
-      _config_.fetchValue("maxDialResponse", _maxDialResponse_)
-  );
+  _dialResponseSupervisorList_.emplace_back(_responseSupervisor_);
 
   return true;
 }
@@ -1058,7 +1488,7 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
 
   return out;
 }
-std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_) const{
+std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_, const Bin* bin_) const{
   std::unique_ptr<DialBase> dialBase{nullptr};
   std::string dialType{};
 
@@ -1067,14 +1497,29 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_) 
   if( dialType == "Formula" or dialType == "RootFormula" ){
     dialBase = std::make_unique<RootFormula>();
     auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
-    auto formulaConfig = config_.fetchValue("dialConfig", JsonType());
+    auto formulaConfig = config_.fetchValue("options", JsonType());
     rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
+    LogThrowIf(not config_.hasField("dialInputList") and not _config_.hasField("dialInputList"),
+               "Formula requires an explicit named dialInputList");
+    const auto inputs = config_.hasField("dialInputList") ? config_.fetchValue<JsonType>("dialInputList")
+                                                        : _config_.fetchValue<JsonType>("dialInputList");
+    LogThrowIf(not inputs.is_array(), "Formula dialInputList must be a list");
+    std::vector<std::string> inputNames;
+    for( const auto& input : inputs ){
+      LogThrowIf(not input.is_object() or not input.contains("name"), "Formula input requires a name");
+      inputNames.emplace_back(GenericToolbox::Json::fetchValue<std::string>(input, "name"));
+    }
+    std::vector<std::string> constantNames;
+    if( bin_ != nullptr ){
+      for( const auto& edge : bin_->getEdgesList() ){ constantNames.emplace_back(edge.varName); }
+    }
+    rootFormulaPtr->setInputNames(inputNames, constantNames);
   }
   else if( dialType == "CompiledLibDial" ){
     dialBase = std::make_unique<CompiledLibDial>();
     auto* compiledLibDialPtr{(CompiledLibDial*) dialBase.get()};
 
-    auto formulaConfig(config_.fetchValue<JsonType>("dialConfig"));
+    auto formulaConfig(config_.fetchValue<JsonType>("options"));
 
     bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
     if( not success ){
@@ -1254,6 +1699,14 @@ std::unique_ptr<DialBase> DialCollection::makeSplineDial(const TObject* src_) co
 
   }
 
+  // A two-point Graph is an affine response and retains the original domain.
+  // Check the effective spline slopes as well as the knot coordinates.
+  if( splType != "ROOT" and isAffine(splinePointList, true)
+      and (dynamic_cast<const GeneralSpline*>(out.get()) != nullptr
+           or DialUtils::isUniform(splinePointList, 64 * std::numeric_limits<double>::epsilon())) ){
+    return makeGraphDial(splinePointList);
+  }
+
   // Pass the ownership without any constraints!
   return out;
 
@@ -1342,7 +1795,9 @@ bool DialCollection::makeDialShortCircuit(const std::vector<DialUtils::DialPoint
   if( pointList_.size() == 1 or DialUtils::isFlat(pointList_) ){
     // it's flat, let's shortcut
 
-    if( std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
+    if( not _isCompositeNode_
+        and std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon()
+        and _responseSupervisor_.process(1.) == 1. ){
       // one! no need for a dial
       if(_verboseShortCircuit_){ _verboseShortCircuitStr_ = "No dial: response is always 1."; }
       return true;
@@ -1377,7 +1832,14 @@ std::unique_ptr<DialBase> DialCollection::makeGraphDial(const std::vector<DialUt
   }
 
   auto dial = std::make_unique<Graph>();
-  dial->buildDial(pointList_);
+  if( isAffine(pointList_, false) ){
+    if( _allowDialExtrapolation_ and std::all_of(pointList_.begin(), pointList_.end(),
+          [](const DialUtils::DialPoint& point_){ return point_.x == point_.y; }) ){
+      return std::make_unique<Norm>();
+    }
+    dial->buildDial(std::vector<DialUtils::DialPoint>{pointList_.front(), pointList_.back()});
+  }
+  else{ dial->buildDial(pointList_); }
   return dial;
 }
 
