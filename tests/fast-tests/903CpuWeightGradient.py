@@ -118,9 +118,17 @@ def check_threads(threads):
     # Eigenvectors span only constrained parameters, not the remaining free coordinates.
     mixed = copy.deepcopy(config)
     mixed['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][1]['priorType'] = 'Flat'
-    engine = build(mixed, True, True)
-    assert len(engine.getMinimizer().getMinimizerFitParameterList()) == 2
-    check(engine, [.1, -.13])
+    for normalized in (False, True):
+        engine = build(mixed, normalized, True)
+        assert len(engine.getMinimizer().getMinimizerFitParameterList()) == 2
+        original = engine.getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList()[0].getParameterList()
+        free_parameter = original[1]
+        close(free_parameter.getParameterValue(), 1.)
+        # A free coordinate must not enter the two-dimensional eigen transform,
+        # even when its value differs from its prior.
+        free_parameter.setParameterValue(.87)
+        check(engine, [.1, -.13])
+        close(free_parameter.getParameterValue(), .87)
     # Exercise spline dials through the same Gaussian BB histogram chain.
     splines = copy.deepcopy(config)
     splines['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'][0]['dialType'] = 'Spline'
