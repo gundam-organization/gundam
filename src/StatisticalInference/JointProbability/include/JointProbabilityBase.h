@@ -35,6 +35,12 @@ namespace JointProbability{
     // testing.
     virtual double eval(double data_, double pred_, double err_, int bin_) const = 0;
 
+    // Evaluate propagated bin values while retaining sample-specific likelihood
+    // settings. err_ is sqrt(sum of squared event weights), as in Histogram.
+    [[nodiscard]] virtual double evalWithPrediction(const SamplePair& samplePair_, double data_, double pred_, double err_, int bin_) const {
+      return eval(data_, pred_, err_, bin_);
+    }
+
     [[nodiscard]] virtual double evalPredictionGradient(double data_, double pred_, double err_, int bin_) const {
       return evalGradientByFiniteDifference(pred_, [&](double predVal_){ return eval(data_, predVal_, err_, bin_); });
     }
@@ -49,7 +55,17 @@ namespace JointProbability{
       const double dataVal{samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights};
       const double predVal{samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights};
       const double predErr{samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights};
-      return eval(dataVal, predVal, predErr, bin_);
+      return evalWithPrediction(samplePair_, dataVal, predVal, predErr, bin_);
+    }
+
+    [[nodiscard]] virtual double evalPredictionGradient( const SamplePair& samplePair_, int bin_ ) const {
+      auto& binContent = samplePair_.model->getHistogram().getBinContentList()[bin_];
+      return evalGradientByFiniteDifference(binContent.sumWeights, [&](double){ return eval(samplePair_, bin_); });
+    }
+
+    [[nodiscard]] virtual double evalSqrtSumSqWeightsGradient( const SamplePair& samplePair_, int bin_ ) const {
+      auto& binContent = samplePair_.model->getHistogram().getBinContentList()[bin_];
+      return evalGradientByFiniteDifference(binContent.sqrtSumSqWeights, [&](double){ return eval(samplePair_, bin_); });
     }
 
     [[nodiscard]] virtual double evalPredictionGradient( const SamplePair& samplePair_, int bin_ ) const {
