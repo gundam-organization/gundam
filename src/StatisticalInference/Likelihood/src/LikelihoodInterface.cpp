@@ -46,6 +46,7 @@ void LikelihoodInterface::configureImpl(){
     {"gaussStatThrowInToys"},
     {"enableEventMcThrow"},
     {"applyInfinitePenaltyOnOutOfBoundPar"},
+    {"externalConstraints"},
   });
   _config_.checkConfiguration();
 
@@ -93,6 +94,9 @@ void LikelihoodInterface::configureImpl(){
   _config_.fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
   _eventTreeWriter_.configure();
 
+  _config_.fillValue(_externalConstraints_.getConfig(), "externalConstraints");
+  _externalConstraints_.configure();
+
   // reading local parameters
   _config_.fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
   _config_.fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
@@ -111,6 +115,9 @@ void LikelihoodInterface::initializeImpl() {
   _modelPropagator_.initialize();
   _dataPropagator_.initialize();
   _modelPropagator_.printConfiguration();
+
+  _externalConstraints_.initialize();
+  _externalConstraints_.bindParameters(_modelPropagator_.getParametersManager());
 
   _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
   _plotGenerator_.setDataSampleSetPtr( &_dataPropagator_.getSampleSet().getSampleList() );
@@ -343,6 +350,7 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
     _buffer_.penaltyLikelihood += LikelihoodInterface::evalPenaltyLikelihood( parSet );
   }
+  _buffer_.penaltyLikelihood += _externalConstraints_.eval();
   return _buffer_.penaltyLikelihood;
 }
 void LikelihoodInterface::evalPenaltyLikelihoodGradient(const std::vector<Parameter*>& parameterList_) {
@@ -454,6 +462,9 @@ std::string LikelihoodInterface::getSummary() const {
         return ssSub.str();
       }
   );
+  if( _externalConstraints_.isEnabled() ){
+    ss << "; external constraints: " << _externalConstraints_.eval();
+  }
   return ss.str();
 }
 
