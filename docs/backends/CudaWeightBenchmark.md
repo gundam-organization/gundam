@@ -30,8 +30,9 @@ sbatch --export=ALL tests/benchmarks/236CudaWeightBenchmark.sbatch \
   --output "$OA_WORK/weights-baseline"
 ```
 
-Le benchmark compare par défaut CPU, CUDA cached/recompute, chacun avec
-`eventMajor` et `warpInterleaved`, dans le même moteur résident. `--cases` permet
+Le benchmark compare par défaut CPU, CUDA cached/recompute avec layout
+`warpInterleaved`, chacun en référence puis avec descripteurs compacts, dans le
+même moteur résident. Les anciens cas `eventMajor` restent disponibles. `--cases` permet
 de réduire cette liste. Les scénarios constant/local1/local2/global sont exécutés
 après échauffement ; local1 couvre **toutes** les coordonnées libres, même si
 leur nombre dépasse `--calls`. `--parameter-match` sélectionne des coordonnées
@@ -92,7 +93,7 @@ sbatch --export=ALL tests/benchmarks/236CudaWeightBenchmark.sbatch \
   --output "$OA_WORK/weights-ncu"
 ```
 
-Par défaut : backend cached/warpInterleaved, scénarios local1 puis global, un
+Par défaut : backends cached/warpInterleaved référence puis compact, scénarios local1 puis global, un
 appel capturé par scénario au premier essai, après huit appels d’échauffement.
 Tous les autres appels, les chargements, les activations de backend et les
 matérialisations restent hors capture. Local1 parcourt toujours toutes les
@@ -127,3 +128,63 @@ marquées `hardwareProfiled` identifient les appels capturés. **Ne pas utiliser
 temps de cette exécution pour mesurer les gains** : l’instrumentation et les
 replays les perturbent. Les performances se comparent avec `--mode benchmark`,
 sans Nsight. Les dossiers existants sont refusés.
+
+
+## Première variante : descripteurs compacts (opt-in)
+
+La configuration CUDA `compactDials: true` active quatre colonnes de `uint32`
+(entrée, offset et taille du payload, référence de politique). Les options
+identiques (type, nombre d'entrées, extrapolation, bornes et smoothing) sont
+partagées dans une table de politiques, sans changer l'ordre des dials, les
+indices des réponses, les payloads ni les multiplications par événement. Les
+kernels dense et sparse utilisent les mêmes routines numériques que la
+référence ; le cache des entrées transformées est conservé.
+
+Le coût par dial devient 16 octets plus la table de politiques, au lieu du
+descripteur générique de 176 octets. Les politiques sont regroupées par leurs
+valeurs binaires pour préserver notamment les zéros signés. Les dials Formula,
+Composite, surfaces et externes déclenchent un repli du modèle entier vers le
+chemin générique, de même qu'un indice ne tenant pas sur 32 bits ou une table
+qui annulerait le gain de stockage. Ce repli est explicite dans les diagnostics.
+Le benchmark refuse de mesurer un cas nommé `-compact` si ce chemin est inactif.
+Le comportement par défaut des applications GUNDAM reste le chemin générique.
+
+Cette itération isole le compactage des descripteurs. La transposition des
+payloads et les kernels spécialisés par type restent pour une expérience
+ultérieure, selon les performances mesurées sur V100.
+
+Reconstruire **et réinstaller** le module CUDA. Dans une allocation adaptée :
+
+```bash
+export GUNDAM_BUILD=/chemin/vers/le/build-cuda
+cmake --build "$GUNDAM_BUILD" -j4
+cmake --install "$GUNDAM_BUILD"
+```
+
+Puis soumettre le benchmark (les tests courts sont lancés dans l'allocation
+avant l'unique chargement des données) :
+
+```bash
+sbatch --export=ALL "$GUNDAM_REPO/tests/benchmarks/236CudaWeightBenchmark.sbatch" \
+  --mode benchmark --work-dir "$OA_WORK" --config configOA2024.yaml \
+  --override override/v13Prod.yaml --python-module-dir "$GUNDAM_MODULE" \
+  --test-executable "$GUNDAM_BUILD/tests/gundamGTest_cudaBackend.exe" \
+  --output "$OA_WORK/benchmark-weights-compact-$(date +%Y%m%d-%H%M%S)"
+```
+
+Le filtre des tests préalables couvre `CudaCompactDialModel.*` et
+`CudaBackendPropagation.*`, y compris les deux modes et layouts, cache inchangé,
+mises à jour sparse/dense, clamping/smoothing et récupération après entrée non
+finie. Pour comparer également tous les poids finaux d'OA2024, ajouter
+`--event-variables` ; prévoir de l'espace pour les snapshots binaires.
+
+Les nouveaux diagnostics `requestedCompactDials`, `compactDials`,
+`compactDialPolicies`, `compactDialFallback` et `deviceDialDescriptorBytes` sont
+exportés dans `model.json` et dans le rapport de benchmark. Vérifier le temps
+complet, celui des réponses et les coordonnées FSI coûteuses, avant de choisir
+un réglage. Aucun gain GPU n'est revendiqué avant ces mesures.
+
+Validation locale de la préparation : compilation C++ hôte des sources CUDA
+modifiées et des tests, tests de packing/sémantique sans GPU, tests Python de
+capture/CLI et test de rechargement à chaud du benchmark réussis. NVCC et les
+tests device restent à exécuter au CC ; le build Mac ne compile pas le `.cu`.

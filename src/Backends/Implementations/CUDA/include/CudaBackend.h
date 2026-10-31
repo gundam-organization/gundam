@@ -71,6 +71,7 @@ ENUM_FIELD( warpInterleaved )
     int _deviceIndex_{0};
     unsigned int _likelihoodBlockSize_{0}; // Zero selects the conservative automatic policy.
     bool _reusePrediction_{true};
+    bool _compactDials_{false};
     CudaPropagationMode _propagationMode_{CudaPropagationMode::cachedResponses};
     CudaWeightLayout _weightLayout_{CudaWeightLayout::warpInterleaved};
     std::uint64_t _nextTokenId_{1};

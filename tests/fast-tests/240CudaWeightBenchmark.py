@@ -21,6 +21,10 @@ def load(name, filename):
 def main():
     profiling = load('weight_profiling', '229CudaBackendProfiling.py')
     wrapper = load('weight_benchmark', '236CudaWeightBenchmark.py')
+    options = profiling.backend_config(SimpleNamespace(worker='CUDA-cachedResponses-interleaved-compact',
+        device_index=0))['options'][0]
+    assert options['compactDials'] and options['weightLayout'] == 'warpInterleaved'
+    assert options['propagationMode'] == 'cachedResponses'
     events = []
     timing = SimpleNamespace(**{field: 0 for field in (*profiling.SECONDS_FIELDS, *profiling.COUNT_FIELDS)})
     manager = SimpleNamespace(getLastTimingSummary=lambda: timing, getLastPreparationSeconds=lambda: 0.)

@@ -18,6 +18,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, add_help=False)
     parser.add_argument('--mode', choices=['benchmark', 'ncu', 'preflight'], default='benchmark')
     parser.add_argument('--python-module-dir', type=Path)
+    parser.add_argument('--test-executable', type=Path, help='Run CUDA packing/propagation tests before loading inputs')
     parser.add_argument('--ncu', default='ncu')
     parser.add_argument('--ncu-set', default='full')
     parser.add_argument('--cache-control', choices=['all', 'none'], default='all')
@@ -52,21 +53,29 @@ def main(argv=None):
         (output/'preflight.json').write_text(json.dumps(results, indent=2)+'\n')
         print(json.dumps(results, indent=2))
         return
+    if own.test_executable:
+        executable = own.test_executable.resolve()
+        if not executable.is_file():
+            parser.error(f'CUDA test executable does not exist: {executable}')
+        subprocess.run([str(executable), '--gtest_filter=CudaCompactDialModel.*:CudaBackendPropagation.*'],
+                       env=environment, check=True)
     if '--execution-mode' in forwarded or '--worker' in forwarded:
         parser.error('This entry point manages resident execution; do not pass --execution-mode or --worker')
     defaults = ['--execution-mode', 'resident', '--require-device-likelihood', '--require-v100',
                 '--require-weight-inventory',
                 '--threads', '4', '--calls', '100', '--global-calls', '40', '--trials', '3', '--warmup', '8']
     if own.mode == 'benchmark':
-        defaults += ['--cases', 'CPU', 'CUDA-cachedResponses', 'CUDA-cachedResponses-interleaved',
-                     'CUDA-recomputeResponses', 'CUDA-recomputeResponses-interleaved']
+        defaults += ['--cases', 'CPU', 'CUDA-cachedResponses-interleaved',
+                     'CUDA-cachedResponses-interleaved-compact', 'CUDA-recomputeResponses-interleaved',
+                     'CUDA-recomputeResponses-interleaved-compact']
         command = [sys.executable, '-u', str(profile), *defaults, *forwarded, '--output', str(own.output.resolve())]
     else:
         if not shutil.which(own.ncu):
             parser.error('Nsight Compute is unavailable; use --ncu /path/to/ncu')
         output = own.output.resolve()
         output.mkdir(parents=True, exist_ok=False)
-        defaults += ['--cases', 'CUDA-cachedResponses-interleaved', '--scenarios', 'local1', 'global',
+        defaults += ['--cases', 'CUDA-cachedResponses-interleaved',
+                     'CUDA-cachedResponses-interleaved-compact', '--scenarios', 'local1', 'global',
                      '--calls', '1', '--global-calls', '1', '--trials', '1', '--profile-capture']
         command = [own.ncu, '--target-processes', 'all', '--profile-from-start', 'off',
                    '--replay-mode', 'kernel', '--set', own.ncu_set, '--clock-control', 'none',

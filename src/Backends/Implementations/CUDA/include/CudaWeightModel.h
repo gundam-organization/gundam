@@ -3,9 +3,11 @@
 
 #include "EngineView.h"
 #include "NativeDialProgramModel.h"
+#include "Semantics/BackendSemanticsQualifiers.h"
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace Backends {
@@ -45,11 +47,36 @@ namespace Backends {
   };
   struct CudaBinningBound { double lower{0}, upper{0}; };
 
+  // Four coalesced uint32 columns: firstInput, payloadOffset, payloadSize,
+  // policy index. Policies share all response semantics, including smoothing.
+  // No event/response slot is reordered; sparse dependency indices stay valid.
+  struct CudaCompactDialView {
+    const std::uint32_t* fields{nullptr};
+    const BackendDialDescriptor* policies{nullptr};
+    std::size_t count{0};
+    GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+    BackendDialDescriptor operator[](std::size_t index_) const {
+      auto dial = policies[fields[3 * count + index_]];
+      dial.firstInput = fields[index_];
+      dial.payloadOffset = fields[count + index_];
+      dial.payloadSize = fields[2 * count + index_];
+      return dial;
+    }
+  };
+  struct CudaGenericDialView {
+    const BackendDialDescriptor* dials{nullptr};
+    GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+    const BackendDialDescriptor& operator[](std::size_t index_) const { return dials[index_]; }
+  };
+
   // Native-double model. Events are in result-slot order; histogram lists retain
   // the original event traversal order, independently of those result slots.
   struct CudaWeightModel {
     std::vector<BackendEventWeightDescriptor> events{};
     std::vector<BackendDialDescriptor> dials{};
+    std::vector<std::uint32_t> compactDialFields{};
+    std::vector<BackendDialDescriptor> compactDialPolicies{};
+    std::string compactDialFallback{};
     std::vector<BackendDialInputDescriptor> inputs{};
     std::vector<double> payloads{};
     std::vector<CudaFormulaProgram> formulaPrograms{};
@@ -101,7 +128,7 @@ namespace Backends {
 
   // Reject unsupported features and malformed layouts before allocating CUDA
   // buffers. This also makes model validation testable without a toolkit.
-  [[nodiscard]] CudaWeightModel makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_ = false);
+  [[nodiscard]] CudaWeightModel makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_ = false, bool compactDials_ = false);
 
   inline constexpr std::size_t cudaResponseBlockSize = 256;
   struct CudaResponseUpdate {

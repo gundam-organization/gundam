@@ -30,7 +30,8 @@ scheduling = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(scheduling)
 progress, write_json = scheduling.progress, scheduling.write_json
 CASES = ('CUDA-cachedResponses', 'CUDA-recomputeResponses', 'CPU',
-         'CUDA-cachedResponses-interleaved', 'CUDA-recomputeResponses-interleaved')
+         'CUDA-cachedResponses-interleaved', 'CUDA-recomputeResponses-interleaved',
+         'CUDA-cachedResponses-interleaved-compact', 'CUDA-recomputeResponses-interleaved-compact')
 SECONDS_FIELDS = ('parameterUploadSeconds', 'cachedDialStageSeconds',
                   'cachePreparationSeconds',
                   'eventWeightsStageSeconds', 'variableStageSeconds', 'binningStageSeconds',
@@ -94,9 +95,11 @@ def backend_config(args):
     backend_type = 'CPU' if args.worker == 'CPU' else 'CUDA'
     options = {} if backend_type == 'CPU' else {
         'deviceIndex': args.device_index, 'propagationMode': args.worker.split('-')[1],
-        'weightLayout': 'warpInterleaved' if args.worker.endswith('-interleaved') else 'eventMajor',
+        'weightLayout': 'warpInterleaved' if '-interleaved' in args.worker else 'eventMajor',
         'likelihoodBlockSize': getattr(args, 'likelihood_block_size', 0),
         'reusePrediction': not getattr(args, 'disable_prediction_reuse', False)}
+    if args.worker.endswith('-compact'):
+        options['compactDials'] = True
     return {'isEnabled': True, 'useBackend': backend_type,
         'options': [{'name': backend_type, **options}]}
 
@@ -300,6 +303,8 @@ def measure(args, engine=None, sequence=None):
               'scenarios': {}, 'hardwareProfile': getattr(args, 'profile_capture', False)}
     if args.worker != 'CPU':
         result['model'] = json.loads(engine.getBackendsManager().getDiagnosticCuda())
+        if args.worker.endswith('-compact') and not result['model'].get('compactDials', False):
+            raise RuntimeError('Compact CUDA dials were requested but are inactive: ' + result['model'].get('compactDialFallback', 'rebuild the module'))
         if getattr(args, 'require_weight_inventory', False) and 'weightInventory' not in result['model']:
             raise RuntimeError('Rebuild/reinstall the CUDA Python module: weightInventory is missing')
         if getattr(args, 'require_device_likelihood', False) and result['model'].get('likelihoodExecution') != 'device':
@@ -516,6 +521,14 @@ def write_report(output, cases):
         if model:
             lines.append(f"| {case} | {model['requestedWeightLayout']} | {model['weightLayout']} | "
                          f"{model['packedEventDialIndexBytes']} |")
+    lines.extend(['', '| CUDA case | Compact requested | Compact active | Device descriptors bytes | Shared policies | Fallback |',
+                  '|---|---|---|---:|---:|---|'])
+    for case in cases:
+        model = json.loads((output / case / 'summary.json').read_text()).get('model')
+        if model:
+            lines.append(f"| {case} | {model.get('requestedCompactDials', False)} | {model.get('compactDials', False)} | "
+                         f"{model.get('deviceDialDescriptorBytes', 'unknown')} | {model.get('compactDialPolicies', 0)} | "
+                         f"{model.get('compactDialFallback', '')} |")
     (output / 'report.md').write_text('\n'.join(lines))
 
 

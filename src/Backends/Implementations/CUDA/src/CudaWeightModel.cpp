@@ -6,6 +6,8 @@
 #include "Semantics/BackendDialSemantics.h"
 
 #include <algorithm>
+#include <array>
+#include <cstring>
 #include <map>
 #include <numeric>
 #include <cmath>
@@ -100,7 +102,7 @@ namespace {
   }
 }
 
-Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_) {
+Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_, bool compactDials_) {
   static_assert(std::is_trivially_copyable<CudaFormulaProgram>::value);
   static_assert(std::is_trivially_copyable<FormulaInstruction>::value);
   static_assert(std::is_trivially_copyable<FormulaInput>::value);
@@ -486,6 +488,59 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
   out.parameterCount = model.parameterCount;
   out.hasReweightCap = model.hasReweightCap;
   out.maxReweight = model.maxReweight;
+  if( compactDials_ ){
+    // All-or-nothing fallback keeps surfaces/programs/external producers on
+    // their existing path. Check every narrowing before allocating columns.
+    for( const auto& dial : out.dials ){
+      if( dial.type > BackendDialType::Graph ){
+        out.compactDialFallback = "model contains nonstandard dials"; break;
+      }
+      if( dial.firstInput > UINT32_MAX or dial.payloadOffset > UINT32_MAX or dial.payloadSize > UINT32_MAX ){
+        out.compactDialFallback = "dial fields exceed uint32 range"; break;
+      }
+    }
+    if( out.dials.size() > UINT32_MAX or out.dials.size() > std::numeric_limits<std::size_t>::max() / 4 ){
+      out.compactDialFallback = "dial count exceeds compact range";
+    }
+    if( out.compactDialFallback.empty() ){
+      // Bitwise keys preserve signed zero and inactive/nonfinite fields too.
+      // Never compare raw descriptors: padding is not initialized uniformly.
+      using PolicyKey = std::array<std::uint64_t, 13>;
+      std::map<PolicyKey, std::uint32_t> policies;
+      out.compactDialFields.resize(4 * out.dials.size());
+      for( std::size_t i = 0; i < out.dials.size(); ++i ){
+        const auto& dial = out.dials[i];
+        PolicyKey key{{std::uint64_t(dial.type), dial.inputCount, dial.allowExtrapolation,
+            dial.hasMinResponse, dial.hasMaxResponse}};
+        const double values[] = {dial.minResponse, dial.maxResponse,
+            dial.smoothing.minResponse, dial.smoothing.maxResponse,
+            dial.smoothing.minWidth, dial.smoothing.maxWidth,
+            dial.smoothing.minInverseWidth, dial.smoothing.maxInverseWidth};
+        static_assert(sizeof(double) == sizeof(std::uint64_t));
+        for( std::size_t j = 0; j < 8; ++j ){ std::memcpy(&key[5 + j], &values[j], sizeof(double)); }
+        const auto entry = policies.emplace(key, std::uint32_t(out.compactDialPolicies.size()));
+        if( entry.second ){
+          BackendDialDescriptor policy;
+          policy.type = dial.type; policy.inputCount = dial.inputCount;
+          policy.allowExtrapolation = dial.allowExtrapolation;
+          policy.hasMinResponse = dial.hasMinResponse; policy.hasMaxResponse = dial.hasMaxResponse;
+          policy.minResponse = dial.minResponse; policy.maxResponse = dial.maxResponse;
+          policy.smoothing = dial.smoothing;
+          out.compactDialPolicies.push_back(policy);
+        }
+        out.compactDialFields[i] = std::uint32_t(dial.firstInput);
+        out.compactDialFields[out.dials.size() + i] = std::uint32_t(dial.payloadOffset);
+        out.compactDialFields[2 * out.dials.size() + i] = std::uint32_t(dial.payloadSize);
+        out.compactDialFields[3 * out.dials.size() + i] = entry.first->second;
+      }
+      if( out.compactDialFields.size() * sizeof(std::uint32_t)
+          + out.compactDialPolicies.size() * sizeof(BackendDialDescriptor)
+          >= out.dials.size() * sizeof(BackendDialDescriptor) ){
+        out.compactDialFields.clear(); out.compactDialPolicies.clear();
+        out.compactDialFallback = "shared policies would not reduce descriptor storage";
+      }
+    }
+  }
   return out;
 }
 

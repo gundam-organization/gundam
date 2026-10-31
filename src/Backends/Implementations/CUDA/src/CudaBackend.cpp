@@ -56,10 +56,11 @@ void Backends::CudaBackend::configureImpl() {
   _deviceIndex_ = 0;
   _likelihoodBlockSize_ = 0;
   _reusePrediction_ = true;
+  _compactDials_ = false;
   _propagationMode_ = CudaPropagationMode::cachedResponses;
   _weightLayout_ = CudaWeightLayout::warpInterleaved;
   _config_.clearFields();
-  _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}, {"weightLayout"}, {"likelihoodBlockSize"}, {"reusePrediction"}});
+  _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}, {"weightLayout"}, {"likelihoodBlockSize"}, {"reusePrediction"}, {"compactDials"}});
   _config_.checkConfiguration();
   // fillValue tolerates conversion errors; explicit device/mode selections must
   // not silently fall back to defaults when they are malformed.
@@ -80,6 +81,10 @@ void Backends::CudaBackend::configureImpl() {
   if( const auto* reuse = _config_.getJsonEntry("reusePrediction") ){
     if( not reuse->is_boolean() ){ throw std::runtime_error("CudaBackend: reusePrediction must be a boolean."); }
   }
+  if( const auto* compact = _config_.getJsonEntry("compactDials") ){
+    if( not compact->is_boolean() ){ throw std::runtime_error("CudaBackend: compactDials must be a boolean."); }
+  }
+  _config_.fillValue(_compactDials_, "compactDials");
   _config_.fillValue(_likelihoodBlockSize_, "likelihoodBlockSize");
   _config_.fillValue(_reusePrediction_, "reusePrediction");
   _config_.fillValue(_deviceIndex_, "deviceIndex");
@@ -142,7 +147,7 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->diagnostics = {{"available", false}};
   if( not engineView_ ){ throw std::runtime_error("CudaBackend requires a model."); }
   const auto start = Clock::now();
-  const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved);
+  const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved, _compactDials_);
   _impl_->buildTiming.buildCompatibilityScanSeconds = elapsed(start);
   // Smaller blocks expose more independent work for short binned likelihoods.
   // This is a starting policy, not a V100 performance claim; benchmark overrides
@@ -164,6 +169,13 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
       {"likelihoodExecution", hasPortableLikelihood(getEngineView().likelihood) ? "device" : "host"},
       {"requestedLikelihoodBlockSize", _likelihoodBlockSize_}, {"likelihoodBlockSize", likelihoodBlockSize},
       {"likelihoodReduction", "parallel256"}, {"reusePrediction", _reusePrediction_},
+      {"requestedCompactDials", _compactDials_},
+      {"compactDials", not packed.compactDialFields.empty()},
+      {"compactDialFallback", packed.compactDialFallback},
+      {"compactDialPolicies", packed.compactDialPolicies.size()},
+      {"deviceDialDescriptorBytes", packed.compactDialFields.empty()
+          ? packed.dials.size() * sizeof(BackendDialDescriptor)
+          : packed.compactDialFields.size() * sizeof(std::uint32_t) + packed.compactDialPolicies.size() * sizeof(BackendDialDescriptor)},
       {"available", true}, {"events", packed.events.size()}, {"uniqueDials", packed.dials.size()},
       {"graphDials", std::count_if(packed.dials.begin(), packed.dials.end(),
           [](const auto& dial_){ return dial_.type == BackendDialType::Graph; })},

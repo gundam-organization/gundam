@@ -1,4 +1,6 @@
 #include "CudaBackend.h"
+#include "CudaWeightModel.h"
+#include "Semantics/BackendDialSemantics.h"
 #include "CpuBackend.h"
 #include "CompactSpline.h"
 #include "UniformSpline.h"
@@ -332,6 +334,117 @@ TEST(CudaBackendPropagation, InterleavedIndicesPreserveOrderedWeightsAndHistogra
         expectClose(interleaved.getEventWeightsHostView(token), cpu.getEventWeightsHostView(cpuToken));
         EXPECT_DOUBLE_EQ(interleaved.getLikelihood(token), original.getLikelihood(reference));
       }
+    }
+  }
+}
+
+// These packing/semantic checks run on the host and do not require a GPU.
+TEST(CudaCompactDialModel, PreservesStandardResponsesAndDependencySlots) {
+  for( bool extrapolate : {false, true} ){
+    auto view = makeModel(false, extrapolate);
+    const auto originals = view.propagation.dials;
+    for( int copy = 0; copy < 40; ++copy ){
+      view.propagation.dials.insert(view.propagation.dials.end(), originals.begin(), originals.end());
+    }
+    const auto packed = makeCudaWeightModel(view, true, true);
+    const auto generic = makeCudaWeightModel(view, true, false);
+    ASSERT_FALSE(packed.compactDialFields.empty());
+    EXPECT_EQ(packed.compactDialPolicies.size(), originals.size());
+    EXPECT_EQ(packed.parameterDialIndices, generic.parameterDialIndices);
+    EXPECT_EQ(packed.parameterDialOffsets, generic.parameterDialOffsets);
+    EXPECT_EQ(packed.eventDialIndices, generic.eventDialIndices);
+    EXPECT_EQ(packed.payloads, generic.payloads);
+    CudaCompactDialView compact{packed.compactDialFields.data(), packed.compactDialPolicies.data(), packed.dials.size()};
+    for( std::size_t i = 0; i < packed.dials.size(); ++i ){
+      const auto restored = compact[i];
+      EXPECT_EQ(restored.firstInput, packed.dials[i].firstInput);
+      EXPECT_EQ(restored.payloadOffset, packed.dials[i].payloadOffset);
+      EXPECT_EQ(restored.payloadSize, packed.dials[i].payloadSize);
+      for( const auto& values : std::vector<std::vector<double>>{{.8, 1.2, 2.3}, {-1., -2., -3.}, {9., 8., 7.}, {.45, 1.55, .55}} ){
+        EXPECT_DOUBLE_EQ(Semantics::evalDialResponse(restored, packed.inputs.data(), packed.payloads.data(), values.data()),
+            Semantics::evalDialResponse(packed.dials[i], packed.inputs.data(), packed.payloads.data(), values.data()));
+      }
+    }
+  }
+}
+
+TEST(CudaCompactDialModel, FallsBackForNonstandardModelsAndUnsharedPolicies) {
+  auto view = makeModel(false, false);
+  auto packed = makeCudaWeightModel(view, false, true);
+  EXPECT_TRUE(packed.compactDialFields.empty());
+  EXPECT_FALSE(packed.compactDialFallback.empty());
+  BackendDialDescriptor surface;
+  surface.type = BackendDialType::Bilinear;
+  surface.inputCount = 2;
+  surface.payloadOffset = view.propagation.dialPayloads.size();
+  surface.payloadSize = 10;
+  view.propagation.dialPayloads.insert(view.propagation.dialPayloads.end(), {2., 2., -1., 1., -1., 1., .5, 1., 1.5, 2.});
+  view.propagation.dials.push_back(surface);
+  packed = makeCudaWeightModel(view, false, true);
+  EXPECT_TRUE(packed.compactDialFields.empty());
+  EXPECT_EQ(packed.compactDialFallback, "model contains nonstandard dials");
+}
+
+TEST(CudaCompactDialModel, ChecksNarrowingAndBooleanConfiguration) {
+  auto view = makeModel(false, false);
+  // Shift ignores firstInput, so this is a valid generic model without a
+  // multi-gigabyte allocation; compact packing must still never truncate it.
+  view.propagation.dials[1].firstInput = std::size_t(UINT32_MAX) + 1;
+  const auto packed = makeCudaWeightModel(view, false, true);
+  EXPECT_TRUE(packed.compactDialFields.empty());
+  EXPECT_EQ(packed.compactDialFallback, "dial fields exceed uint32 range");
+  CudaBackend backend;
+  EXPECT_NO_THROW(backend.configure(ConfigReader(JsonType{{"compactDials", true}})));
+  EXPECT_NO_THROW(backend.configure(ConfigReader(JsonType{{"compactDials", false}})));
+  EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"compactDials", "true"}})), std::runtime_error);
+}
+
+TEST(CudaCompactDialModel, PolicySharingPreservesSignedZero) {
+  auto view = makeModel(false, false);
+  auto dial = view.propagation.dials.front();
+  dial.hasMinResponse = false; dial.minResponse = 0.;
+  view.propagation.dials.assign(128, dial);
+  view.propagation.dials[0].minResponse = -0.;
+  // Events originally refer to seven slots, all of which remain valid.
+  const auto packed = makeCudaWeightModel(view, false, true);
+  ASSERT_FALSE(packed.compactDialFields.empty());
+  ASSERT_EQ(packed.compactDialPolicies.size(), 2);
+  CudaCompactDialView compact{packed.compactDialFields.data(), packed.compactDialPolicies.data(), packed.dials.size()};
+  EXPECT_TRUE(std::signbit(compact[0].minResponse));
+  EXPECT_FALSE(std::signbit(compact[1].minResponse));
+}
+
+TEST(CudaBackendPropagation, CompactDialsMatchCpuAcrossSparseDenseAndReuse) {
+  for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){
+    for( const auto* layout : {"eventMajor", "warpInterleaved"} ){
+      auto view = makeModel(true, true);
+      const auto originals = view.propagation.dials;
+      for( int copy = 0; copy < 40; ++copy ){
+        view.propagation.dials.insert(view.propagation.dials.end(), originals.begin(), originals.end());
+      }
+      CpuBackend cpu;
+      CudaBackend cuda;
+      cuda.configure(ConfigReader(JsonType{{"compactDials", true}, {"propagationMode", mode}, {"weightLayout", layout}}));
+      cpu.build(view); cuda.build(view);
+      ASSERT_TRUE(JsonType::parse(cuda.getDiagnostics()).at("compactDials").get<bool>());
+      for( const auto& values : std::vector<std::vector<double>>{
+          {.8, 1.2, 2.3}, {.8, 1.2, 2.3}, {1., 1.2, 2.3}, {1., 2., 3.}, {-1., -2., -3.}, {.45, 1.55, .55}} ){
+        PropagationInputs inputs;
+        inputs.parameters.values = values;
+        const auto reference = cpu.requestPropagation(inputs);
+        const auto token = cuda.requestPropagation(inputs);
+        expectClose(cuda.getEventWeightsHostView(token), cpu.getEventWeightsHostView(reference));
+        expectClose(cuda.getHistogramSumsHostView(token), cpu.getHistogramSumsHostView(reference));
+        expectClose(cuda.getHistogramSumSquaresHostView(token), cpu.getHistogramSumSquaresHostView(reference));
+        EXPECT_NEAR(cuda.getLikelihood(token), cpu.getLikelihood(reference), 2.e-11 * std::max(1., std::abs(cpu.getLikelihood(reference))));
+      }
+      PropagationInputs invalid;
+      invalid.parameters.values = {std::numeric_limits<double>::quiet_NaN(), 1., 2.};
+      EXPECT_THROW(cuda.requestPropagation(invalid), std::runtime_error);
+      invalid.parameters.values = {.8, 1.2, 2.3};
+      const auto reference = cpu.requestPropagation(invalid);
+      const auto recovered = cuda.requestPropagation(invalid);
+      expectClose(cuda.getEventWeightsHostView(recovered), cpu.getEventWeightsHostView(reference));
     }
   }
 }

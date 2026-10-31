@@ -103,7 +103,9 @@ namespace {
     DeviceBuffer<double> likelihoodPartials, likelihoodTotal;
     unsigned int likelihoodBlockSize{256};
     DeviceBuffer<Backends::BackendEventWeightDescriptor> events;
-    DeviceBuffer<Backends::BackendDialDescriptor> dials;
+    DeviceBuffer<Backends::BackendDialDescriptor> dials, compactDialPolicies;
+    DeviceBuffer<std::uint32_t> compactDialFields;
+    std::size_t dialCount{0};
     DeviceBuffer<Backends::BackendDialInputDescriptor> inputs;
     DeviceBuffer<double> payloads, parameters, responses, previousInputs, previousSecondInputs, weights, sums, sumSquares;
     DeviceBuffer<std::uint32_t> dialIndices, parameterDialIndices;
@@ -174,8 +176,8 @@ namespace {
     return static_cast<unsigned int>(std::min<std::size_t>((size_ - 1) / blockSize + 1, 65535));
   }
 
-  template<bool surfaces_, int programMode_>
-  __device__ void evaluateResponse(std::size_t i, const Backends::BackendDialDescriptor* dials_,
+  template<bool surfaces_, int programMode_, typename DialView>
+  __device__ void evaluateResponse(std::size_t i, DialView dials_,
                                   const Backends::BackendDialInputDescriptor* inputs_, const double* payloads_,
                                   const double* parameters_, double* responses_, double* previousInputs_,
                                   bool reuse_, int* error_, double* previousSecondInputs_, std::size_t surfaceOffset_, Backends::CudaProgramView programs_) {
@@ -240,8 +242,8 @@ namespace {
     previousInputs_[i] = input;
   }
 
-  template<bool surfaces_, int programMode_>
-  __global__ void evaluateResponses(const Backends::BackendDialDescriptor* dials_, std::size_t count_,
+  template<bool surfaces_, int programMode_, typename DialView>
+  __global__ void evaluateResponses(DialView dials_, std::size_t count_,
                                     const Backends::BackendDialInputDescriptor* inputs_, const double* payloads_,
                                     const double* parameters_, double* responses_, double* previousInputs_,
                                     bool reuse_, int* error_, double* previousSecondInputs_, std::size_t surfaceOffset_, Backends::CudaProgramView programs_) {
@@ -252,10 +254,10 @@ namespace {
     }
   }
 
-  template<bool surfaces_, int programMode_>
+  template<bool surfaces_, int programMode_, typename DialView>
   __global__ void evaluateSelectedResponses(const Backends::CudaResponseUpdate* updates_,
       std::size_t rangeCount_, std::size_t blockCount_, const std::uint32_t* indices_,
-      const Backends::BackendDialDescriptor* dials_, const Backends::BackendDialInputDescriptor* inputs_,
+      DialView dials_, const Backends::BackendDialInputDescriptor* inputs_,
       const double* payloads_, const double* parameters_, double* responses_, double* previousInputs_, int* error_,
       double* previousSecondInputs_, std::size_t surfaceOffset_, Backends::CudaProgramView programs_) {
     __shared__ std::size_t first, end;
@@ -667,7 +669,12 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
   auto& b = *buffers;
   try{
     b.events.upload(model_.events, _impl_->stream);
-    b.dials.upload(model_.dials, _impl_->stream);
+    b.dialCount = model_.dials.size();
+    if( model_.compactDialFields.empty() ){ b.dials.upload(model_.dials, _impl_->stream); }
+    else{
+      b.compactDialFields.upload(model_.compactDialFields, _impl_->stream);
+      b.compactDialPolicies.upload(model_.compactDialPolicies, _impl_->stream);
+    }
     b.inputs.upload(model_.inputs, _impl_->stream);
     b.payloads.upload(model_.payloads, _impl_->stream);
     b.formulaPrograms.upload(model_.formulaPrograms, _impl_->stream);
@@ -796,9 +803,9 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     // avoids a full dial scan and uploads only one range per changed parameter.
     const bool directPrograms = not b.programDispatchIndices.empty() and not b.updatePlan.ranges.empty()
         and std::all_of(b.updatePlan.ranges.begin(), b.updatePlan.ranges.end(), [](const auto& range_){ return range_.direct; });
-    const bool sparse = reuse and (b.updatePlan.dialCount <= (b.dials.size - b.externalDialCount) / 2
-        or (directPrograms and b.updatePlan.dialCount < b.dials.size - b.externalDialCount));
-    const auto candidates = sparse ? b.updatePlan.dialCount : b.dials.size - b.externalDialCount;
+    const bool sparse = reuse and (b.updatePlan.dialCount <= (b.dialCount - b.externalDialCount) / 2
+        or (directPrograms and b.updatePlan.dialCount < b.dialCount - b.externalDialCount));
+    const auto candidates = sparse ? b.updatePlan.dialCount : b.dialCount - b.externalDialCount;
     // Conservative invalidation: any selected response, observable/binning
     // update or failed/unprimed cache forces fresh weights and histograms.
     const bool updatePrediction = not reusePrediction_ or not reuse or updateState
@@ -834,29 +841,33 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
                                 cudaMemcpyHostToDevice, stream), "parameter upload");
     }
     record(1);
-    auto launchResponses = [&](auto surfaceTag_, auto directTag_){
+    auto launchResponses = [&](auto surfaceTag_, auto directTag_, auto dialView_){
       constexpr bool withSurfaces = decltype(surfaceTag_)::value;
       constexpr int programMode = decltype(directTag_)::value;
       if( sparse and candidates ){
         const auto blocks = static_cast<unsigned int>(std::min<std::size_t>(b.updatePlan.blockCount, 65535));
         evaluateSelectedResponses<withSurfaces, programMode><<<blocks, blockSize, 0, stream>>>(b.responseUpdates.data,
             b.updatePlan.ranges.size(), b.updatePlan.blockCount, b.parameterDialIndices.data,
-            b.dials.data, b.inputs.data, b.payloads.data, b.parameters.data,
+            dialView_, b.inputs.data, b.payloads.data, b.parameters.data,
             b.responses.data, b.previousInputs.data, b.error.data, b.previousSecondInputs.data, b.surfaceOffset, b.programView());
         checkCuda(cudaGetLastError(), "selected dial response kernel launch");
       }
       else if( not sparse and candidates ){
-        evaluateResponses<withSurfaces, programMode><<<gridSize(b.dials.size), blockSize, 0, stream>>>(b.dials.data, b.dials.size,
+        evaluateResponses<withSurfaces, programMode><<<gridSize(b.dialCount), blockSize, 0, stream>>>(dialView_, b.dialCount,
             b.inputs.data, b.payloads.data, b.parameters.data, b.responses.data, b.previousInputs.data,
             reuse, b.error.data, b.previousSecondInputs.data, b.surfaceOffset, b.programView());
         checkCuda(cudaGetLastError(), "dial response kernel launch");
       }
     };
     auto launch = [&](auto directTag_){
-      if( b.surfaceOffset < b.dials.size ){ launchResponses(std::true_type{}, directTag_); }
-      else{ launchResponses(std::false_type{}, directTag_); }
+      if( b.surfaceOffset < b.dialCount ){ launchResponses(std::true_type{}, directTag_, CudaGenericDialView{b.dials.data}); }
+      else{ launchResponses(std::false_type{}, directTag_, CudaGenericDialView{b.dials.data}); }
     };
-    if( b.onlyFastPrograms ){ launch(std::integral_constant<int, 2>{}); }
+    if( b.compactDialFields.size ){
+      launchResponses(std::false_type{}, std::integral_constant<int, 0>{},
+          CudaCompactDialView{b.compactDialFields.data, b.compactDialPolicies.data, b.dialCount});
+    }
+    else if( b.onlyFastPrograms ){ launch(std::integral_constant<int, 2>{}); }
     else if( b.formulaPrograms.size or b.compositePrograms.size ){ launch(std::integral_constant<int, 1>{}); }
     else{ launch(std::integral_constant<int, 0>{}); }
     if( b.externalUpdatePlan.dialCount ){
@@ -1146,7 +1157,7 @@ Backends::BackendResourceUsage Backends::CudaDeviceContext::getResourceUsage() c
       b.likelihoodBins, b.likelihoodPartials, b.likelihoodTotal,
       b.formulaPrograms, b.formulaInstructions, b.formulaConstants, b.formulaInputs,
       b.compositePrograms, b.compositeInstances, b.compositeNodeData, b.compositeInstructions, b.compositeInputs, b.programScratchOffsets, b.programScratch,
-      b.events, b.dials, b.inputs, b.payloads, b.parameters,
+      b.events, b.dials, b.compactDialFields, b.compactDialPolicies, b.inputs, b.payloads, b.parameters,
       b.responses, b.previousInputs, b.previousSecondInputs, b.weights, b.sums,
       b.sumSquares, b.dialIndices, b.parameterDialIndices, b.responseUpdates, b.externalResponseUpdates,
       b.tableTerms, b.externalBlocks, b.externalWeights, b.binOffsets, b.binEvents,
