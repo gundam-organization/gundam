@@ -2,7 +2,7 @@
 #define SHARED_SURFACE_H_SEEN
 
 #ifndef GUNDAM_DEVICE_MATH_SKIP_COMMON_INCLUDE
-#include "DeviceMath/SharedSplineCommon.h"
+#include "SharedSplineCommon.h"
 #endif
 
 // Uses the Catmull-Rom/Horner interpolation and edge continuation from

@@ -2,7 +2,7 @@
 #define SHARED_SPLINE_UNIFORM_H_SEEN
 
 #ifndef GUNDAM_DEVICE_MATH_SKIP_COMMON_INCLUDE
-#include "DeviceMath/SharedSplineCommon.h"
+#include "SharedSplineCommon.h"
 #endif
 
 namespace GundamDeviceMath {
