@@ -5,6 +5,22 @@
 #include <limits>
 
 #include "JointProbability.h"
+#include "BarlowBeeston.h"
+#include "BarlowBeestonLiteGaussian.h"
+#include "BarlowBeestonLitePoisson.h"
+
+namespace {
+    void configurePredictionSample(Sample& sample_, const std::string& name_) {
+        JsonType config{
+            {"name", name_},
+            {"binning", {{"binningDefinition", {{{"name", "X"}, {"edges", {0, 1}}}}}}}
+        };
+        sample_.configure(ConfigReader(config));
+        sample_.setIndex(0);
+    }
+}
+
+
 
 TEST(jointProbability, BarlowBeestonResolvesPoissonDevianceNearTheMinimum) {
     std::unique_ptr<JointProbability::JointProbabilityBase> probability(
@@ -76,7 +92,9 @@ TEST(jointProbability, Construction) {
         "LeastSquares",
         "Chi2",
         "PoissonLLH",
-        "BarlowLLH",
+        "BarlowBeeston",
+        "BarlowBeestonLiteGaussian",
+        "BarlowBeestonLitePoisson",
         "BarlowLLH_BANFF_OA2020",
         "BarlowLLH_BANFF_OA2021",
         "BarlowLLH_BANFF_OA2021_SFGD",
@@ -392,69 +410,217 @@ TEST(jointProbability, OA2021_UpdateErr_Continuity) {
 
 }
 
-TEST(jointProbability, BarlowLLH_Continuity) {
-
-    std::unique_ptr<JointProbability::JointProbabilityBase>
-        jointProb(JointProbability::makeJointProbability(
-                      "BarlowLLH"));
-    double data = 20.0;
-    double origPred = std::max(1.0, data);
-    double fracErr = 1.0/sqrt(origPred);
-    double origErr = fracErr * origPred;;
-    double predErr = fracErr * origPred;;
-
-    // Check the continuity for values less than the observation
-    double lastP = -1;
-    double lastPred = 0.0;
-    for (double pred = origPred; pred != lastPred; pred *= 0.9) {
-        predErr = fracErr*pred;
-        double newP = jointProb->eval(data, pred, predErr,0);
-        ASSERT_FALSE(std::isnan(newP)) << "Not a number for"
-                                       << " data: " << data
-                                       << " prediction: " << pred
-                                       << " error: " << predErr;
-        ASSERT_GE(newP,lastP) << "Not monotonic for"
-                              << " data: " << data
-                              << " prediction: " << pred
-                              << " error: " << predErr
-                              << " prob: " << newP << " (" << lastP << ")"
-                              << " diff: " << newP-lastP;
-        lastP = newP;
-        lastPred = pred;
+TEST(jointProbability, ExactBarlowBeestonSingleSource) {
+    using BB = JointProbability::BarlowBeeston;
+    for (double n : {0., 1., 20., 1000.}) {
+        for (double a : {1., 20., 1000.}) {
+            for (double p : {.001, .5, 2., 100.}) {
+                const auto result = BB::evaluateSources(n, {{a, p}});
+                const double fitted = (n+a)/(1+p);
+                EXPECT_NEAR(result.fittedCounts[0], fitted, fitted*2.e-14);
+                const double expected = 2*(p*fitted-n + (n == 0 ? 0 : n*std::log(n/(p*fitted)))
+                    + fitted-a + a*std::log(a/fitted));
+                EXPECT_NEAR(result.value, expected, 1.e-10*(1+expected));
+            }
+        }
     }
+}
 
-    // Check the value for a prediction of zero.
-    double zeroP = jointProb->eval(data, 0.0, 0.0, 0);
-    ASSERT_FALSE(std::isnan(zeroP)) << "Not a number for"
-                                    << " data: " << data
-                                    << " prediction: " << 0.0
-                                    << " error: " << 0.0;
-    ASSERT_GE(zeroP,lastP) << "Not monotonic for"
-                           << " data: " << data
-                           << " prediction: " << 0.0
-                           << " error: " << 0.0
-                           << " prob: " << zeroP << " (" << lastP << ")"
-                           << " diff: " << zeroP-lastP;
-
-
-    // Check the continuity for values greater than the observation
-    lastP = -1;
-    lastPred = 0.0;
-    for (double pred = origPred; pred < 20*origPred; pred *= 1.01) {
-        predErr = fracErr*pred;
-        double newP = jointProb->eval(data, pred, predErr,0);
-        ASSERT_FALSE(std::isnan(newP)) << "Not a number for"
-                                       << " data: " << data
-                                       << " prediction: " << pred
-                                       << " error: " << predErr;
-        ASSERT_GE(newP,lastP) << "Not monotonic for"
-                              << " data: " << data
-                              << " prediction: " << pred
-                              << " error: " << predErr
-                              << " prob: " << newP << " (" << lastP << ")"
-                              << " diff: " << newP-lastP;
-        lastP = newP;
-        lastPred = pred;
+TEST(jointProbability, ExactBarlowBeestonEmptySourcesAndStationarity) {
+    using BB = JointProbability::BarlowBeeston;
+    // An empty template with the largest scale can acquire a positive mean.
+    const auto boundary = BB::evaluateSources(10, {{0, 2}, {1, .1}});
+    EXPECT_NEAR(boundary.prediction, 10./1.5, 1.e-13);
+    EXPECT_GT(boundary.fittedCounts[0], 0);
+    EXPECT_NEAR(boundary.fittedCounts[1], 1./.95, 1.e-13);
+    EXPECT_DOUBLE_EQ(BB::evaluateSources(0, {{0, 2}}).value, 0);
+    EXPECT_TRUE(std::isinf(BB::evaluateSources(10, {}).value));
+    const std::vector<BB::Source> sources{{12, .2}, {3, 4}, {0, .8}};
+    for (double n : {0., 1., 30., 100.}) {
+        const auto result = BB::evaluateSources(n, sources, 2);
+        for (size_t i = 0; i < sources.size(); ++i) {
+            if (sources[i].count == 0) continue;
+            const double a = result.fittedCounts[i];
+            const double score = sources[i].scale*(1-n/result.prediction)+1-sources[i].count/a;
+            EXPECT_NEAR(score, 0, 1.e-12);
+            auto up = sources, down = sources;
+            const double step = sources[i].scale*1.e-5;
+            up[i].scale += step;
+            down[i].scale -= step;
+            EXPECT_NEAR(result.scaleGradients[i],
+                (BB::evaluateSources(n, up, 2).value-BB::evaluateSources(n, down, 2).value)/(2*step), 1.e-6);
+        }
     }
+    BB probability;
+    EXPECT_THROW((void)probability.eval(10, 12, 2, 0), std::logic_error);
+    EXPECT_THROW((void)BB::evaluateSources(1, {{1.5, 1}}), std::invalid_argument);
+}
 
+TEST(jointProbability, LiteGaussianMatchesValidatedBanffAndHasAnalyticGradients) {
+    using Gaussian = JointProbability::BarlowBeestonLiteGaussian;
+    std::unique_ptr<JointProbability::JointProbabilityBase> legacy(
+        JointProbability::makeJointProbability("BarlowLLH_BANFF_OA2021"));
+    for (double n : {0., 1., 20., 1.e6}) {
+        for (double mu : {.1, 2., 20., 1000.}) {
+            for (double sigma : {0., .1, 2., 100.}) {
+                const auto result = Gaussian::evaluate(n, mu, sigma);
+                EXPECT_NEAR(result.value, legacy->eval(n, mu, sigma*sigma, 0), 2.e-9*(1+result.value));
+                const double step = mu*1.e-5;
+                EXPECT_NEAR(result.predictionGradient,
+                    (Gaussian::evaluate(n, mu+step, sigma).value-Gaussian::evaluate(n, mu-step, sigma).value)/(2*step),
+                    1.e-4*(1+std::abs(result.predictionGradient)));
+                if (sigma == 0) continue;
+                const double errorStep = sigma*1.e-5;
+                EXPECT_NEAR(result.uncertaintyGradient,
+                    (Gaussian::evaluate(n, mu, sigma+errorStep).value-Gaussian::evaluate(n, mu, sigma-errorStep).value)/(2*errorStep),
+                    1.e-4*(1+std::abs(result.uncertaintyGradient)));
+            }
+        }
+    }
+}
+
+TEST(jointProbability, LiteGaussianBoundariesAndSmallDisplacements) {
+    using Gaussian = JointProbability::BarlowBeestonLiteGaussian;
+    EXPECT_DOUBLE_EQ(Gaussian::evaluate(0, 0, 0).value, 0);
+    EXPECT_TRUE(std::isinf(Gaussian::evaluate(1, 0, 0).value));
+    EXPECT_TRUE(std::isinf(Gaussian::evaluate(-1, 2, 1).value));
+    EXPECT_DOUBLE_EQ(Gaussian::evaluate(0, 1, 2).value, .25);
+    for (double n : {1.e-100, 1., 1.e100}) {
+        const double sigma = std::sqrt(n);
+        EXPECT_DOUBLE_EQ(Gaussian::evaluate(n, n, sigma).value, 0);
+        const double mu = n*(1+1.e-10);
+        const double expected = (mu-n)*(mu-n)/(n+sigma*sigma);
+        EXPECT_NEAR(Gaussian::evaluate(n, mu, sigma).value, expected, expected*1.e-8);
+    }
+    EXPECT_TRUE(std::isfinite(Gaussian::evaluate(10, 1.e-300, 1).value));
+    EXPECT_TRUE(std::isfinite(Gaussian::evaluate(10, 0, 1.e-300).value));
+    EXPECT_NEAR(Gaussian::evaluate(10, 2, 1.e-300).predictionGradient, -8., 1.e-13);
+    EXPECT_TRUE(std::isfinite(Gaussian::evaluate(10, 1.e300, 1.e300).value));
+}
+
+
+TEST(jointProbability, LiteLikelihoodsUseCurrentErrorsAndAnalyticSampleGradients) {
+    Sample model, data;
+    configurePredictionSample(model, "model");
+    configurePredictionSample(data, "data");
+    SamplePair pair{&model, &data};
+    auto& bin = model.getHistogram().getBinContentList()[0];
+    data.getHistogram().getBinContentList()[0].sumWeights = 15;
+    for (const auto& type : {"BarlowBeestonLiteGaussian", "BarlowBeestonLitePoisson"}) {
+        SCOPED_TRACE(type);
+        std::unique_ptr<JointProbability::JointProbabilityBase> probability(
+            JointProbability::makeJointProbability(type));
+        probability->configure(ConfigReader(JsonType::object()));
+        bin = {25, 3};
+        const double original = probability->eval(pair, 0);
+        bin = {25, 11};
+        EXPECT_NE(probability->eval(pair, 0), original);
+        EXPECT_DOUBLE_EQ(probability->eval(pair, 0), probability->eval(15, 25, 11, 0));
+        EXPECT_DOUBLE_EQ(probability->evalPredictionGradient(pair, 0), probability->evalPredictionGradient(15, 25, 11, 0));
+        EXPECT_DOUBLE_EQ(probability->evalSqrtSumSqWeightsGradient(pair, 0), probability->evalSqrtSumSqWeightsGradient(15, 25, 11, 0));
+        EXPECT_DOUBLE_EQ(probability->evalWithPrediction(pair, 15, 30, 7, 0), probability->eval(15, 30, 7, 0));
+        EXPECT_DOUBLE_EQ(bin.sumWeights, 25);
+        EXPECT_DOUBLE_EQ(bin.sqrtSumSqWeights, 11);
+        probability->configure(ConfigReader(JsonType{{"ignoreBinsWithZeroPredictionAtPrior", true}}));
+        bin = {0, 0};
+        probability->updateZeroPredictionBinsAtPriorFlag({pair});
+        bin = {25, 11};
+        EXPECT_DOUBLE_EQ(probability->eval(pair, 0), 0);
+        EXPECT_DOUBLE_EQ(probability->evalWithPrediction(pair, 15, 30, 7, 0), 0);
+        EXPECT_DOUBLE_EQ(probability->evalPredictionGradient(pair, 0), 0);
+        EXPECT_DOUBLE_EQ(probability->evalSqrtSumSqWeightsGradient(pair, 0), 0);
+    }
+}
+
+TEST(jointProbability, LitePoissonMatchesExactSingleTemplate) {
+    using Lite = JointProbability::BarlowBeestonLitePoisson;
+    using Exact = JointProbability::BarlowBeeston;
+    for (double count : {1., 5., 100., 1.e6}) {
+        for (double scale : {.01, .2, 2., 100.}) {
+            for (double n : {0., 1., 10., 1000.}) {
+                SCOPED_TRACE(::testing::Message() << "n=" << n << ", a=" << count << ", scale=" << scale);
+                const double mu = count*scale, sigma = std::sqrt(count)*scale;
+                const auto actual = Lite::evaluate(n, mu, sigma);
+                const auto expected = Exact::evaluateSources(n, {{count, scale}});
+                EXPECT_NEAR(actual.value, expected.value, 2.e-12*(1+expected.value));
+                // Along a source normalization variation, mu and sigma both vary.
+                const double scaleDerivative = count*actual.predictionGradient + std::sqrt(count)*actual.uncertaintyGradient;
+                EXPECT_NEAR(scaleDerivative, expected.scaleGradients[0], 2.e-10*(1+std::abs(expected.scaleGradients[0])));
+            }
+        }
+    }
+}
+
+TEST(jointProbability, LitePoissonAnalyticGradients) {
+    using Lite = JointProbability::BarlowBeestonLitePoisson;
+    for (double n : {0., 1., 20., 1.e6}) {
+        for (double mu : {.1, 2., 20., 1000.}) {
+            for (double sigma : {.01, 2., 100.}) {
+                SCOPED_TRACE(::testing::Message() << "n=" << n << ", mu=" << mu << ", sigma=" << sigma);
+                const auto actual = Lite::evaluate(n, mu, sigma);
+                const double h = mu*1.e-5, k = sigma*1.e-5;
+                const double predDerivative = (Lite::evaluate(n, mu+h, sigma).value-Lite::evaluate(n, mu-h, sigma).value)/(2*h);
+                const double errDerivative = (Lite::evaluate(n, mu, sigma+k).value-Lite::evaluate(n, mu, sigma-k).value)/(2*k);
+                EXPECT_GE(actual.value, 0);
+                EXPECT_NEAR(actual.predictionGradient, predDerivative, 2.e-5*(1+std::abs(predDerivative)));
+                EXPECT_NEAR(actual.uncertaintyGradient, errDerivative, 2.e-5*(1+std::abs(errDerivative)));
+            }
+        }
+    }
+}
+
+TEST(jointProbability, LitePoissonLimitsAndStability) {
+    using Lite = JointProbability::BarlowBeestonLitePoisson;
+    EXPECT_DOUBLE_EQ(Lite::evaluate(0, 0, 0).value, 0);
+    EXPECT_TRUE(std::isinf(Lite::evaluate(1, 0, 0).value));
+    EXPECT_TRUE(std::isinf(Lite::evaluate(0, 0, 1).value));
+    EXPECT_TRUE(std::isinf(Lite::evaluate(-1, 2, 1).value));
+    EXPECT_TRUE(std::isinf(Lite::evaluate(1, 2, -1).value));
+    EXPECT_NEAR(Lite::evaluate(0, 5, 0).value, 10, 1.e-14);
+    EXPECT_NEAR(Lite::evaluate(3, 5, 0).predictionGradient, .8, 1.e-14);
+    for (double n : {1.e-100, 1., 1.e100}) {
+        for (double sigma : {std::sqrt(n)*.1, std::sqrt(n), std::sqrt(n)*10}) {
+            EXPECT_DOUBLE_EQ(Lite::evaluate(n, n, sigma).value, 0);
+            for (double mu : {std::nextafter(n, 0.), std::nextafter(n, 2*n), n*(1+1.e-10)}) {
+                const long double difference = static_cast<long double>(mu)-n;
+                const double expected = double(difference*difference/(n+static_cast<long double>(sigma)*sigma));
+                const auto actual = Lite::evaluate(n, mu, sigma);
+                EXPECT_GT(actual.value, 0);
+                EXPECT_NEAR(actual.value, expected, expected*1.e-9);
+            }
+        }
+    }
+    for (const auto& point : std::vector<std::vector<double>>{{10, 1.e-300, 1}, {10, 1.e300, 1.e300},
+            {10, 2, 1.e-300}, {10, 2, 1.e300}, {0, 1.e300, 1.e300}}) {
+        const auto actual = Lite::evaluate(point[0], point[1], point[2]);
+        EXPECT_TRUE(std::isfinite(actual.value));
+        EXPECT_TRUE(std::isfinite(actual.predictionGradient));
+        EXPECT_TRUE(std::isfinite(actual.uncertaintyGradient));
+        EXPECT_GE(actual.value, 0);
+    }
+    // Infinite MC-statistics limit.
+    EXPECT_NEAR(Lite::evaluate(10, 2, 1.e-100).value, 2*(2-10+10*std::log(5)), 1.e-11);
+}
+
+
+TEST(jointProbability, LiteGaussianCombinedGradientPreservesIgnoredBins) {
+    Sample model, data;
+    configurePredictionSample(model, "model");
+    configurePredictionSample(data, "data");
+    SamplePair pair{&model, &data};
+    JointProbability::BarlowBeestonLiteGaussian probability;
+    probability.configure(ConfigReader(JsonType{{"ignoreBinsWithZeroPredictionAtPrior", true}}));
+    model.getHistogram().getBinContentList()[0].sumWeights = 0.;
+    probability.updateZeroPredictionBinsAtPriorFlag({pair});
+    model.getHistogram().getBinContentList()[0].sumWeights = 8.;
+    model.getHistogram().getBinContentList()[0].sqrtSumSqWeights = 2.;
+    data.getHistogram().getBinContentList()[0].sumWeights = 10.;
+    const auto ignored = probability.evalBinGradient(pair, 0);
+    EXPECT_DOUBLE_EQ(ignored.prediction, 0.);
+    EXPECT_DOUBLE_EQ(ignored.uncertainty, 0.);
+    probability.configure(ConfigReader(JsonType{{"ignoreBinsWithZeroPredictionAtPrior", false}}));
+    const auto gradient = probability.evalBinGradient(pair, 0);
+    const auto expected = JointProbability::BarlowBeestonLiteGaussian::evaluate(10., 8., 2.);
+    EXPECT_DOUBLE_EQ(gradient.prediction, expected.predictionGradient);
+    EXPECT_DOUBLE_EQ(gradient.uncertainty, expected.uncertaintyGradient);
 }

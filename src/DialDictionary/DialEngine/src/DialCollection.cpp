@@ -7,6 +7,7 @@
 #include "TabulatedDialFactory.h"
 #include "KrigedDialFactory.h"
 #include "ExternalWeightDialFactory.h"
+#include "CompositeDial.h"
 
 #include "RootFormula.h"
 #include "Shift.h"
@@ -27,6 +28,7 @@
 
 #include "Logger.h"
 
+#include <algorithm>
 #include <sstream>
 
 void DialCollection::prepareConfig(ConfigReader &config_){
@@ -38,7 +40,7 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"dialInputList"},
       {"printDialSummary", {"printDialsSummary"}},
       {"dialType", {"type", "dialsType"}},
-      {"options", {"dialSubType"}},
+      {"options", {"dialSubType", "dialConfig"}},
       {"dialBranchData", {"dialLeafName", "treeExpression"}},
       {"minDialResponse", {"minimumSplineResponse"}},
       {"maxDialResponse"},
@@ -47,6 +49,8 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"mirrorHighEdge"},
       {"allowDialExtrapolation"},
       {"applyCondition"},
+      {"applyToVariable"},
+      {"variableResponseMode"},
       {"definitionRange"},
       {"knotResponseLimits"},
       {"mirrorDefinitionRange"},
@@ -62,12 +66,72 @@ void DialCollection::prepareConfig(ConfigReader &config_){
     });
   config_.checkConfiguration();
 }
+void DialCollection::prepareCompositeInputs(ConfigReader& config_){
+  prepareConfig(config_);
+  LogThrowIf(config_.hasField("dialInputList"),
+             "Composite: declare parameterName or parameterIndex in nodes, without an outer dialInputList");
+  auto options = config_.fetchValue<ConfigReader>("options");
+  options.defineFields({{"nodes"}, {"output"}});
+  options.checkConfiguration();
+  auto nodes = options.fetchValue<ConfigReader>("nodes");
+  JsonType normalizedNodes = JsonType::array();
+  JsonType parameters = JsonType::array();
+  // Infer a stable, deduplicated buffer layout for cache invalidation. Nested
+  // graphs expose their inferred dependencies to their enclosing graph.
+  for( auto node : nodes.loop() ){
+    prepareConfig(node);
+    if( node.fetchValue<DialType>("dialType") == DialType::Composite ){
+      prepareCompositeInputs(node);
+    }
+    auto inputs = node.fetchValue<JsonType>("dialInputList");
+    LogThrowIf(not inputs.is_array(), "Composite node dialInputList must be a list");
+    for( auto& input : inputs ){
+      LogThrowIf(input.contains("inputIndex"),
+                 "Composite: inputIndex has been removed; use parameterName or parameterIndex");
+      const int sources = int(input.contains("parameterName")) + int(input.contains("parameterIndex"))
+                          + int(input.contains("dialResponse")) + int(input.contains("eventVariable"));
+      LogThrowIf(sources != 1,
+                 "Composite input: specify exactly one of parameterName, parameterIndex, dialResponse and eventVariable");
+      if( not input.contains("parameterName") and not input.contains("parameterIndex") ){ continue; }
+      auto* parameterSet = getSupervisedParameterSet();
+      std::string name;
+      if( input.contains("parameterIndex") ){
+        const auto& index = input.at("parameterIndex");
+        LogThrowIf(not index.is_number_integer() or index < 0 or index >= parameterSet->getParameterList().size(),
+                   "Composite: parameterIndex outside the supervised parameter set");
+        name = parameterSet->getParameterList().at(index.get<int>()).getName();
+        input.erase("parameterIndex");
+      }
+      else{
+        name = input.at("parameterName").get<std::string>();
+        LogThrowIf(parameterSet->getParameterPtr(name) == nullptr, "Could not find parameter: " << name);
+      }
+      input["parameterName"] = name;
+      const JsonType reference = {{"parameterName", name}};
+      if( std::find(parameters.begin(), parameters.end(), reference) == parameters.end() ){
+        parameters.emplace_back(reference);
+      }
+    }
+    node.getConfig()["dialInputList"] = std::move(inputs);
+    normalizedNodes.emplace_back(node.getConfig());
+  }
+  options.getConfig()["nodes"] = std::move(normalizedNodes);
+  config_.getConfig()[config_.getConfigEntry("options").first] = options.getConfig();
+  config_.getConfig()["dialInputList"] = std::move(parameters);
+}
+
 void DialCollection::configureImpl() {
   prepareConfig(_config_);
 
   _config_.fillValue(_dataSetNameList_, "applyOnDataSets");
   _config_.fillValue(_isEnabled_, "isEnabled");
   if( not _isEnabled_ ){ return; }
+
+  if( not _isCompositeNode_ and _config_.fetchValue<DialType>("dialType", DialType::Unset) == DialType::Composite ){
+    prepareCompositeInputs(_config_);
+  }
+
+  readVariableResponseConfig(_config_);
 
   // Dials are directly defined with a binning file?
   if     ( initializeNormDialsWithParBinning() ){}
@@ -86,13 +150,45 @@ void DialCollection::configureImpl() {
     _dialInputBufferList_.emplace_back();
     _dialInputBufferList_.back().setParSetRef( _parameterSetListPtr_ );
 
+    auto formulaDefinition = std::make_shared<EventFormula::Definition>();
+
     // add the ref of each selected parameter
     for( auto& dialInput : dialInputList.getConfig() ){
+      EventFormula::Input source;
+      if( _dialType_ == DialType::Formula ){
+        const int sourceCount = int(dialInput.contains("parameterName")) + int(dialInput.contains("parameterIndex"))
+                                + int(dialInput.contains("eventVariable"));
+        LogThrowIf(sourceCount != 1,
+                   "Formula input must specify exactly one of parameterName, parameterIndex and eventVariable");
+      }
+      if( GenericToolbox::Json::doKeyExist(dialInput, "eventVariable") ){
+        LogThrowIf(_dialType_ != DialType::Formula, "eventVariable inputs are only supported by Formula dials");
+        auto name = GenericToolbox::Json::fetchValue<std::string>(dialInput, "eventVariable");
+        name = GenericToolbox::trimString(name, " ");
+        if( name.size() >= 2 and name.front() == '[' and name.back() == ']' ){
+          name = name.substr(1, name.size() - 2);
+        }
+        LogThrowIf(name.empty(), "Formula eventVariable must not be empty");
+        GenericToolbox::addIfNotInVector(name, formulaDefinition->eventVariables);
+        source.eventIndex = GenericToolbox::findElementIndex(name, formulaDefinition->eventVariables);
+        formulaDefinition->inputs.emplace_back(source);
+        continue;
+      }
+      source.parameterIndex = int(_dialInputBufferList_.back().getInputSize());
+      formulaDefinition->inputs.emplace_back(source);
       DialInputBuffer::ParameterReference p;
       p.parSetIndex = _supervisedParameterSetIndex_;
 
-      if( GenericToolbox::Json::doKeyExist(dialInput, "name") ){
-        auto parName = GenericToolbox::Json::fetchValue<std::string>(dialInput, "name");
+      const std::string parameterKey = dialInput.contains("parameterName") ? "parameterName" : "name";
+      if( dialInput.contains("parameterIndex") ){
+        const auto& index = dialInput.at("parameterIndex");
+        LogThrowIf(not index.is_number_integer() or index < 0
+                   or index >= _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
+                   "Dial input: parameterIndex outside the supervised parameter set");
+        p.parIndex = index.get<int>();
+      }
+      else if( GenericToolbox::Json::doKeyExist(dialInput, parameterKey) ){
+        auto parName = GenericToolbox::Json::fetchValue<std::string>(dialInput, parameterKey);
         auto* parPtr{_parameterSetListPtr_->at( _supervisedParameterSetIndex_ ).getParameterPtr( parName )};
         LogThrowIf(parPtr == nullptr, "Could not find parameter: " << parName);
         p.parIndex = parPtr->getParameterIndex();
@@ -100,6 +196,7 @@ void DialCollection::configureImpl() {
 
       _dialInputBufferList_.back().addParameterReference( p );
     }
+    if( not formulaDefinition->eventVariables.empty() ){ _eventFormulaDefinition_ = std::move(formulaDefinition); }
 
   }
 
@@ -148,6 +245,7 @@ std::string DialCollection::getSummary(bool shallow_) const{
     ss << " / dialBranchData:{parameterValuesTArray:" << _dialParameterValuesBranch_
        << ", weightValuesTArray:" << _dialResponsesBranch_ << "}";
   }
+  if( not _applyToVariable_.empty() ){ ss << " / variable:" << _applyToVariable_ << " / mode:" << _variableResponseMode_; }
   if( _definitionRange_.hasBound() ){ ss << " / definitionRange:" << _definitionRange_; }
   if( _knotResponseLimits_.hasBound() ){ ss << " / knotResponseLimits:" << _knotResponseLimits_; }
   if( _mirrorDefinitionRange_.hasBound() ){ ss << " / mirrorDefinitionRange:" << _mirrorDefinitionRange_; }
@@ -295,11 +393,30 @@ void DialCollection::setupDialInterfaceReferences(){
 }
 
 // init protected
+void DialCollection::readVariableResponseConfig(const ConfigReader& config_){
+  if( config_.hasField("applyToVariable") ){
+    _applyToVariable_ = config_.fetchValue<std::string>("applyToVariable");
+  }
+  if( config_.hasField("variableResponseMode") ){
+    LogThrowIf(config_.fetchValue<std::string>("variableResponseMode").empty(), "variableResponseMode must not be empty");
+  }
+  config_.fillEnum(_variableResponseMode_, "variableResponseMode");
+  LogThrowIf(_variableResponseMode_ != VariableResponseMode::Multiply
+             and _variableResponseMode_ != VariableResponseMode::Add
+             and _variableResponseMode_ != VariableResponseMode::Override,
+             "Invalid variableResponseMode: expected Multiply, Add, or Override");
+  LogThrowIf(config_.hasField("applyToVariable") and _applyToVariable_.empty(), "applyToVariable must not be empty");
+  LogThrowIf(config_.hasField("variableResponseMode") and _applyToVariable_.empty(),
+             "variableResponseMode requires applyToVariable");
+}
+
 void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
+  readVariableResponseConfig(config_);
   // globals for the dialSet
   config_.fillValue(_enableDialsSummary_, "printDialSummary");
   config_.fillValue(_dialType_, "dialType");
-  if( _dialType_ != DialType::ExternalWeight ){
+  if( _dialType_ != DialType::ExternalWeight and _dialType_ != DialType::Formula
+      and _dialType_ != DialType::CompiledLibDial and _dialType_ != DialType::Composite ){
     config_.fillValue(_dialOptions_, "options");
   }
   if( config_.hasField("dialBranchData") ){
@@ -324,6 +441,8 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
                  "TArray dialBranchData requires dialType Spline or Graph");
     }
   }
+  _minDialResponse_ = not _isCompositeNode_ and (_applyToVariable_.empty() or _variableResponseMode_ == VariableResponseMode::Multiply)
+      ? 0. : std::nan("unset");
   config_.fillValue(_minDialResponse_, "minDialResponse");
   config_.fillValue(_maxDialResponse_, "maxDialResponse");
   config_.fillValue(_useMirrorDial_, "useMirrorDial");
@@ -490,7 +609,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );
-  _dialResponseSupervisorList_[0].setMinResponse( _config_.fetchValue("minDialResponse", double(0.)) );
+  _dialResponseSupervisorList_[0].setMinResponse( _minDialResponse_ );
   _dialResponseSupervisorList_[0].setMaxResponse( _config_.fetchValue("maxDialResponse", _maxDialResponse_) );
 
   _dialInterfaceList_.reserve( _dialBinSet_.getBinList().size() );
@@ -899,7 +1018,19 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   this->readParametersFromConfig( ConfigReader(dialsDefinition) );
 
-  if     ( _dialType_ == DialType::Norm ) {
+  if( _dialType_ == DialType::Composite ){
+    LogThrowIf(dialsDefinition.hasField("binning") or hasDialBranchData(),
+               "Composite: put binning and dialBranchData on individual nodes");
+    std::vector<std::string> parameterNames;
+    for( const auto& input : _config_.fetchValue<JsonType>("dialInputList") ){
+      parameterNames.emplace_back(input.at("parameterName").get<std::string>());
+    }
+    _isEventByEvent_ = false;
+    _dialInterfaceList_.emplace_back();
+    _dialInterfaceList_.back().setDial(DialBaseObject(std::make_unique<CompositeDial>(
+        dialsDefinition.fetchValue<ConfigReader>("options"), parameterNames)));
+  }
+  else if( _dialType_ == DialType::Norm ) {
     // This dial collection is a normalization, so there is a single dial.
     // Create it here.
     _isEventByEvent_ = false;
@@ -923,12 +1054,13 @@ bool DialCollection::initializeDialsWithDefinition() {
       for( auto& bin : _dialBinSet_.getBinList() ){
 
         _dialInterfaceList_.emplace_back();
-        _dialInterfaceList_.back().setDial( DialBaseObject(makeDial( dialsDefinition )) );
+        _dialInterfaceList_.back().setDial( DialBaseObject(makeDial( dialsDefinition, &bin )) );
 
         for( auto& var : bin.getEdgesList() ){
-          ((RootFormula*) _dialInterfaceList_.back().getDialBaseRef())->getFormula().SetParameter(
-              var.varName.c_str(), var.getCenterValue()
-          );
+          auto& formula = ((RootFormula*) _dialInterfaceList_.back().getDialBaseRef())->getFormula();
+          if( formula.GetParNumber(var.varName.c_str()) >= 0 ){
+            formula.SetParameter(var.varName.c_str(), var.getCenterValue());
+          }
         }
       }
 
@@ -993,7 +1125,7 @@ bool DialCollection::initializeDialsWithDefinition() {
 
   _dialResponseSupervisorList_.emplace_back();
   _dialResponseSupervisorList_.back().setMinResponse(
-      _config_.fetchValue("minDialResponse", double(0.))
+      _minDialResponse_
   );
   _dialResponseSupervisorList_.back().setMaxResponse(
       _config_.fetchValue("maxDialResponse", _maxDialResponse_)
@@ -1058,7 +1190,7 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const TObject* src_) const {
 
   return out;
 }
-std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_) const{
+std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_, const Bin* bin_) const{
   std::unique_ptr<DialBase> dialBase{nullptr};
   std::string dialType{};
 
@@ -1067,14 +1199,29 @@ std::unique_ptr<DialBase> DialCollection::makeDial(const ConfigReader& config_) 
   if( dialType == "Formula" or dialType == "RootFormula" ){
     dialBase = std::make_unique<RootFormula>();
     auto* rootFormulaPtr{(RootFormula*) dialBase.get()};
-    auto formulaConfig = config_.fetchValue("dialConfig", JsonType());
+    auto formulaConfig = config_.fetchValue("options", JsonType());
     rootFormulaPtr->setFormulaStr( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "formulaStr") );
+    LogThrowIf(not config_.hasField("dialInputList") and not _config_.hasField("dialInputList"),
+               "Formula requires an explicit named dialInputList");
+    const auto inputs = config_.hasField("dialInputList") ? config_.fetchValue<JsonType>("dialInputList")
+                                                        : _config_.fetchValue<JsonType>("dialInputList");
+    LogThrowIf(not inputs.is_array(), "Formula dialInputList must be a list");
+    std::vector<std::string> inputNames;
+    for( const auto& input : inputs ){
+      LogThrowIf(not input.is_object() or not input.contains("name"), "Formula input requires a name");
+      inputNames.emplace_back(GenericToolbox::Json::fetchValue<std::string>(input, "name"));
+    }
+    std::vector<std::string> constantNames;
+    if( bin_ != nullptr ){
+      for( const auto& edge : bin_->getEdgesList() ){ constantNames.emplace_back(edge.varName); }
+    }
+    rootFormulaPtr->setInputNames(inputNames, constantNames);
   }
   else if( dialType == "CompiledLibDial" ){
     dialBase = std::make_unique<CompiledLibDial>();
     auto* compiledLibDialPtr{(CompiledLibDial*) dialBase.get()};
 
-    auto formulaConfig(config_.fetchValue<JsonType>("dialConfig"));
+    auto formulaConfig(config_.fetchValue<JsonType>("options"));
 
     bool success = compiledLibDialPtr->loadLibrary( GenericToolbox::Json::fetchValue<std::string>(formulaConfig, "libraryFile") );
     if( not success ){
@@ -1342,7 +1489,7 @@ bool DialCollection::makeDialShortCircuit(const std::vector<DialUtils::DialPoint
   if( pointList_.size() == 1 or DialUtils::isFlat(pointList_) ){
     // it's flat, let's shortcut
 
-    if( std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
+    if( not _isCompositeNode_ and std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
       // one! no need for a dial
       if(_verboseShortCircuit_){ _verboseShortCircuitStr_ = "No dial: response is always 1."; }
       return true;

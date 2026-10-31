@@ -82,3 +82,15 @@ double MonotonicSpline::evalResponse(const DialInputBuffer& input_) const {
 
   return CalculateMonotonicSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()-2) );
 }
+
+double MonotonicSpline::evalGradient(const DialInputBuffer& input_, int iInput_) const {
+  if( iInput_ != 0 ){ return 0.; }
+
+  double dialInput{input_.getInputBuffer()[0]};
+
+  if( not _allowExtrapolation_ ){
+    if( dialInput <= _splineBounds_.min or dialInput >= _splineBounds_.max ){ return 0.; }
+  }
+
+  return CalculateMonotonicSplineGradient( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()-2) );
+}

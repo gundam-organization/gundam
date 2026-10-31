@@ -196,6 +196,65 @@ TEST(BiCubicSpline,TwelveByTwelveSlice) {
     gPad->Print("unitTest_CalculateBicubicSpline_TwelveByTwelveSlice.png");
 }
 
+TEST(BicubicSpline,Gradient) {
+    const int nX = 8;
+    const int nY = 9;
+    double knots[nX*nY];
+    double xx[nX];
+    double yy[nY];
+    for (int i=0; i<nX; ++i) {
+        xx[i] = -1.0 + 2.0*i/(nX-1.0);
+    }
+    for (int i=0; i<nY; ++i) {
+        yy[i] = -1.2 + 2.4*i/(nY-1.0);
+    }
+    for (int i=0; i<nX; ++i) {
+        for (int j=0; j<nY; ++j) {
+            const double x = xx[i];
+            const double y = yy[j];
+            knots[i*nY + j] = 0.3 + 0.2*x - 0.4*y + 0.5*x*y
+                              + 0.1*x*x - 0.05*y*y + 0.2*x*x*y;
+        }
+    }
+
+    constexpr double lowerBound = -1E20;
+    constexpr double upperBound = 1E20;
+    constexpr double eps = 1E-6;
+
+    for (double x = -0.65; x <= 0.65; x += 0.17) {
+        for (double y = -0.75; y <= 0.75; y += 0.19) {
+            double grad[2] = {0.0, 0.0};
+            const double v = CalculateBicubicSpline(
+                grad, x, y, lowerBound, upperBound, knots, nX, nY, xx, nX, yy, nY);
+            const double vCompat = CalculateBicubicSpline(
+                x, y, lowerBound, upperBound, knots, nX, nY, xx, nX, yy, nY);
+            EXPECT_NEAR(v, vCompat, 1E-12);
+
+            const double vxHigh = CalculateBicubicSpline(
+                x+eps, y, lowerBound, upperBound, knots, nX, nY, xx, nX, yy, nY);
+            const double vxLow = CalculateBicubicSpline(
+                x-eps, y, lowerBound, upperBound, knots, nX, nY, xx, nX, yy, nY);
+            const double vyHigh = CalculateBicubicSpline(
+                x, y+eps, lowerBound, upperBound, knots, nX, nY, xx, nX, yy, nY);
+            const double vyLow = CalculateBicubicSpline(
+                x, y-eps, lowerBound, upperBound, knots, nX, nY, xx, nX, yy, nY);
+
+            EXPECT_NEAR(grad[0], (vxHigh-vxLow)/(2.0*eps), 1E-7);
+            EXPECT_NEAR(grad[1], (vyHigh-vyLow)/(2.0*eps), 1E-7);
+            EXPECT_NEAR(grad[0], CalculateBicubicSplineGradient(
+                x, y, 0, lowerBound, upperBound, knots, nX, nY, xx, nX, yy, nY), 1E-12);
+            EXPECT_NEAR(grad[1], CalculateBicubicSplineGradient(
+                x, y, 1, lowerBound, upperBound, knots, nX, nY, xx, nX, yy, nY), 1E-12);
+        }
+    }
+
+    double grad[2] = {1.0, 1.0};
+    CalculateBicubicSpline(
+        grad, 0.2, -0.3, -0.1, 0.1, knots, nX, nY, xx, nX, yy, nY);
+    EXPECT_EQ(grad[0], 0.0);
+    EXPECT_EQ(grad[1], 0.0);
+}
+
 // Local Variables:
 // mode:c++
 // c-basic-offset:4

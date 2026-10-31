@@ -24,7 +24,9 @@ public:
   // mandatory overrides
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<CompactSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"CompactSpline"}; }
+  [[nodiscard]] bool hasAnalyticGradient() const override { return true; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override;
 
   // other overrides
   void setAllowExtrapolation(bool allowExtrapolation) override { _allowExtrapolation_ = allowExtrapolation; }
