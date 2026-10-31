@@ -216,6 +216,12 @@ void LikelihoodInterface::evalLikelihoodGradient(const std::vector<Parameter*>& 
   validateWeightGradient();
   // Always evaluate the requested current parameter state; preserve the likelihood buffers.
   propagateAndEvalLikelihood();
+  evalLikelihoodGradient(parameterList_, [this](const auto& parameters_){ evalStatLikelihoodGradient(parameters_); });
+}
+
+void LikelihoodInterface::evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_,
+    const std::function<void(const std::vector<Parameter*>&)>& statGradientEvaluator_) {
+  validateWeightGradient();
   LogThrowIf(not _buffer_.isValid(), "Cannot differentiate a non-finite likelihood.");
   std::vector<Parameter*> statGradientParameterList{parameterList_};
 
@@ -246,7 +252,7 @@ void LikelihoodInterface::evalLikelihoodGradient(const std::vector<Parameter*>& 
     parameter->resetGradient();
   }
 
-  this->evalStatLikelihoodGradient(statGradientParameterList);
+  statGradientEvaluator_(statGradientParameterList);
 
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() or not parSet.isEnableEigenDecomp() ){ continue; }
