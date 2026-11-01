@@ -25,10 +25,32 @@ behavior being checked:
 | **8XX** | `Compatibility` | Configuration and input backward compatibility | Historical configuration keys and input conventions retain their results and expected deprecation warnings |
 | **9XX** | — | Reserved | Available for future categories |
 
-Numbers are independent between suites: backend regression tests and benchmarks
-both start at `700`, for example `fast/700BackendsCpuPropagation.py` and
-a backend benchmark numbered `700` in `benchmarks/`. Backend-specific scripts use the
-`7XXBackends<Subject>.py` naming convention.
+Backend-specific scripts use `7XXBackends<Subcategory><Subject>.py`, with the
+exact subcategory spelling `Common`, `Multiple`, `Cpu`, `Mps` or `Cuda`:
+
+| Range | Subcategory | Scope |
+|---|---|---|
+| **700–709** | `Common` | Backend-neutral checks with no implementation specialization; one selected backend per invocation |
+| **710–719** | `Multiple` | Several target backends, such as MPS and CUDA, or backend switching contracts |
+| **720–739** | `Cpu` | CPU implementations, execution and numerical behavior |
+| **740–759** | `Mps` | Apple Metal implementations and numerical behavior, including CPU reference checks |
+| **760–799** | `Cuda` | NVIDIA CUDA implementations, profiling and tooling, including CPU reference checks |
+
+Within each suite, assign consecutive identifiers to the existing tests in each
+subcategory. The ranges leave room for additions while keeping each group
+contiguous when sorted by filename. CPU is always available in a backend build:
+using it as a reference does not make a test `Multiple`. CPU/MPS comparisons
+belong to `Mps`; CPU/CUDA comparisons belong to `Cuda`. Apply the same rule to
+benchmark wrappers and the regression tests for those wrappers.
+
+Use `Multiple` when the test covers several target implementations, such as MPS
+and CUDA (including opt-in cases), or tests switching across backend types.
+`Common` is reserved for backend-neutral tests without implementation-specific
+behavior; a generic test accepting one `--backend` selection belongs there.
+
+Numbers are independent between suites: for example,
+`fast/720BackendsCpuPropagation.py` and `benchmarks/720BackendsCpuBenchmark.py`
+share a number. Both suites start `Common` at `700` and `Multiple` at `710`.
 
 Choose a category by the test's primary purpose. A general feature test may also
 exercise a backend without belonging to `7XX`. Model-content checks verify the
@@ -36,7 +58,8 @@ loaded objects and data; numerical-result checks verify the calculated values.
 Leave gaps when assigning new numbers, and keep a test's number when moving it
 between `fast` and `regular`, provided it does not collide with another test.
 Numbers do not imply execution dependencies: every script must run independently.
-Use PascalCase for the category and subject (`Api`, `Cpu`, `Mps`, `Cuda`). Avoid
+Use PascalCase for the category and subject (`Api`, `FitGradient`), keeping
+backend subcategories capitalized as `Common`, `Multiple`, `Cpu`, `Mps` and `Cuda`. Avoid
 repeating the category in the subject: use `470DialsComposite.py`, rather than
 `470DialsCompositeDials.py`. Benchmark wrappers retain the same category prefix
 with their appropriate `.sh`, `.sbatch` or `.mm` extension.
@@ -53,6 +76,8 @@ compatibility check.
 | `810CompatibilityEvalFromLib.py` | `variablesTransform` versus `variableDict/evalFromLib` |
 | `820CompatibilityFriendTrees.py` | Individual friend paths, mixed declarations and disabled friends |
 | `830CompatibilityDialBranchData.py` | `dialLeafName` and `treeExpression` versus `dialBranchData` |
+| `840CompatibilityBinnedDials.py` | Implicit `Graph`/`Spline` branches and deprecation warnings |
+| `850CompatibilityDialOptions.py` | `dialConfig` versus `options` for Formula, Composite and compiled dials |
 
 These scripts reuse input builders and assertion helpers without running another
 test's `main()`. They generate their own inputs in their own working directory.
@@ -78,7 +103,7 @@ python tests/python/run.py --list
 python tests/python/run.py --output /tmp/gundam-python-fast
 python tests/python/run.py --suite regular --output /tmp/gundam-python-regular
 python tests/python/run.py --test 510NumericsIgnoreZeroPredictionAtPrior.py
-python tests/python/run.py --suite benchmarks --list
+python tests/python/run.py --suite benchmarks --test 761BackendsCudaWeightBenchmark.py -- --help
 ```
 
 The runner starts each script in a separate directory with a `test.log`, using
@@ -93,10 +118,13 @@ python /path/to/gundam/tests/python/fast/510NumericsIgnoreZeroPredictionAtPrior.
 python /path/to/gundam/tests/python/fast/010BuildPythonInterfaces.py
 ```
 
-Some tests compile small native libraries and require a C++ compiler. Tests
-that generate TGraph/TArray inputs also require the ROOT executable. The
-`regular` and `benchmarks` directories are reserved for compatible additions;
-tests for features not yet present in `main` stay on their feature branches.
+Some tests compile small native libraries and require a C++ compiler. The two
+gradient checks `570NumericsFitGradient.py` and
+`580NumericsFitGradientSpline.py` also require the ROOT executable: they prepare
+their own inputs using the shared fixtures in `tests/fast-tests`, without running
+the standard test suite. GPU tests retain their existing device requirements and
+opt-in environment variables. Benchmark commands and prerequisites are documented
+in [benchmarks/README.md](benchmarks/README.md).
 
 `fast/010BuildPythonInterfaces.py` exercises CMake configuration without compiling
 GUNDAM. It requires CMake 3.18 or newer, a C++ compiler, pybind11 and Python
