@@ -6,8 +6,8 @@
 # nothing unless the apply option ("-a") is given.
 #
 # See README-TESTS.md in this directory for the testing levels, how a test
-# script is run, the script naming convention, the support file convention,
-# and the environment that the python tests need.
+# script is run, the script naming convention and the support file convention.
+# Python tests are run separately; see python/README.md.
 
 echo 'USAGE: gundam-tests.sh [-f] [-r] [-e] [-s] [-v] [-a] [output-directory]'
 echo '    -c               : Force use of terminfo colors for output'
@@ -123,6 +123,10 @@ export GUNDAM_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 is_test_runnable() {
     local test_path=$1
+    # Python tests have their own runner and environment.
+    if [[ "${test_path}" == *.py ]]; then
+        return 1
+    fi
     if [ -x "${test_path}" ]; then
         return 0
     fi

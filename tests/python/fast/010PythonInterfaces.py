@@ -1,4 +1,4 @@
-"""Configuration regression tests; run with python3 tests/cmake/testPythonInterfaces.py.
+"""Configuration regression tests; run with python3 tests/python/fast/010PythonInterfaces.py.
 
 Requires CMake >= 3.18, pybind11 and CPython development files.
 """
@@ -16,8 +16,8 @@ class PythonInterfacesTest(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.directory = pathlib.Path(self.temporary.name)
-        source = pathlib.Path(__file__).resolve().parents[2] / 'src/PythonInterface'
-        options = pathlib.Path(__file__).resolve().parents[2] / 'cmake/options.cmake'
+        source = pathlib.Path(__file__).resolve().parents[3] / 'src/PythonInterface'
+        options = pathlib.Path(__file__).resolve().parents[3] / 'cmake/options.cmake'
         messages = options.parent / 'utils/cmessage.cmake'
         # Exercise the real options and module configuration without ROOT or
         # compiling the GUNDAM core. GundamFitter is only needed at link time.

@@ -9,12 +9,11 @@ from importlib import import_module
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def write_input(path, offset, variant="regular"):
     # uproot cannot write these TArray/TGraph object branches.
-    macro = Path.cwd() / f"215ArrayDialBranchData-{offset}-input.C"
+    macro = Path.cwd() / f"410ArrayDialBranchData-{offset}-input.C"
     macro.write_text(r'''#include <TFile.h>
 #include <TTree.h>
 #include <TGraph.h>
@@ -126,12 +125,12 @@ def expect_failure(paths, config, message, index):
     result = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--check-invalid", payload],
                             capture_output=True, text=True, errors="replace", timeout=60)
     log = result.stdout + result.stderr
-    Path(f"215ArrayDialBranchData-invalid-{index}.log").write_text(log)
+    Path(f"410ArrayDialBranchData-invalid-{index}.log").write_text(log)
     assert result.returncode == 0 and "SUCCESS: caught expected loader exception" in log, (config, result.returncode, log[-4000:])
 
 
 def main():
-    paths = [Path.cwd() / f"215ArrayDialBranchData-{i}.root" for i in range(2)]
+    paths = [Path.cwd() / f"410ArrayDialBranchData-{i}.root" for i in range(2)]
     for i, path in enumerate(paths):
         write_input(path, i * 3)
     reference = evaluate(paths, "dialLeafName: graph", False)
