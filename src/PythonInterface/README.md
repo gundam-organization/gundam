@@ -17,8 +17,13 @@ cd $BUILD_DIR/gundam
 cmake -D WITH_PYTHON_INTERFACE=ON ./
 ```
 
-On certain computing clusters, CMake won't be able to find the `pybind11` library. You can do so with the following
-option:
+CMake first searches for a pybind11 CMake package. If none is found, it queries
+the Python interpreters selected by `GUNDAM_PYTHON_VERSIONS` (or discovered in
+`PATH` in `AUTO` mode) using `python -m pybind11 --cmakedir`. This also finds
+pybind11 installed with pip in those environments. No package is downloaded or
+installed automatically.
+
+You can also specify the pybind11 CMake package directory explicitly:
 
 ```
 -D WITH_PYTHON_INTERFACE=ON -D pybind11_DIR=/path/to/pybind11/cmake/files

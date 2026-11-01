@@ -6,6 +6,7 @@ import pathlib
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -31,11 +32,11 @@ set(GUNDAM_FULL_VERSION_STR test)
 add_subdirectory("{source.as_posix()}" interfaces)
 ''')
 
-    def configure(self, selection=None):
+    def configure(self, selection=None, extraArguments=()):
         command = ['cmake', '-S', str(self.directory), '-B', str(self.directory / 'build')]
         if selection is not None:
             command.append('-DGUNDAM_PYTHON_VERSIONS=' + selection)
-        return subprocess.run(command, capture_output=True, text=True)
+        return subprocess.run(command + list(extraArguments), capture_output=True, text=True)
 
     def testAuto(self):
         result = self.configure()
@@ -62,6 +63,26 @@ add_subdirectory("{source.as_posix()}" interfaces)
         result = self.configure(executable + ';' + executable)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(result.stdout.count('Building GUNDAM_python'), 1)
+
+    def testPybind11FromInterpreter(self):
+        probe = subprocess.run([sys.executable, '-m', 'pybind11', '--cmakedir'],
+                               capture_output=True, text=True)
+        if probe.returncode != 0:
+            self.skipTest('The test interpreter needs an installed pybind11 package')
+        # Disable implicit package locations so only the Python fallback can
+        # discover pybind11. Explicit PATHS from --cmakedir remain enabled.
+        result = self.configure(sys.executable, [
+            '-DCMAKE_FIND_USE_CMAKE_PATH=OFF',
+            '-DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=OFF',
+            '-DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF',
+            '-DCMAKE_FIND_USE_CMAKE_SYSTEM_PATH=OFF',
+            '-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF',
+            '-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF',
+            '-DCMAKE_MAKE_PROGRAM=' + shutil.which('make'),
+            '-DCMAKE_CXX_COMPILER=' + (shutil.which('c++') or shutil.which('g++')),
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Found pybind11 via ' + sys.executable, result.stdout)
 
     def availableVersions(self):
         versions = []

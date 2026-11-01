@@ -131,9 +131,6 @@ if(WITH_PYTHON_INTERFACE)
   if(CMAKE_VERSION VERSION_LESS 3.18)
     cmessage(FATAL_ERROR "The Python interface requires CMake 3.18 or newer.")
   endif()
-  # Discover Python separately for each module, without attaching one ABI to pybind11.
-  set( PYBIND11_NOPYTHON ON )
-  find_package( pybind11 CONFIG REQUIRED )
 endif()
 
 if(WITH_ASAN AND WITH_PYTHON_INTERFACE AND APPLE)

@@ -1,3 +1,7 @@
+# Discover Python separately for each module, without attaching one ABI to pybind11.
+set(PYBIND11_NOPYTHON ON)
+find_package(pybind11 CONFIG QUIET)
+
 # Each child directory owns its Python3 imported targets. This prevents one
 # interpreter's headers or link settings from leaking into another module.
 set(pythonCandidates)
@@ -52,6 +56,29 @@ foreach(pythonCandidate IN LISTS pythonCandidates)
   list(APPEND pythonCandidates_${pythonVersionTag} "${pythonCandidate}")
 endforeach()
 list(REMOVE_DUPLICATES pythonAvailableVersions)
+
+# Python packages installed with pip are not always on CMake's search path.
+# Reuse the interpreter candidates, including explicit selections and virtual
+# environments, before deduplicating them by version for module builds.
+if(NOT pybind11_FOUND)
+  foreach(pythonCandidate IN LISTS pythonCandidates)
+    execute_process(COMMAND "${pythonCandidate}" -m pybind11 --cmakedir
+        RESULT_VARIABLE pythonPybind11Result OUTPUT_VARIABLE pythonPybind11Directory
+        ERROR_QUIET OUTPUT_STRIP_TRAILING_WHITESPACE TIMEOUT 10)
+    if(NOT pythonPybind11Result STREQUAL "0" OR NOT IS_DIRECTORY "${pythonPybind11Directory}")
+      continue()
+    endif()
+    find_package(pybind11 CONFIG QUIET PATHS "${pythonPybind11Directory}" NO_DEFAULT_PATH)
+    if(pybind11_FOUND)
+      cmessage(STATUS "Found pybind11 via ${pythonCandidate}: ${pybind11_DIR}")
+      break()
+    endif()
+  endforeach()
+endif()
+if(NOT pybind11_FOUND)
+  cmessage(FATAL_ERROR "pybind11 was not found by CMake or the selected Python interpreters. Install pybind11 in one of these environments, or set pybind11_DIR to its CMake package directory.")
+endif()
+
 if(GUNDAM_PYTHON_VERSIONS STREQUAL "AUTO")
   # Natural ordering compares minor versions numerically (3.14 comes before 3.9).
   list(SORT pythonAvailableVersions COMPARE NATURAL ORDER DESCENDING)
