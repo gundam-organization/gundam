@@ -219,7 +219,7 @@ Standard tests use `tests/gundam-tests.sh`. Python tests run independently with
 `tests/python/run.py`, organized into `fast`, `regular` and `benchmarks`.
 You can run a specific Python test using for instance:
 ```bash
-python tests/python/run.py --test 510IgnoreZeroPredictionAtPrior.py
+python tests/python/run.py --test 510NumericsIgnoreZeroPredictionAtPrior.py
 ```
 
 Note that in order to succeed, python tests must run with GUNDAM compiled using
