@@ -107,7 +107,7 @@ namespace {
     DeviceBuffer<std::uint32_t> compactDialFields;
     std::size_t dialCount{0};
     Backends::CudaEventUpdateIndex eventUpdateIndex;
-    Backends::CudaEventUpdatePlan eventUpdatePlan;
+    Backends::CudaEventSelectionCache eventSelectionCache;
     DeviceBuffer<std::uint32_t> selectedEventGroups;
     int eventWeightMode{0};
     double eventWeightSparseFraction{0.25};
@@ -684,8 +684,7 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
     b.eventWeightSparseFraction = eventWeightSparseFraction_;
     if( b.eventUpdateIndex.available() ){
       b.selectedEventGroups.allocate(b.eventUpdateIndex.groupCount);
-      b.eventUpdatePlan.masks.resize(b.eventUpdateIndex.groupCount, 0);
-      b.eventUpdatePlan.groups.reserve(b.eventUpdateIndex.groupCount);
+      b.eventSelectionCache.bind(b.eventUpdateIndex);
     }
     if( model_.compactDialFields.empty() ){ b.dials.upload(model_.dials, _impl_->stream); }
     else{
@@ -833,13 +832,13 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
         and not inputs_.forceBinningUpdate and (b.eventWeightMode == 1 or sparse) ){
       const auto maxGroups = b.eventWeightMode == 1 ? b.eventUpdateIndex.groupCount
           : std::size_t(b.eventWeightSparseFraction * double(b.eventUpdateIndex.groupCount));
-      b.eventUpdatePlan.select(b.eventUpdateIndex, b.previousParameters, parameters_, maxGroups);
-      if( b.eventUpdatePlan.complete ){
+      b.eventSelectionCache.select(b.previousParameters, parameters_, maxGroups);
+      timing_.eventSelectionCacheHit = b.eventSelectionCache.wasHit() ? 1 : 0;
+      if( b.eventSelectionCache.result().complete ){
         timing_.eventWeightCoverageKnown = 1;
-        timing_.eventWeightCandidateCount = b.eventUpdatePlan.affectedEvents;
-        timing_.eventWeightGroupCount = b.eventUpdatePlan.groups.size();
-        sparseEvents = b.eventWeightMode == 2 and b.eventUpdatePlan.groups.size() < b.eventUpdateIndex.groupCount;
-        if( sparseEvents ){ std::sort(b.eventUpdatePlan.groups.begin(), b.eventUpdatePlan.groups.end()); }
+        timing_.eventWeightCandidateCount = b.eventSelectionCache.result().affectedEvents;
+        timing_.eventWeightGroupCount = b.eventSelectionCache.result().groups.size();
+        sparseEvents = b.eventWeightMode == 2 and b.eventSelectionCache.result().groups.size() < b.eventUpdateIndex.groupCount;
       }
     }
     if( b.eventUpdateIndex.available() ){
@@ -849,9 +848,9 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       timing_.eventWeightsRecomputedCount = b.events.size;
       if( sparseEvents ){
         timing_.sparseEventWeightsUsed = 1;
-        timing_.eventWeightsRecomputedCount = b.eventUpdatePlan.groups.size() * 32;
+        timing_.eventWeightsRecomputedCount = b.eventSelectionCache.result().groups.size() * 32;
         const auto tail = b.events.size % 32;
-        if( tail and not b.eventUpdatePlan.groups.empty() and b.eventUpdatePlan.groups.back() == b.events.size / 32 ){
+        if( tail and not b.eventSelectionCache.result().groups.empty() and b.eventSelectionCache.result().groups.back() == b.events.size / 32 ){
           timing_.eventWeightsRecomputedCount -= 32 - tail;
         }
       }
@@ -860,9 +859,9 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     timing_.cachePreparationSeconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - preparationStart).count();
     record(0);
-    if( sparseEvents and updatePrediction and not b.eventUpdatePlan.groups.empty() ){
-      checkCuda(cudaMemcpyAsync(b.selectedEventGroups.data, b.eventUpdatePlan.groups.data(),
-          b.eventUpdatePlan.groups.size() * sizeof(std::uint32_t), cudaMemcpyHostToDevice, stream), "selected event groups upload");
+    if( sparseEvents and updatePrediction and not b.eventSelectionCache.result().groups.empty() ){
+      checkCuda(cudaMemcpyAsync(b.selectedEventGroups.data, b.eventSelectionCache.result().groups.data(),
+          b.eventSelectionCache.result().groups.size() * sizeof(std::uint32_t), cudaMemcpyHostToDevice, stream), "selected event groups upload");
     }
     if( sparse and not b.updatePlan.ranges.empty() ){
       checkCuda(cudaMemcpyAsync(b.responseUpdates.data, b.updatePlan.ranges.data(),
@@ -932,10 +931,10 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       auto launchWeights = [&](auto interleavedTag_){
         constexpr bool interleaved = decltype(interleavedTag_)::value;
         if( sparseEvents ){
-          if( not b.eventUpdatePlan.groups.empty() ){
-            reweightEvents<interleaved, true><<<gridSize(b.eventUpdatePlan.groups.size() * 32), blockSize, 0, stream>>>(
+          if( not b.eventSelectionCache.result().groups.empty() ){
+            reweightEvents<interleaved, true><<<gridSize(b.eventSelectionCache.result().groups.size() * 32), blockSize, 0, stream>>>(
                 b.events.data, b.events.size, b.dialIndices.data, b.responses.data, b.weights.data,
-                b.hasReweightCap, b.maxReweight, b.error.data, b.selectedEventGroups.data, b.eventUpdatePlan.groups.size());
+                b.hasReweightCap, b.maxReweight, b.error.data, b.selectedEventGroups.data, b.eventSelectionCache.result().groups.size());
           }
         }
         else{

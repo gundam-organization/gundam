@@ -43,7 +43,7 @@ SECONDS_FIELDS = ('parameterUploadSeconds', 'cachedDialStageSeconds',
                   'likelihoodHostSeconds', 'likelihoodDeviceSeconds', 'eventWeightReadbackSeconds')
 COUNT_FIELDS = ('histogramReadbackBytes', 'eventWeightReadbackBytes', 'eventStateReadbackBytes',
                 'eventWeightCandidateCount', 'eventWeightGroupCount', 'eventWeightsRecomputedCount',
-                'eventWeightCoverageKnown', 'sparseEventWeightsUsed', 'cacheCandidateCount', 'rebinnedEventCount', 'binCandidateCount',
+                'eventWeightCoverageKnown', 'eventSelectionCacheHit', 'sparseEventWeightsUsed', 'cacheCandidateCount', 'rebinnedEventCount', 'binCandidateCount',
                 'binContributionCount', 'contributionBufferBytes', 'externalWeightUploadBytes',
                 'externalWeightUploadBlocks', 'likelihoodReadbackBytes')
 
@@ -606,14 +606,14 @@ def write_report(output, cases):
                          f"{model.get('compactDialFallback', '')} |")
     lines.extend(['', 'Event selection is host time included in cache preparation. Coverage counts are exact only when coverageKnown=1.',
                   'Coverage mode always recomputes dense weights; sparse mode may stop selection early and report coverageKnown=0.', '',
-                  '| Case | Scenario | Coverage known (median) | Affected events (median) | Groups (median) | Recomputed events (median) | Sparse used (median) | Selection ms |',
-                  '|---|---|---:|---:|---:|---:|---:|---:|'])
+                  '| Case | Scenario | Coverage known (median) | Affected events (median) | Groups (median) | Recomputed events (median) | Sparse used (median) | Selection cache hit (median) | Selection ms |',
+                  '|---|---|---:|---:|---:|---:|---:|---:|---:|'])
     for case in cases:
         data = json.loads((output / case / 'summary.json').read_text())
         for scenario, entry in data['scenarios'].items():
             counts = entry['counts']
             cells = [str(counts[name]['median']) for name in ('eventWeightCoverageKnown', 'eventWeightCandidateCount',
-                     'eventWeightGroupCount', 'eventWeightsRecomputedCount', 'sparseEventWeightsUsed')]
+                     'eventWeightGroupCount', 'eventWeightsRecomputedCount', 'sparseEventWeightsUsed', 'eventSelectionCacheHit')]
             lines.append('| ' + ' | '.join([case, scenario, *cells, f"{entry['timings']['eventSelectionSeconds']['medianMs']:.4f}"]) + ' |')
     (output / 'report.md').write_text('\n'.join(lines))
 

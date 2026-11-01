@@ -631,6 +631,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def_readonly("eventWeightCandidateCount", &Backends::BackendTimingSummary::eventWeightCandidateCount)
   .def_readonly("eventWeightGroupCount", &Backends::BackendTimingSummary::eventWeightGroupCount)
   .def_readonly("eventWeightsRecomputedCount", &Backends::BackendTimingSummary::eventWeightsRecomputedCount)
+  .def_readonly("eventSelectionCacheHit", &Backends::BackendTimingSummary::eventSelectionCacheHit)
   .def_readonly("eventWeightCoverageKnown", &Backends::BackendTimingSummary::eventWeightCoverageKnown)
   .def_readonly("sparseEventWeightsUsed", &Backends::BackendTimingSummary::sparseEventWeightsUsed)
   .def_readonly("eventSelectionSeconds", &Backends::BackendTimingSummary::eventSelectionSeconds)

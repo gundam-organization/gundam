@@ -1,6 +1,6 @@
 # CUDA standard-dial optimization: V100 results and next steps for Minuit2
 
-**31 October 2026** — OA2024 production inputs. All calculations remain in `double` precision.
+**31 October 2026; updated 1 November 2026** — OA2024 production inputs. All calculations remain in `double` precision.
 
 | Setting | Value |
 |---|---|
@@ -30,9 +30,10 @@ This improvement is directly relevant to MCMC proposals that update all paramete
 | Uninstrumented benchmark | [Benchmark report](../../benchmark-weights-compact-20261031-190025/report.md) | CPU and four CUDA variants; three trials after warmup | Measure application performance |
 | Uninstrumented no-eigen benchmark | [No-eigen report](../../benchmark-weights-noEigen-20261031-203949/report.md) | CPU, reference cached CUDA, compact cached CUDA; three trials | Isolate physical-parameter updates |
 | Nsight Compute capture | [NCU report](../../benchmark-weights-compact-20261031-195643/weights.ncu-rep) | NCU 2025.2.1; reference and compact, each with one local and one global call | Explain GPU behavior |
+| Local-propagation prototype | [Local benchmark report](../../benchmark-weights-local-20261101-003328/report.md) | CPU, dense compact, coverage, sparse; local and derivative workloads | Validate selective event updates on production eigen coordinates |
 | Extracted hardware counters | [Metrics JSON](../../benchmark-weights-compact-20261031-195643/analysis/metrics.json) | Eight profiled kernel actions | Preserve the evidence used below |
 
-All three runs use the same GUNDAM module hash. Each run loads the inputs **once**, then switches backends while retaining the loaded model. Parameter points and random seeds are identical across variants within a benchmark; data selection and likelihood configuration are preserved.
+The original compaction benchmark, no-eigen benchmark and NCU capture use the same GUNDAM module hash. The later local-propagation experiment uses a subsequent build; variants are compared within that run. Each run loads the inputs **once**, then switches backends while retaining the loaded model. Parameter points and random seeds are identical across variants within a benchmark; data selection and likelihood configuration are preserved.
 
 These are reproducible propagation workloads, without minimization or Hesse. Configurations run sequentially, without randomized interleaving. Absolute timings from different jobs should not be compared directly.
 
@@ -456,7 +457,7 @@ For small local calls, the new capture supports a different priority: measure ev
 | ROOT test-runner and host-callback `NaN` fixes | Separate from descriptor compaction |
 | Production default changed | No |
 | Complete-fit speedup measured | No |
-| Selective event propagation | Optional prototype prepared; host checks pass; V100 correctness and performance pending |
+| Selective event propagation | First prototype passes V100 numerical checks; benefits narrow coordinates but regresses aggregate eigen workloads |
 
 The established result is the speedup from compact descriptors. Selective event propagation remains a proposal to measure and validate.
 
@@ -479,6 +480,113 @@ to the center and bounded coordinates. They approximate derivative propagation
 patterns; they do not establish MIGRAD/HESSE wall-time gains or validate Hessian
 accuracy. Production defaults remain unchanged.
 
-The next external measurement is the production-eigen run, followed optionally
-by the same matrix without eigen. No further speedup is claimed until the new
-CUDA path has passed the CC tests and benchmark comparisons.
+The production-eigen run is now available below. A follow-up selection-cache change is prepared, with host checks completed and V100 performance still pending.
+
+
+## Production eigen local-update results — 1 November 2026
+
+The [local benchmark](../../benchmark-weights-local-20261101-003328/report.md)
+is complete. All CPU/CUDA comparisons pass, including final individual event
+weights and exact bin membership. It uses one dataset load and three trials per
+scenario. The following results describe the first sparse prototype, before the
+selection cache described below.
+
+### Correctness passes; aggregate performance regresses
+
+| Scenario | Dense compact median | Sparse median | Change |
+|---|---:|---:|---:|
+| Constant | 0.541 ms | 0.543 ms | Similar |
+| Local1 | 2.019 ms | 2.293 ms | **13.6% slower** |
+| One-coordinate derivative stencil | 2.020 ms | 2.292 ms | **13.5% slower** |
+| Two-coordinate derivative stencil | 2.018 ms | 2.292 ms | **13.6% slower** |
+| Global | 6.885 ms | 6.905 ms | About 0.3% slower |
+
+The mean evaluation time is also worse: 2.068 → 2.161 ms for derivative1 and
+2.083 → 2.208 ms for derivative2. The narrow-coordinate gains therefore do not
+compensate for the selection overhead across these sampled production workloads.
+These are propagation sequences, not measured complete MIGRAD/HESSE timings.
+The current sparse mode should **not replace the dense default** on these results.
+
+| Validation or construction metric | Result |
+|---|---:|
+| Maximum absolute LLH difference | `1.88e-12` |
+| Maximum absolute histogram/error difference | `1.32e-11` |
+| Maximum absolute final event-weight difference | `1.39e-15` |
+| Stored event index | 45,644,696 bytes, about 43.5 MiB |
+| Event-index construction | About 1.1–1.7 s per indexed backend activation |
+
+### Why the eigen workload defeats most sparse selections
+
+The exact coverage case shows the following local-coordinate structure:
+
+| Parameter group | Coordinates | Median affected events | Median affected groups of 32 | Coordinates using sparse execution |
+|---|---:|---:|---:|---:|
+| Flux | 100 | 2,395,205 | 74,874 | 0 |
+| Detector variations, eigen | 571 | **2,406,926: all events** | **75,217: all groups** | 0 |
+| Detector splines | 79 | 11,302 | 4,868 | 55 |
+| FSI eigen | 6 | 925,607 | 74,787 | 0 |
+| Cross-section | 82 | 46,495.5 | 26,776.5 | 30 |
+| Binned cross-section | 4 | 156,413.5 | 25,053.5 | 2 |
+
+Counts summarize the local1 coordinate-cost records; they are not the frequency
+of those coordinates in a real optimizer. In total, **87 of 842 coordinates**
+use sparse execution in this run. The detector eigen group alone accounts for
+571 of 842 coordinates, explaining the aggregate median.
+
+The FSI example also demonstrates spatial amplification: about 38.5% of events
+are affected, but they occupy about **99.4% of the groups**. Selecting complete
+warps offers little benefit there, even though the event fraction is below 50%.
+
+| Cost for a typical broad detector-eigen update | Measured median |
+|---|---:|
+| Dense event-weight kernel | 1.250 ms |
+| Exact coverage diagnostic | About 1.188 ms host selection |
+| Sparse selection before early dense fallback | About **0.268 ms** host selection |
+| Event-weight kernel after fallback | Still **1.250 ms** |
+
+The sparse path repeatedly proves that the same broad update needs dense
+execution. It pays the selection cost without avoiding the dense kernel.
+This explains the regression; correctness of the cached weights is not the issue.
+
+### Narrow coordinates do benefit
+
+| Effective coordinate | Affected events | Groups | Dense evaluation | Sparse evaluation |
+|---|---:|---:|---:|---:|
+| Detector `ECalPID_muon_DSEcal` | 4,738 | 4,559 | 2.001 ms | **0.982 ms** |
+| Binned cross-section `EB_bin_O_nubar` | 33,055 | 6,545 | 2.007 ms | **0.964 ms** |
+
+These observations support retaining the selective kernel for narrow updates,
+while improving the decision path for broad eigen updates.
+
+### Prepared correction: cache structural selections and dense decisions
+
+The next version adds a bounded cache of **eight exact changed-parameter
+signatures**. Each signature records which physical parameters differ from the
+previous successful propagation, together with the selection threshold.
+
+| Cached item | Purpose |
+|---|---|
+| Complete sorted group selection and affected-event count | Reuse selection for repeated narrow dependency sets |
+| Early dense-fallback decision | Avoid repeated scans for broad eigen updates |
+| Exact parameter-change bitset | Avoid confusing distinct dependency sets; no approximate hashing |
+| Threshold in the key | Keep decisions valid when the selection limit differs |
+
+The cache is bound to an immutable model index and cleared on rebinding/model
+replacement. Parameter values and event products are not cached under this key:
+the dependency topology alone determines the selection. Each selected event still
+recomputes its full ordered product using current responses. The union-builder's
+scratch masks remain separate from cached results to avoid stale-mask errors.
+
+The new `eventSelectionCacheHit` counter and existing selection timings will show
+whether repeated MIGRAD/HESSE-style updates avoid the measured 0.268 ms cost.
+Host tests cover different numerical values with the same dependency signature,
+eviction, thresholds, dense decisions, sparse unions and rebinding. The C++ CUDA
+host branch has been syntax-checked. **V100 performance of this correction is
+not yet measured.**
+
+The next CC run should repeat the same production-eigen matrix with the updated
+code and a new output directory. Keep dense compact as the performance reference.
+If broad eigen updates remain dominant after eliminating selection overhead,
+further gains will require reducing the cost of the dense event-weight path or
+exploiting additional structure in shared normalization responses; event skipping
+cannot remove a genuine dependency on almost every event.

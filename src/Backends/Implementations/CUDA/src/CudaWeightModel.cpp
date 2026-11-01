@@ -674,3 +674,48 @@ void Backends::CudaEventUpdatePlan::select(const CudaEventUpdateIndex& index_,
   for( auto group : groups ){ affectedEvents += std::size_t(__builtin_popcount(masks[group])); }
   complete = true;
 }
+
+
+void Backends::CudaEventSelectionCache::bind(const CudaEventUpdateIndex& index_) {
+  _index_ = &index_;
+  _entries_ = {}; _next_ = _current_ = 0; _wasHit_ = false;
+  _work_ = {};
+  _work_.masks.resize(index_.groupCount, 0);
+  _work_.groups.reserve(index_.groupCount);
+  _signature_.resize((index_.parameterEventCounts.size() + 63) / 64, 0);
+}
+
+const Backends::CudaEventSelection& Backends::CudaEventSelectionCache::select(
+    const std::vector<double>& previous_, const std::vector<double>& current_, std::size_t maxGroups_) {
+  if( _index_ == nullptr or not _index_->available() ){
+    throw std::runtime_error("CudaBackend: event selection cache requires an available bound index.");
+  }
+  if( previous_.size() != _index_->parameterEventCounts.size() or current_.size() != previous_.size() ){
+    throw std::runtime_error("CudaBackend: cached event selection parameter count mismatch.");
+  }
+  std::fill(_signature_.begin(), _signature_.end(), 0);
+  for( std::size_t p = 0; p < current_.size(); ++p ){
+    if( current_[p] != previous_[p] ){ _signature_[p / 64] |= std::uint64_t(1) << (p % 64); }
+  }
+  for( std::size_t i = 0; i < _entries_.size(); ++i ){
+    const auto& entry = _entries_[i];
+    if( entry.valid and entry.maxGroups == maxGroups_ and entry.signature == _signature_ ){
+      _wasHit_ = true; _current_ = i;
+      return entry.selection;
+    }
+  }
+  _wasHit_ = false;
+  _work_.select(*_index_, previous_, current_, maxGroups_);
+  auto& entry = _entries_[_next_];
+  entry.selection = {};
+  entry.signature = _signature_; entry.maxGroups = maxGroups_; entry.valid = true;
+  entry.selection.complete = _work_.complete;
+  if( _work_.complete ){
+    entry.selection.affectedEvents = _work_.affectedEvents;
+    entry.selection.groups = _work_.groups;
+    std::sort(entry.selection.groups.begin(), entry.selection.groups.end());
+  }
+  _current_ = _next_;
+  _next_ = (_next_ + 1) % _entries_.size();
+  return entry.selection;
+}

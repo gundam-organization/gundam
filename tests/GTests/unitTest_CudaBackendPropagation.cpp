@@ -537,7 +537,7 @@ TEST(CudaBackendPropagation, SparseEventGroupsPreserveProductsAcrossUpdatesAndEr
       cuda.configure(ConfigReader(JsonType{{"compactDials", true}, {"weightLayout", layout},
           {"eventWeightMode", mode}, {"eventWeightSparseFraction", .5}}));
       cuda.build(view);
-      bool sawSparse = false, sawDense = false;
+      bool sawSparse = false, sawDense = false, sawSelectionCacheHit = false;
       for( const auto& values : std::vector<std::vector<double>>{
           {1., 1., 1., 1.}, {1., 1., 1.2, 1.}, {1., 1., 1., 1.},
           {1., 1., -.5, 1.}, {1., 1., 1., 1.}, {.8, 1., 1., 1.},
@@ -550,6 +550,7 @@ TEST(CudaBackendPropagation, SparseEventGroupsPreserveProductsAcrossUpdatesAndEr
         expectClose(cuda.getHistogramSumSquaresHostView(token), cpu.getHistogramSumSquaresHostView(reference));
         const auto timing = cuda.getLastTimingSummary();
         sawSparse |= timing.sparseEventWeightsUsed != 0;
+        sawSelectionCacheHit |= timing.eventSelectionCacheHit != 0;
         sawDense |= timing.eventWeightsRecomputedCount == 105;
         if( timing.eventWeightCoverageKnown ){
           EXPECT_LE(timing.eventWeightCandidateCount, timing.eventWeightsRecomputedCount);
@@ -562,6 +563,7 @@ TEST(CudaBackendPropagation, SparseEventGroupsPreserveProductsAcrossUpdatesAndEr
         }
       }
       EXPECT_TRUE(sawDense);
+      EXPECT_TRUE(sawSelectionCacheHit);
       EXPECT_EQ(sawSparse, std::string(mode) == "sparseGroups");
       PropagationInputs inputs; inputs.parameters.values = {1., 1., std::numeric_limits<double>::infinity(), 1.};
       EXPECT_THROW(cuda.requestPropagation(inputs), std::runtime_error);
@@ -580,4 +582,52 @@ TEST(CudaBackendPropagation, SparseEventGroupsPreserveProductsAcrossUpdatesAndEr
       expectClose(cuda.getEventWeightsHostView(rebuilt), cpu.getEventWeightsHostView(reference));
     }
   }
+}
+
+
+TEST(CudaEventUpdates, SelectionCacheUsesDependencySetsAndResetsOnRebind) {
+  auto view = eventUpdateModel();
+  CudaEventUpdateIndex index;
+  index.build(view.propagation, false);
+  CudaEventSelectionCache cache;
+  const std::vector<double> center{1., 1., 1., 1.};
+  EXPECT_THROW(cache.select(center, center, 4), std::runtime_error);
+  cache.bind(index);
+  CudaEventUpdatePlan reference;
+  // More signatures than cache slots exercise eviction; each signature is
+  // reused with different numerical values to check that only topology matters.
+  for( auto limit : {std::size_t(1), std::size_t(2), std::size_t(4)} ){
+    for( unsigned signature = 0; signature < 16; ++signature ){
+      for( unsigned repeat = 0; repeat < 2; ++repeat ){
+        auto point = center;
+        for( unsigned p = 0; p < 4; ++p ){
+          if( signature & (1u << p) ){ point[p] = repeat == 0 ? 1.2 : -.2; }
+        }
+        reference.select(index, center, point, limit);
+        const auto& result = cache.select(center, point, limit);
+        if( repeat ){ EXPECT_TRUE(cache.wasHit()); }
+        EXPECT_EQ(result.complete, reference.complete);
+        if( result.complete ){
+          auto groups = reference.groups;
+          std::sort(groups.begin(), groups.end());
+          EXPECT_EQ(result.groups, groups);
+          EXPECT_EQ(result.affectedEvents, reference.affectedEvents);
+        }
+        else{ EXPECT_TRUE(result.groups.empty()); }
+      }
+    }
+  }
+  cache.bind(index);
+  cache.select(center, {1., 1., 1.2, 1.}, 4);
+  EXPECT_FALSE(cache.wasHit());
+  EXPECT_EQ(cache.result().affectedEvents, 9);
+  cache.select({1., 1., 1.2, 1.}, center, 4);
+  EXPECT_TRUE(cache.wasHit());
+  EXPECT_EQ(cache.result().affectedEvents, 9);
+  // A different model at the same index object must be rebound explicitly.
+  index.build(view.propagation, false);
+  cache.bind(index);
+  cache.select(center, {1., 1., 1.2, 1.}, 4);
+  EXPECT_FALSE(cache.wasHit());
+  EXPECT_THROW(cache.select({1.}, center, 4), std::runtime_error);
 }

@@ -291,3 +291,25 @@ constant, forced, error/recovery and rebuilt-cache updates, for both layouts.
 Local validation covers C++ host index tests, Python stencil/CLI tests and real
 CPU resident-engine smoke tests. NVCC and the new sparse device kernel still
 require validation on the CC GPU.
+
+
+### Selection decision cache (follow-up to the 1 November run)
+
+The initial production-eigen run passed numerical checks but regressed the local
+median because broad detector-eigen updates paid about 0.268 ms to select groups
+before falling back to the same dense kernel. The updated implementation caches
+eight dependency signatures: exact physical-parameter change masks plus the
+selection limit. Both complete sorted selections and dense-fallback decisions
+are reused. The cache is cleared when binding a new immutable model index.
+
+`eventSelectionCacheHit` is now exported per call and in coordinate-cost reports.
+It measures structural selection reuse, not reuse of event weights or likelihood
+values at previous fit points. A hit still updates selected event products from
+current responses. The bounded cache adds at most eight group lists and their
+small signatures; this storage is additional to the CSR index budget.
+
+Repeat the same command with a new output directory such as
+`benchmark-weights-local-cache-<timestamp>`. Rebuild/reinstall the Python module
+because the timing interface gains the new cache-hit counter. Check the dense
+baseline, selection time, hit rate and mean/median derivative timings before
+considering any production default change.

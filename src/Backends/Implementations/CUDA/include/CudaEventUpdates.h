@@ -1,6 +1,7 @@
 #ifndef GUNDAM_CUDA_EVENT_UPDATES_H
 #define GUNDAM_CUDA_EVENT_UPDATES_H
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -35,6 +36,36 @@ namespace Backends {
     // selection is never used for sparse execution or reported as exact.
     void select(const CudaEventUpdateIndex& index_, const std::vector<double>& previous_,
                 const std::vector<double>& current_, std::size_t maxGroups_);
+  };
+  struct CudaEventSelection {
+    std::vector<std::uint32_t> groups{};
+    std::size_t affectedEvents{0};
+    bool complete{false};
+  };
+
+  // Bound to one immutable model index. Keys are exact changed-parameter masks
+  // plus the selection limit; values never depend on the parameter values.
+  // Rebinding after model replacement clears every cached decision.
+  class CudaEventSelectionCache {
+  public:
+    void bind(const CudaEventUpdateIndex& index_);
+    const CudaEventSelection& select(const std::vector<double>& previous_,
+        const std::vector<double>& current_, std::size_t maxGroups_);
+    [[nodiscard]] const CudaEventSelection& result() const { return _entries_[_current_].selection; }
+    [[nodiscard]] bool wasHit() const { return _wasHit_; }
+  private:
+    struct Entry {
+      std::vector<std::uint64_t> signature{};
+      CudaEventSelection selection{};
+      std::size_t maxGroups{0};
+      bool valid{false};
+    };
+    const CudaEventUpdateIndex* _index_{nullptr};
+    CudaEventUpdatePlan _work_{};
+    std::array<Entry, 8> _entries_{};
+    std::vector<std::uint64_t> _signature_{};
+    std::size_t _next_{0}, _current_{0};
+    bool _wasHit_{false};
   };
 }
 #endif
