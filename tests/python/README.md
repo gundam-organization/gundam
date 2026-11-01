@@ -1,5 +1,54 @@
 # Python tests
 
+## Prerequisites
+
+Build GUNDAM with `-DWITH_PYTHON_INTERFACE=ON`, then expose the matching module
+through `PYTHONPATH` (or source the installed GUNDAM `setup.sh`).
+
+## How to run the tests?
+
+Install the Python dependencies into your chosen environment:
+
+```bash
+cd $GUNDAM_REPO_DIR
+python3 -m venv --system-site-packages tests/python/venv
+source tests/python/venv/bin/activate
+python -m pip install -r tests/python/requirements.txt
+```
+
+From the repository root:
+
+```bash
+python tests/python/run.py # run fasts tests
+```
+
+Scripts can also be launched directly from a writable working directory:
+
+```bash
+python tests/python/fast/510NumericsIgnoreZeroPredictionAtPrior.py
+python tests/python/fast/010BuildPythonInterfaces.py
+```
+
+
+Command line options:
+
+```bash
+--list # show tests file names
+--output <folder-path> # place where logger files are writen. By default it will be in a temp folder
+--test <python-test-filename> # runs a specific test
+--suite <name-of-the-suite> # runs the tests of the selected suite [fast, regular, benchmarks]
+```
+
+!TODO: add option for printout the tests instead of writing
+
+Sub command options can be passed. Useful for benchmarks:
+```bash
+python tests/python/run.py --suite benchmarks --test 761BackendsCudaWeightBenchmark.py -- --help
+```
+
+
+## How tests are organized?
+
 These tests run directly with Python, independently of `tests/gundam-tests.sh`.
 They use the interpreter you launch; they do not create an environment, install
 packages or switch interpreters automatically.
@@ -83,40 +132,6 @@ These scripts reuse input builders and assertion helpers without running another
 test's `main()`. They generate their own inputs in their own working directory.
 Shared compiled-variable-transform helpers live in `helpers/EvalFromLib.py`;
 the corresponding feature check is `210ApiEvalFromLib.py`.
-
-
-Build GUNDAM with `-DWITH_PYTHON_INTERFACE=ON`, then expose the matching module
-through `PYTHONPATH` (or source the installed GUNDAM `setup.sh`). Install the
-Python dependencies into your chosen environment:
-
-```bash
-python3 -m venv --system-site-packages .venv
-source .venv/bin/activate
-python -m pip install -r tests/python/requirements.txt
-export PYTHONPATH="$PWD/cmake-build-release/src/PythonInterface${PYTHONPATH:+:$PYTHONPATH}"
-```
-
-From the repository root:
-
-```bash
-python tests/python/run.py --list
-python tests/python/run.py --output /tmp/gundam-python-fast
-python tests/python/run.py --suite regular --output /tmp/gundam-python-regular
-python tests/python/run.py --test 510NumericsIgnoreZeroPredictionAtPrior.py
-python tests/python/run.py --suite benchmarks --test 761BackendsCudaWeightBenchmark.py -- --help
-```
-
-The runner starts each script in a separate directory with a `test.log`, using
-the same Python interpreter. It runs every selected script and exits nonzero if
-any script fails. Without `--output`, it creates and preserves a temporary output
-directory. An explicit output directory must not already exist.
-
-Scripts can also be launched directly from a writable working directory:
-
-```bash
-python /path/to/gundam/tests/python/fast/510NumericsIgnoreZeroPredictionAtPrior.py
-python /path/to/gundam/tests/python/fast/010BuildPythonInterfaces.py
-```
 
 Some tests compile small native libraries and require a C++ compiler. The two
 gradient checks `570NumericsFitGradient.py` and
