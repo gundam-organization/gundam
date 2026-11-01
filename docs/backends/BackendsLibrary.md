@@ -64,7 +64,7 @@ with each backend:
 - [CUDA implementation and validation](../guides/CudaBackend.md).
 - [Multi-input dials](MultiInputDials.md).
 - [Small-fit and Hesse covariance regression](BackendFitCovariance.md).
-- [CUDA production profiling](../../tests/benchmarks/README.md#cuda-production-profiling).
+- [CUDA production profiling](../../tests/python/benchmarks/README.md#cuda-production-profiling).
 - [CUDA OA2024 profiling results and optimization priorities](CudaOa2024Benchmark.md).
 
 ## Compatibility
@@ -205,7 +205,7 @@ uploaded every call, including at unchanged parameters.
 
 Host validation and native/CPU Python regressions pass locally. CC validation
 of external/table event weights was confirmed on 2026-10-25. Opt-in CUDA runs
-of `214ExternalWeightBackend.py` / `215CpuTableDials.py` remain available for
+of `710BackendsMultipleExternalWeight.py` / `762BackendsCudaTableDials.py` remain available for
 end-to-end checks. See [CUDA validation](../guides/CudaBackend.md).
 
 ### Engine features
@@ -246,7 +246,7 @@ state are exposed through `EventState`; weight-only changes reuse this index.
 Host math/validation and CPU/MPS regressions pass; GPU execution was confirmed
 at the CC on 2026-10-25. See [CUDA observable responses](CudaObservableResponses.md) and
 [smoothed binning validation](CudaSmoothedBinning.md). Production workload commands
-are in the [CUDA migration/smoothing benchmark](../../tests/benchmarks/README.md#cuda-migration-and-smoothing-on-upgrade-cc-2026).
+are in the [CUDA migration/smoothing benchmark](../../tests/python/benchmarks/README.md#cuda-migration-and-smoothing-on-upgrade-cc-2026).
 The [upgrade-cc-2026 production results](CudaUpgradeBinningBenchmark.md) pass
 CPU comparisons for Pmu migration with 1 MeV smoothing: cached CUDA takes
 4.10 ms per varying-parameter evaluation versus 29.93 ms on four CPU threads

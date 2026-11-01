@@ -163,7 +163,7 @@ The incomplete first pilot run was excluded from the summary.
 ```sh
 env -u DYLD_LIBRARY_PATH \
   PYTHONPATH="$PWD/cmake-build-release/src/PythonInterface" \
-  /opt/homebrew/bin/python3.15 -u tests/benchmarks/233ResidentLikelihoodBenchmark.py \
+  /opt/homebrew/bin/python3.15 -u tests/python/benchmarks/746BackendsMpsResidentLikelihoodBenchmark.py \
   --work-dir /Users/nadrino/Documents/Work/Output/results/gundam/upgrade-cc-2026 \
   --config ndUpCcInc.yaml \
   --override override/datasetHighlandv5.27.1_CCLyon.yaml \
@@ -172,6 +172,6 @@ env -u DYLD_LIBRARY_PATH \
 
 Use `--likelihood PoissonLLH` for the Poisson comparison, or
 `--threads 12 --cpu-only --probe-calls 0` for CPU scaling. The native
-`234MetalLikelihoodMicrobenchmark.mm` documents its compilation command; an
+`742BackendsMpsLikelihoodMicrobenchmark.mm` documents its compilation command; an
 optional `--reverse` argument reverses chunk order. It only modifies source
 strings in its own process and leaves production code unchanged.

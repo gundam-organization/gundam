@@ -43,7 +43,7 @@ La version de Python doit correspondre au module GUNDAM compilé.
 
 ## Lancer le benchmark
 
-`tests/benchmarks/235CudaV100LikelihoodBenchmark.py` orchestre le profileur
+`tests/python/benchmarks/763BackendsCudaV100LikelihoodBenchmark.py` orchestre le profileur
 résident existant, avec des expériences indépendantes et des comparaisons
 numériques entre réglages. Par défaut :
 
@@ -65,7 +65,7 @@ d'initialisation et de changement de backend sont exclus dans les deux cas.
 Exemple Upgrade, dans une allocation V100, depuis le checkout au CC :
 
 ```sh
-python3 tests/benchmarks/235CudaV100LikelihoodBenchmark.py \
+python3 tests/python/benchmarks/763BackendsCudaV100LikelihoodBenchmark.py \
   --work-dir /chemin/upgrade-cc-2026 --config ndUpCcInc.yaml \
   --override override/datasetHighlandv5.27.1_CCLyon.yaml \
   --python-module-dir "$PWD/cmake-build-v100/src/PythonInterface" \
@@ -113,7 +113,7 @@ avec contrôle du domaine ; ce n'est pas un rejeu exact de Migrad.
 
 ## Soumission batch
 
-Le modèle `tests/benchmarks/235CudaV100LikelihoodBenchmark.sbatch` demande
+Le modèle `tests/python/benchmarks/763BackendsCudaV100LikelihoodBenchmark.sbatch` demande
 un GPU, quatre CPU et 48 Gio de RAM sur `gpu_v100`, pendant deux heures.
 Le CC présente cette partition dans sa [documentation Slurm](https://doc.cc.in2p3.fr/en/Computing/slurm/configuration.html)
 et demande de vérifier l'état et les droits courants avec `sinfo` / `scontrol`.
@@ -124,7 +124,7 @@ Après activation de l'environnement de compilation :
 ```sh
 export GUNDAM_REPO="$PWD"
 export PYTHON="$(command -v python3)"
-sbatch --export=ALL tests/benchmarks/235CudaV100LikelihoodBenchmark.sbatch \
+sbatch --export=ALL tests/python/benchmarks/763BackendsCudaV100LikelihoodBenchmark.sbatch \
   --work-dir /chemin/upgrade-cc-2026 --config ndUpCcInc.yaml \
   --override override/datasetHighlandv5.27.1_CCLyon.yaml \
   --python-module-dir "$GUNDAM_REPO/cmake-build-v100/src/PythonInterface" \

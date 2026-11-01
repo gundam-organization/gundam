@@ -6,7 +6,7 @@ selected automatically. From the repository, inside a CUDA GPU allocation, with
 the matching GUNDAM Python module and ROOT runtime selected:
 
 ```bash
-python3 tests/benchmarks/232CudaEbMigrationBenchmark.py \
+python3 tests/python/benchmarks/762BackendsCudaEbMigrationBenchmark.py \
   --work-dir /path/to/inputs \
   --config analysis.yaml \
   --override override/production.yaml override/selection.yaml override/migration.yaml \
@@ -69,7 +69,7 @@ with observable migration. The default matrix loads five engines sequentially.
 A shorter run:
 
 ```bash
-python3 tests/benchmarks/232CudaEbMigrationBenchmark.py \
+python3 tests/python/benchmarks/762BackendsCudaEbMigrationBenchmark.py \
   --work-dir /path/to/inputs --config analysis.yaml \
   --cases CPU CUDA-cachedResponses-interleaved \
   --calls 20 --global-calls 10 --trials 1 \
@@ -126,7 +126,7 @@ search and binning/index stages have different boundaries from CPU stages. CUDA
 stream times overlap host evaluation: compare total evaluations first and do not
 sum the host/GPU columns. No additional per-opcode timing fences are introduced.
 
-The script reuses `229CudaBackendProfiling.py` for replay, timings and numerical
+The script reuses `760BackendsCudaProfiling.py` for replay, timings and numerical
 comparison. It requires no new Python library. The automated test creates its own
 six-event ROOT fixture and configuration in a temporary directory, then exercises
 both CPU binning variants. It does not access

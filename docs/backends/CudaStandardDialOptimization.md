@@ -225,7 +225,7 @@ The OA2024 inputs already contain `override/noEigen.yaml`. Applied after `overri
 The complementary run used CPU, reference cached CUDA, and compact cached CUDA, with constant/local1/global scenarios. Reproduction command:
 
 ```bash
-sbatch --export=ALL "$GUNDAM_REPO/tests/benchmarks/236CudaWeightBenchmark.sbatch" \
+sbatch --export=ALL "$GUNDAM_REPO/tests/python/benchmarks/761BackendsCudaWeightBenchmark.sbatch" \
   --mode benchmark --work-dir "$OA_WORK" --config configOA2024.yaml \
   --override override/v13Prod.yaml override/noEigen.yaml \
   --python-module-dir "$GUNDAM_MODULE" \

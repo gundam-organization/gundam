@@ -57,7 +57,7 @@ Response products still account for approximately 69% and 72% of backend time. R
 
 - Release compilation succeeded.
 - **105 C++ tests passed**, excluding the `RootReaderCleanup` family. That family exits on a configuration missing a required `name` field; the same failure was reproduced using the Debug binary built before these changes. The complete suite is therefore not fully green.
-- **26 Python tests passed**: all existing Python scripts numbered 210 through 229 in `tests/fast-tests`, including `215ArrayDialBranchData.py`, CPU/Metal propagation, external weights, observable responses and dependencies, dynamic binning, response limits and smoothing.
+- **26 Python tests passed**: all existing Python scripts numbered 210 through 229 in `tests/fast-tests`, including `410DialsArrayBranchData.py`, CPU/Metal propagation, external weights, observable responses and dependencies, dynamic binning, response limits and smoothing.
 - New CPU tests cover fully cached and mixed paths, external and constant dials, cap placement with a negative base weight, uneven workloads, 1/2/5 threads, reordered metadata, changed parameters, retained output storage, empty models, NaN, rebuilds and shared ownership.
 - Before and after optimization, both backend fits converged with identical call counts, printed final likelihoods and saved parameter states.
 - Exact comparison found no differences in the contents and variances of **1,419 Upgrade histograms and 10,375 OA2024 histograms**, including ROOT cycles. Names containing memory addresses were normalized, and resulting name collisions were compared as multisets of histogram contents.
@@ -89,7 +89,7 @@ Both supplied Upgrade configurations were rerun in Release with four threads and
 | Hesse status, reference / backend | 0 / 0 |
 | Covariance status, reference / backend | 3 / 3 |
 
-The C++ near-minimum regression fails before the fix and passes after it. `230AsimovHesseStability.py` checks small-step curvature and post-fit Hesse uncertainties against an analytic one-parameter Asimov model, with and without the CPU backend. The resulting validation covers **106 C++ tests** (with the pre-existing `RootReaderCleanup` exclusion) and **27 Python tests** numbered 210 through 230.
+The C++ near-minimum regression fails before the fix and passes after it. `722BackendsCpuAsimovHesseStability.py` checks small-step curvature and post-fit Hesse uncertainties against an analytic one-parameter Asimov model, with and without the CPU backend. The resulting validation covers **106 C++ tests** (with the pre-existing `RootReaderCleanup` exclusion) and **27 Python tests** numbered 210 through 230.
 
 Raw outputs, logs and comparison data are under `/tmp/gundam-hesse-investigation/`. The regenerated comparison is `comp-stable.root`; the supplied comparison and fit outputs were not overwritten. These Hesse checks apply to CPU propagation; the earlier performance table remains a historical measurement of the optimization before this numerical fix.
 

@@ -40,7 +40,7 @@ ctest --test-dir build-cuda -R '^cuda-backend-' --output-on-failure
 export PYTHONPATH="$PWD/build-cuda/src/PythonInterface${PYTHONPATH:+:$PYTHONPATH}"
 export GUNDAM_TEST_CUDA=1
 cd tests
-bash gundam-tests.sh -a -t fast-tests/235CudaFormulaCompositeDials.py -v
+python python/run.py --test 760BackendsCudaFormulaCompositeDials.py
 ```
 
 The C++ tests compare CUDA with CPU for every opcode, composite graph evaluation,
@@ -57,7 +57,7 @@ libraries). From the repository root, inside a GPU allocation:
 ```bash
 export PYTHONPATH="$PWD/build-cuda/src/PythonInterface${PYTHONPATH:+:$PYTHONPATH}"
 PYTHON=/path/to/venv/bin/python \
-  tests/benchmarks/231CudaFormulaCompositeBenchmark.sh \
+  tests/python/benchmarks/764BackendsCudaFormulaCompositeBenchmark.sh \
   /path/to/upgrade-cc-2026 --output "$PWD/cuda-eb-benchmark"
 ```
 

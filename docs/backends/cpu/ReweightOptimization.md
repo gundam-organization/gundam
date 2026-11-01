@@ -168,14 +168,14 @@ bit across the indexed and automatic response traversals, including sparse/dense
 transitions and mixed features. The numerical contract also preserves event
 product order and histogram reduction order across weight schedulers.
 
-`224CpuSingleThreadBenchmark.py` uses one thread for the complete propagation
+`723BackendsCpuSingleThreadBenchmark.py` uses one thread for the complete propagation
 pipeline and reports all available stage timers. Its optional `--perf-record`
 pass samples resident likelihood evaluations by function after loading, outside
 ordinary timing/counter passes. This isolates steady-state costs with a primed
 dial cache; it does not model all-parameter response updates.
 
-Performance scripts live in `tests/benchmarks`; see the
-[benchmark instructions](../../../tests/benchmarks/README.md). The resident
+Performance scripts live in `tests/python/benchmarks`; see the
+[benchmark instructions](../../../tests/python/benchmarks/README.md). The resident
 weight-scaling benchmark loads the model once and varies only active weight
 workers. It separates ordinary stage timings from per-worker wall-time probes,
 retains the histogram pool and checks likelihood/histogram agreement. These
@@ -184,7 +184,7 @@ worker controls are diagnostic API calls; the default fit policy is unchanged. O
 the separate weight-probe pass. Reports retain unsupported/denied events and PMU
 running fractions; they do not infer RAM bandwidth directly from cache misses.
 
-`222CpuWeightSchedulingBenchmark.py --benchmark cache` compares `Indexed` and
+`721BackendsCpuWeightSchedulingBenchmark.py --benchmark cache` compares `Indexed` and
 `Auto` on the same loaded model with Dynamic x2 weights. It replays identical
 constant, local and global parameter sequences, checks likelihood/histogram
 agreement and exports cache preparation, worker execution and complete-evaluation
@@ -197,7 +197,7 @@ Auto traversal and Dynamic x2 weights. It loads the model once, replays the same
 sequences and retains the short global-call cap. For example:
 
 ```sh
-python3 /path/to/gundam/tests/benchmarks/222CpuWeightSchedulingBenchmark.py \
+python3 /path/to/gundam/tests/python/benchmarks/721BackendsCpuWeightSchedulingBenchmark.py \
   --benchmark inputs --config configOA2024.yaml --threads 8 \
   --scenarios local1 --calls 1 --warmup 3 --trials 1 --rounds 1 \
   --override override/v13Prod.yaml override/backendCpuTest.yaml

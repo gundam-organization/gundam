@@ -73,7 +73,7 @@ likelihoods still read back only the scalar statistical likelihood during normal
 evaluations, plus the existing backend control metadata. Backend changes must
 be made between evaluations, rather than concurrently with a fit thread.
 
-`tests/fast-tests/240BackendLifecycle.py` checks CPU/MPS/original-engine switches
+`tests/python/fast/711BackendsMultipleLifecycle.py` checks CPU/MPS/original-engine switches
 with observable responses, explicitly dynamic and smoothed samples, weights,
 histogram errors, Poisson and Barlow-Beeston 2022. It deletes the ROOT input
 after loading to verify transitions do not require disk access. Set

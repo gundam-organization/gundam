@@ -1,6 +1,6 @@
 # Benchmark résident des poids CUDA sur OA2024
 
-Le point d’entrée est `tests/benchmarks/236CudaWeightBenchmark.py`, avec trois
+Le point d’entrée est `tests/python/benchmarks/761BackendsCudaWeightBenchmark.py`, avec trois
 modes : `benchmark`, `preflight`, `ncu`. Il réutilise le profileur 229 et son
 activation à chaud des backends : **un seul chargement des inputs par lancement**,
 y compris pour comparer CPU, les deux modes CUDA et les deux layouts de poids.
@@ -24,7 +24,7 @@ export PYTHON="$(command -v python3)"
 export OA_WORK=/sps/t2k/ablanche/work/results/gundam/GundamInputOA2024
 export GUNDAM_MODULE=/sps/t2k/ablanche/install/gundam/lib
 
-sbatch --export=ALL tests/benchmarks/236CudaWeightBenchmark.sbatch \
+sbatch --export=ALL tests/python/benchmarks/761BackendsCudaWeightBenchmark.sbatch \
   --mode benchmark --work-dir "$OA_WORK" --config configOA2024.yaml \
   --override override/v13Prod.yaml --python-module-dir "$GUNDAM_MODULE" \
   --output "$OA_WORK/weights-baseline"
@@ -68,7 +68,7 @@ les scripts seuls ne peuvent pas l’obtenir d’une ancienne installation.
 Dans une allocation V100, capturer les versions sans lire les données :
 
 ```bash
-python3 tests/benchmarks/236CudaWeightBenchmark.py --mode preflight \
+python3 tests/python/benchmarks/761BackendsCudaWeightBenchmark.py --mode preflight \
   --output "$OA_WORK/weights-preflight"
 ```
 
@@ -88,7 +88,7 @@ différent de l’installation autonome du profileur.
 ## Capture ciblée sans recharger le moteur
 
 ```bash
-sbatch --export=ALL tests/benchmarks/236CudaWeightBenchmark.sbatch \
+sbatch --export=ALL tests/python/benchmarks/761BackendsCudaWeightBenchmark.sbatch \
   --mode ncu --work-dir "$OA_WORK" --config configOA2024.yaml \
   --override override/v13Prod.yaml --python-module-dir "$GUNDAM_MODULE" \
   --output "$OA_WORK/weights-ncu"
@@ -166,7 +166,7 @@ Puis soumettre le benchmark (les tests courts sont lancés dans l'allocation
 avant l'unique chargement des données) :
 
 ```bash
-sbatch --export=ALL "$GUNDAM_REPO/tests/benchmarks/236CudaWeightBenchmark.sbatch" \
+sbatch --export=ALL "$GUNDAM_REPO/tests/python/benchmarks/761BackendsCudaWeightBenchmark.sbatch" \
   --mode benchmark --work-dir "$OA_WORK" --config configOA2024.yaml \
   --override override/v13Prod.yaml --python-module-dir "$GUNDAM_MODULE" \
   --test-executable "$GUNDAM_BUILD/tests/gundamGTest_cudaBackend.exe" \
@@ -245,7 +245,7 @@ derivative2/global; use `--scenarios` to change them.
 After rebuilding and reinstalling GUNDAM in the matching CUDA/Python environment:
 
 ```bash
-sbatch --export=ALL "$GUNDAM_REPO/tests/benchmarks/236CudaWeightBenchmark.sbatch" \
+sbatch --export=ALL "$GUNDAM_REPO/tests/python/benchmarks/761BackendsCudaWeightBenchmark.sbatch" \
   --mode benchmark --work-dir "$OA_WORK" --config configOA2024.yaml \
   --override override/v13Prod.yaml \
   --python-module-dir "$GUNDAM_MODULE" \

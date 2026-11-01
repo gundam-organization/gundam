@@ -64,7 +64,7 @@ opcode, three-parameter sparse cache updates, repeated inputs, constant/event
 inputs, and both execution modes. The composite interpolation regression also
 compares all supported leaf types against the native engine on Metal.
 
-`tests/fast-tests/234MpsFormulaCompositeDials.py` reuses the CPU/ROOT formula and
+`tests/python/fast/743BackendsMpsFormulaCompositeDials.py` reuses the CPU/ROOT formula and
 composite matrices with MPS in both modes and asserts that event propagation is
 active. It covers event inputs, nested graphs, binning constants, input ordering,
 mirroring, response smoothing, and formulas feeding splines or migrated

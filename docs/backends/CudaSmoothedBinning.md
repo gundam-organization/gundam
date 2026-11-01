@@ -121,9 +121,10 @@ repoDir="$PWD"
 export PYTHONPATH="/sps/t2k/ablanche/build/gundam/src/PythonInterface${PYTHONPATH:+:$PYTHONPATH}"
 mkdir -p cuda-smoothed-tests
 cd cuda-smoothed-tests
-bash "$repoDir/tests/fast-tests/005PythonSetup.sh" "$repoDir/tests/fast-tests" &&
-GUNDAM_TEST_CUDA=1 venv/bin/python "$repoDir/tests/fast-tests/230BackendObservableResponses.py" &&
-GUNDAM_TEST_CUDA=1 venv/bin/python "$repoDir/tests/fast-tests/222VariableResponseDependencies.py"
+python3 -m venv --system-site-packages venv &&
+venv/bin/python -m pip install -r "$repoDir/tests/python/requirements.txt" &&
+GUNDAM_TEST_CUDA=1 venv/bin/python "$repoDir/tests/python/fast/761BackendsCudaObservableResponses.py" &&
+GUNDAM_TEST_CUDA=1 venv/bin/python "$repoDir/tests/python/fast/712BackendsMultipleVariableResponseDependencies.py"
 ```
 
 The first test checks strict/smoothed composition, `widthFraction`, manual host

@@ -72,9 +72,9 @@ compilation itself does not launch them.
 
 ## Full engine and producer regression
 
-`230BackendObservableResponses.py` compares native propagation and CPU through
+`761BackendsCudaObservableResponses.py` compares native propagation and CPU through
 the actual engine, including state materialization, histogram pointer lists,
-weights, likelihood and Asimov copies. `222VariableResponseDependencies.py`
+weights, likelihood and Asimov copies. `712BackendsMultipleVariableResponseDependencies.py`
 checks an external Python producer and explicit invalidation. Both keep their
 default CPU/MPS tests usable without CUDA. `GUNDAM_TEST_CUDA=1` additionally
 requires successful CUDA execution in both modes, using strict and smoothed bins.
@@ -86,9 +86,10 @@ repoDir="$PWD"
 export PYTHONPATH="/sps/t2k/ablanche/build/gundam/src/PythonInterface${PYTHONPATH:+:$PYTHONPATH}"
 mkdir -p cuda-observable-tests
 cd cuda-observable-tests
-bash "$repoDir/tests/fast-tests/005PythonSetup.sh" "$repoDir/tests/fast-tests" &&
-GUNDAM_TEST_CUDA=1 venv/bin/python "$repoDir/tests/fast-tests/230BackendObservableResponses.py" &&
-GUNDAM_TEST_CUDA=1 venv/bin/python "$repoDir/tests/fast-tests/222VariableResponseDependencies.py"
+python3 -m venv --system-site-packages venv &&
+venv/bin/python -m pip install -r "$repoDir/tests/python/requirements.txt" &&
+GUNDAM_TEST_CUDA=1 venv/bin/python "$repoDir/tests/python/fast/761BackendsCudaObservableResponses.py" &&
+GUNDAM_TEST_CUDA=1 venv/bin/python "$repoDir/tests/python/fast/712BackendsMultipleVariableResponseDependencies.py"
 ```
 
 Use the Python version matching the compiled module when creating `venv`.

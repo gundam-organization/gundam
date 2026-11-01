@@ -175,14 +175,14 @@ Intermediate eight-bin OA2024 results are excluded from the final tables.
 cmake --build cmake-build-release -j3
 env -u DYLD_LIBRARY_PATH \
   PYTHONPATH="$PWD/cmake-build-release/src/PythonInterface" \
-  python3.15 tests/benchmarks/233ResidentLikelihoodBenchmark.py \
+  python3.15 tests/python/benchmarks/746BackendsMpsResidentLikelihoodBenchmark.py \
   --work-dir /Users/nadrino/Documents/Work/Output/results/gundam/GundamInputOA2024 \
   --config configOA2024.yaml --override override/v13ProdFewRuns.yaml \
   --calls 60 --global-calls 20 --probe-calls 4 \
   --output /tmp/new-oa2024-likelihood-benchmark
 ```
 
-The native `234MetalLikelihoodMicrobenchmark.mm` contains its compilation
+The native `742BackendsMpsLikelihoodMicrobenchmark.mm` contains its compilation
 command and now configures the current parallel shader through the shared
 work descriptor. Historical serial-shader timings remain archived rather
 than silently being replaced by measurements of the new kernel.

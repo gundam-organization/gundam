@@ -122,7 +122,7 @@ the final Hesse matrix but does not resolve all minimizer diagnostics.
   configuration missing a required `name` field in the earlier build.
 - All 28 Python tests numbered 210 through 231 passed, including the array-dial
   input test, MPS dynamic binning, external weights and smoothing.
-- New `231MpsHessePrecision.py` checks a weighted, single-bin Asimov model against
+- New `742BackendsMpsHessePrecision.py` checks a weighted, single-bin Asimov model against
   analytic Barlow–Beeston curvature and the expected Hesse error, with a 0.5%
   tolerance. It checks the automatic recommendation, explicit override, saved
   precision and invalid inputs. It skips outside macOS or without backend support.

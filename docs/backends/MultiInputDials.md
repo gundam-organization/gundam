@@ -95,7 +95,7 @@ repeated parameter references, mirroring, extrapolation, response bounds, cache
 options, rebuilds and invalid inputs. Analytic checks also cover 2-knot and
 larger-than-16-knot axes.
 
-For production inputs, `tests/benchmarks/227BackendComparison.py` loads the same
+For production inputs, `tests/python/benchmarks/745BackendsMpsComparison.py` loads the same
 Asimov model in separate original/CPU/MPS processes and compares every measured
 likelihood, bin content and bin error. Timing excludes input updates and explicit
 histogram materialization. Local scenarios cover every effective fit coordinate;
@@ -105,7 +105,7 @@ benchmarks, not full minimizer or Hesse timings.
 ```sh
 env -u DYLD_LIBRARY_PATH \
   PYTHONPATH="$PWD/cmake-build-release/src/PythonInterface" \
-  python3.15 tests/benchmarks/227BackendComparison.py \
+  python3.15 tests/python/benchmarks/745BackendsMpsComparison.py \
   --work-dir /Users/nadrino/Documents/Work/Output/results/gundam/upgrade-cc-2026 \
   --config ndUpCcInc.yaml --threads 4 \
   --override override/datasetHighlandv5.27.1_CCLyon.yaml override/enableEb2d.yaml \
@@ -118,7 +118,7 @@ reports the build-tree module. Use a matching native-library search path or
 remove that variable for the benchmark invocation.
 
 For before/after scalar performance measurements, use
-`222CpuWeightSchedulingBenchmark.py` and `225MpsBackendProfiling.py` with the same
+`721BackendsCpuWeightSchedulingBenchmark.py` and `741BackendsMpsProfiling.py` with the same
 configuration, thread count, seed, call counts and trial counts on both builds.
 
 ## Production measurements (2026-10-22)

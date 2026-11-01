@@ -169,7 +169,7 @@ unsupported with binning responses and raise an error, since their outcomes
 cannot in general be represented by the shared event weights. The cache manager
 has not been adapted to this feature; use the CPU histogram filling path.
 
-`tests/regular-tests/218BinningResponse.py` produces PNG/PDF comparisons of hard
+`tests/python/regular/350ModelBinningResponse.py` produces PNG/PDF comparisons of hard
 and smooth responses, sums of fractions and numerical derivatives, a quadratic
 objective plot, and a CSV of the scan. It covers 1D and 2D binning, unequal bin
 sizes, categorical slices, external boundaries, L-shaped domains and several
@@ -177,7 +177,7 @@ thread counts. The plots include the outside response and conservation of
 physical-bin plus outside weights. A separate 2D map shows the response across
 the full L-shaped domain. Its Python environment needs `uproot`, `numpy` and `matplotlib`.
 
-`tests/regular-tests/220BinningWidthFraction.py` checks the width options, the
+`tests/python/regular/360ModelBinningWidthFraction.py` checks the width options, the
 1D two-bin limit, numerical derivatives, mixed modes, independent categories,
 and staggered L-shaped domains across thread counts. It also plots a comparison
 of absolute and relative widths around a narrow bin.
@@ -210,7 +210,7 @@ The optional benchmark helper measures rebinning separately from propagation
 (reweighting, histogram filling and likelihood evaluation):
 
 ```bash
-python /path/to/tests/regular-tests/218BinningResponse-benchmark.py \
+python /path/to/tests/python/benchmarks/350ModelBinningResponseBenchmark.py \
   --events 100000 --bins 4 64 --threads 1 2 4 8 --repeat 7
 ```
 
