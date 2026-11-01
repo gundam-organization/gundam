@@ -10,12 +10,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def write_input(path):
     # uproot does not write TGraph object branches. Keep ROOT in a subprocess.
-    macro = Path.cwd() / "229DialResponseSmoothing-input.C"
+    macro = Path.cwd() / "460DialResponseSmoothing-input.C"
     macro.write_text(r'''#include <TFile.h>
 #include <TTree.h>
 #include <TGraph.h>
@@ -117,7 +116,7 @@ def plot_scans(path):
     cases = [("symmetric", "Normalization", 0.25, (0.25, 0.25), "Shared width: 0.25"),
              ("asymmetric", "Normalization", [0.4, 0.1], (0.4, 0.1), "Separate widths: [0.4, 0.1]"),
              ("v-shape", "Graph", [0.4, 0.1], (0.4, 0.1), "V-shaped dial: w = |parameter|")]
-    csv_path = Path.cwd() / "229DialResponseSmoothing.csv"
+    csv_path = Path.cwd() / "460DialResponseSmoothing.csv"
     with csv_path.open("w", newline="") as output:
         writer = csv.writer(output)
         writer.writerow(["case", "parameter", "raw_response", "hard_clamp", "smooth_reference", "gundam_response"])
@@ -180,7 +179,7 @@ def plot_scans(path):
         axes[row, 0].set_ylabel(label)
     figure.suptitle("Original GUNDAM engine: centered C2 response smoothing, limits [0, 2]", fontsize=16)
     for extension in ["png", "pdf"]:
-        plot_path = Path.cwd() / f"229DialResponseSmoothing.{extension}"
+        plot_path = Path.cwd() / f"460DialResponseSmoothing.{extension}"
         figure.savefig(plot_path, dpi=160)
         print("Saved plot:", plot_path, flush=True)
     plt.close(figure)
@@ -192,7 +191,7 @@ def main():
 
     print("Testing module:", GUNDAM.__file__, flush=True)
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / "229DialResponseSmoothing.root"
+    path = Path.cwd() / "460DialResponseSmoothing.root"
     write_input(path)
     backends = [None]
     if hasattr(GUNDAM.FitterEngine, "getBackendsManager"):

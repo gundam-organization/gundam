@@ -8,9 +8,8 @@ from importlib import import_module
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fast-tests"))
-import_module("005PythonSetup-utils").requireVenv(__file__)
-response_test = import_module("218BinningResponse")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fast"))
+response_test = import_module("350BinningResponse")
 
 
 def grid_binning(x_edges, y_edges=None):
@@ -232,7 +231,7 @@ def plot_comparison(path):
     axes[1].set_xlim(positions[0], positions[-1])
     figure.tight_layout()
     for extension in ["png", "pdf"]:
-        figure.savefig(f"220BinningWidthFraction.{extension}")
+        figure.savefig(f"360BinningWidthFraction.{extension}")
     plt.close(figure)
 
 
@@ -241,7 +240,7 @@ def main():
     import uproot
 
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / "220BinningWidthFraction.root"
+    path = Path.cwd() / "360BinningWidthFraction.root"
     with uproot.recreate(path) as output:
         tree = output.mktree("events", {name: "float64" for name in ["X", "Y", "category", "weight"]})
         tree.extend({"X": array("d", [0.5, 0.5]), "Y": array("d", [0.5, 0.5]),

@@ -54,7 +54,7 @@ python tests/python/run.py --list
 python tests/python/run.py --output /tmp/gundam-python-fast
 python tests/python/run.py --suite regular --output /tmp/gundam-python-regular
 python tests/python/run.py --test 510IgnoreZeroPredictionAtPrior.py
-python tests/python/run.py --suite benchmarks --list
+python tests/python/run.py --suite benchmarks --test 350BinningResponseBenchmark.py -- --help
 ```
 
 The runner starts each script in a separate directory with a `test.log`, using
@@ -69,9 +69,11 @@ python /path/to/gundam/tests/python/fast/510IgnoreZeroPredictionAtPrior.py
 python /path/to/gundam/tests/python/fast/010PythonInterfaces.py
 ```
 
-Some tests compile small native libraries and require a C++ compiler. Additional
-regular tests and benchmarks can be added to their respective directories using
-the same category numbering.
+Some tests compile small native libraries and require a C++ compiler. The two
+gradient checks `570EvalFitGradientCheck.py` and
+`580EvalFitGradientSplineCheck.py` also require the ROOT executable: they prepare
+their own inputs using the shared fixtures in `tests/fast-tests`, without running
+the standard test suite. Benchmark scripts accept their own arguments; use `--help` to inspect them.
 
 `fast/010PythonInterfaces.py` exercises CMake configuration without compiling
 GUNDAM. It requires CMake 3.18 or newer, a C++ compiler, pybind11 and Python

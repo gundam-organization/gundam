@@ -4,6 +4,7 @@ import math
 import os
 from pathlib import Path
 import sys
+import subprocess
 
 import GUNDAM
 
@@ -48,9 +49,9 @@ def tolerance(message, value, reference, tolerance_value):
 
 def make_fitter(script_dir):
     config_builder = GUNDAM.ConfigUtils.ConfigBuilder(
-        f"{script_dir}/200CovarianceFit-config.yaml"
+        f"{script_dir}/200NormalizationFit-config.yaml"
     )
-    override_path = Path("902EvalFitGradientSplineCheck-override.yaml")
+    override_path = Path("570EvalFitGradientCheck-override.yaml")
     override_path.write_text(
         "\n".join(
             [
@@ -71,8 +72,8 @@ def make_fitter(script_dir):
         GUNDAM.ConfigUtils.ConfigReader.FieldDefinition("fitterEngineConfig")
     )
 
-    app = GUNDAM.GundamApp("902EvalFitGradientSplineCheck")
-    app.openOutputFile("902EvalFitGradientSplineCheck.root")
+    app = GUNDAM.GundamApp("570EvalFitGradientCheck")
+    app.openOutputFile("570EvalFitGradientCheck.root")
 
     fitter = GUNDAM.FitterEngine()
     fitter.setSaveDir(app, "FitterEngine")
@@ -84,12 +85,11 @@ def make_fitter(script_dir):
     return app, fitter
 
 
-def is_spline_parameter(parameter):
-    return parameter.getName() in ["spline_C", "spline_D"]
-
-
 def main():
-    script_dir = sys.argv[1] if len(sys.argv) > 1 else "."
+    script_dir = str(Path(__file__).resolve().parents[2] / "fast-tests")
+    subprocess.run(["bash", str(Path(script_dir) / "100NormalizationTree.C")], check=True)
+    if not Path("100NormalizationTree.root").is_file():
+        raise RuntimeError("Failed to generate 100NormalizationTree.root")
     os.environ["CONFIG_DIR"] = script_dir
     os.environ["DATA_DIR"] = os.getcwd()
 
@@ -102,37 +102,23 @@ def main():
     minimizer = fitter.getMinimizer()
     fit_parameters = minimizer.getMinimizerFitParameterList()
 
-    expect("Four covariance fit parameters are expected", len(fit_parameters) == 4)
-    if len(fit_parameters) != 4:
-        return STATUS
-
-    spline_parameter_indices = []
-    spline_parameters = []
-    for parameter_index, parameter in enumerate(fit_parameters):
-        if not is_spline_parameter(parameter):
-            continue
-        spline_parameter_indices.append(parameter_index)
-        spline_parameters.append(parameter)
-
-    expect("Two spline fit parameters are expected", len(spline_parameters) == 2)
-    if len(spline_parameters) != 2:
+    expect("Two normalization fit parameters are expected", len(fit_parameters) == 2)
+    if len(fit_parameters) != 2:
         return STATUS
 
     nominal_values = [parameter.getParameterValue() for parameter in fit_parameters]
     nominal_llh = minimizer.evalFit(nominal_values)
-    minimizer.evalFitGradient(spline_parameters)
+    minimizer.evalFitGradient()
 
     expect("Nominal LLH is finite", math.isfinite(nominal_llh))
     if not math.isfinite(nominal_llh):
         return STATUS
 
-    gradient_values = [parameter.getGradient() for parameter in spline_parameters]
+    gradient_values = [parameter.getGradient() for parameter in fit_parameters]
 
     step = 1.0e-4
-    tolerance_value = 1.0e-2
-    for spline_index, parameter in enumerate(spline_parameters):
-        parameter_index = spline_parameter_indices[spline_index]
-
+    tolerance_value = 5.0e-3
+    for parameter_index, parameter in enumerate(fit_parameters):
         shifted_values = list(nominal_values)
         shifted_values[parameter_index] = nominal_values[parameter_index] + step
         up = minimizer.evalFit(shifted_values)
@@ -142,9 +128,9 @@ def main():
 
         finite_diff = (up - down) / (2.0 * step)
         tolerance(
-            "evalFitGradient matches finite difference for spline parameter "
+            "evalFitGradient matches finite difference for "
             + parameter.getFullTitle(),
-            gradient_values[spline_index],
+            gradient_values[parameter_index],
             finite_diff,
             tolerance_value,
         )
@@ -156,9 +142,9 @@ def main():
         displacement = 0.2 * sigma if math.isfinite(sigma) and sigma > 0 else 0.1 * max(1., abs(value))
         shifted_values.append(value + displacement)
     minimizer.evalFit(shifted_values)
-    minimizer.evalFitGradient(spline_parameters)
-    shifted_gradients = [parameter.getGradient() for parameter in spline_parameters]
-    for parameter, gradient in zip(spline_parameters, shifted_gradients):
+    minimizer.evalFitGradient(fit_parameters)
+    shifted_gradients = [parameter.getGradient() for parameter in fit_parameters]
+    for parameter, gradient in zip(fit_parameters, shifted_gradients):
         index = next(i for i, candidate in enumerate(fit_parameters) if candidate is parameter)
         probe = list(shifted_values)
         probe[index] += step

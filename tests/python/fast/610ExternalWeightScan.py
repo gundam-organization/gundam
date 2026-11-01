@@ -10,14 +10,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def run_scan(executable, root, threads, scan_migration, cache_manager_cli=True):
     work = Path.cwd()
     tag = f"{threads}-{'migration' if scan_migration else 'flux'}"
-    commands_path = work / f"220ExternalWeightScan-{tag}-commands.jsonl"
-    worker_path = work / f"220ExternalWeightScan-{tag}-worker.py"
+    commands_path = work / f"610ExternalWeightScan-{tag}-commands.jsonl"
+    worker_path = work / f"610ExternalWeightScan-{tag}-worker.py"
     worker_path.write_text(f'''import json
 
 
@@ -44,7 +43,7 @@ def run(command_):
                     "binningDefinition": [{"name": "X", "edges": [0, 1, 2]}]}}]},
                 "parametersManagerConfig": {"parameterSetList": [
                     {"name": "Flux", "isEnabled": True, "enableEigenDecomp": True,
-                     "parameterDefinitionFilePath": str(work / "220ExternalWeightScan-covariance.root"),
+                     "parameterDefinitionFilePath": str(work / "610ExternalWeightScan-covariance.root"),
                      "covarianceMatrix": "flux",
                      "nominalStepSize": .01, "parameterDefinitions": [
                          {"name": "flux1", "parameterIndex": 0, "priorValue": 1., "stdDev": .05,
@@ -66,14 +65,14 @@ def run(command_):
             },
         },
     }}
-    config_path = work / f"220ExternalWeightScan-{tag}.json"
+    config_path = work / f"610ExternalWeightScan-{tag}.json"
     config_path.write_text(json.dumps(config))
-    log_path = work / f"220ExternalWeightScan-{tag}.log"
+    log_path = work / f"610ExternalWeightScan-{tag}.log"
     with log_path.open("w") as output:
         result = subprocess.run([
             executable, "-c", str(config_path), "-a", "-d", "--scan", str(points),
             "--light-mode", *(["--cache-manager", "off"] if cache_manager_cli else []), "-t", str(threads),
-            "-o", str(work / f"220ExternalWeightScan-{tag}.root"),
+            "-o", str(work / f"610ExternalWeightScan-{tag}.root"),
         ], stdout=output, stderr=subprocess.STDOUT, timeout=120)
     # Concurrent progress output may interleave UTF-8 characters. The scan
     # markers checked below are ASCII; keep the log usable for diagnostics.
@@ -124,7 +123,7 @@ def main():
     assert root_executable, "ROOT must be on PATH to create the covariance fixture"
     macro = Path.cwd() / "ExternalWeightScanCovariance.C"
     macro.write_text('''void ExternalWeightScanCovariance(){
-    TFile output("220ExternalWeightScan-covariance.root", "RECREATE");
+    TFile output("610ExternalWeightScan-covariance.root", "RECREATE");
     TMatrixDSym covariance(2);
     covariance(0, 0) = 0.0025;
     covariance(1, 1) = 0.01;
@@ -134,7 +133,7 @@ def main():
     result = subprocess.run([root_executable, "-n", "-l", "-b", "-q", str(macro)],
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
     assert result.returncode == 0, result.stdout.decode(errors="replace")
-    root = Path.cwd() / "220ExternalWeightScan-input.root"
+    root = Path.cwd() / "610ExternalWeightScan-input.root"
     with uproot.recreate(root) as output:
         tree = output.mktree("events", {"X": "float64"})
         tree.extend({"X": np.array([.2, .8, 1.2, 1.8])})

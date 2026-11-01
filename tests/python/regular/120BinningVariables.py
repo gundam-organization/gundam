@@ -6,8 +6,7 @@ from importlib import import_module
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fast-tests"))
-import_module("005PythonSetup-utils").requireVenv(__file__)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fast"))
 
 
 def make_bin(*edges):
@@ -68,10 +67,10 @@ def main():
     configure_samples([{"name": "first", "binning": {"binList": [make_bin(("X", [0, 1]))]}},
                        {"name": "second", "binning": {"binList": [make_bin(("Y", [0, 1]))]}}])
 
-    valid = Path.cwd() / "219BinningVariables-valid.txt"
+    valid = Path.cwd() / "120BinningVariables-valid.txt"
     valid.write_text("variables: X X Y Y\n0 1 0 1\nvariables: Y Y X X\n0 2 1 3\n")
     configure_binning(str(valid))
-    invalid = Path.cwd() / "219BinningVariables-invalid.txt"
+    invalid = Path.cwd() / "120BinningVariables-invalid.txt"
     invalid.write_text("variables: X X Y Y\n0 1 0 1\nvariables: X X\n2 3\n")
     expect_rejection(str(invalid), "All bins must define the same variables")
     print("SUCCESS: bin variables are consistent across JSON/YAML and text definitions.", flush=True)

@@ -9,14 +9,13 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import_module('005PythonSetup-utils').requireVenv(__file__)
 
 
 def reference_throws(nominal, gaussian):
     # Preserve the exact ROOT random stream without loading PyROOT in Python.
     mode = 'gaussian' if gaussian else 'poisson'
-    output = Path.cwd() / f'223BinningResponseStatThrows-{mode}.json'
-    macro = Path.cwd() / f'223BinningResponseStatThrows-{mode}.C'
+    output = Path.cwd() / f'540BinningResponseStatThrows-{mode}.json'
+    macro = Path.cwd() / f'540BinningResponseStatThrows-{mode}.C'
     values = json.dumps(nominal).replace('[', '{').replace(']', '}')
     macro.write_text(r'''#include <TRandom.h>
 #include <TSystem.h>
@@ -132,7 +131,7 @@ def main():
     print('Testing module:', GUNDAM.__file__, flush=True)
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(1)
-    path = Path.cwd() / '223BinningResponseStatThrows.root'
+    path = Path.cwd() / '540BinningResponseStatThrows.root'
     with uproot.recreate(path) as output:
         tree = output.mktree('events', {'X': 'float64'})
         tree.extend({'X': np.array([.95])})

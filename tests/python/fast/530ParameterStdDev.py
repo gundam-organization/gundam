@@ -171,7 +171,7 @@ def main():
     GUNDAM.setRuntimeWorkingDirectory(str(Path.cwd()))
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(1)
-    path = Path.cwd() / "216ParameterStdDev.root"
+    path = Path.cwd() / "530ParameterStdDev.root"
     write_input(path)
     for eigen in (False, True):
         # z = (1, 2/3), rho = 1/2: chi2 = (z0^2 - z0*z1 + z1^2)/(3/4).

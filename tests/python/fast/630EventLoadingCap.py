@@ -8,8 +8,6 @@ import sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-if '--worker' not in sys.argv:
-    import_module('005PythonSetup-utils').requireVenv(__file__)
 
 
 def worker(path, threads):
@@ -40,7 +38,7 @@ def worker(path, threads):
 
 
 def main():
-    path = Path.cwd() / '904EventLoadingCap.root'
+    path = Path.cwd() / '630EventLoadingCap.root'
     macro = path.with_suffix('.C')
     macro.write_text('''#include <TFile.h>
 #include <TTree.h>

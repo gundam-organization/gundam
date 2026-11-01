@@ -10,11 +10,10 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import_module('005PythonSetup-utils').requireVenv(__file__)
 
 
 def write_input(path):
-    macro = Path.cwd() / '230CompositeDials-input.C'
+    macro = Path.cwd() / '470CompositeDials-input.C'
     macro.write_text(r'''#include <TFile.h>
 #include <TTree.h>
 #include <TGraph.h>
@@ -174,7 +173,7 @@ def reject(config, message):
 def main():
     import GUNDAM
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / '230CompositeDials.root'
+    path = Path.cwd() / '470CompositeDials.root'
     write_input(path)
     first = {'parameterName': 'p'}
     second = {'parameterIndex': 1}
@@ -284,7 +283,7 @@ def main():
         exercise(path, snapshot, lambda p, q, i: .25+.5*i+p, observable=True)
 
     # Compiled functions can consume intermediate responses through DialInputBuffer.
-    source = Path.cwd() / '230CompositeDials-library.cpp'
+    source = Path.cwd() / '470CompositeDials-library.cpp'
     library = source.with_suffix('.so')
     source.write_text('extern "C" double evalVariable(double* x) { return 2 + x[0] + 3*x[1]; }\n')
     subprocess.run(['c++', '-shared', '-fPIC', str(source), '-o', str(library)], check=True)
@@ -307,7 +306,7 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
   indices[0] = 0; weights[0] = 1.; return 1;
 }
 ''')
-    table_library = source.with_name('230CompositeDials-table.so')
+    table_library = source.with_name('470CompositeDials-table.so')
     subprocess.run(['c++', '-shared', '-fPIC', str(source), '-o', str(table_library)], check=True)
     for dial_type in ('Tabulated', 'Kriged'):
         table_config = dict(name=dial_type, libraryPath=str(table_library), initFunction='initialize',
@@ -320,7 +319,7 @@ extern "C" int weights(const char*, int, int, double*, int, int* indices, double
         exercise(path, composite([table, formula('output', '[arg0]*[arg0]', upstream)], 'output'),
                  lambda p, q, i: (1+p+2*q)**2)
 
-    worker = Path.cwd() / '230CompositeDials-worker.py'
+    worker = Path.cwd() / '470CompositeDials-worker.py'
     worker.write_text("""def run(command):
     if command['command'] == 'evaluate':
         command['weights'][:] = 1 + command['parameters']['p'] + 2*command['parameters']['q']
