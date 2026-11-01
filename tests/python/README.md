@@ -53,8 +53,6 @@ compatibility check.
 | `810CompatibilityEvalFromLib.py` | `variablesTransform` versus `variableDict/evalFromLib` |
 | `820CompatibilityFriendTrees.py` | Individual friend paths, mixed declarations and disabled friends |
 | `830CompatibilityDialBranchData.py` | `dialLeafName` and `treeExpression` versus `dialBranchData` |
-| `840CompatibilityBinnedDials.py` | Implicit `Graph`/`Spline` branches and deprecation warnings |
-| `850CompatibilityDialOptions.py` | `dialConfig` versus `options` for Formula, Composite and compiled dials |
 
 These scripts reuse input builders and assertion helpers without running another
 test's `main()`. They generate their own inputs in their own working directory.
@@ -80,7 +78,7 @@ python tests/python/run.py --list
 python tests/python/run.py --output /tmp/gundam-python-fast
 python tests/python/run.py --suite regular --output /tmp/gundam-python-regular
 python tests/python/run.py --test 510NumericsIgnoreZeroPredictionAtPrior.py
-python tests/python/run.py --suite benchmarks --test 350ModelBinningResponseBenchmark.py -- --help
+python tests/python/run.py --suite benchmarks --list
 ```
 
 The runner starts each script in a separate directory with a `test.log`, using
@@ -95,12 +93,28 @@ python /path/to/gundam/tests/python/fast/510NumericsIgnoreZeroPredictionAtPrior.
 python /path/to/gundam/tests/python/fast/010BuildPythonInterfaces.py
 ```
 
-Some tests compile small native libraries and require a C++ compiler. The two
-gradient checks `570NumericsFitGradient.py` and
-`580NumericsFitGradientSpline.py` also require the ROOT executable: they prepare
-their own inputs using the shared fixtures in `tests/fast-tests`, without running
-the standard test suite. Benchmark scripts accept their own arguments; use `--help` to inspect them.
+Some tests compile small native libraries and require a C++ compiler. Tests
+that generate TGraph/TArray inputs also require the ROOT executable. The
+`regular` and `benchmarks` directories are reserved for compatible additions;
+tests for features not yet present in `main` stay on their feature branches.
 
 `fast/010BuildPythonInterfaces.py` exercises CMake configuration without compiling
 GUNDAM. It requires CMake 3.18 or newer, a C++ compiler, pybind11 and Python
 development files; it does not need an installed GUNDAM module.
+
+When validating a specific build on macOS, `PYTHONPATH` alone does not guarantee
+that its native libraries are loaded. `DYLD_LIBRARY_PATH` can override the Python
+extension itself or its dependencies with an installed GUNDAM version. Use the
+matching Python interpreter and remove library search overrides for an isolated
+check (replace `/path/to/build` below):
+
+```bash
+env -u DYLD_LIBRARY_PATH -u LD_LIBRARY_PATH \
+  PYTHONPATH=/path/to/build/src/PythonInterface \
+  python tests/python/run.py --output /tmp/gundam-python-isolated
+```
+
+Set `DYLD_PRINT_LIBRARIES=1` to inspect the actual native library paths on macOS.
+Checking only `GUNDAM.__file__` is insufficient to establish their provenance.
+A script that exits successfully after skipping unsupported features does not
+validate compatibility with those features.
