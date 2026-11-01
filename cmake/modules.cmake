@@ -36,7 +36,12 @@ if(WITH_CACHE_MANAGER)
   list( APPEND MODULES CacheManager )
 endif()
 
+cmessage( STATUS "The following modules will be included:" )
 foreach(mod ${MODULES})
-  cmessage( STATUS "Adding cmake module: ${mod}" )
+  cmessage( STATUS "- ${mod}" )
+endforeach()
+
+cmessage( STATUS "Reading module cmake config..." )
+foreach(mod ${MODULES})
   add_subdirectory( ${CMAKE_SOURCE_DIR}/src/${mod} )
 endforeach()
