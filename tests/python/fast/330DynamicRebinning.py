@@ -8,7 +8,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def write_input(path):
@@ -235,7 +234,7 @@ def main():
 
     print("Testing module:", GUNDAM.__file__, flush=True)
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / "217DynamicRebinning.root"
+    path = Path.cwd() / "330DynamicRebinning.root"
     write_input(path)
     # Include more workers than events or bins, as well as uneven partitions.
     for threads in [1, 2, 4, 8]:

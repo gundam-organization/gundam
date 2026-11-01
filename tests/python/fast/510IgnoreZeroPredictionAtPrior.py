@@ -7,17 +7,10 @@ import math
 import sys
 from pathlib import Path
 
-# Re-run inside the python environment built by 005PythonSetup.sh.  This
-# fails when the environment does not exist, which is what happens when the
-# test is run on its own instead of through gundam-tests.sh.  The helper
-# module name cannot be written in an import statement, so it is imported by
-# name, and the bytecode is not written so that a test run leaves nothing
-# behind in the test directory.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
 from importlib import import_module
 
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def flush_python_outputs() -> None:
@@ -109,10 +102,9 @@ def evaluate_config(config_text: str, work_dir: Path, label: str) -> float:
 
 def main() -> int:
     script_dir = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(__file__).resolve().parent
-    repo_root = script_dir.parents[1]
 
     work_dir = Path.cwd()
-    root_path = work_dir / "210IgnoreZeroPredictionAtPrior.root"
+    root_path = work_dir / "510IgnoreZeroPredictionAtPrior.root"
 
     write_input_root_file(root_path)
     config_false_text = build_config_text(root_path, False)
