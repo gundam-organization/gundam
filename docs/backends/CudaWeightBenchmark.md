@@ -131,9 +131,9 @@ replays les perturbent. Les performances se comparent avec `--mode benchmark`,
 sans Nsight. Les dossiers existants sont refusés.
 
 
-## Première variante : descripteurs compacts (opt-in)
+## Descripteurs compacts (activés par défaut)
 
-La configuration CUDA `compactDials: true` active quatre colonnes de `uint32`
+La configuration CUDA utilise par défaut `compactDials: true`, avec quatre colonnes de `uint32`
 (entrée, offset et taille du payload, référence de politique). Les options
 identiques (type, nombre d'entrées, extrapolation, bornes et smoothing) sont
 partagées dans une table de politiques, sans changer l'ordre des dials, les
@@ -212,7 +212,7 @@ still use full reductions. No ratio or atomic delta update is introduced.
 
 | Control | Initial value or behavior |
 |---|---|
-| Production default | `eventWeightMode: dense` |
+| Production default | `eventWeightMode: sparseGroups`, with cached selection and automatic dense fallback |
 | `eventWeightSparseFraction` | `0.25`, an experimental threshold, not a measured optimum |
 | CLI override for indexed cases | `--event-weight-sparse-fraction 0.25` |
 | Sparse selection | Stop early once selected groups exceed the threshold |
@@ -311,5 +311,7 @@ small signatures; this storage is additional to the CSR index budget.
 Repeat the same command with a new output directory such as
 `benchmark-weights-local-cache-<timestamp>`. Rebuild/reinstall the Python module
 because the timing interface gains the new cache-hit counter. Check the dense
-baseline, selection time, hit rate and mean/median derivative timings before
-considering any production default change.
+baseline, selection time, hit rate and mean/median derivative timings. The completed
+selection-cache benchmark now supports enabling compact descriptors and cached
+selective event groups by default. Reference benchmark variants explicitly select
+their descriptor and event-weight modes, independently of production defaults.

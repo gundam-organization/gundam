@@ -166,10 +166,11 @@ def backend_config(args):
     options = {} if backend_type == 'CPU' else {
         'deviceIndex': args.device_index, 'propagationMode': args.worker.split('-')[1],
         'weightLayout': 'warpInterleaved' if '-interleaved' in args.worker else 'eventMajor',
+        # Reference cases must remain stable when production defaults improve.
+        'compactDials': '-compact' in args.worker,
+        'eventWeightMode': 'dense',
         'likelihoodBlockSize': getattr(args, 'likelihood_block_size', 0),
         'reusePrediction': not getattr(args, 'disable_prediction_reuse', False)}
-    if '-compact' in args.worker:
-        options['compactDials'] = True
     if args.worker.endswith('-coverage') or args.worker.endswith('-sparse'):
         options['eventWeightMode'] = 'coverage' if args.worker.endswith('-coverage') else 'sparseGroups'
         options['eventWeightSparseFraction'] = getattr(args, 'event_weight_sparse_fraction', .25)

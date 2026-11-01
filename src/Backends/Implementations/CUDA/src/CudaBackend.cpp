@@ -57,8 +57,8 @@ void Backends::CudaBackend::configureImpl() {
   _deviceIndex_ = 0;
   _likelihoodBlockSize_ = 0;
   _reusePrediction_ = true;
-  _compactDials_ = false;
-  _eventWeightMode_ = CudaEventWeightMode::dense;
+  _compactDials_ = true;
+  _eventWeightMode_ = CudaEventWeightMode::sparseGroups;
   _eventWeightSparseFraction_ = 0.25;
   _propagationMode_ = CudaPropagationMode::cachedResponses;
   _weightLayout_ = CudaWeightLayout::warpInterleaved;

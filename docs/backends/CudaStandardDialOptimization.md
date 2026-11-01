@@ -21,7 +21,7 @@ Compact descriptors accelerate global dial-response evaluation by **2.50×** and
 | Expensive local FSI updates | About **10.9 → 6.0 ms** per evaluation | Account for the physical parameters changed by the eigen transformation |
 | Median local updates | About **2.09 ms**, essentially unchanged | Recompute only affected events, when profitable |
 
-This improvement is directly relevant to MCMC proposals that update all parameters. It does not establish a speedup for a complete MCMC run. For Minuit2, the next priority should be selective event recomputation, after measuring the fraction of events affected by each coordinate.
+This improvement is directly relevant to MCMC proposals that update all parameters. It does not establish a speedup for a complete MCMC run. The subsequent selective-event implementation with a structural selection cache reduces **mean local propagation time by 4.7–5.2% for single-coordinate workloads and 3.8% for the sampled two-coordinate stencils**. Narrow coordinates improve by more than 2×, while broad eigen updates retain dense execution. See the [selection-cache results](#selection-cache-results--1-november-2026) below; complete MIGRAD/HESSE speedups remain unmeasured.
 
 ## Measurement sets and methodology
 
@@ -31,6 +31,7 @@ This improvement is directly relevant to MCMC proposals that update all paramete
 | Uninstrumented no-eigen benchmark | [No-eigen report](../../benchmark-weights-noEigen-20261031-203949/report.md) | CPU, reference cached CUDA, compact cached CUDA; three trials | Isolate physical-parameter updates |
 | Nsight Compute capture | [NCU report](../../benchmark-weights-compact-20261031-195643/weights.ncu-rep) | NCU 2025.2.1; reference and compact, each with one local and one global call | Explain GPU behavior |
 | Local-propagation prototype | [Local benchmark report](../../benchmark-weights-local-20261101-003328/report.md) | CPU, dense compact, coverage, sparse; local and derivative workloads | Validate selective event updates on production eigen coordinates |
+| Cached local propagation | [Selection-cache benchmark report](../../benchmark-weights-local-cache-20261101-022640/report.md) | Same four cases; production eigen coordinates, individual event comparisons | Measure cached selections and cached dense-fallback decisions |
 | Extracted hardware counters | [Metrics JSON](../../benchmark-weights-compact-20261031-195643/analysis/metrics.json) | Eight profiled kernel actions | Preserve the evidence used below |
 
 The original compaction benchmark, no-eigen benchmark and NCU capture use the same GUNDAM module hash. The later local-propagation experiment uses a subsequent build; variants are compared within that run. Each run loads the inputs **once**, then switches backends while retaining the loaded model. Parameter points and random seeds are identical across variants within a benchmark; data selection and likelihood configuration are preserved.
@@ -73,7 +74,7 @@ These figures describe allocated storage, not memory traffic per propagation.
 | Multiplication order within each event | Preserved |
 | Dense and sparse response evaluation | Same numerical routines as the reference |
 | Transformed-input cache | Retained |
-| Production default | Generic path remains the default |
+| Production default | Compact packing requested automatically; generic fallback when unsupported or unprofitable |
 
 Compact mode falls back to the generic representation for models containing formulas, composites, surfaces, or external producers. It also falls back if indices exceed 32 bits or policy sharing would not reduce storage. Diagnostics report the actual path; the benchmark rejects a case named `compact` if compact representation is inactive.
 
@@ -451,20 +452,20 @@ For small local calls, the new capture supports a different priority: measure ev
 | No-eigen maximum absolute histogram/error difference | `1.02e-11` |
 | Maximum absolute LLH difference | `1.88e-12` |
 | Maximum absolute histogram/error difference | `1.32e-11` |
-| Individual OA2024 event weights | Not materialized for comparison in this run |
+| Individual OA2024 event weights | Not materialized in the original compaction run; compared successfully in both later local-propagation runs |
 | Individual weights on small dedicated models | Compared by dedicated tests |
 | CUDA propagation and surface tests on V100 | Passed, including compact propagation and error paths |
 | ROOT test-runner and host-callback `NaN` fixes | Separate from descriptor compaction |
-| Production default changed | No |
+| Production default changed | Yes, after the selection-cache benchmark: compact descriptors and cached selective event groups |
 | Complete-fit speedup measured | No |
-| Selective event propagation | First prototype passes V100 numerical checks; benefits narrow coordinates but regresses aggregate eigen workloads |
+| Selective event propagation | Cached version passes V100 comparisons and improves sampled local means by 3.8–5.2%; aggregate medians remain almost unchanged |
 
-The established result is the speedup from compact descriptors. Selective event propagation remains a proposal to measure and validate.
+Both descriptor compaction and cached selective event propagation now have V100 benchmark evidence. Their gains apply to the measured propagation workloads; complete optimizer timings and Hessian accuracy remain to be validated.
 
 
 ## Prepared follow-up: resident local-update benchmark
 
-An opt-in event-group prototype and coverage diagnostics are now available in
+Event-group propagation and coverage diagnostics are available in
 benchmark 236. See the [run instructions and counter definitions](CudaWeightBenchmark.md#selective-event-updates-for-migradhesse-workloads).
 
 | Variant | Purpose |
@@ -478,9 +479,10 @@ and the current error/rebuild invalidation rules. The initial 25% group threshol
 is experimental. New one- and two-coordinate stencil scenarios exercise returns
 to the center and bounded coordinates. They approximate derivative propagation
 patterns; they do not establish MIGRAD/HESSE wall-time gains or validate Hessian
-accuracy. Production defaults remain unchanged.
+accuracy. After the successful selection-cache run, compact packing and cached
+selective event groups become the production defaults; coverage remains a diagnostic.
 
-The production-eigen run is now available below. A follow-up selection-cache change is prepared, with host checks completed and V100 performance still pending.
+Both the initial production-eigen run and the subsequent selection-cache run are available below.
 
 
 ## Production eigen local-update results — 1 November 2026
@@ -581,12 +583,167 @@ The new `eventSelectionCacheHit` counter and existing selection timings will sho
 whether repeated MIGRAD/HESSE-style updates avoid the measured 0.268 ms cost.
 Host tests cover different numerical values with the same dependency signature,
 eviction, thresholds, dense decisions, sparse unions and rebinding. The C++ CUDA
-host branch has been syntax-checked. **V100 performance of this correction is
-not yet measured.**
+host branch has been syntax-checked. **V100 results are now available in the
+following section.**
 
-The next CC run should repeat the same production-eigen matrix with the updated
-code and a new output directory. Keep dense compact as the performance reference.
+The follow-up production-eigen matrix is now complete, with dense compact as
+the performance reference.
 If broad eigen updates remain dominant after eliminating selection overhead,
 further gains will require reducing the cost of the dense event-weight path or
 exploiting additional structure in shared normalization responses; event skipping
 cannot remove a genuine dependency on almost every event.
+
+## Selection-cache results — 1 November 2026
+
+The [cached local benchmark](../../benchmark-weights-local-cache-20261101-022640/report.md)
+is complete. All four cases share PID `673004`: inputs are loaded once and
+backends are replaced in the resident engine. Production eigendecompositions
+remain enabled. Three trials cover all 842 coordinates, with derivative steps
+of `0.001` parameter sigma. The two-coordinate scenario samples adjacent pairs;
+it does not reproduce the full set of Hessian pairs.
+
+### Aggregate gains appear in the mean, not the median
+
+All comparisons below are **within this new run**, against compact CUDA with
+dense event weights. The earlier job had different absolute kernel timings.
+
+| Scenario | Dense mean | Cached sparse mean | Mean time reduction | Dense / sparse median |
+|---|---:|---:|---:|---:|
+| Constant | 0.5405 ms | 0.5433 ms | −0.53% | 0.5407 / 0.5435 ms |
+| Local1 | 2.0211 ms | **1.9254 ms** | **4.74%** | 1.9759 / 1.9813 ms |
+| One-coordinate derivative stencil | 2.0170 ms | **1.9117 ms** | **5.22%** | 1.9760 / 1.9800 ms |
+| Two-coordinate derivative stencil | 2.0360 ms | **1.9577 ms** | **3.85%** | 1.9765 / 1.9803 ms |
+| Global | 6.4627 ms | 6.4669 ms | −0.06% | 6.4403 / 6.4647 ms |
+
+The median local evaluation is about 4–5 µs slower, while the mean improves:
+most coordinates still use the dense kernel, and a smaller set receives large
+savings. Only **87 of 842 local1 coordinates** use sparse execution. In the
+one-coordinate stencil, the mean reduction is 5.16–5.26% across the three trials;
+for two-coordinate stencils it is 3.80–3.93%. These repeat within this job,
+although sequential case execution does not eliminate clock or order effects.
+
+The upper tail does not improve uniformly. Local1 p95 is 2.123 → 2.196 ms,
+derivative1 p95 is 2.125 → 2.145 ms, and derivative2 p95 is 2.259 → 2.285 ms.
+Selection misses still have a cost. A lower mean therefore does not imply every
+call, coordinate or percentile improves.
+
+### The structural cache removes repeated selection work
+
+Hit rates below count **all raw timed calls**, rather than taking the median
+of the binary hit counter. Both complete selections and dense decisions count
+as cache hits.
+
+| Scenario | Timed calls | Selection-cache hits | Hit rate | Sparse calls | Median selection time |
+|---|---:|---:|---:|---:|---:|
+| Local1 | 2,526 | 2,020 | **79.97%** | 261 | 1.588 µs |
+| One-coordinate stencil | 10,104 | 9,598 | **94.99%** | 1,044 | 1.499 µs |
+| Two-coordinate stencil | 6,315 | 5,806 | **91.94%** | 525 | 1.540 µs |
+
+The previous prototype spent about 268 µs selecting groups before a typical
+dense fallback; selection now costs about 1.5 µs in the aggregate median.
+This comparison explains the removed overhead, rather than asserting an exact
+cross-job speedup. Within this run, the derivative1 selection median is
+**1.493 µs on hits versus 60.692 µs on misses**. Broad eigen coordinates reuse
+the same physical dependency sets even when their numerical values differ.
+
+The diagnostic coverage case also benefits: median local1 evaluation is now
+1.981 ms, close to the dense baseline. Its mean remains higher, 2.096 versus
+2.021 ms, because exact coverage on misses costs more than early dense fallback.
+Global sparse calls bypass selection and execute densely; their zero hit count
+is expected. Zero affected-event counters after incomplete selection still mean
+**unknown coverage**, not zero affected events.
+
+### Narrow updates retain substantial gains
+
+These are per-coordinate **derivative1 medians** in the same run:
+
+| Coordinate | Dense evaluation | Cached sparse evaluation | Speedup | Sparse weight stage |
+|---|---:|---:|---:|---:|
+| Detector `ECalPID_muon_DSEcal` (#700) | 1.966 ms | **0.893 ms** | **2.20×** | 0.142 ms |
+| Binned cross-section `EB_bin_O_nubar` (#841) | 1.962 ms | **0.844 ms** | **2.33×** | 0.093 ms |
+| Detector eigen #0 (#100) | 1.975 ms | 1.986 ms | Similar | 1.222 ms |
+| FSI eigen #1 (#751) | 5.484 ms | 5.484 ms | Similar | 1.225 ms |
+
+The narrow examples spend about 1.1 µs on selection. FSI remains dominated by
+response evaluation: about 3.526 ms for coordinate #751, followed by the dense
+event-weight kernel. Group selection cannot accelerate an update spread over
+almost every warp.
+
+### Numerical validation
+
+| Check across all compared CUDA cases and scenarios | Result |
+|---|---:|
+| Benchmark completion and comparisons | Passed |
+| Maximum absolute LLH difference from CPU | `1.88e-12` |
+| Maximum absolute histogram/error difference | `1.32e-11` |
+| Maximum absolute final individual event-weight difference | `1.39e-15` |
+| Event-bin membership mismatches | **0** |
+
+LLH is compared at every measured call; histograms and individual event snapshots
+are compared at trial endpoints. These checks do not validate a fitted covariance
+matrix or establish end-to-end MIGRAD/HESSE performance. No new NCU capture is
+included in this run: cache-hit counters and host selection timers explain the
+selection improvement, while the earlier NCU capture explains the dense kernel's
+memory-bandwidth limit.
+
+Derived timing reductions and raw hit counts are preserved in
+[selection-cache-summary.json](../../benchmark-weights-local-cache-20261101-022640/analysis/selection-cache-summary.json).
+
+### Next priority: reuse unchanged factors within broadly affected events
+
+The selection cache fixes the first prototype's regression. The next substantial
+target is **the dense event-product stage for broad eigen updates**, rather
+than enlarging an eight-entry cache without evidence of useful extra reuse.
+Typical local calls still spend about 1.223 ms recomputing event products,
+despite a median dial-response stage of only 0.018 ms. Full histogram reduction
+costs about 0.176 ms, and host preparation about 0.452 ms.
+
+| Priority | Investigation or implementation | Decision criterion |
+|---|---|---|
+| 1 | Record and replay actual MIGRAD/HESSE parameter changes with the resident engine | Measure real dependency-signature reuse, mixed-coordinate calls and total propagation cost |
+| 2 | Diagnose the positions of changed factors in each ordered event product, especially detector normalization and flux updates | Determine whether unchanged prefixes or contiguous blocks can be cached profitably |
+| 3 | Prototype cached partial products, with current-response recomputation and a dense fallback | Reduce dense response-index reads and response gathers even when all events are affected |
+| 4 | Validate finite-difference gradients, Hessian entries and complete optimizer runs | Confirm the propagation gain survives actual call patterns and numerical sensitivity |
+
+There is concrete motivation for factor reuse: the inventory contains only
+**641 unique `Norm` dials but 6,370,088 event occurrences**. Reusing their
+dependency structure may avoid rereading other unchanged factors. The potential
+gain depends on factor order and how often other parameter groups invalidate
+the cached products; this benchmark does not yet measure it.
+
+An unchanged prefix checkpoint can preserve the existing multiplication order
+when recomputation resumes from that exact accumulated value. More general
+block products change floating-point association and require explicit numerical
+validation, particularly for HESSE. Avoid repeated `new/old` ratio updates:
+zeros, caps and accumulated rounding need a robust policy. Preserve final caps,
+base weights and error/rebuild invalidation, and retain the full ordered kernel
+as the reference and fallback. Actual optimizer workloads remain necessary to
+measure complete-fit gains with the new defaults.
+
+
+## Default CUDA policy after these measurements
+
+Selecting CUDA without extra options now requests the best measured combination
+for these workloads. No user tuning is required to enable it.
+
+| Internal setting | Default | Automatic fallback |
+|---|---|---|
+| Dial responses | `cachedResponses` | Recompute when invalidated |
+| Descriptor storage | `compactDials: true` | Generic descriptors for unsupported models, index overflow or no storage benefit |
+| Event index layout | `warpInterleaved` | Existing packing compatibility rules |
+| Event products | `eventWeightMode: sparseGroups` | Dense execution for broad selections, unsupported dependencies, index budget limits or invalidated state |
+| Group-selection threshold | 25% of groups | Early dense decision cached by exact dependency signature |
+| Prediction reuse | Enabled | Invalidated on model/state changes as before |
+
+The compact dense benchmark case explicitly requests dense execution, and the
+reference noncompact cases explicitly disable compaction. Benchmark labels
+therefore retain their original meaning after the production defaults change.
+Advanced overrides remain useful for diagnosis and regression comparisons.
+
+These defaults optimize the measured compromise across global and local calls;
+they do not guarantee the fastest individual call for every model or GPU. The
+selection index adds construction time and memory, and misses can slightly
+increase tail latency. The eight-entry selection cache and dense fallback avoid
+the earlier large regression on repeated broad eigen updates. The new default
+configuration has a dedicated GPU regression test, to run on the CC; CUDA device
+execution is unavailable on the local development machine.

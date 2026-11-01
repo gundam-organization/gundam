@@ -528,6 +528,35 @@ TEST(CudaEventUpdates, RejectsUnsupportedModelsBudgetsAndConfiguration) {
   EXPECT_THROW(backend.configure(ConfigReader(JsonType{{"eventWeightMode", "unknown"}})), std::exception);
 }
 
+TEST(CudaBackendPropagation, DefaultsSelectOptimizedPathsAndResetOverrides) {
+  const auto view = eventUpdateModel();
+  CpuBackend cpu; cpu.build(view);
+  CudaBackend cuda;
+  for( int configuration = 0; configuration < 2; ++configuration ){
+    if( configuration == 1 ){
+      cuda.configure(ConfigReader(JsonType{{"compactDials", false}, {"eventWeightMode", "dense"},
+          {"weightLayout", "eventMajor"}, {"propagationMode", "recomputeResponses"}}));
+      cuda.configure(ConfigReader(JsonType::object()));
+    }
+    cuda.build(view);
+    const auto diagnostics = JsonType::parse(cuda.getDiagnostics());
+    EXPECT_TRUE(diagnostics.at("requestedCompactDials").get<bool>());
+    EXPECT_EQ(diagnostics.at("eventWeightMode"), "sparseGroups");
+    EXPECT_EQ(diagnostics.at("eventWeightSparseFraction"), .25);
+    EXPECT_EQ(diagnostics.at("requestedWeightLayout"), "warpInterleaved");
+    EXPECT_EQ(cuda.getName(), "CUDA/cachedResponses");
+    for( const auto& values : std::vector<std::vector<double>>{
+        {1., 1., 1., 1.}, {1., 1., 1.2, 1.}, {1., 1., 1., 1.}} ){
+      PropagationInputs inputs; inputs.parameters.values = values;
+      const auto reference = cpu.requestPropagation(inputs);
+      const auto token = cuda.requestPropagation(inputs);
+      expectClose(cuda.getEventWeightsHostView(token), cpu.getEventWeightsHostView(reference));
+      expectClose(cuda.getHistogramSumsHostView(token), cpu.getHistogramSumsHostView(reference));
+      expectClose(cuda.getHistogramSumSquaresHostView(token), cpu.getHistogramSumSquaresHostView(reference));
+    }
+  }
+}
+
 TEST(CudaBackendPropagation, SparseEventGroupsPreserveProductsAcrossUpdatesAndErrors) {
   const auto view = eventUpdateModel();
   for( const auto* layout : {"eventMajor", "warpInterleaved"} ){

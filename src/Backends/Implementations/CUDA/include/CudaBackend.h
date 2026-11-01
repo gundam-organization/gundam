@@ -78,8 +78,8 @@ ENUM_FIELD( sparseGroups )
     int _deviceIndex_{0};
     unsigned int _likelihoodBlockSize_{0}; // Zero selects the conservative automatic policy.
     bool _reusePrediction_{true};
-    bool _compactDials_{false};
-    CudaEventWeightMode _eventWeightMode_{CudaEventWeightMode::dense};
+    bool _compactDials_{true};
+    CudaEventWeightMode _eventWeightMode_{CudaEventWeightMode::sparseGroups};
     double _eventWeightSparseFraction_{0.25};
     CudaPropagationMode _propagationMode_{CudaPropagationMode::cachedResponses};
     CudaWeightLayout _weightLayout_{CudaWeightLayout::warpInterleaved};

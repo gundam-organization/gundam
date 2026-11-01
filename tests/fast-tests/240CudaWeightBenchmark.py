@@ -25,6 +25,10 @@ def main():
         device_index=0))['options'][0]
     assert options['compactDials'] and options['weightLayout'] == 'warpInterleaved'
     assert options['propagationMode'] == 'cachedResponses'
+    assert options['eventWeightMode'] == 'dense'
+    reference = profiling.backend_config(SimpleNamespace(worker='CUDA-cachedResponses-interleaved',
+        device_index=0))['options'][0]
+    assert reference['compactDials'] is False and reference['eventWeightMode'] == 'dense'
     options = profiling.backend_config(SimpleNamespace(worker='CUDA-cachedResponses-interleaved-compact-sparse',
         device_index=0))['options'][0]
     assert options['compactDials'] and options['eventWeightMode'] == 'sparseGroups'
