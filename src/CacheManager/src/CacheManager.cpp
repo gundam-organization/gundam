@@ -794,10 +794,10 @@ std::future<bool> Cache::Manager::Fill(SampleSet& samples,
     cache->GetHistogramsCache().Invalidate();
     for (auto& par : fParameters.ParameterMap ) {
         if (not par.first->isEnabled()) {
-            LogWarning << "WARNING: Disabled parameter: "
+            LogWarning << "Disabled parameter: "
                        << par.first->getFullTitle()
                        << std::endl;
-            LogWarning << "WARNING: Cache::Manager will not be used"
+            LogWarning << "Cache::Manager will not be used"
                        << std::endl;
             return  std::future<bool>();
         }
@@ -886,7 +886,7 @@ bool Cache::Manager::ValidateHistogramContents(int quiet){
             ++failed;
             continue;
         }
-        if (quiet < 1) LogError << "Histogram " << count++ << " OK" << std::endl;
+        if (quiet < 1) LogInfo << "Histogram " << count++ << " OK" << std::endl;
     }
 
     return failed < 1;
