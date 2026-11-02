@@ -53,11 +53,8 @@ Cache::Weights::Weights(std::size_t results)
 int Cache::Weights::AddWeightCalculator(Cache::Weight::Base* v) {
     int index = fWeightCalculators++;
     if (fWeightCalculator.size() < fWeightCalculators) {
-        std::cout << "CacheWeights: Overflow --"
-                  << " Increase size of fWeightCalculator std::array. "
-                  << " Current Size: " << fWeightCalculator.size()
-                  << std::endl;
-        std::exit(EXIT_FAILURE);
+      LogExit("Overflow -- increase size of fWeightCalculator std::array. Current size: "
+              << fWeightCalculator.size());
     }
     fWeightCalculator.at(index) = v;
     return index;
