@@ -458,13 +458,14 @@ void Backends::BackendManager::evalGradient(ParameterGradient& gradient_) {
   validateLikelihoodGradient();
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for backend gradients.");
   auto& likelihood = *_likelihoodInterfacePtr_;
-  auto statGradient = likelihood.prepareGradient(gradient_);
+  likelihood.validateWeightGradient();
 
   // Refresh the backend snapshot/token even when no value callback preceded us.
   auto propagation = propagate();
   LogThrowIf(not propagation.valid(), "Backend gradient propagation is unavailable.");
   const auto result = propagation.get();
   LogThrowIf(not result.isValid, "Backend gradient propagation failed.");
+  auto statGradient = likelihood.prepareGradient(gradient_);
   likelihood.evalPenaltyLikelihood();
   if( result.hasStatLikelihood ){
     likelihood.getBuffer().statLikelihood = result.statLikelihood;
