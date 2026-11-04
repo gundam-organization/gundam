@@ -212,11 +212,24 @@ void LikelihoodInterface::validateWeightGradient() const {
   }
 }
 
-void LikelihoodInterface::evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_) {
+void LikelihoodInterface::evalGradient() {
   validateWeightGradient();
-  // Always evaluate the requested current parameter state; preserve the likelihood buffers.
+  // Refresh the current parameter state and preserve the likelihood buffers.
   propagateAndEvalLikelihood();
-  evalLikelihoodGradient(parameterList_, [this](const auto& parameters_){ evalStatLikelihoodGradient(parameters_); });
+  evalGradient([this](const auto& parameters_){ evalStatLikelihoodGradient(parameters_); });
+}
+
+void LikelihoodInterface::evalGradient(
+    const std::function<void(const std::vector<Parameter*>&)>& statGradientEvaluator_) {
+  std::vector<Parameter*> parameterList;
+  for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
+    for( auto& par : parSet.getEffectiveParameterList() ){
+      if( par.isEnabled() and not par.isPenaltyDisabled() ){
+        parameterList.emplace_back(&par);
+      }
+    }
+  }
+  evalLikelihoodGradient(parameterList, statGradientEvaluator_);
 }
 
 void LikelihoodInterface::evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_,

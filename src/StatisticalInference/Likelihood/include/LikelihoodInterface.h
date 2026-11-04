@@ -97,13 +97,11 @@ public:
   // core
   double evalLikelihood(std::future<bool>& propagation) const;
   void validateWeightGradient() const;
-  /// Repropagate the current original-engine point and fill physical-parameter gradients.
-  /// Supported scope: analytic weight dials, fixed unsmoothed bins, no external constraints.
-  void evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
-  // Complete a caller-evaluated likelihood using a statistical gradient provider.
-  // The provider fills physical Parameter gradients; projection/penalties stay here.
-  void evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_,
-      const std::function<void(const std::vector<Parameter*>&)>& statGradientEvaluator_);
+  /// Refresh the current point and fill gradients in physical/effective coordinates.
+  void evalGradient();
+  /// Complete an already evaluated likelihood using a statistical gradient provider.
+  /// Parameter selection, eigen projection and penalties are handled here.
+  void evalGradient(const std::function<void(const std::vector<Parameter*>&)>& statGradientEvaluator_);
   double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
@@ -126,6 +124,8 @@ protected:
   void loadModelPropagator();
   void loadDataPropagator();
   void buildSamplePairList();
+  void evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_,
+      const std::function<void(const std::vector<Parameter*>&)>& statGradientEvaluator_);
   void evalStatLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
   void evalPenaltyLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
   void evalPenaltyLikelihoodGradient(ParameterSet& parSet_, const std::vector<Parameter*>& parameterList_);

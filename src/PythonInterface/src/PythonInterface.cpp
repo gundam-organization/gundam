@@ -552,18 +552,7 @@ PYBIND11_MODULE(GUNDAM, module) {
     this_.evalFitGradientAt(parameters_.data(), gradient.data());
     return gradient;
   }, pybind11::arg("parameters"))
-  .def("evalFitGradient", pybind11::overload_cast<>(&MinimizerBase::evalFitGradient))
-  .def("evalFitGradient", pybind11::overload_cast<const std::vector<Parameter*>&>(&MinimizerBase::evalFitGradient))
-  .def("evalFitGradient", [](MinimizerBase& this_, const pybind11::list& parameters_){
-    std::vector<Parameter*> parameters;
-    parameters.reserve(parameters_.size());
-    for( const auto& parameter : parameters_ ){
-      auto* pointer = parameter.cast<Parameter*>();
-      if( pointer == nullptr ){ throw pybind11::value_error("Gradient parameters cannot contain None."); }
-      parameters.push_back(pointer);
-    }
-    this_.evalFitGradient(parameters);
-  })
+  .def("evalFitGradient", &MinimizerBase::evalFitGradient)
   .def("getMinimizerFitParameterList", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterList), pybind11::return_value_policy::reference)
   ;
 

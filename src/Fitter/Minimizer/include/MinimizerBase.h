@@ -87,9 +87,7 @@ public:
   /// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
   virtual double evalFit( const double* parArray_ );
   void evalFitGradient();
-  void evalFitGradient( const std::vector<Parameter*>& parameterList_ );
-  /// CPU-only gradient callback in exactly the same coordinates as evalFit().
-  /// Prepared for GradFunctor; it is not registered with Minuit yet.
+  /// Analytic gradient callback in exactly the same coordinates as evalFit().
   void evalFitGradientAt(const double* parArray_, double* gradient_);
 
   /// Throw a new parameter point around the post-fit best fit. By default,

@@ -319,6 +319,10 @@ void FitterEngine::initializeImpl(){
 }
 
 // Core
+void FitterEngine::evalGradient(){
+  getLikelihoodInterface().evalGradient();
+}
+
 void FitterEngine::fit(){
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf( not isInitialized() );
