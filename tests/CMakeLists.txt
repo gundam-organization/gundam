@@ -47,7 +47,7 @@ else(WITH_INTERFACE_TEST)
   cmessage( WARNING "WITH_INTERFACE_TEST is OFF: gundam-tests.sh will be skipped")
 endif(WITH_INTERFACE_TEST)
 
-# Python dependencies must already be installed in the selected interpreter.
+# Use a build-local venv by default; CI can select its prepared interpreter.
 # Use only the last interpreter that successfully configured an interface.
 if(WITH_PYTHON_INTERFACE)
   set(pythonTestEnvironment "${CMAKE_COMMAND}" -E env)
@@ -56,15 +56,36 @@ if(WITH_PYTHON_INTERFACE)
   endif()
   list(APPEND pythonTestEnvironment
     "PYTHONPATH=$<TARGET_FILE_DIR:${gundamTestPythonTarget}>")
+  set(pythonTestInterpreter "${gundamTestPython}")
+  if(WITH_PYTHON_TEST_VENV AND (WITH_FAST_TEST OR WITH_REGULAR_TEST))
+    set(pythonTestVenv "${CMAKE_CURRENT_BINARY_DIR}/python-venv")
+    if(WIN32)
+      set(pythonTestInterpreter "${pythonTestVenv}/Scripts/python.exe")
+    else()
+      set(pythonTestInterpreter "${pythonTestVenv}/bin/python")
+    endif()
+    add_test(
+      NAME gundam-python-prepare
+      COMMAND ${pythonTestEnvironment} "${gundamTestPython}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/python/PrepareTestEnvironment.py"
+        "${pythonTestVenv}"
+    )
+    set_tests_properties(gundam-python-prepare PROPERTIES
+      FIXTURES_SETUP gundamPythonEnvironment LABELS python)
+  endif()
   foreach(pythonSuite fast regular)
     string(TOUPPER "${pythonSuite}" pythonSuiteOption)
     if(WITH_${pythonSuiteOption}_TEST)
       add_test(
         NAME gundam-python-${pythonSuite}
-        COMMAND ${pythonTestEnvironment} "${gundamTestPython}"
+        COMMAND ${pythonTestEnvironment} "${pythonTestInterpreter}"
           "${CMAKE_CURRENT_SOURCE_DIR}/python/run.py" --suite "${pythonSuite}"
       )
       set_tests_properties(gundam-python-${pythonSuite} PROPERTIES LABELS python)
+      if(WITH_PYTHON_TEST_VENV)
+        set_tests_properties(gundam-python-${pythonSuite} PROPERTIES
+          FIXTURES_REQUIRED gundamPythonEnvironment)
+      endif()
     endif()
   endforeach()
 endif()

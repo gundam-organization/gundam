@@ -116,8 +116,10 @@ Python tests live separately in [`python/`](python/README.md), organized into
 `fast`, `regular` and `benchmarks`. They are excluded from `gundam-tests.sh`.
 CTest includes these suites when `WITH_TESTS=ON` and `WITH_PYTHON_INTERFACE=ON`,
 using the last interpreter selected for an interface build. `WITH_FAST_TEST`
-and `WITH_REGULAR_TEST` control the corresponding Python suites. Dependencies
-must be installed in that interpreter beforehand.
+and `WITH_REGULAR_TEST` control the corresponding Python suites. CTest prepares
+a build-local test venv and installs `python/requirements.txt`
+on its first run. Set `WITH_PYTHON_TEST_VENV=OFF` to use an environment whose
+dependencies have already been installed (as in CI).
 
 For manual execution, use the Python interpreter matching your GUNDAM build:
 

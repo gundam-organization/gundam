@@ -17,6 +17,12 @@ class PythonInterfacesTest(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.directory = pathlib.Path(self.temporary.name)
+        # pybind11 is a build dependency shared across Python ABIs. It may only
+        # be installed in the test venv, while AUTO/explicit versions use system
+        # interpreters. Pass its CMake package independently of that selection.
+        probe = subprocess.run([sys.executable, '-m', 'pybind11', '--cmakedir'],
+                               capture_output=True, text=True)
+        self.pybind11Directory = probe.stdout.strip() if probe.returncode == 0 else None
         source = pathlib.Path(__file__).resolve().parents[3] / 'src/PythonInterface'
         options = pathlib.Path(__file__).resolve().parents[3] / 'cmake/options.cmake'
         messages = options.parent / 'utils/cmessage.cmake'
@@ -40,7 +46,10 @@ add_subdirectory("{source.parents[1].as_posix()}/tests" tests)
 ''')
 
     def configure(self, selection=None, extraArguments=()):
-        command = ['cmake', '-S', str(self.directory), '-B', str(self.directory / 'build')]
+        command = ['cmake', '-S', str(self.directory), '-B', str(self.directory / 'build'),
+                   '-DWITH_PYTHON_TEST_VENV=OFF']
+        if self.pybind11Directory:
+            command.append('-Dpybind11_DIR=' + self.pybind11Directory)
         if selection is not None:
             command.append('-DGUNDAM_PYTHON_VERSIONS=' + selection)
         return subprocess.run(command + list(extraArguments), capture_output=True, text=True)
@@ -67,6 +76,18 @@ add_subdirectory("{source.parents[1].as_posix()}/tests" tests)
             result = self.configure(sys.executable, arguments)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual([test['name'] for test in self.registeredTests()], expected)
+
+    def testCTestEnvironmentFixture(self):
+        result = self.configure(sys.executable, ['-DWITH_PYTHON_TEST_VENV=ON',
+                                                '-DWITH_REGULAR_TEST=ON'])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        tests = self.registeredTests()
+        self.assertEqual([test['name'] for test in tests],
+                         ['gundam-python-prepare', 'gundam-python-fast', 'gundam-python-regular'])
+        for test in tests[1:]:
+            properties = {item['name']: item['value'] for item in test['properties']}
+            self.assertEqual(properties['FIXTURES_REQUIRED'], ['gundamPythonEnvironment'])
+            self.assertTrue(any('python-venv' in part for part in test['command']))
 
     def testAuto(self):
         result = self.configure()
@@ -102,6 +123,7 @@ add_subdirectory("{source.parents[1].as_posix()}/tests" tests)
         # Disable implicit package locations so only the Python fallback can
         # discover pybind11. Explicit PATHS from --cmakedir remain enabled.
         result = self.configure(sys.executable, [
+            '-Dpybind11_DIR=pybind11_DIR-NOTFOUND',
             '-DCMAKE_FIND_USE_CMAKE_PATH=OFF',
             '-DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=OFF',
             '-DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF',
@@ -113,6 +135,24 @@ add_subdirectory("{source.parents[1].as_posix()}/tests" tests)
         ])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('Found pybind11 via ' + sys.executable, result.stdout)
+
+    def testPybind11PackageIndependentOfSelectedInterpreter(self):
+        if not self.pybind11Directory:
+            self.skipTest('The test interpreter needs an installed pybind11 package')
+        # Match CI: pybind11 exists only in the test venv, and the selected
+        # interpreter is outside it. Disable implicit CMake package locations.
+        result = self.configure(sys._base_executable, [
+            '-DCMAKE_FIND_USE_CMAKE_PATH=OFF',
+            '-DCMAKE_FIND_USE_CMAKE_ENVIRONMENT_PATH=OFF',
+            '-DCMAKE_FIND_USE_SYSTEM_ENVIRONMENT_PATH=OFF',
+            '-DCMAKE_FIND_USE_CMAKE_SYSTEM_PATH=OFF',
+            '-DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF',
+            '-DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF',
+            '-DCMAKE_MAKE_PROGRAM=' + shutil.which('make'),
+            '-DCMAKE_CXX_COMPILER=' + (shutil.which('c++') or shutil.which('g++')),
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Building GUNDAM_python', result.stdout)
 
     def availableVersions(self):
         versions = []
