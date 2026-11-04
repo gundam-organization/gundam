@@ -13,7 +13,9 @@ when `WITH_REGULAR_TEST=ON`. Benchmarks are run manually. With the Python interf
 disabled, no Python tests are registered.
 
 CTest uses the last interpreter that successfully configured a Python interface,
-and loads the module from the build directory. By default, a CTest setup fixture
+and loads the module from the build directory.
+
+By default, a CTest setup fixture
 creates `tests/python-venv` inside the build directory using that interpreter
 and installs `requirements.txt`. The environment inherits its system packages
 and is reused until the requirements or selected interpreter change. The first
@@ -52,7 +54,6 @@ Scripts can also be launched directly from a writable working directory:
 
 ```bash
 python tests/python/fast/510NumericsIgnoreZeroPredictionAtPrior.py
-python tests/python/fast/010BuildPythonInterfaces.py
 ```
 
 
@@ -84,7 +85,7 @@ These tests run directly with Python, independently of `tests/gundam-tests.sh`.
 They use the interpreter you launch; they do not create an environment, install
 packages or switch interpreters automatically.
 
-- `fast/`: regression tests, including Python interface CMake configuration tests.
+- `fast/`: runtime regression tests using the Python interface.
 - `regular/`: longer validation tests and plots.
 - `benchmarks/`: performance measurements and their supporting scripts.
 
@@ -171,10 +172,6 @@ their own inputs using the shared fixtures in `tests/fast-tests`, without runnin
 the standard test suite. GPU tests retain their existing device requirements and
 opt-in environment variables. Benchmark commands and prerequisites are documented
 in [benchmarks/README.md](benchmarks/README.md).
-
-`fast/010BuildPythonInterfaces.py` exercises CMake configuration without compiling
-GUNDAM. It requires CMake 3.18 or newer, a C++ compiler, pybind11 and Python
-development files; it does not need an installed GUNDAM module.
 
 When validating a specific build on macOS, `PYTHONPATH` alone does not guarantee
 that its native libraries are loaded. `DYLD_LIBRARY_PATH` can override the Python
