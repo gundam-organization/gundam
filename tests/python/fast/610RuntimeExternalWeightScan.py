@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Unrelated eigen scans keep a PythonWorker alive without reevaluating it."""
 import json
-import math
 import shutil
 import subprocess
 import sys
@@ -35,9 +34,6 @@ def run(command_):
         commands_path.unlink()
     points = 100
     config = {
-        "enablePreFitScan": True,
-        "generateSamplePlots": False,
-        "generateOneSigmaPlots": False,
         "parameterScannerConfig": {"nbPoints": points},
         "likelihoodInterfaceConfig": {
             "jointProbabilityConfig": {"type": "LeastSquares", "lsqPoissonianApproximation": True},
@@ -74,13 +70,11 @@ def run(command_):
     app = GUNDAM.GundamApp("610RuntimeExternalWeightScan")
     app.openOutputFile(str(output_path))
     fitter = GUNDAM.FitterEngine()
-    fitter.setSaveDir(app, "FitterEngine")
     fitter.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
     fitter.getLikelihoodInterface().setForceAsimovData(True)
     fitter.getLikelihoodInterface().setDataType(GUNDAM.LikelihoodInterface.DataType.Asimov)
-    fitter.setIsDryRun(True)
     fitter.initialize()
-    fitter.fit()
+    fitter.getMinimizer().scanParameters(app, "scan")
     # Destroy the engine before inspecting shutdown, then close the ROOT file.
     del fitter
     del app
@@ -91,7 +85,7 @@ def run(command_):
     if scan_migration:
         expected_graphs.add("Migration_0_shift_TGraph")
     with uproot.open(output_path) as output:
-        graphs = output["FitterEngine/preFit/scan/llh"]
+        graphs = output["scan/llh"]
         assert set(graphs.keys(cycle=False)) == expected_graphs, graphs.keys()
         for name in expected_graphs:
             assert graphs[name].member("fNpoints") == points + 1, name
@@ -100,26 +94,14 @@ def run(command_):
     assert sum(command["command"] == "shutdown" for command in commands) == 1, commands
     evaluations = [command["parameters"] for command in commands if command["command"] == "evaluate"]
     assert evaluations[0] == {"shift": .05}, evaluations
-    # fit() also checks flat directions in dry-run mode. Separate those probes
-    # from scan evaluations; their detailed behavior is covered by test 550.
-    scan_count = points + 3 if scan_migration else 1
-    scan_evaluations = evaluations[:scan_count]
-    probes = evaluations[scan_count:]
-    if probes:
-        assert len(probes) == 3, probes
-        lower, upper, restored = probes
-        assert lower["shift"] < .05 < upper["shift"], probes
-        assert math.isclose(lower["shift"] + upper["shift"], .1, abs_tol=1e-12), probes
-        assert restored == {"shift": .05}, probes
     if scan_migration:
         # Initial evaluation, nbPoints+1 scan points, and restoration.
-        assert len(scan_evaluations) == points + 3, len(scan_evaluations)
-        assert len({state["shift"] for state in scan_evaluations}) == points + 1, scan_evaluations
-        assert scan_evaluations[-1] == {"shift": .05}, scan_evaluations[-1]
+        assert len(evaluations) == points + 3, len(evaluations)
+        assert len({state["shift"] for state in evaluations}) == points + 1, evaluations
+        assert evaluations[-1] == {"shift": .05}, evaluations[-1]
     else:
-        assert scan_evaluations == [{"shift": .05}], scan_evaluations
-    print(f"threads={threads}, scan_migration={scan_migration}: {len(scan_evaluations)} scan evaluations, "
-          f"{len(probes)} flat-direction probe/restoration evaluations", flush=True)
+        assert evaluations == [{"shift": .05}], evaluations
+    print(f"threads={threads}, scan_migration={scan_migration}: {len(evaluations)} evaluations", flush=True)
 
 
 def main():
