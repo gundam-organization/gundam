@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <sstream>
 
 std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& timing_) {
@@ -453,8 +454,33 @@ void Backends::BackendManager::validateLikelihoodGradient() const {
   _activeBackendPtr_->validateLikelihoodGradient();
 }
 
-void Backends::BackendManager::evalStatLikelihoodGradient(ParameterGradient& gradient_) {
+void Backends::BackendManager::evalGradient(ParameterGradient& gradient_) {
   validateLikelihoodGradient();
+  LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for backend gradients.");
+  auto& likelihood = *_likelihoodInterfacePtr_;
+  auto statGradient = likelihood.prepareGradient(gradient_);
+
+  // Refresh the backend snapshot/token even when no value callback preceded us.
+  auto propagation = propagate();
+  LogThrowIf(not propagation.valid(), "Backend gradient propagation is unavailable.");
+  const auto result = propagation.get();
+  LogThrowIf(not result.isValid, "Backend gradient propagation failed.");
+  likelihood.evalPenaltyLikelihood();
+  if( result.hasStatLikelihood ){
+    likelihood.getBuffer().statLikelihood = result.statLikelihood;
+  }
+  else{
+    std::future<bool> invalidPropagation;
+    likelihood.evalStatLikelihood(invalidPropagation);
+  }
+  likelihood.getBuffer().updateTotal();
+  LogThrowIf(not likelihood.getBuffer().isValid(), "Cannot differentiate a non-finite likelihood.");
+
+  evalStatLikelihoodGradient(statGradient);
+  likelihood.finalizeGradient(statGradient, gradient_);
+}
+
+void Backends::BackendManager::evalStatLikelihoodGradient(ParameterGradient& gradient_) {
   const auto gradient = _activeBackendPtr_->getLikelihoodGradient(_lastPropagationToken_);
   const auto& bindings = _backendEngineLayout_->bindings.parameters;
   LogThrowIf(gradient.size() != bindings.size(), "Backend gradient dimension mismatch.");

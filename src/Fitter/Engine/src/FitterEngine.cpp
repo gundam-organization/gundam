@@ -373,6 +373,12 @@ void FitterEngine::evaluateLikelihood(){
 }
 
 void FitterEngine::evalGradient(ParameterGradient& gradient_){
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    _backendsManager_.evalGradient(gradient_);
+    return;
+  }
+#endif
   getLikelihoodInterface().evalGradient(gradient_);
 }
 

@@ -55,7 +55,7 @@ namespace Backends {
     void materialize(OutputRequest outputRequest_);
     std::future<BackendPropagationResult> propagate();
     void validateLikelihoodGradient() const;
-    void evalStatLikelihoodGradient(ParameterGradient& gradient_);
+    void evalGradient(ParameterGradient& gradient_);
     [[nodiscard]] std::string getActiveBackendName() const;
     [[nodiscard]] std::vector<std::string> getAvailableBackendNames() const;
     void deactivateBackend();
@@ -80,6 +80,7 @@ namespace Backends {
     std::vector<BackendEntry> _availableBackendList_{};
     Backend* _activeBackendPtr_{nullptr};
     std::string _activeBackendName_{};
+    void evalStatLikelihoodGradient(ParameterGradient& gradient_);
     void activateImpl(const std::string& name_, const ConfigReader* config_);
     void buildEngineLayout();
 
