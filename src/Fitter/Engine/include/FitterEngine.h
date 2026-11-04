@@ -87,7 +87,7 @@ public:
   bool& getDoAllParamVariations(){ return _doAllParamVariations_; }
 
   // Core
-  void evalGradient();
+  void evalGradient(ParameterGradient& gradient_);
   void fit();
   void runPcaCheck();
   void rescaleParametersStepSize();

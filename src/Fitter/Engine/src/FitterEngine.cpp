@@ -319,8 +319,8 @@ void FitterEngine::initializeImpl(){
 }
 
 // Core
-void FitterEngine::evalGradient(){
-  getLikelihoodInterface().evalGradient();
+void FitterEngine::evalGradient(ParameterGradient& gradient_){
+  getLikelihoodInterface().evalGradient(gradient_);
 }
 
 void FitterEngine::fit(){

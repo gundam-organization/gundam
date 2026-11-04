@@ -9,6 +9,7 @@
 #include "ParameterScanner.h"
 #include "LikelihoodInterface.h"
 #include "Parameter.h"
+#include "ParameterGradient.h"
 
 
 #include "GenericToolbox.Utils.h"
@@ -87,6 +88,7 @@ public:
   /// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
   virtual double evalFit( const double* parArray_ );
   void evalFitGradient();
+  [[nodiscard]] const ParameterGradient& getGradient() const { return _gradient_; }
   /// Analytic gradient callback in exactly the same coordinates as evalFit().
   void evalFitGradientAt(const double* parArray_, double* gradient_);
 
@@ -177,6 +179,7 @@ protected:
 
 protected:
   std::vector<Parameter*> _minimizerParameterPtrList_{};
+  ParameterGradient _gradient_;
   Monitor _monitor_{};
 
 private:
