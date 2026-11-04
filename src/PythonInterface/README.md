@@ -17,12 +17,45 @@ cd $BUILD_DIR/gundam
 cmake -D WITH_PYTHON_INTERFACE=ON ./
 ```
 
-On certain computing clusters, CMake won't be able to find the `pybind11` library. You can do so with the following
-option:
+CMake first searches for a pybind11 CMake package. If none is found, it queries
+the Python interpreters selected by `GUNDAM_PYTHON_VERSIONS` (or discovered in
+`PATH` in `AUTO` mode) using `python -m pybind11 --cmakedir`. This also finds
+pybind11 installed with pip in those environments. No package is downloaded or
+installed automatically.
+
+You can also specify the pybind11 CMake package directory explicitly:
 
 ```
 -D WITH_PYTHON_INTERFACE=ON -D pybind11_DIR=/path/to/pybind11/cmake/files
 ```
+
+
+With CMake 3.18 or newer, `GUNDAM_PYTHON_VERSIONS=AUTO` (the default)
+searches `PATH` for `python3` and `python3.x` executables and builds the
+three newest usable CPython major/minor versions (or all if fewer are available).
+One module is built per version; aliases and virtual environments
+with the same version are deduplicated. The first usable installation
+in `PATH` wins. Interpreters without matching development files are
+skipped with a configure message; configuration fails if none are usable.
+The pybind11 installation must support the selected Python versions.
+
+Explicit selections have no three-version limit. To select versions explicitly:
+
+```bash
+cmake -S . -B build -DWITH_PYTHON_INTERFACE=ON \
+  '-DGUNDAM_PYTHON_VERSIONS=3.13;3.14'
+```
+
+Absolute interpreter paths can also be supplied in this list. Explicit
+selections fail configuration if an interpreter or its development files
+are missing. Use this option instead of `Python_EXECUTABLE` to select a
+single interpreter. Re-run CMake after adding a Python installation to `PATH`.
+
+The `GUNDAM` build target builds all selected interfaces. Individual targets
+are named `GUNDAM_python3_13`, `GUNDAM_python3_14`, etc. The core C++
+libraries are shared between them. Installed modules coexist in `lib` with
+ABI-specific names such as `GUNDAM.cpython-313-darwin.so`; each Python
+imports its matching module using `import GUNDAM` and the same `PYTHONPATH`.
 
 
 ## Setup
