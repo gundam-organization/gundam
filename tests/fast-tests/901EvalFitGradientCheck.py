@@ -107,7 +107,7 @@ def main():
     if not math.isfinite(nominal_llh):
         return STATUS
 
-    gradient_values = [parameter.getGradient() for parameter in fit_parameters]
+    gradient_values = [fitter.getLikelihoodInterface().getGradient().getValue(parameter) for parameter in fit_parameters]
 
     step = 1.0e-4
     tolerance_value = 5.0e-3

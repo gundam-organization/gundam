@@ -5,6 +5,7 @@
 #ifndef GUNDAM_EVENT_DIAL_CACHE_H
 #define GUNDAM_EVENT_DIAL_CACHE_H
 
+#include "ParameterGradient.h"
 #include "SampleSet.h"
 #include "DialCollection.h"
 #include "Event.h"
@@ -229,10 +230,10 @@ public:
 
   void reweightEntry( CacheEntry& entry_);
   /// Bulk CPU gradient: independent thread-local sums, followed by an ordered reduction.
-  std::vector<double> evalEventWeightGradients(const std::vector<Parameter*>& parameterList_,
+  void evalEventWeightGradients(ParameterGradient& gradient_,
                                               const std::vector<double>& eventScales_,
                                               GenericToolbox::ParallelWorker& workers_);
-  void evalEventWeightGradient(CacheEntry& entry_, const std::vector<Parameter*>& parameterList_,
+  void evalEventWeightGradient(CacheEntry& entry_, ParameterGradient& gradient_,
                                bool resetGradients_ = true, double gradientScale_ = 1.);
 
 

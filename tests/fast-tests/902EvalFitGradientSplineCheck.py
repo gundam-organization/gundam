@@ -123,7 +123,7 @@ def main():
     if not math.isfinite(nominal_llh):
         return STATUS
 
-    gradient_values = [parameter.getGradient() for parameter in spline_parameters]
+    gradient_values = [fitter.getLikelihoodInterface().getGradient().getValue(parameter) for parameter in spline_parameters]
 
     step = 1.0e-4
     tolerance_value = 1.0e-2
