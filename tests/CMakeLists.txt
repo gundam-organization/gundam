@@ -42,10 +42,75 @@ else(WITH_INTERFACE_TEST)
   cmessage( WARNING "WITH_INTERFACE_TEST is OFF: gundam-tests.sh will be skipped")
 endif(WITH_INTERFACE_TEST)
 
+# Use a build-local venv by default; CI can select its prepared interpreter.
+# Use only the last interpreter that successfully configured an interface.
+if(WITH_PYTHON_INTERFACE)
+  set(pythonTestEnvironment "${CMAKE_COMMAND}" -E env)
+  if(APPLE)
+    list(APPEND pythonTestEnvironment --unset=DYLD_LIBRARY_PATH)
+  endif()
+  list(APPEND pythonTestEnvironment
+    "PYTHONPATH=$<TARGET_FILE_DIR:${gundamTestPythonTarget}>")
+  set(pythonTestInterpreter "${gundamTestPython}")
+  if(WITH_PYTHON_TEST_VENV AND (WITH_FAST_TEST OR WITH_REGULAR_TEST))
+    set(pythonTestVenv "${CMAKE_CURRENT_BINARY_DIR}/python-venv")
+    if(WIN32)
+      set(pythonTestInterpreter "${pythonTestVenv}/Scripts/python.exe")
+    else()
+      set(pythonTestInterpreter "${pythonTestVenv}/bin/python")
+    endif()
+    add_test(
+      NAME gundam-python-prepare
+      COMMAND ${pythonTestEnvironment} "${gundamTestPython}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/python/PrepareTestEnvironment.py"
+        "${pythonTestVenv}"
+    )
+    set_tests_properties(gundam-python-prepare PROPERTIES
+      FIXTURES_SETUP gundamPythonEnvironment LABELS python)
+  endif()
+  foreach(pythonSuite fast regular)
+    string(TOUPPER "${pythonSuite}" pythonSuiteOption)
+    if(WITH_${pythonSuiteOption}_TEST)
+      add_test(
+        NAME gundam-python-${pythonSuite}
+        COMMAND ${pythonTestEnvironment} "${pythonTestInterpreter}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/python/run.py" --suite "${pythonSuite}"
+      )
+      set_tests_properties(gundam-python-${pythonSuite} PROPERTIES LABELS python)
+      if(WITH_PYTHON_TEST_VENV)
+        set_tests_properties(gundam-python-${pythonSuite} PROPERTIES
+          FIXTURES_REQUIRED gundamPythonEnvironment)
+      endif()
+    endif()
+  endforeach()
+endif()
+
 if( WITH_GOOGLE_TEST )
   ## Compiled unit tests using GoogleTest.
   include(GoogleTest)
   cmessage( STATUS "Compiling google tests" )
+
+  function(gundam_discover_tests target_)
+    if(APPLE)
+      # DYLD_LIBRARY_PATH overrides even the build RPATHs and can load an older
+      # installed GUNDAM. Sanitize both discovery (which runs during the build)
+      # and CTest execution, without changing the user's shell environment.
+      # TEST_LAUNCHER was introduced in CMake 3.29. Older GoogleTest modules
+      # use CROSSCOMPILING_EMULATOR as their executable wrapper on native builds.
+      if(CMAKE_VERSION VERSION_LESS 3.29)
+        set(launcher_property CROSSCOMPILING_EMULATOR)
+      else()
+        set(launcher_property TEST_LAUNCHER)
+      endif()
+      get_property(existing_launcher TARGET ${target_} PROPERTY ${launcher_property})
+      set(launcher "${CMAKE_COMMAND}" -E env --unset=DYLD_LIBRARY_PATH)
+      if(existing_launcher)
+        list(APPEND launcher ${existing_launcher})
+      endif()
+      set_property(TARGET ${target_} PROPERTY ${launcher_property} "${launcher}")
+    endif()
+    gtest_discover_tests(${target_} ${ARGN})
+  endfunction()
 
   ## Create a list of all of the fast tests.  These are always
   ## compiled, and are run when WITH_FAST_TEST is on.  The fast tests
@@ -74,7 +139,7 @@ if( WITH_GOOGLE_TEST )
     target_link_libraries(gundamGTest_fastTest.exe GTest::gtest_main)
     target_link_libraries(gundamGTest_fastTest.exe GundamFitter)
     if(WITH_FAST_TEST)
-      gtest_discover_tests(gundamGTest_fastTest.exe PROPERTIES LABELS unit)
+      gundam_discover_tests(gundamGTest_fastTest.exe PROPERTIES LABELS unit)
     endif(WITH_FAST_TEST)
   endif(FAST_TESTS)
 
@@ -90,7 +155,7 @@ if( WITH_GOOGLE_TEST )
     target_link_libraries(gundamGTest_regularTest.exe GTest::gtest_main)
     target_link_libraries(gundamGTest_regularTest.exe GundamFitter)
     if(WITH_REGULAR_TEST)
-      gtest_discover_tests(gundamGTest_regularTest.exe PROPERTIES LABELS unit)
+      gundam_discover_tests(gundamGTest_regularTest.exe PROPERTIES LABELS unit)
     endif(WITH_REGULAR_TEST)
   endif(REGULAR_TESTS)
 
@@ -105,7 +170,7 @@ if( WITH_GOOGLE_TEST )
     target_link_libraries(gundamGTest_host.exe GundamCacheManager)
     target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
     if (WITH_REGULAR_TEST)
-      gtest_discover_tests(gundamGTest_host.exe PROPERTIES LABELS host)
+      gundam_discover_tests(gundamGTest_host.exe PROPERTIES LABELS host)
     endif(WITH_REGULAR_TEST)
 
     if(CMAKE_CUDA_COMPILER)
@@ -119,7 +184,7 @@ if( WITH_GOOGLE_TEST )
       target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
       target_link_libraries(gundamGTest_device.exe GundamCacheManager)
       if(WITH_REGULAR_TEST)
-        gtest_discover_tests(gundamGTest_device.exe PROPERTIES LABELS device)
+        gundam_discover_tests(gundamGTest_device.exe PROPERTIES LABELS device)
       endif(WITH_REGULAR_TEST)
     endif(CMAKE_CUDA_COMPILER)
 

@@ -1162,7 +1162,7 @@ void ParameterSet::defineParameters(){
 
       if( selectedParConfig.empty() and par.isEnabled() ){
         std::stringstream ss;
-        ss << "No parameterDefinitions entry mapped to enabled parameter #"
+        ss << getName() << ": No parameterDefinitions entry mapped to enabled parameter #"
            << par.getParameterIndex();
         if( _parameterNamesList_ != nullptr ){
           ss << " (\"" << _parameterNamesList_->At(par.getParameterIndex())->GetName() << "\")";
