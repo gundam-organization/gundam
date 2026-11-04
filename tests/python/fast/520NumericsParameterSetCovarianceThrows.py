@@ -212,7 +212,7 @@ def print_summary_table(gundam_statistics) -> None:
 
 def main() -> int:
     work_dir = Path.cwd()
-    covariance_path = work_dir / "213ParameterSetCovarianceThrows.root"
+    covariance_path = work_dir / "520NumericsParameterSetCovarianceThrows.root"
     write_covariance_file(covariance_path)
 
     (engine, likelihood_interface, propagator, parameter_manager, parameter_set, parameters) = \
