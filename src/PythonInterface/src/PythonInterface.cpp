@@ -536,7 +536,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getExternalConstraints", &LikelihoodInterface::getExternalConstraints, pybind11::return_value_policy::reference_internal)
   .def("getLastStatLikelihood", &LikelihoodInterface::getLastStatLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("evalGradient", pybind11::overload_cast<ParameterGradient&>(&LikelihoodInterface::evalGradient),
+  .def("evalGradient", pybind11::overload_cast<ParameterGradient&>(&LikelihoodInterface::propagateAndEvalGradient),
        pybind11::arg("gradient"))
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())

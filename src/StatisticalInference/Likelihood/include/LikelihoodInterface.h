@@ -95,15 +95,11 @@ public:
   void propagateAndEvalLikelihood();
 
   // core
+  /// Propagate and fill the requested derivatives without evaluating scalar likelihoods.
+  /// Likelihood buffers retain the values from their last explicit evaluation.
+  void propagateAndEvalGradient(ParameterGradient& gradient_);
   double evalLikelihood(std::future<bool>& propagation) const;
   void validateWeightGradient() const;
-  /// Fill only the supplied parameter entries at the current point.
-  /// Refreshes propagation and likelihood buffers; never selects fit parameters.
-  void evalGradient(ParameterGradient& gradient_);
-  /// Build temporary physical-coordinate derivatives, then project/add penalties
-  /// into the caller-selected entries. Shared by original and backend engines.
-  [[nodiscard]] ParameterGradient prepareGradient(const ParameterGradient& gradient_);
-  void finalizeGradient(const ParameterGradient& statGradient_, ParameterGradient& gradient_);
   double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
@@ -121,15 +117,18 @@ public:
   void throwToyParameters(Propagator& propagator_);
   void throwStatErrors(Propagator& propagator_);
 
+  // utils for gradient
+  [[nodiscard]] ParameterGradient prepareGradient(const ParameterGradient& gradient_);
+  void finalizeGradient(const ParameterGradient& statGradient_, ParameterGradient& gradient_);
+
 protected:
   void load();
   void loadModelPropagator();
   void loadDataPropagator();
   void buildSamplePairList();
   void evalStatLikelihoodGradient(ParameterGradient& gradient_);
-  void evalPenaltyLikelihoodGradient(const std::vector<const Parameter*>& parameterList_, ParameterGradient& gradient_);
-  void evalPenaltyLikelihoodGradient(ParameterSet& parSet_, const std::vector<const Parameter*>& parameterList_,
-                                     ParameterGradient& gradient_);
+  void evalPenaltyLikelihoodGradient(ParameterGradient& gradient_) const;
+  void evalPenaltyLikelihoodGradient(const ParameterSet& parSet_, ParameterGradient& gradient_) const;
 
   DataDispenser* getDataDispenser( DatasetDefinition& dataset_ );
 

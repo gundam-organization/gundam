@@ -379,7 +379,7 @@ void FitterEngine::evalGradient(ParameterGradient& gradient_){
     return;
   }
 #endif
-  getLikelihoodInterface().evalGradient(gradient_);
+  getLikelihoodInterface().propagateAndEvalGradient(gradient_);
 }
 
 // Core
