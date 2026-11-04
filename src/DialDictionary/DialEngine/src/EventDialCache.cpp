@@ -255,21 +255,18 @@ void EventDialCache::applyVariableResponses(CacheEntry& entry_){
 }
 
 void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
-                                             const std::vector<Parameter*>& parameterList_,
+                                             ParameterGradient& gradient_,
                                              bool resetGradients_,
                                              double gradientScale_){
   if( resetGradients_ ){
-    for( auto* parameter : parameterList_ ){
-      if( parameter == nullptr ){ continue; }
-      parameter->resetGradient();
-    }
+    for( auto& entry : gradient_.values ){ entry.second = 0.; }
   }
 
   if( entry_.event == nullptr or entry_.dialResponseCacheList.empty() ){ return; }
 
   auto isRequestedParameter = [&](Parameter* parameter_){
     if( parameter_ == nullptr ){ return false; }
-    return std::find(parameterList_.begin(), parameterList_.end(), parameter_) != parameterList_.end();
+    return gradient_.values.count(parameter_) != 0;
   };
 
   std::vector<double> responseList(entry_.dialResponseCacheList.size(), 1.);
@@ -284,10 +281,10 @@ void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
     return;
   }
 
-  auto addGradient = [&](Parameter* parameter_, double gradient_){
-    if( parameter_ == nullptr or gradient_ == 0 ){ return; }
+  auto addGradient = [&](Parameter* parameter_, double value_){
+    if( parameter_ == nullptr or value_ == 0 ){ return; }
     if( not isRequestedParameter(parameter_) ){ return; }
-    parameter_->addGradient(gradient_);
+    gradient_.addValue(parameter_, value_);
   };
 
   const double baseWeight{entry_.event->getWeights().base};
@@ -311,18 +308,22 @@ void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
 }
 
 
-std::vector<double> EventDialCache::evalEventWeightGradients(
-    const std::vector<Parameter*>& parameterList_, const std::vector<double>& eventScales_,
+void EventDialCache::evalEventWeightGradients(
+    ParameterGradient& gradient_, const std::vector<double>& eventScales_,
     GenericToolbox::ParallelWorker& workers_){
   LogThrowIf(eventScales_.size() != _cache_.size(), "Event gradient scale size mismatch.");
+  // Freeze an index order for the thread-local sums and their final reduction.
+  std::vector<const Parameter*> parameterList;
+  parameterList.reserve(gradient_.values.size());
+  for( const auto& entry : gradient_.values ){ parameterList.push_back(entry.first); }
   const int threadCount = workers_.getNbThreads();
   std::unordered_map<const Parameter*, std::size_t> parameterIndices;
-  parameterIndices.reserve(parameterList_.size());
-  for( std::size_t i = 0; i < parameterList_.size(); ++i ){
-    if( parameterList_[i] != nullptr ){ parameterIndices.emplace(parameterList_[i], i); }
+  parameterIndices.reserve(parameterList.size());
+  for( std::size_t i = 0; i < parameterList.size(); ++i ){
+    if( parameterList[i] != nullptr ){ parameterIndices.emplace(parameterList[i], i); }
   }
   const auto& indices = parameterIndices; // Concurrent read-only lookup.
-  std::vector<std::vector<double>> partials(threadCount, std::vector<double>(parameterList_.size(), 0.));
+  std::vector<std::vector<double>> partials(threadCount, std::vector<double>(parameterList.size(), 0.));
   workers_.runJob([&](int thread_){
     auto& sums = partials.at(thread_);
     // Scratch storage is reused for every event assigned to this worker.
@@ -357,9 +358,11 @@ std::vector<double> EventDialCache::evalEventWeightGradients(
       }
     }
   });
-  std::vector<double> result(parameterList_.size(), 0.);
+  std::vector<double> result(parameterList.size(), 0.);
   for( const auto& partial : partials ){
     for( std::size_t i = 0; i < result.size(); ++i ){ result[i] += partial[i]; }
   }
-  return result;
+  for( std::size_t i = 0; i < result.size(); ++i ){
+    gradient_.addValue(parameterList[i], result[i]);
+  }
 }

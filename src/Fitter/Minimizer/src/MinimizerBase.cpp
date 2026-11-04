@@ -320,7 +320,7 @@ void MinimizerBase::evalFitGradientAt(const double* parArray_, double* gradient_
   result.reserve(_minimizerParameterPtrList_.size());
   for( const auto* parameter : _minimizerParameterPtrList_ ){
     const double scale = _useNormalizedFitSpace_ ? ParameterSet::toRealParRange(1., *parameter) : 1.;
-    const double value = parameter->getGradient() * scale;
+    const double value = getLikelihoodInterface().getGradient().getValue(parameter) * scale;
     LogThrowIf(not std::isfinite(value), "Non-finite gradient in fit coordinates.");
     result.push_back(value);
   }

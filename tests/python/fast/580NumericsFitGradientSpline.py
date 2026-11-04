@@ -130,7 +130,7 @@ def main():
     if not math.isfinite(nominal_llh):
         return STATUS
 
-    gradient_values = [parameter.getGradient() for parameter in spline_parameters]
+    gradient_values = [fitter.getLikelihoodInterface().getGradient().getValue(parameter) for parameter in spline_parameters]
 
     step = 1.0e-4
     tolerance_value = 1.0e-2
@@ -161,7 +161,7 @@ def main():
         shifted_values.append(value + displacement)
     minimizer.evalFit(shifted_values)
     minimizer.evalFitGradient()
-    shifted_gradients = [parameter.getGradient() for parameter in spline_parameters]
+    shifted_gradients = [fitter.getLikelihoodInterface().getGradient().getValue(parameter) for parameter in spline_parameters]
     for parameter, gradient in zip(spline_parameters, shifted_gradients):
         index = next(i for i, candidate in enumerate(fit_parameters) if candidate is parameter)
         probe = list(shifted_values)

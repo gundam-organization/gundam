@@ -10,6 +10,7 @@
 #include "Event.h"
 #include "Histogram.h"
 #include "Parameter.h"
+#include "ParameterGradient.h"
 #include "ParameterSet.h"
 #include "ParametersManager.h"
 #include "Sample.h"
@@ -315,7 +316,6 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getStdDevValue", &Parameter::getStdDevValue)
   .def("getThrowValue", &Parameter::getThrowValue)
   .def("getParameterValue", &Parameter::getParameterValue)
-  .def("getGradient", &Parameter::getGradient)
   .def("isPenaltyDisabled", &Parameter::isPenaltyDisabled)
   .def("getSummary", &Parameter::getSummary)
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
@@ -476,6 +476,10 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("initialize", pybind11::overload_cast<>(&DatasetDefinition::initialize), pybind11::return_value_policy::reference)
   ;
 
+  pybind11::class_<ParameterGradient>(module, "ParameterGradient")
+  .def("getValue", &ParameterGradient::getValue, pybind11::arg("parameter"))
+  ;
+
   auto likelihoodInterfaceClass = pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface");
 
   auto dataTypeClass = pybind11::class_<LikelihoodInterface::DataType>(likelihoodInterfaceClass, "DataType")
@@ -530,6 +534,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getExternalConstraints", &LikelihoodInterface::getExternalConstraints, pybind11::return_value_policy::reference_internal)
   .def("getLastStatLikelihood", &LikelihoodInterface::getLastStatLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getGradient", &LikelihoodInterface::getGradient, pybind11::return_value_policy::reference_internal)
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())

@@ -74,6 +74,10 @@ def check_threads(threads, backend_name="CPU"):
         close(stat, likelihood.getLastStatLikelihood())
         close(penalty, likelihood.getLastPenaltyLikelihood())
         assert len(gradient) == len(point)
+        parameters = list(minimizer.getMinimizerFitParameterList())
+        physical_gradient = likelihood.getGradient()
+        stored_values = [physical_gradient.getValue(parameter) for parameter in parameters]
+        assert all(math.isfinite(value) for value in stored_values)
         for i, value in enumerate(gradient):
             step = 2e-5 * max(1., abs(point[i]))
             up, down = list(point), list(point)
@@ -87,7 +91,10 @@ def check_threads(threads, backend_name="CPU"):
             else:
                 numeric = (minimizer.evalFit(up) - minimizer.evalFit(down))/(2*step)
             close(value, numeric)
-        # The legacy interface also refreshes current parameters without destroying the LLH.
+        # Value probes update parameters but must leave the stored gradient intact.
+        for parameter, value in zip(parameters, stored_values):
+            close(physical_gradient.getValue(parameter), value)
+        # The no-argument callback also refreshes current parameters without destroying the LLH.
         minimizer.evalFit(point)
         before = likelihood.getLastLikelihood()
         minimizer.evalFitGradient()

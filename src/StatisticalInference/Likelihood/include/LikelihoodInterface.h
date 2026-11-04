@@ -9,6 +9,7 @@
 #include "SamplePair.h"
 #include "Propagator.h"
 #include "ParameterSet.h"
+#include "ParameterGradient.h"
 #include "JointProbability.h"
 #include "Propagator.h"
 #include "EventTreeWriter.h"
@@ -67,6 +68,7 @@ public:
   void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const getters
+  [[nodiscard]] const ParameterGradient& getGradient() const { return _gradient_; }
   [[nodiscard]] auto& getExternalConstraints() const{ return _externalConstraints_; }
   [[nodiscard]] auto getNbParameters() const{ return _nbParameters_; }
   [[nodiscard]] auto getNbSampleBins() const{ return _nbSampleBins_; }
@@ -101,7 +103,7 @@ public:
   void evalGradient();
   /// Complete an already evaluated likelihood using a statistical gradient provider.
   /// Parameter selection, eigen projection and penalties are handled here.
-  void evalGradient(const std::function<void(const std::vector<Parameter*>&)>& statGradientEvaluator_);
+  void evalGradient(const std::function<void(ParameterGradient&)>& statGradientEvaluator_);
   double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
@@ -125,14 +127,16 @@ protected:
   void loadDataPropagator();
   void buildSamplePairList();
   void evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_,
-      const std::function<void(const std::vector<Parameter*>&)>& statGradientEvaluator_);
-  void evalStatLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
+      const std::function<void(ParameterGradient&)>& statGradientEvaluator_);
+  void evalStatLikelihoodGradient(ParameterGradient& gradient_);
   void evalPenaltyLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
   void evalPenaltyLikelihoodGradient(ParameterSet& parSet_, const std::vector<Parameter*>& parameterList_);
 
   DataDispenser* getDataDispenser( DatasetDefinition& dataset_ );
 
 private:
+  ParameterGradient _gradient_;
+
   // parameters
   bool _forceAsimovData_{false};
   bool _enableStatThrowInToys_{true};
