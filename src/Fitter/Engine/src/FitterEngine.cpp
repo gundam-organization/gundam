@@ -378,8 +378,8 @@ void FitterEngine::evalGradient(){
     _backendsManager_.validateLikelihoodGradient();
     getLikelihoodInterface().validateWeightGradient();
     evaluateLikelihood();
-    getLikelihoodInterface().evalGradient([this](const auto& parameters_){
-      _backendsManager_.evalStatLikelihoodGradient(parameters_);
+    getLikelihoodInterface().evalGradient([this](auto& gradient_){
+      _backendsManager_.evalStatLikelihoodGradient(gradient_);
     });
     return;
   }

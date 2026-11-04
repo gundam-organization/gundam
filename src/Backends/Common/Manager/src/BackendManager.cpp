@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <chrono>
 #include <sstream>
-#include <unordered_set>
 
 std::string Backends::formatBackendTimingSummary(const BackendTimingSummary& timing_) {
   std::stringstream ss;
@@ -454,16 +453,15 @@ void Backends::BackendManager::validateLikelihoodGradient() const {
   _activeBackendPtr_->validateLikelihoodGradient();
 }
 
-void Backends::BackendManager::evalStatLikelihoodGradient(const std::vector<Parameter*>& parameterList_) {
+void Backends::BackendManager::evalStatLikelihoodGradient(ParameterGradient& gradient_) {
   validateLikelihoodGradient();
   const auto gradient = _activeBackendPtr_->getLikelihoodGradient(_lastPropagationToken_);
   const auto& bindings = _backendEngineLayout_->bindings.parameters;
   LogThrowIf(gradient.size() != bindings.size(), "Backend gradient dimension mismatch.");
-  const std::unordered_set<Parameter*> requested(parameterList_.begin(), parameterList_.end());
   for( std::size_t i = 0; i < bindings.size(); ++i ){
     auto* parameter = bindings[i].parameter;
-    if( parameter != nullptr and requested.count(parameter) ){
-      parameter->addGradient(gradient[i]);
+    if( parameter != nullptr and gradient_.values.count(parameter) ){
+      gradient_.addValue(parameter, gradient[i]);
     }
   }
 }

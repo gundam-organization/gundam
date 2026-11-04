@@ -4,6 +4,7 @@
 #include "EngineLayout.h"
 #include "BackendFactory.h"
 #include "Backend.h"
+#include "ParameterGradient.h"
 
 #include "ConfigUtils.h"
 
@@ -54,7 +55,7 @@ namespace Backends {
     void materialize(OutputRequest outputRequest_);
     std::future<BackendPropagationResult> propagate();
     void validateLikelihoodGradient() const;
-    void evalStatLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
+    void evalStatLikelihoodGradient(ParameterGradient& gradient_);
     [[nodiscard]] std::string getActiveBackendName() const;
     [[nodiscard]] std::vector<std::string> getAvailableBackendNames() const;
     void deactivateBackend();
