@@ -9,8 +9,7 @@ from importlib import import_module
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fast-tests"))
-import_module("005PythonSetup-utils").requireVenv(__file__)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fast"))
 
 
 def make_engine(path, threads, dynamic=True, l_shaped=False):
@@ -178,7 +177,7 @@ def plot_results(positions, results, suffix=""):
                 axes[row, column].axvline(edge, color="gray", linewidth=0.5)
     figure.tight_layout()
     for extension in ["png", "pdf"]:
-        figure.savefig(f"218BinningResponse{suffix}.{extension}")
+        figure.savefig(f"350ModelBinningResponse{suffix}.{extension}")
     plt.close(figure)
 
     figure, axes = plt.subplots(1, 2, figsize=(12, 4), sharey=True)
@@ -190,7 +189,7 @@ def plot_results(positions, results, suffix=""):
         axis.set(title=f"Quadratic objective: {mode}", xlabel="Event X", ylabel="Sum of squared residuals")
         axis.grid(alpha=0.25)
     figure.tight_layout()
-    figure.savefig(f"218BinningResponse{suffix}-objective.png")
+    figure.savefig(f"350ModelBinningResponse{suffix}-objective.png")
     plt.close(figure)
 
 
@@ -286,7 +285,7 @@ def plot_l_shaped_domain(engine):
             axis.add_patch(Rectangle(rectangle[:2], rectangle[2], rectangle[3], fill=False, edgecolor="white", linewidth=0.7))
         axis.set(title=title, xlabel="Event X", ylabel="Event Y", aspect="equal")
     figure.colorbar(mesh, ax=list(axes), label="Fraction of event weight", shrink=0.8)
-    figure.savefig("218BinningResponse-L-domain.png", bbox_inches="tight")
+    figure.savefig("350ModelBinningResponse-L-domain.png", bbox_inches="tight")
     plt.close(figure)
 
 
@@ -297,7 +296,7 @@ def main():
 
     print("Testing module:", GUNDAM.__file__, flush=True)
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / "218BinningResponse.root"
+    path = Path.cwd() / "350ModelBinningResponse.root"
     with uproot.recreate(path) as output:
         tree = output.mktree("events", {name: "float64" for name in ["X", "Y", "category", "weight"]})
         tree.extend({"X": array("d", [0.5, 0.5]), "Y": array("d", [0.5, 0.5]),
@@ -311,7 +310,7 @@ def main():
         for name, (_, values) in threaded.items():
             indices = [int(np.argmin(abs(positions - value))) for value in [-0.5, 0.8, 1., 1.2, 2.5, 3.5]]
             assert np.allclose(values, results[name][1][indices], atol=1e-12)
-    outside_path = Path.cwd() / "218BinningResponse-outside.root"
+    outside_path = Path.cwd() / "350ModelBinningResponse-outside.root"
     with uproot.recreate(outside_path) as output:
         tree = output.mktree("events", {name: "float64" for name in ["X", "Y", "category", "weight"]})
         tree.extend({"X": array("d", [-2, 4]), "Y": array("d", [0.5, 0.5]),
@@ -328,7 +327,7 @@ def main():
         else:
             assert len(sample.getEventList()) == 0
 
-    with open("218BinningResponse.csv", "w", newline="") as output:
+    with open("350ModelBinningResponse.csv", "w", newline="") as output:
         writer = csv.writer(output)
         writer.writerow(["X"] + [f"{name}_{key}" for name, (keys, _) in results.items() for key in keys])
         for index, position in enumerate(positions):
@@ -345,7 +344,7 @@ def main():
         else:
             for name, (_, values) in l_results.items():
                 assert np.array_equal(values, l_reference[name][1][scan_indices])
-    print("SUCCESS: conserved weights and histogram errors; generated 218BinningResponse plots and CSV.")
+    print("SUCCESS: conserved weights and histogram errors; generated 350ModelBinningResponse plots and CSV.")
     return 0
 
 
