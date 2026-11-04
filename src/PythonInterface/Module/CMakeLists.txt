@@ -23,3 +23,7 @@ install(TARGETS ${pythonTarget} DESTINATION lib)
 list(APPEND pythonBuiltVersions "${pythonVersion}")
 set(pythonBuiltVersions "${pythonBuiltVersions}" PARENT_SCOPE)
 cmessage(STATUS "Building ${pythonTarget} with ${Python3_EXECUTABLE}")
+
+# Keep the last successfully configured interpreter for the CTest Python suites.
+set(gundamTestPython "${Python3_EXECUTABLE}" PARENT_SCOPE)
+set(gundamTestPythonTarget "${pythonTarget}" PARENT_SCOPE)

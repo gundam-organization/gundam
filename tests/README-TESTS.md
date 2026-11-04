@@ -114,7 +114,12 @@ this kind holds utilities that the test imports, and has no `#!` line.
 
 Python tests live separately in [`python/`](python/README.md), organized into
 `fast`, `regular` and `benchmarks`. They are excluded from `gundam-tests.sh`.
-Use the Python interpreter matching your GUNDAM build:
+CTest includes these suites when `WITH_TESTS=ON` and `WITH_PYTHON_INTERFACE=ON`,
+using the last interpreter selected for an interface build. `WITH_FAST_TEST`
+and `WITH_REGULAR_TEST` control the corresponding Python suites. Dependencies
+must be installed in that interpreter beforehand.
+
+For manual execution, use the Python interpreter matching your GUNDAM build:
 
 ```bash
 python python/run.py --list
