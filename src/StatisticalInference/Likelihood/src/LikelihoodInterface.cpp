@@ -206,18 +206,17 @@ void LikelihoodInterface::validateWeightGradient() const {
   }
 }
 
-void LikelihoodInterface::evalGradient(ParameterGradient& gradient_) {
+void LikelihoodInterface::propagateAndEvalGradient(ParameterGradient& gradient_) {
+  validateWeightGradient();
+  auto propagation = _modelPropagator_.applyParameters();
+  LogThrowIf(not propagation.valid(), "Gradient propagation is unavailable.");
+  LogThrowIf(not propagation.get(), "Gradient propagation failed.");
   auto statGradient = prepareGradient(gradient_);
-  // A gradient request may follow parameter changes without a value evaluation.
-  // Keep likelihood buffers synchronized with the point being differentiated.
-  propagateAndEvalLikelihood();
-  LogThrowIf(not _buffer_.isValid(), "Cannot differentiate a non-finite likelihood.");
   evalStatLikelihoodGradient(statGradient);
   finalizeGradient(statGradient, gradient_);
 }
 
 ParameterGradient LikelihoodInterface::prepareGradient(const ParameterGradient& gradient_) {
-  validateWeightGradient();
   ParameterGradient statGradient;
   std::vector<const Parameter*> parameterList;
   parameterList.reserve(gradient_.values.size());
@@ -264,7 +263,7 @@ void LikelihoodInterface::finalizeGradient(const ParameterGradient& statGradient
     }
   }
 
-  evalPenaltyLikelihoodGradient(parameterList, gradient_);
+  evalPenaltyLikelihoodGradient(gradient_);
   for( const auto* parameter : parameterList ){
     LogThrowIf(not std::isfinite(gradient_.getValue(parameter)), "Non-finite likelihood gradient.");
   }
@@ -342,21 +341,20 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
   _buffer_.penaltyLikelihood += _externalConstraints_.eval();
   return _buffer_.penaltyLikelihood;
 }
-void LikelihoodInterface::evalPenaltyLikelihoodGradient(const std::vector<const Parameter*>& parameterList_, ParameterGradient& gradient_) {
-  for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
-    this->evalPenaltyLikelihoodGradient(parSet, parameterList_, gradient_);
+void LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterGradient& gradient_) const {
+  for( const auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
+    this->evalPenaltyLikelihoodGradient(parSet, gradient_);
   }
 }
-void LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterSet& parSet_,
-                                                        const std::vector<const Parameter*>& parameterList_,
-                                                        ParameterGradient& gradient_) {
+void LikelihoodInterface::evalPenaltyLikelihoodGradient(const ParameterSet& parSet_,
+                                                        ParameterGradient& gradient_) const {
   if( not parSet_.isEnabled() ){ return; }
   if( parSet_.getPriorCovarianceMatrix() == nullptr ){ return; }
 
   if( parSet_.isEnableEigenDecomp() ){
     bool hasRequestedOriginalParameter{false};
-    for( auto& eigenPar : parSet_.getEigenParameterList() ){
-      if( not containsParameter(parameterList_, &eigenPar) ){ continue; }
+    for( const auto& eigenPar : parSet_.getEigenParameterList() ){
+      if( gradient_.values.count(&eigenPar) == 0 ){ continue; }
       if( eigenPar.isPenaltyDisabled() ){ continue; }
       if( eigenPar.getStdDevValue() == 0 ){ continue; }
       gradient_.addValue(&eigenPar,
@@ -365,9 +363,9 @@ void LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterSet& parSet_,
       );
     }
 
-    for( auto& par : parSet_.getParameterList() ){
+    for( const auto& par : parSet_.getParameterList() ){
       if( not ParameterSet::isValidCorrelatedParameter(par) ){ continue; }
-      if( containsParameter(parameterList_, &par) ){
+      if( gradient_.values.count(&par) != 0 ){
         hasRequestedOriginalParameter = true;
         break;
       }
@@ -384,9 +382,9 @@ void LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterSet& parSet_,
   penaltyGradient *= 2.;
 
   int iFit{0};
-  for( auto& par : parSet_.getParameterList() ){
+  for( const auto& par : parSet_.getParameterList() ){
     if( not ParameterSet::isValidCorrelatedParameter(par) ){ continue; }
-    if( containsParameter(parameterList_, &par) ){
+    if( gradient_.values.count(&par) != 0 ){
       gradient_.addValue(&par, penaltyGradient[iFit]);
     }
     iFit++;

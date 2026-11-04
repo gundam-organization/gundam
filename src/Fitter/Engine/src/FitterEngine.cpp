@@ -320,7 +320,7 @@ void FitterEngine::initializeImpl(){
 
 // Core
 void FitterEngine::evalGradient(ParameterGradient& gradient_){
-  getLikelihoodInterface().evalGradient(gradient_);
+  getLikelihoodInterface().propagateAndEvalGradient(gradient_);
 }
 
 void FitterEngine::fit(){

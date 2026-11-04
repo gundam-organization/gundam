@@ -65,12 +65,18 @@ def check_threads(threads):
         minimizer = engine.getMinimizer()
         # Deliberately leave the engine at another point: the callback must refresh it.
         minimizer.evalFit([value + .02 for value in point])
-        gradient = minimizer.evalFitGradientAt(point)
         likelihood = engine.getLikelihoodInterface()
-        total, stat, penalty = likelihood.getLastLikelihood(), likelihood.getLastStatLikelihood(), likelihood.getLastPenaltyLikelihood()
-        close(total, minimizer.evalFit(point))
-        close(stat, likelihood.getLastStatLikelihood())
-        close(penalty, likelihood.getLastPenaltyLikelihood())
+        previous = (likelihood.getLastLikelihood(), likelihood.getLastStatLikelihood(),
+                    likelihood.getLastPenaltyLikelihood())
+        gradient = minimizer.evalFitGradientAt(point)
+        if not hasattr(engine, 'getBackendsManager') or not engine.getBackendsManager().hasBackend():
+            # The original gradient path propagates without evaluating scalar likelihoods.
+            current = (likelihood.getLastLikelihood(), likelihood.getLastStatLikelihood(),
+                       likelihood.getLastPenaltyLikelihood())
+            for actual, expected in zip(current, previous):
+                close(actual, expected)
+        minimizer.evalFit(point)
+        stat = likelihood.getLastStatLikelihood()
         assert len(gradient) == len(point)
         parameters = list(minimizer.getMinimizerFitParameterList())
         physical_gradient = minimizer.getGradient()
