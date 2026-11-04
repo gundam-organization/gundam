@@ -42,6 +42,28 @@ else(WITH_INTERFACE_TEST)
   cmessage( WARNING "WITH_INTERFACE_TEST is OFF: gundam-tests.sh will be skipped")
 endif(WITH_INTERFACE_TEST)
 
+# Python dependencies must already be installed in the selected interpreter.
+# Use only the last interpreter that successfully configured an interface.
+if(WITH_PYTHON_INTERFACE)
+  set(pythonTestEnvironment "${CMAKE_COMMAND}" -E env)
+  if(APPLE)
+    list(APPEND pythonTestEnvironment --unset=DYLD_LIBRARY_PATH)
+  endif()
+  list(APPEND pythonTestEnvironment
+    "PYTHONPATH=$<TARGET_FILE_DIR:${gundamTestPythonTarget}>")
+  foreach(pythonSuite fast regular)
+    string(TOUPPER "${pythonSuite}" pythonSuiteOption)
+    if(WITH_${pythonSuiteOption}_TEST)
+      add_test(
+        NAME gundam-python-${pythonSuite}
+        COMMAND ${pythonTestEnvironment} "${gundamTestPython}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/python/run.py" --suite "${pythonSuite}"
+      )
+      set_tests_properties(gundam-python-${pythonSuite} PROPERTIES LABELS python)
+    endif()
+  endforeach()
+endif()
+
 if( WITH_GOOGLE_TEST )
   ## Compiled unit tests using GoogleTest.
   include(GoogleTest)

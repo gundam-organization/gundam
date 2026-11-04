@@ -111,3 +111,6 @@ if(NOT pythonBuiltVersions)
   cmessage(FATAL_ERROR "No usable Python interface could be configured. Install CPython development files and expose python3.x in PATH, or set GUNDAM_PYTHON_VERSIONS.")
 endif()
 cmessage(STATUS "GUNDAM Python interfaces: ${pythonBuiltVersions}")
+
+set(gundamTestPython "${gundamTestPython}" PARENT_SCOPE)
+set(gundamTestPythonTarget "${gundamTestPythonTarget}" PARENT_SCOPE)

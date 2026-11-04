@@ -2,6 +2,7 @@
 
 Requires CMake >= 3.18, pybind11 and CPython development files.
 """
+import json
 import pathlib
 import re
 import shutil
@@ -29,7 +30,13 @@ set(WITH_PYTHON_INTERFACE ON CACHE BOOL "")
 include("{options.as_posix()}")
 add_library(GundamFitter INTERFACE)
 set(GUNDAM_FULL_VERSION_STR test)
-add_subdirectory("{source.as_posix()}" interfaces)
+if(WITH_PYTHON_INTERFACE)
+  add_subdirectory("{source.as_posix()}" interfaces)
+endif()
+enable_testing()
+set(WITH_GOOGLE_TEST OFF)
+set(WITH_INTERFACE_TEST OFF)
+add_subdirectory("{source.parents[1].as_posix()}/tests" tests)
 ''')
 
     def configure(self, selection=None, extraArguments=()):
@@ -37,6 +44,29 @@ add_subdirectory("{source.as_posix()}" interfaces)
         if selection is not None:
             command.append('-DGUNDAM_PYTHON_VERSIONS=' + selection)
         return subprocess.run(command + list(extraArguments), capture_output=True, text=True)
+
+    def registeredTests(self):
+        result = subprocess.run(['ctest', '--show-only=json-v1'],
+                                cwd=self.directory / 'build', capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return json.loads(result.stdout)['tests']
+
+    def testCTestSuites(self):
+        # Explicitly select the prepared test interpreter, including its venv.
+        result = self.configure(sys.executable)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        tests = self.registeredTests()
+        self.assertEqual([test['name'] for test in tests], ['gundam-python-fast'])
+        self.assertIn(sys.executable, tests[0]['command'])
+        self.assertTrue(any(part.startswith('PYTHONPATH=') for part in tests[0]['command']))
+        for arguments, expected in [
+            (['-DWITH_REGULAR_TEST=ON'], ['gundam-python-fast', 'gundam-python-regular']),
+            (['-DWITH_REGULAR_TEST=OFF', '-DWITH_FAST_TEST=OFF'], []),
+            (['-DWITH_PYTHON_INTERFACE=OFF', '-DWITH_FAST_TEST=ON'], []),
+        ]:
+            result = self.configure(sys.executable, arguments)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual([test['name'] for test in self.registeredTests()], expected)
 
     def testAuto(self):
         result = self.configure()
@@ -104,6 +134,9 @@ add_subdirectory("{source.as_posix()}" interfaces)
         result = self.configure(';'.join(versions))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(result.stdout.count('Building GUNDAM_python'), len(versions))
+        tests = self.registeredTests()
+        self.assertEqual(len(tests), 1)
+        self.assertIn(shutil.which('python' + versions[-1]), tests[0]['command'])
 
     def testMissingVersion(self):
         result = self.configure('3.999')

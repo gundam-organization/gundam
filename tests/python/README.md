@@ -5,7 +5,25 @@
 Build GUNDAM with `-DWITH_PYTHON_INTERFACE=ON`, then expose the matching module
 through `PYTHONPATH` (or source the installed GUNDAM `setup.sh`).
 
-## How to run the tests?
+## Running with CTest and CI
+
+With `WITH_TESTS=ON` and `WITH_PYTHON_INTERFACE=ON`, `make test` (or `ctest`)
+includes the Python fast suite when `WITH_FAST_TEST=ON`, and the regular suite
+when `WITH_REGULAR_TEST=ON`. Benchmarks are run manually. With the Python interface
+disabled, no Python tests are registered.
+
+CTest uses the last interpreter that successfully configured a Python interface,
+and loads the module from the build directory. Install the requirements into
+that interpreter before running tests; CMake and CTest never create a venv or
+install Python packages. To select a prepared venv explicitly, configure with
+`-DGUNDAM_PYTHON_VERSIONS=/absolute/path/to/venv/bin/python`.
+
+The GitHub Docker CI prepares its venv, installs `requirements.txt` and fetches
+C++ dependency sources before configuring GUNDAM. CMake uses those local sources
+with `FETCHCONTENT_FULLY_DISCONNECTED=ON`. The existing `make test` step then runs
+the Python tests too, and Python failures fail the CI check.
+
+## How to run the tests manually?
 
 Install the Python dependencies into your chosen environment:
 
