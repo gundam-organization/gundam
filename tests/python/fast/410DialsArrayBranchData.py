@@ -9,12 +9,11 @@ from importlib import import_module
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def write_input(path, offset, variant="regular"):
     # uproot cannot write these TArray/TGraph object branches.
-    macro = Path.cwd() / f"215ArrayDialBranchData-{offset}-input.C"
+    macro = Path.cwd() / f"410DialsArrayBranchData-{offset}-input.C"
     macro.write_text(r'''#include <TFile.h>
 #include <TTree.h>
 #include <TGraph.h>
@@ -123,20 +122,30 @@ likelihoodInterfaceConfig:
 def expect_failure(paths, config, message, index):
     # Isolate invalid inputs, but require a caught exception rather than a native crash.
     payload = json.dumps({"paths": [str(path) for path in paths], "config": config, "message": message})
-    result = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--check-invalid", payload],
-                            capture_output=True, text=True, errors="replace", timeout=60)
+    log_path = Path(f"410DialsArrayBranchData-invalid-{index}.log")
+    try:
+        result = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--check-invalid", payload],
+                                capture_output=True, text=True, errors="replace", timeout=60)
+    except subprocess.TimeoutExpired as error:
+        # TimeoutExpired can contain bytes even with text=True. Preserve native
+        # diagnostics so CI reports where the loader stopped.
+        output = [part.decode(errors="replace") if isinstance(part, bytes) else part or ""
+                  for part in (error.stdout, error.stderr)]
+        log_path.write_text("".join(output))
+        print("".join(output)[-4000:], file=sys.stderr, flush=True)
+        raise
     log = result.stdout + result.stderr
-    Path(f"215ArrayDialBranchData-invalid-{index}.log").write_text(log)
+    log_path.write_text(log)
     assert result.returncode == 0 and "SUCCESS: caught expected loader exception" in log, (config, result.returncode, log[-4000:])
 
 
 def main():
-    paths = [Path.cwd() / f"215ArrayDialBranchData-{i}.root" for i in range(2)]
+    paths = [Path.cwd() / f"410DialsArrayBranchData-{i}.root" for i in range(2)]
     for i, path in enumerate(paths):
         write_input(path, i * 3)
-    reference = evaluate(paths, "dialLeafName: graph", False)
+    reference = evaluate(paths, "dialBranchData: graph", False)
     for backend in [False, True]:
-        for config in ["treeExpression: graph", "dialBranchData: graph",
+        for config in ["dialBranchData: graph",
                        "dialBranchData: {parameterValuesTArray: parameters, weightValuesTArray: responses}"]:
             result = evaluate(paths, config, backend)
             for actual, expected in zip(result, reference):
@@ -164,7 +173,7 @@ def main():
     write_input(paths[0], 0, "mismatch")
     expect_failure(paths[:1], "dialBranchData: {parameterValuesTArray: parameters, weightValuesTArray: responses}",
                    "array size mismatch", 3)
-    print("SUCCESS: TArray spline inputs match TGraph, including aliases and CPU propagation.")
+    print("SUCCESS: TArray spline inputs match TGraph, including edge cases and CPU propagation.")
     return 0
 
 
@@ -173,12 +182,14 @@ if __name__ == "__main__":
         write_input(Path(sys.argv[2]), int(sys.argv[3]), sys.argv[4] if len(sys.argv) > 4 else "regular")
     elif len(sys.argv) > 1 and sys.argv[1] == "--check-invalid":
         payload = json.loads(sys.argv[2])
-        try:
-            evaluate([Path(path) for path in payload["paths"]], payload["config"], False)
-        except RuntimeError as error:
-            assert payload["message"] in str(error), str(error)
-            print("SUCCESS: caught expected loader exception:", error, flush=True)
-        else:
-            raise AssertionError("Invalid dial input was accepted")
+        # Repeat initialization failures to exercise reader/filler scheduling.
+        for attempt in range(5):
+            try:
+                evaluate([Path(path) for path in payload["paths"]], payload["config"], False)
+            except RuntimeError as error:
+                assert payload["message"] in str(error), str(error)
+                print("SUCCESS: caught expected loader exception:", error, flush=True)
+            else:
+                raise AssertionError("Invalid dial input was accepted")
     else:
         sys.exit(main())

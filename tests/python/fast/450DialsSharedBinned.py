@@ -10,7 +10,7 @@ from pathlib import Path
 
 def write_input(path):
     # ROOT object branches/containers are written by a separate C++ process.
-    macro = Path.cwd() / "228SharedBinnedDials-input.C"
+    macro = Path.cwd() / "450DialsSharedBinned-input.C"
     macro.write_text(r'''#include <TFile.h>
 #include <TTree.h>
 #include <TGraph.h>
@@ -89,8 +89,7 @@ def exercise(path, threads):
 def main():
     sys.dont_write_bytecode = True
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import_module('005PythonSetup-utils').requireVenv(__file__)
-    path = Path.cwd() / '228SharedBinnedDials.root'
+    path = Path.cwd() / '450DialsSharedBinned.root'
     write_input(path)
     for threads in (1, 2):
         exercise(path, threads)

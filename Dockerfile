@@ -43,28 +43,17 @@ COPY ./CMakeLists.txt $REPO_DIR/CMakeLists.txt
 COPY ./.git $REPO_DIR/.git
 COPY ./tests $REPO_DIR/tests
 
+# Prepare the selected Python environment before configuring GUNDAM.
 RUN python3 -m venv $REPO_DIR/venv
-# Keep pybind11 independent of the Ubuntu package version.  This is also
-# the environment that gundam-tests.sh runs the python tests in today.
-#
-# TO BE REMOVED once the python tests run in a standalone environment:
-# the "uproot numpy" line below is only here because gundam-tests.sh runs
-# the python tests inside $REPO_DIR/venv.  When the tests build an
-# environment of their own, they inherit the system interpreter instead,
-# and the system installation further down is the one they use.  The rest
-# of this RUN stays, since pybind11 is needed to build GUNDAM.
-RUN . $REPO_DIR/venv/bin/activate && \
-    python -m pip install --upgrade pip && \
-    python -m pip install pybind11==2.13.6 && \
-    python -m pip install uproot numpy
+RUN $REPO_DIR/venv/bin/python -m pip install --upgrade pip && \
+    $REPO_DIR/venv/bin/python -m pip install pybind11==2.13.6 && \
+    $REPO_DIR/venv/bin/python -m pip install -r $REPO_DIR/tests/python/requirements.txt
 
-# The packages the python tests need, named explicitly.  This list
-# must be kept in step with the python test requirements file. This
-# will override the system packages if they were already installed.
-# Since this is being done on a clean installation, these packages
-# probably don't exist. This safely handles it for future
-# distributions.
-RUN PIP_BREAK_SYSTEM_PACKAGES=1 python3 -m pip install uproot numpy
+# Fetch the pinned C++ sources before CMake, which will use these local copies.
+ENV DEPS_DIR=$WORK_DIR/dependencies
+RUN git clone --depth 1 --branch v3.11.3 https://github.com/nlohmann/json.git $DEPS_DIR/json && \
+    git clone --depth 1 --branch yaml-cpp-0.9.0 https://github.com/jbeder/yaml-cpp.git $DEPS_DIR/yaml-cpp && \
+    git clone --depth 1 --branch v1.16.0 https://github.com/google/googletest.git $DEPS_DIR/googletest
 
 # Checking out missing code
 WORKDIR $REPO_DIR
@@ -72,16 +61,23 @@ RUN git submodule update --init --recursive
 
 # Now build GUNDAM
 WORKDIR $BUILD_DIR
-RUN . $REPO_DIR/venv/bin/activate && \
+RUN --network=none . $REPO_DIR/venv/bin/activate && \
     cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
       -D WITH_PYTHON_INTERFACE=ON \
+      -D WITH_PYTHON_TEST_VENV=OFF \
+      -D GUNDAM_PYTHON_VERSIONS=$REPO_DIR/venv/bin/python \
+      -D FETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON=$DEPS_DIR/json \
+      -D FETCHCONTENT_SOURCE_DIR_YAML-CPP=$DEPS_DIR/yaml-cpp \
+      -D FETCHCONTENT_SOURCE_DIR_GTEST=$DEPS_DIR/googletest \
+      -D FETCHCONTENT_FULLY_DISCONNECTED=ON \
       -D pybind11_DIR="$(python -m pybind11 --cmakedir)" \
       $REPO_DIR 
-RUN make -j3 install
+RUN --network=none make -j3 install
 
 # run the tests
-RUN . $INSTALL_DIR/setup.sh && CTEST_OUTPUT_ON_FAILURE=1 make test
+RUN --network=none . $REPO_DIR/venv/bin/activate && \
+    . $INSTALL_DIR/setup.sh && CTEST_OUTPUT_ON_FAILURE=1 make test
 
 # activate it
 ENV PATH=${INSTALL_DIR}/bin:${PATH}

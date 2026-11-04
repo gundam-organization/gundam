@@ -10,7 +10,7 @@ from pathlib import Path
 
 def write_input(path):
     # ROOT object branches/containers are written by a separate C++ process.
-    macro = Path.cwd() / "227SharedSplineLoading-input.C"
+    macro = Path.cwd() / "440DialsSharedSplineLoading-input.C"
     macro.write_text(r'''#include <TFile.h>
 #include <TTree.h>
 #include <TGraph.h>
@@ -90,8 +90,7 @@ def exercise(paths, branch_data, threads):
 def main():
     sys.dont_write_bytecode = True
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import_module("005PythonSetup-utils").requireVenv(__file__)
-    paths = [Path.cwd() / f'227SharedSplineLoading-{i}.root' for i in range(2)]
+    paths = [Path.cwd() / f'440DialsSharedSplineLoading-{i}.root' for i in range(2)]
     for path in paths:
         write_input(path)
     for threads in (1, 2):
