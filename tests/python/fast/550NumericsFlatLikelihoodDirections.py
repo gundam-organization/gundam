@@ -10,7 +10,6 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import_module('005PythonSetup-utils').requireVenv(__file__)
 
 
 def child(mode):
@@ -19,7 +18,7 @@ def child(mode):
     import uproot
     GUNDAM.setNumberOfThreads(1)
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / f'225FlatLikelihoodDirections-{mode}.root'
+    path = Path.cwd() / f'550NumericsFlatLikelihoodDirections-{mode}.root'
     with uproot.recreate(path) as output:
         tree = output.mktree('events', {'X': 'float64'})
         tree.extend({'X': np.full(10, .5, dtype=np.float64)})
@@ -91,7 +90,7 @@ def main():
         result = subprocess.run([sys.executable, __file__, mode], capture_output=True, text=True, errors='replace')
         rawLog = result.stdout + result.stderr
         log = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', rawLog)
-        Path(f'225FlatLikelihoodDirections-{mode}.log').write_text(log)
+        Path(f'550NumericsFlatLikelihoodDirections-{mode}.log').write_text(log)
         # Python markers can land inside buffered C++ ANSI sequences. Check
         # them before stripping escape codes, which can consume their first letter.
         assert result.returncode == 0 and f'CHILD_OK {mode}' in rawLog, (mode, result.returncode, log[-8000:])
