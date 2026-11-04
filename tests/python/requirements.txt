@@ -1,0 +1,5 @@
+# Install into the interpreter used to launch tests/python/run.py.
+# GUNDAM itself must be built with WITH_PYTHON_INTERFACE=ON and be on PYTHONPATH.
+uproot     # generates ROOT input trees
+numpy      # input generation and numerical checks
+matplotlib # bin-migration and dial-response plots

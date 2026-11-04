@@ -8,8 +8,7 @@ from importlib import import_module
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fast-tests"))
-import_module("005PythonSetup-utils").requireVenv(__file__)
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fast"))
 
 
 def make_engine(path, bins, width_fraction=None):
@@ -60,7 +59,7 @@ def main():
     parser.add_argument("--threads", type=int, nargs="+", default=[1, 2, 4, 8])
     parser.add_argument("--width-fraction", type=float, help="Use relative widths instead of the default absolute width")
     parser.add_argument("--repeat", type=int, default=7)
-    parser.add_argument("--output", type=Path, default=Path("218BinningResponse-benchmark.json"))
+    parser.add_argument("--output", type=Path, default=Path("350ModelBinningResponseBenchmark.json"))
     args = parser.parse_args()
     if min([args.events, args.repeat] + args.bins + args.threads) <= 0:
         parser.error("Event, bin, thread and repetition counts must be positive")
@@ -69,7 +68,7 @@ def main():
         parser.error("width-fraction must be in (0, 0.5]")
 
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / "218BinningResponse-benchmark.root"
+    path = Path.cwd() / "350ModelBinningResponseBenchmark.root"
     random = np.random.default_rng(724)
     with uproot.recreate(path) as output:
         tree = output.mktree("events", {"X": "float64", "weight": "float64"})

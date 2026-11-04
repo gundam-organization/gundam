@@ -10,7 +10,6 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import_module('005PythonSetup-utils').requireVenv(__file__)
 
 
 def formula(expression, inputs, **options):
@@ -85,7 +84,7 @@ def main():
     import numpy as np
     import uproot
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd()/'231EventVarInputForFormulaDials.root'
+    path = Path.cwd()/'480DialsEventVarInputForFormula.root'
     with uproot.recreate(path) as output:
         tree = output.mktree('events', {'X': 'float64', 'rawQ3': 'float64'})
         tree.extend({'X': .25+.5*np.arange(6), 'rawQ3': 250.*np.arange(6)})
@@ -135,7 +134,7 @@ def main():
     for index in (-1, 2, .5):
         reject(config(path, formula('[p]', [{'name': 'p', 'parameterIndex': index}])), 'parameterIndex')
     reject(config(path, dict(dialType='Normalization', dialInputList=[q3])), 'only supported by Formula')
-    missing = Path.cwd()/'231EventVarInputForFormulaDials-missing.json'
+    missing = Path.cwd()/'480DialsEventVarInputForFormula-missing.json'
     missing.write_text(json.dumps(config(path, formula('[q3]', [{'name': 'q3', 'eventVariable': 'missingQ3'}]))))
     result = subprocess.run([sys.executable, __file__, '--load-config', str(missing)], capture_output=True, text=True)
     assert result.returncode != 0 and 'missingQ3' in result.stdout+result.stderr, result

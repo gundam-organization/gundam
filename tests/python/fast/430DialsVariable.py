@@ -9,7 +9,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 RAW = [-0.25, 0.25, 1.25, 2.25]
 
@@ -239,7 +238,7 @@ def main():
 
     print("Testing module:", GUNDAM.__file__, flush=True)
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / "219VariableDials.root"
+    path = Path.cwd() / "430DialsVariable.root"
     write_input(path)
     for threads in [1, 4, 8]:
         exercise(path, threads)
@@ -248,7 +247,7 @@ def main():
     exercise(path, 2, disjoint=True)
     # The reader runs independently even with one filler thread. Alternating
     # conditions must use this event, never the reader's next entry.
-    stress_path = Path.cwd() / "219VariableDials-conditions.root"
+    stress_path = Path.cwd() / "430DialsVariable-conditions.root"
     write_input(stress_path, 512)
     for threads in [1, 4]:
         GUNDAM.setNumberOfThreads(threads)
