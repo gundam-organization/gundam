@@ -76,7 +76,8 @@ RUN --network=none . $REPO_DIR/venv/bin/activate && \
 RUN --network=none make -j3 install
 
 # run the tests
-RUN --network=none . $INSTALL_DIR/setup.sh && CTEST_OUTPUT_ON_FAILURE=1 make test
+RUN --network=none . $REPO_DIR/venv/bin/activate && \
+    . $INSTALL_DIR/setup.sh && CTEST_OUTPUT_ON_FAILURE=1 make test
 
 # activate it
 ENV PATH=${INSTALL_DIR}/bin:${PATH}
