@@ -373,6 +373,17 @@ void FitterEngine::evaluateLikelihood(){
 }
 
 void FitterEngine::evalGradient(){
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    _backendsManager_.validateLikelihoodGradient();
+    getLikelihoodInterface().validateWeightGradient();
+    evaluateLikelihood();
+    getLikelihoodInterface().evalGradient([this](const auto& parameters_){
+      _backendsManager_.evalStatLikelihoodGradient(parameters_);
+    });
+    return;
+  }
+#endif
   getLikelihoodInterface().evalGradient();
 }
 

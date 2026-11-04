@@ -160,7 +160,7 @@ def main():
         displacement = 0.2 * sigma if math.isfinite(sigma) and sigma > 0 else 0.1 * max(1., abs(value))
         shifted_values.append(value + displacement)
     minimizer.evalFit(shifted_values)
-    minimizer.evalFitGradient(spline_parameters)
+    minimizer.evalFitGradient()
     shifted_gradients = [parameter.getGradient() for parameter in spline_parameters]
     for parameter, gradient in zip(spline_parameters, shifted_gradients):
         index = next(i for i, candidate in enumerate(fit_parameters) if candidate is parameter)
