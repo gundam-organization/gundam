@@ -33,13 +33,18 @@ python tests/python/fast/010BuildPythonInterfaces.py
 Command line options:
 
 ```bash
+-v, --verbose # display test output live and keep it in test.log
 --list # show tests file names
 --output <folder-path> # place where logger files are writen. By default it will be in a temp folder
 --test <python-test-filename> # runs a specific test
 --suite <name-of-the-suite> # runs the tests of the selected suite [fast, regular, benchmarks]
 ```
 
-!TODO: add option for printout the tests instead of writing
+For live output:
+
+```bash
+python tests/python/run.py -v
+```
 
 Sub command options can be passed. Useful for benchmarks:
 ```bash
