@@ -9,7 +9,6 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def checkMinimizerState(rootPath_, maxFcnCalls_):
@@ -70,7 +69,7 @@ def main():
 
     GUNDAM.setNumberOfThreads(1)
     GUNDAM.setLightOutputMode(True)
-    rootPath = Path.cwd() / "220MinimizerState-input.root"
+    rootPath = Path.cwd() / "220ApiMinimizerState-input.root"
     with uproot.recreate(rootPath) as output:
         tree = output.mktree("events", {"X": "float64"})
         tree.extend({"X": np.full(100, .5)})
