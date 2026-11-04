@@ -372,6 +372,10 @@ void FitterEngine::evaluateLikelihood(){
   getLikelihoodInterface().propagateAndEvalLikelihood();
 }
 
+void FitterEngine::evalGradient(){
+  getLikelihoodInterface().evalGradient();
+}
+
 // Core
 std::string FitterEngine::getPropagationMonitorTitle() const {
 #ifdef GUNDAM_USING_BACKENDS

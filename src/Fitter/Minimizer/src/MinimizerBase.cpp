@@ -309,26 +309,12 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   return getLikelihoodInterface().getLastLikelihood();
 }
 void MinimizerBase::evalFitGradient(){
-  this->evalFitGradient(_minimizerParameterPtrList_);
-}
-void MinimizerBase::evalFitGradient( const std::vector<Parameter*>& parameterList_ ){
-#ifdef GUNDAM_USING_BACKENDS
-  auto& manager = getOwner().getBackendsManager();
-  if( manager.hasBackend() ){
-    manager.validateLikelihoodGradient();
-    getLikelihoodInterface().validateWeightGradient();
-    getOwner().evaluateLikelihood();
-    getLikelihoodInterface().evalLikelihoodGradient(parameterList_,
-        [&manager](const auto& parameters_){ manager.evalStatLikelihoodGradient(parameters_); });
-    return;
-  }
-#endif
-  getLikelihoodInterface().evalLikelihoodGradient(parameterList_);
+  getOwner().evalGradient();
 }
 
 void MinimizerBase::evalFitGradientAt(const double* parArray_, double* gradient_){
   LogThrowIf(parArray_ == nullptr or gradient_ == nullptr, "Null gradient callback buffer.");
-  LogThrowIf(not setFitParameterValues(parArray_), "Invalid parameter point for CPU gradient.");
+  LogThrowIf(not setFitParameterValues(parArray_), "Invalid parameter point for analytic gradient.");
   evalFitGradient();
   std::vector<double> result;
   result.reserve(_minimizerParameterPtrList_.size());

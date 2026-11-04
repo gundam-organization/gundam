@@ -124,7 +124,7 @@ def main():
 
     nominal_values = [parameter.getParameterValue() for parameter in fit_parameters]
     nominal_llh = minimizer.evalFit(nominal_values)
-    minimizer.evalFitGradient(spline_parameters)
+    minimizer.evalFitGradient()
 
     expect("Nominal LLH is finite", math.isfinite(nominal_llh))
     if not math.isfinite(nominal_llh):
