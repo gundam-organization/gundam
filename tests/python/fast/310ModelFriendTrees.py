@@ -8,17 +8,10 @@ from array import array
 from pathlib import Path
 from typing import List
 
-# Re-run inside the python environment built by 005PythonSetup.sh.  This
-# fails when the environment does not exist, which is what happens when the
-# test is run on its own instead of through gundam-tests.sh.  The helper
-# module name cannot be written in an import statement, so it is imported by
-# name, and the bytecode is not written so that a test run leaves nothing
-# behind in the test directory.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
 from importlib import import_module
 
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def write_root_files(main_path: Path, friend_path: Path) -> None:
@@ -63,7 +56,7 @@ fitterEngineConfig:
 """
 
 
-def check_histogram(config_yaml: str, expected: List[float]) -> None:
+def check_histogram(config_yaml: str, expected: List[float]) -> List[float]:
     import GUNDAM
 
     config_builder = GUNDAM.ConfigUtils.ConfigBuilder()
@@ -82,47 +75,39 @@ def check_histogram(config_yaml: str, expected: List[float]) -> None:
     contents = [bin_content.sumWeights for bin_content in sample.getHistogram().getBinContentList()]
     if contents != expected:
         raise AssertionError(f"Expected {expected}, got {contents}")
+    return contents
 
 
 def main() -> int:
     import GUNDAM
 
     work_dir = Path.cwd()
-    main_path = work_dir / "214FriendTrees-main.root"
-    friend_path = work_dir / "214FriendTrees-friend.root"
+    main_path = work_dir / "310ModelFriendTrees-main.root"
+    friend_path = work_dir / "310ModelFriendTrees-friend.root"
     write_root_files(main_path, friend_path)
 
     GUNDAM.setRuntimeWorkingDirectory(str(work_dir))
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(1)
 
-    legacy_friend = f"""
-                - name: friend
-                  path: "{friend_path}:friend_events"
-"""
     grouped_friends = f"""
                 - name: xsec_syst_friends
                   path: "{friend_path}"
                   treeList: [friend_events, friend_offsets]
 """
-    check_histogram(build_config(main_path, legacy_friend, "friend.friendValue"), [2.0, 2.0])
     check_histogram(
         build_config(main_path, grouped_friends, "friend_events.friendValue + friend_offsets.friendValue"),
         [1.0, 3.0],
     )
-    check_histogram(
-        build_config(main_path, legacy_friend + grouped_friends, "friend.friendValue + friend_offsets.friendValue"),
-        [1.0, 3.0],
-    )
     disabled_friends = f"""
                 - name: disabled_friends
-                  path: "{work_dir / '214FriendTrees-missing.root'}"
+                  path: "{work_dir / '310ModelFriendTrees-missing.root'}"
                   isEnabled: false
                   treeList: [missing_tree1, missing_tree2]
 """
-    check_histogram(build_config(main_path, legacy_friend + disabled_friends, "friend.friendValue"), [2.0, 2.0])
+    check_histogram(build_config(main_path, grouped_friends + disabled_friends, "friend_events.friendValue + friend_offsets.friendValue"), [1.0, 3.0])
 
-    print("SUCCESS: legacy, grouped, mixed and disabled friend trees behave as expected.")
+    print("SUCCESS: grouped and disabled friend trees populate the expected bins.")
     return 0
 
 

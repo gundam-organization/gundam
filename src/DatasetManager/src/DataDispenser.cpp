@@ -33,6 +33,7 @@
 #include <TClass.h>
 #include <TGraph.h>
 
+#include <exception>
 #include <unordered_map>
 #include <map>
 #include <set>
@@ -2045,7 +2046,15 @@ void DataDispenser::loadEvent(int iThread_){
       // make sure we request a new entry and wait once we go for another loop
       GenericToolbox::ScopedGuard readerGuard{
         [&]{ threadSharedData.isEntryBufferReady.waitUntilEqual( true ); threadSharedData.isEntryBufferReady.setValue( false ); },
-        [&]{ threadSharedData.requestReadNextEntry.setValue( true ); }
+        [&]{
+          // Publish failure before waking the reader. Otherwise it can request
+          // another entry before the outer ready guard is destroyed, then wait
+          // forever for a filler that has already thrown.
+          if( std::uncaught_exceptions() > 0 ){
+            threadSharedData.isEventFillerReady.setValue( false );
+          }
+          threadSharedData.requestReadNextEntry.setValue( true );
+        }
       };
 
       // ***** from this point, the TChain reader is waiting *****
