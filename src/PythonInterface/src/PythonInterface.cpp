@@ -19,6 +19,7 @@
 
 #include "GenericToolbox.Fs.h"
 #include "GenericToolbox.Os.h"
+#include "GenericToolbox.Root.h"
 
 #include "Logger.h"
 
@@ -499,6 +500,13 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("isRootMinimizer", [](const MinimizerBase& this_){
     return dynamic_cast<const RootMinimizer*>(&this_) != nullptr;
   })
+  .def("scanParameters", [](MinimizerBase& this_, GundamApp& app_, const std::string& subFolder_){
+    if( app_.getOutfilePtr() == nullptr or not app_.getOutfilePtr()->IsOpen() ){
+      throw pybind11::value_error("Open the GundamApp output file before scanning parameters.");
+    }
+    this_.scanParameters(GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_));
+  }, pybind11::arg("app"), pybind11::arg("subFolder") = "scan",
+     pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("minimize", &MinimizerBase::minimize)
   .def("getMinimizerStatus", &MinimizerBase::getMinimizerStatus)
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
