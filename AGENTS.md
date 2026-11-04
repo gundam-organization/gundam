@@ -214,12 +214,12 @@ I recommend to implement a `.py` test, handling the creation of the inputs
 and the running of GUNDAM. 
 Python tests allow to use the `PythonInterface` library of GUNDAM to
 check the engine behavior while running.
-For example bases, read `tests/fast-tests/21*.py` files.
-GUNDAM tests are run using the dedicated bash script `tests/gundam-tests.sh`.
-You can run a specific test using for instance:
+For example bases, read `tests/python/fast/*.py` files.
+Standard tests use `tests/gundam-tests.sh`. Python tests run independently with
+`tests/python/run.py`, organized into `fast`, `regular` and `benchmarks`.
+You can run a specific Python test using for instance:
 ```bash
-cd ./tests
-bash gundam-tests.sh -a -t fast-tests/210IgnoreZeroPredictionAtPrior.py -v
+python tests/python/run.py --test 510NumericsIgnoreZeroPredictionAtPrior.py
 ```
 
 Note that in order to succeed, python tests must run with GUNDAM compiled using

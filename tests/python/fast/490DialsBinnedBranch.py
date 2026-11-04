@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 def write_input(path):
-    macro = Path.cwd() / '237BinnedDialsBranch-input.C'
+    macro = Path.cwd() / '490DialsBinnedBranch-input.C'
     macro.write_text(r'''#include <TFile.h>
 #include <TTree.h>
 #include <TGraph.h>
@@ -129,8 +129,7 @@ def exercise(path, cases):
 def main():
     sys.dont_write_bytecode = True
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import_module('005PythonSetup-utils').requireVenv(__file__)
-    path = Path.cwd() / '237BinnedDialsBranch.root'
+    path = Path.cwd() / '490DialsBinnedBranch.root'
     write_input(path)
     explicit = []
     for dial_type in ('Graph', 'Spline'):
@@ -197,7 +196,7 @@ def main():
         result = subprocess.run([sys.executable, str(Path(__file__).resolve()), '--exercise',
                                  str(path), json.dumps(cases)], text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        Path(f'237BinnedDialsBranch-{name}.log').write_text(result.stdout)
+        Path(f'490DialsBinnedBranch-{name}.log').write_text(result.stdout)
         assert result.returncode == 0, result.stdout
         occurrences = result.stdout.count(warning)
         assert (occurrences == 0 if count == 0 else occurrences >= count), result.stdout
