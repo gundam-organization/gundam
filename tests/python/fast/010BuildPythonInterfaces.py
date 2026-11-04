@@ -40,7 +40,8 @@ add_subdirectory("{source.parents[1].as_posix()}/tests" tests)
 ''')
 
     def configure(self, selection=None, extraArguments=()):
-        command = ['cmake', '-S', str(self.directory), '-B', str(self.directory / 'build')]
+        command = ['cmake', '-S', str(self.directory), '-B', str(self.directory / 'build'),
+                   '-DWITH_PYTHON_TEST_VENV=OFF']
         if selection is not None:
             command.append('-DGUNDAM_PYTHON_VERSIONS=' + selection)
         return subprocess.run(command + list(extraArguments), capture_output=True, text=True)
@@ -67,6 +68,18 @@ add_subdirectory("{source.parents[1].as_posix()}/tests" tests)
             result = self.configure(sys.executable, arguments)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual([test['name'] for test in self.registeredTests()], expected)
+
+    def testCTestEnvironmentFixture(self):
+        result = self.configure(sys.executable, ['-DWITH_PYTHON_TEST_VENV=ON',
+                                                '-DWITH_REGULAR_TEST=ON'])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        tests = self.registeredTests()
+        self.assertEqual([test['name'] for test in tests],
+                         ['gundam-python-prepare', 'gundam-python-fast', 'gundam-python-regular'])
+        for test in tests[1:]:
+            properties = {item['name']: item['value'] for item in test['properties']}
+            self.assertEqual(properties['FIXTURES_REQUIRED'], ['gundamPythonEnvironment'])
+            self.assertTrue(any('python-venv' in part for part in test['command']))
 
     def testAuto(self):
         result = self.configure()

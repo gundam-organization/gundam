@@ -13,14 +13,22 @@ when `WITH_REGULAR_TEST=ON`. Benchmarks are run manually. With the Python interf
 disabled, no Python tests are registered.
 
 CTest uses the last interpreter that successfully configured a Python interface,
-and loads the module from the build directory. Install the requirements into
-that interpreter before running tests; CMake and CTest never create a venv or
-install Python packages. To select a prepared venv explicitly, configure with
+and loads the module from the build directory. By default, a CTest setup fixture
+creates `tests/python-venv` inside the build directory using that interpreter
+and installs `requirements.txt`. The environment inherits its system packages
+and is reused until the requirements or selected interpreter change. The first
+`make test` needs network access if packages are not already available locally.
+No packages are installed into the system Python.
+
+To use a prepared environment without automatic installation, configure with
+`-DWITH_PYTHON_TEST_VENV=OFF` and
 `-DGUNDAM_PYTHON_VERSIONS=/absolute/path/to/venv/bin/python`.
+Install the requirements into that environment before running tests.
 
 The GitHub Docker CI prepares its venv, installs `requirements.txt` and fetches
 C++ dependency sources before configuring GUNDAM. CMake uses those local sources
-with `FETCHCONTENT_FULLY_DISCONNECTED=ON`. The existing `make test` step then runs
+with `FETCHCONTENT_FULLY_DISCONNECTED=ON` and disables automatic test venv
+preparation with `WITH_PYTHON_TEST_VENV=OFF`. The existing `make test` step then runs
 the Python tests too, and Python failures fail the CI check.
 
 ## How to run the tests manually?

@@ -65,6 +65,7 @@ RUN --network=none . $REPO_DIR/venv/bin/activate && \
     cmake \
       -D CMAKE_INSTALL_PREFIX=$INSTALL_DIR \
       -D WITH_PYTHON_INTERFACE=ON \
+      -D WITH_PYTHON_TEST_VENV=OFF \
       -D GUNDAM_PYTHON_VERSIONS=$REPO_DIR/venv/bin/python \
       -D FETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON=$DEPS_DIR/json \
       -D FETCHCONTENT_SOURCE_DIR_YAML-CPP=$DEPS_DIR/yaml-cpp \
