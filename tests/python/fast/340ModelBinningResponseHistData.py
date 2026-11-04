@@ -9,7 +9,6 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import_module('005PythonSetup-utils').requireVenv(__file__)
 
 
 def exercise(path, histName, threads):
@@ -77,13 +76,13 @@ def main():
 
     print('Testing module:', GUNDAM.__file__, flush=True)
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / '226BinningResponseHistData.root'
+    path = Path.cwd() / '340ModelBinningResponseHistData.root'
     with uproot.recreate(path) as output:
         tree = output.mktree('events', {'X': 'float64'})
         tree.extend({'X': np.array([.95])})
         output['flat'] = (np.array([13., 0., 7.]), np.array([0., 1., 2., 3.]))
     # THnD serialization is not supported by uproot.
-    macro = Path.cwd() / '226BinningResponseHistData-input.C'
+    macro = Path.cwd() / '340ModelBinningResponseHistData-input.C'
     macro.write_text(r'''#include <TFile.h>
 #include <THn.h>
 #include <TSystem.h>
