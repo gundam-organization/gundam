@@ -18,7 +18,6 @@
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
-#include <functional>
 #include <string>
 #include <memory>
 #include <vector>
@@ -68,7 +67,6 @@ public:
   void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const getters
-  [[nodiscard]] const ParameterGradient& getGradient() const { return _gradient_; }
   [[nodiscard]] auto& getExternalConstraints() const{ return _externalConstraints_; }
   [[nodiscard]] auto getNbParameters() const{ return _nbParameters_; }
   [[nodiscard]] auto getNbSampleBins() const{ return _nbSampleBins_; }
@@ -99,11 +97,13 @@ public:
   // core
   double evalLikelihood(std::future<bool>& propagation) const;
   void validateWeightGradient() const;
-  /// Refresh the current point and fill gradients in physical/effective coordinates.
-  void evalGradient();
-  /// Complete an already evaluated likelihood using a statistical gradient provider.
-  /// Parameter selection, eigen projection and penalties are handled here.
-  void evalGradient(const std::function<void(ParameterGradient&)>& statGradientEvaluator_);
+  /// Fill only the supplied parameter entries at the current point.
+  /// Refreshes propagation and likelihood buffers; never selects fit parameters.
+  void evalGradient(ParameterGradient& gradient_);
+  /// Build temporary physical-coordinate derivatives, then project/add penalties
+  /// into the caller-selected entries. Shared by original and backend engines.
+  [[nodiscard]] ParameterGradient prepareGradient(const ParameterGradient& gradient_);
+  void finalizeGradient(const ParameterGradient& statGradient_, ParameterGradient& gradient_);
   double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
@@ -126,17 +126,14 @@ protected:
   void loadModelPropagator();
   void loadDataPropagator();
   void buildSamplePairList();
-  void evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_,
-      const std::function<void(ParameterGradient&)>& statGradientEvaluator_);
   void evalStatLikelihoodGradient(ParameterGradient& gradient_);
-  void evalPenaltyLikelihoodGradient(const std::vector<Parameter*>& parameterList_);
-  void evalPenaltyLikelihoodGradient(ParameterSet& parSet_, const std::vector<Parameter*>& parameterList_);
+  void evalPenaltyLikelihoodGradient(const std::vector<const Parameter*>& parameterList_, ParameterGradient& gradient_);
+  void evalPenaltyLikelihoodGradient(ParameterSet& parSet_, const std::vector<const Parameter*>& parameterList_,
+                                     ParameterGradient& gradient_);
 
   DataDispenser* getDataDispenser( DatasetDefinition& dataset_ );
 
 private:
-  ParameterGradient _gradient_;
-
   // parameters
   bool _forceAsimovData_{false};
   bool _enableStatThrowInToys_{true};

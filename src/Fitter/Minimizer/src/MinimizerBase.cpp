@@ -309,7 +309,13 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   return getLikelihoodInterface().getLastLikelihood();
 }
 void MinimizerBase::evalFitGradient(){
-  getOwner().evalGradient();
+  _gradient_.clear();
+  for( const auto* parameter : _minimizerParameterPtrList_ ){
+    if( parameter->isEnabled() and not parameter->isFixed() and not parameter->isPenaltyDisabled() ){
+      _gradient_.resetValue(parameter);
+    }
+  }
+  getOwner().evalGradient(_gradient_);
 }
 
 void MinimizerBase::evalFitGradientAt(const double* parArray_, double* gradient_){
@@ -320,7 +326,7 @@ void MinimizerBase::evalFitGradientAt(const double* parArray_, double* gradient_
   result.reserve(_minimizerParameterPtrList_.size());
   for( const auto* parameter : _minimizerParameterPtrList_ ){
     const double scale = _useNormalizedFitSpace_ ? ParameterSet::toRealParRange(1., *parameter) : 1.;
-    const double value = getLikelihoodInterface().getGradient().getValue(parameter) * scale;
+    const double value = (_gradient_.values.count(parameter) ? _gradient_.getValue(parameter) * scale : 0.);
     LogThrowIf(not std::isfinite(value), "Non-finite gradient in fit coordinates.");
     result.push_back(value);
   }

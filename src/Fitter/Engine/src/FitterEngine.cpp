@@ -372,19 +372,8 @@ void FitterEngine::evaluateLikelihood(){
   getLikelihoodInterface().propagateAndEvalLikelihood();
 }
 
-void FitterEngine::evalGradient(){
-#ifdef GUNDAM_USING_BACKENDS
-  if( _backendsManager_.hasBackend() ){
-    _backendsManager_.validateLikelihoodGradient();
-    getLikelihoodInterface().validateWeightGradient();
-    evaluateLikelihood();
-    getLikelihoodInterface().evalGradient([this](auto& gradient_){
-      _backendsManager_.evalStatLikelihoodGradient(gradient_);
-    });
-    return;
-  }
-#endif
-  getLikelihoodInterface().evalGradient();
+void FitterEngine::evalGradient(ParameterGradient& gradient_){
+  getLikelihoodInterface().evalGradient(gradient_);
 }
 
 // Core

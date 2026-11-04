@@ -477,7 +477,9 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
   pybind11::class_<ParameterGradient>(module, "ParameterGradient")
+  .def(pybind11::init())
   .def("getValue", &ParameterGradient::getValue, pybind11::arg("parameter"))
+  .def("resetValue", &ParameterGradient::resetValue, pybind11::arg("parameter"))
   ;
 
   auto likelihoodInterfaceClass = pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface");
@@ -534,7 +536,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getExternalConstraints", &LikelihoodInterface::getExternalConstraints, pybind11::return_value_policy::reference_internal)
   .def("getLastStatLikelihood", &LikelihoodInterface::getLastStatLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("getGradient", &LikelihoodInterface::getGradient, pybind11::return_value_policy::reference_internal)
+  .def("evalGradient", pybind11::overload_cast<ParameterGradient&>(&LikelihoodInterface::evalGradient),
+       pybind11::arg("gradient"))
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
@@ -577,6 +580,7 @@ PYBIND11_MODULE(GUNDAM, module) {
     return gradient;
   }, pybind11::arg("parameters"))
   .def("evalFitGradient", &MinimizerBase::evalFitGradient)
+  .def("getGradient", &MinimizerBase::getGradient, pybind11::return_value_policy::reference_internal)
   .def("getMinimizerFitParameterList", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterList), pybind11::return_value_policy::reference)
   ;
 

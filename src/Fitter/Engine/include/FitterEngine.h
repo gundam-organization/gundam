@@ -99,7 +99,7 @@ public:
   [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const;
 
   // Core
-  void evalGradient();
+  void evalGradient(ParameterGradient& gradient_);
   void fit();
   void evaluateLikelihood();
   void runPcaCheck();

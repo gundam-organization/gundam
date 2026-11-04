@@ -114,7 +114,7 @@ def main():
     if not math.isfinite(nominal_llh):
         return STATUS
 
-    gradient_values = [fitter.getLikelihoodInterface().getGradient().getValue(parameter) for parameter in fit_parameters]
+    gradient_values = [minimizer.getGradient().getValue(parameter) for parameter in fit_parameters]
 
     step = 1.0e-4
     tolerance_value = 5.0e-3
@@ -143,7 +143,7 @@ def main():
         shifted_values.append(value + displacement)
     minimizer.evalFit(shifted_values)
     minimizer.evalFitGradient()
-    shifted_gradients = [fitter.getLikelihoodInterface().getGradient().getValue(parameter) for parameter in fit_parameters]
+    shifted_gradients = [minimizer.getGradient().getValue(parameter) for parameter in fit_parameters]
     for parameter, gradient in zip(fit_parameters, shifted_gradients):
         index = next(i for i, candidate in enumerate(fit_parameters) if candidate is parameter)
         probe = list(shifted_values)

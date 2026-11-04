@@ -75,7 +75,7 @@ def check_threads(threads, backend_name="CPU"):
         close(penalty, likelihood.getLastPenaltyLikelihood())
         assert len(gradient) == len(point)
         parameters = list(minimizer.getMinimizerFitParameterList())
-        physical_gradient = likelihood.getGradient()
+        physical_gradient = minimizer.getGradient()
         stored_values = [physical_gradient.getValue(parameter) for parameter in parameters]
         assert all(math.isfinite(value) for value in stored_values)
         for i, value in enumerate(gradient):
@@ -123,6 +123,49 @@ def check_threads(threads, backend_name="CPU"):
                 pass
             else:
                 raise AssertionError('Wrong gradient dimension accepted')
+
+    # The original engine can fill an independent output, including eigen and
+    # penalty terms, without writing into the minimizer-owned gradient object.
+    for eigen in (False, True):
+        engine = build(config, False, eigen)
+        minimizer = engine.getMinimizer()
+        parameters = list(minimizer.getMinimizerFitParameterList())
+        first = [p.getParameterValue() + .07 * p.getStdDevValue() for p in parameters]
+        reference = list(minimizer.evalFitGradientAt(first))
+        likelihood = engine.getLikelihoodInterface()
+        output = GUNDAM.ParameterGradient()
+        for parameter in parameters:
+            output.resetValue(parameter)
+        likelihood.evalGradient(output)
+        for parameter, value in zip(parameters, reference):
+            close(output.getValue(parameter), value)
+        second = [value + .03 * p.getStdDevValue() for value, p in zip(first, parameters)]
+        minimizer.evalFit(second)
+        likelihood.evalGradient(output)
+        for parameter, value in zip(parameters, reference):
+            close(minimizer.getGradient().getValue(parameter), value)
+        updated = list(minimizer.evalFitGradientAt(second))
+        for parameter, value in zip(parameters, updated):
+            close(output.getValue(parameter), value)
+
+        # A caller may ask for a single component, including a fixed parameter.
+        # Eigen projection must not leak its temporary original coordinates.
+        subset = GUNDAM.ParameterGradient()
+        subset.resetValue(parameters[0])
+        parameters[0].setIsFixed(True)
+        fixed_gradient = list(minimizer.evalFitGradientAt(second))
+        close(fixed_gradient[0], 0.)
+        for actual, expected in zip(fixed_gradient[1:], updated[1:]):
+            close(actual, expected)
+        likelihood.evalGradient(subset)
+        close(subset.getValue(parameters[0]), updated[0])
+        try:
+            subset.getValue(parameters[1])
+        except IndexError:
+            pass
+        else:
+            raise AssertionError('Unrequested gradient component was added')
+        parameters[0].setIsFixed(False)
 
     # Eigenvectors span only constrained parameters, not the remaining free coordinates.
     mixed = copy.deepcopy(config)

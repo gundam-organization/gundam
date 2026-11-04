@@ -17,14 +17,8 @@
 #include <algorithm>
 
 namespace {
-  bool containsParameter(const std::vector<Parameter*>& parameterList_, const Parameter* parameter_){
+  bool containsParameter(const std::vector<const Parameter*>& parameterList_, const Parameter* parameter_){
     return std::find(parameterList_.begin(), parameterList_.end(), parameter_) != parameterList_.end();
-  }
-
-  void addUniqueParameter(std::vector<Parameter*>& parameterList_, Parameter* parameter_){
-    if( parameter_ == nullptr ){ return; }
-    if( containsParameter(parameterList_, parameter_) ){ return; }
-    parameterList_.emplace_back(parameter_);
   }
 
   bool isEigenProjectedOriginalParameter(const Parameter& parameter_){
@@ -213,89 +207,67 @@ void LikelihoodInterface::validateWeightGradient() const {
   }
 }
 
-void LikelihoodInterface::evalGradient() {
-  validateWeightGradient();
-  // Refresh the current parameter state and preserve the likelihood buffers.
+void LikelihoodInterface::evalGradient(ParameterGradient& gradient_) {
+  auto statGradient = prepareGradient(gradient_);
+  // A gradient request may follow parameter changes without a value evaluation.
+  // Keep likelihood buffers synchronized with the point being differentiated.
   propagateAndEvalLikelihood();
-  evalGradient([this](auto& gradient_){ evalStatLikelihoodGradient(gradient_); });
-}
-
-void LikelihoodInterface::evalGradient(
-    const std::function<void(ParameterGradient&)>& statGradientEvaluator_) {
-  std::vector<Parameter*> parameterList;
-  for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
-    for( auto& par : parSet.getEffectiveParameterList() ){
-      if( par.isEnabled() and not par.isPenaltyDisabled() ){
-        parameterList.emplace_back(&par);
-      }
-    }
-  }
-  evalLikelihoodGradient(parameterList, statGradientEvaluator_);
-}
-
-void LikelihoodInterface::evalLikelihoodGradient(const std::vector<Parameter*>& parameterList_,
-    const std::function<void(ParameterGradient&)>& statGradientEvaluator_) {
-  _gradient_.clear();
-  validateWeightGradient();
   LogThrowIf(not _buffer_.isValid(), "Cannot differentiate a non-finite likelihood.");
-  std::vector<Parameter*> statGradientParameterList{parameterList_};
+  evalStatLikelihoodGradient(statGradient);
+  finalizeGradient(statGradient, gradient_);
+}
 
+ParameterGradient LikelihoodInterface::prepareGradient(const ParameterGradient& gradient_) {
+  validateWeightGradient();
+  ParameterGradient statGradient;
+  std::vector<const Parameter*> parameterList;
+  parameterList.reserve(gradient_.values.size());
+  for( const auto& entry : gradient_.values ){
+    LogThrowIf(entry.first == nullptr, "Null parameter in gradient request.");
+    parameterList.push_back(entry.first);
+    statGradient.resetValue(entry.first);
+  }
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() or not parSet.isEnableEigenDecomp() ){ continue; }
-
-    bool hasRequestedEigenParameter{false};
-    for( auto& eigenPar : parSet.getEigenParameterList() ){
-      if( containsParameter(parameterList_, &eigenPar) ){
-        hasRequestedEigenParameter = true;
-        break;
-      }
-    }
+    const bool hasRequestedEigenParameter = std::any_of(
+        parSet.getEigenParameterList().begin(), parSet.getEigenParameterList().end(),
+        [&](const auto& parameter_){ return containsParameter(parameterList, &parameter_); });
     if( not hasRequestedEigenParameter ){ continue; }
-
     for( auto& par : parSet.getParameterList() ){
-      if( not isEigenProjectedOriginalParameter(par) ){ continue; }
-      addUniqueParameter(statGradientParameterList, &par);
+      if( isEigenProjectedOriginalParameter(par) ){ statGradient.resetValue(&par); }
     }
   }
+  return statGradient;
+}
 
-  for( auto* parameter : statGradientParameterList ){
-    if( parameter == nullptr ){ continue; }
-    _gradient_.resetValue(parameter);
+void LikelihoodInterface::finalizeGradient(const ParameterGradient& statGradient_, ParameterGradient& gradient_) {
+  std::vector<const Parameter*> parameterList;
+  parameterList.reserve(gradient_.values.size());
+  for( auto& entry : gradient_.values ){
+    parameterList.push_back(entry.first);
+    entry.second = statGradient_.getValue(entry.first);
   }
-  for( auto* parameter : parameterList_ ){
-    if( parameter == nullptr ){ continue; }
-    _gradient_.resetValue(parameter);
-  }
-
-  statGradientEvaluator_(_gradient_);
-
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
     if( not parSet.isEnabled() or not parSet.isEnableEigenDecomp() ){ continue; }
     if( parSet.getEigenVectors() == nullptr ){ continue; }
 
     for( int iEigen = 0 ; iEigen < int(parSet.getEigenParameterList().size()) ; iEigen++ ){
       auto& eigenPar = parSet.getEigenParameterList()[iEigen];
-      if( not containsParameter(parameterList_, &eigenPar) ){ continue; }
+      if( not containsParameter(parameterList, &eigenPar) ){ continue; }
 
       double eigenGradient{0};
       int iOrig{0};
       for( auto& par : parSet.getParameterList() ){
         if( not isEigenProjectedOriginalParameter(par) ){ continue; }
-        eigenGradient += _gradient_.getValue(&par) * (*parSet.getEigenVectors())[iOrig++][iEigen];
+        eigenGradient += statGradient_.getValue(&par) * (*parSet.getEigenVectors())[iOrig++][iEigen];
       }
-      _gradient_.addValue(&eigenPar, eigenGradient);
+      gradient_.addValue(&eigenPar, eigenGradient);
     }
   }
 
-  for( auto* parameter : statGradientParameterList ){
-    if( parameter == nullptr ){ continue; }
-    if( containsParameter(parameterList_, parameter) ){ continue; }
-    _gradient_.values.erase(parameter);
-  }
-
-  this->evalPenaltyLikelihoodGradient(parameterList_);
-  for( const auto* parameter : parameterList_ ){
-    LogThrowIf(parameter != nullptr and not std::isfinite(_gradient_.getValue(parameter)), "Non-finite CPU likelihood gradient.");
+  evalPenaltyLikelihoodGradient(parameterList, gradient_);
+  for( const auto* parameter : parameterList ){
+    LogThrowIf(not std::isfinite(gradient_.getValue(parameter)), "Non-finite likelihood gradient.");
   }
 }
 double LikelihoodInterface::evalStatLikelihood(std::future<bool>& propagation) const {
@@ -371,13 +343,14 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
   _buffer_.penaltyLikelihood += _externalConstraints_.eval();
   return _buffer_.penaltyLikelihood;
 }
-void LikelihoodInterface::evalPenaltyLikelihoodGradient(const std::vector<Parameter*>& parameterList_) {
+void LikelihoodInterface::evalPenaltyLikelihoodGradient(const std::vector<const Parameter*>& parameterList_, ParameterGradient& gradient_) {
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
-    this->evalPenaltyLikelihoodGradient(parSet, parameterList_);
+    this->evalPenaltyLikelihoodGradient(parSet, parameterList_, gradient_);
   }
 }
 void LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterSet& parSet_,
-                                                        const std::vector<Parameter*>& parameterList_) {
+                                                        const std::vector<const Parameter*>& parameterList_,
+                                                        ParameterGradient& gradient_) {
   if( not parSet_.isEnabled() ){ return; }
   if( parSet_.getPriorCorrelationMatrix() == nullptr ){ return; }
 
@@ -387,7 +360,7 @@ void LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterSet& parSet_,
       if( not containsParameter(parameterList_, &eigenPar) ){ continue; }
       if( eigenPar.isPenaltyDisabled() ){ continue; }
       if( eigenPar.getStdDevValue() == 0 ){ continue; }
-      _gradient_.addValue(&eigenPar,
+      gradient_.addValue(&eigenPar,
           2. * (eigenPar.getParameterValue() - eigenPar.getPriorValue())
           / TMath::Sq(eigenPar.getStdDevValue())
       );
@@ -416,7 +389,7 @@ void LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterSet& parSet_,
     if( not ParameterSet::isValidCorrelatedParameter(par) ){ continue; }
     if( containsParameter(parameterList_, &par) ){
       // The delta vector is normalized by each parameter standard deviation.
-      _gradient_.addValue(&par, penaltyGradient[iFit] / par.getStdDevValue());
+      gradient_.addValue(&par, penaltyGradient[iFit] / par.getStdDevValue());
     }
     iFit++;
   }
