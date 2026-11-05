@@ -8,6 +8,12 @@ cmake_minimum_required( VERSION 3.10 FATAL_ERROR )
 # Define project
 project( GUNDAM )
 
+if(APPLE)
+  # Copy fresh Mach-O files before CMake rewrites install names and RPATHs.
+  # Reusing an installed file would apply the same edits a second time.
+  install(CODE "set(ENV{CMAKE_INSTALL_ALWAYS} 1)")
+endif()
+
 
 # colored messages
 include( ${CMAKE_SOURCE_DIR}/cmake/utils/cmessage.cmake )
