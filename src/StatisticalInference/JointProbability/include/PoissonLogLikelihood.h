@@ -10,6 +10,8 @@
 #include "Logger.h"
 
 
+#include <TMath.h>
+
 namespace JointProbability{
 
   class PoissonLogLikelihood : public JointProbabilityBase {

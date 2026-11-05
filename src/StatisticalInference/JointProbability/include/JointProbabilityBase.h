@@ -33,13 +33,19 @@ namespace JointProbability{
     // testing.
     virtual double eval(double data_, double pred_, double err_, int bin_) const = 0;
 
+    // Evaluate propagated bin values while retaining sample-specific likelihood
+    // settings. err_ is sqrt(sum of squared event weights), as in Histogram.
+    [[nodiscard]] virtual double evalWithPrediction(const SamplePair& samplePair_, double data_, double pred_, double err_, int bin_) const {
+      return eval(data_, pred_, err_, bin_);
+    }
+
     // Likelihood for a single bin llh from histogram and bin index.  Override this if precalculation is needed.
     [[nodiscard]] virtual double eval( const SamplePair& samplePair_, int bin_ ) const {
       if( this->isBinIgnored(samplePair_, bin_) ){ return 0.; }
       const double dataVal{samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights};
       const double predVal{samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights};
       const double predErr{samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights};
-      return eval(dataVal, predVal, predErr, bin_);
+      return evalWithPrediction(samplePair_, dataVal, predVal, predErr, bin_);
     }
 
     // classic binned llh. Could be overriden to introduce correlations for instance.
