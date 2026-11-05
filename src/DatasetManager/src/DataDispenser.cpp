@@ -1174,10 +1174,8 @@ void DataDispenser::preAllocateMemory(){
   }
 
   size_t nTotalSlots{0};
-  size_t nDialsMaxPerEvent{0};
   for( auto& dialCollection : _cache_.dialCollectionsRefList ){
     LogScopeIndent;
-    nDialsMaxPerEvent += 1;
 
     if (dialCollection->isEventByEvent()) {
       // Only increase the size.  It's probably zero before
@@ -1202,7 +1200,7 @@ void DataDispenser::preAllocateMemory(){
     LogInfo << "Created "  << nTotalSlots << " slots (" << _cache_.totalNbEvents << " per set) for event-by-event dials:" << std::endl;
   }
 
-  _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
+  _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, 0);
 }
 void DataDispenser::readAndFill(){
   LogInfo << "Reading dataset and loading..." << std::endl;
@@ -1894,6 +1892,9 @@ void DataDispenser::loadEvent(int iThread_){
 
   std::unordered_map<int, DialBase*> eventByEventDialBuffer{};
   eventByEventDialBuffer.reserve(_cache_.dialCollectionsRefList.size());
+  // Reuse per-worker scratch space; retained event lists contain selected dials only.
+  std::vector<EventDialCache::DialIndexCacheEntry> selectedDialIndices;
+  selectedDialIndices.reserve(_cache_.dialCollectionsRefList.size());
 
   if(iThread_ == 0){
 
@@ -2248,7 +2249,7 @@ void DataDispenser::loadEvent(int iThread_){
       eventDialCacheEntry->event.sampleIndex = std::size_t(eventIndexingBuffer.getIndices().sample);
       eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
-      auto *dialEntryPtr = eventDialCacheEntry->dials.data();
+      selectedDialIndices.clear();
       for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
         auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
 
@@ -2269,9 +2270,7 @@ void DataDispenser::loadEvent(int iThread_){
                 = std::unique_ptr<DialBase>(eventByEventDialBuffer[dialCollectionRef->getIndex()]->clone());
             }
 
-            dialEntryPtr->collectionIndex = dialCollectionRef->getIndex();
-            dialEntryPtr->interfaceIndex = freeSlotDial;
-            dialEntryPtr++;
+            selectedDialIndices.push_back({std::size_t(dialCollectionRef->getIndex()), std::size_t(freeSlotDial)});
           }
 
           continue; // skip the rest
@@ -2302,9 +2301,7 @@ void DataDispenser::loadEvent(int iThread_){
             dialCollectionRef->getDialInterfaceList()[freeSlotDial].getDial().dialPtr =
               std::unique_ptr<DialBase>(dialBase.release());
 
-            dialEntryPtr->collectionIndex = iCollection;
-            dialEntryPtr->interfaceIndex = freeSlotDial;
-            dialEntryPtr++;
+            selectedDialIndices.push_back({std::size_t(iCollection), std::size_t(freeSlotDial)});
           }
         }
         else{
@@ -2314,9 +2311,7 @@ void DataDispenser::loadEvent(int iThread_){
             // There isn't any binning, and there is only one dial.
             // In this case we don't need to check if the dial is in
             // a bin.
-            dialEntryPtr->collectionIndex = iCollection;
-            dialEntryPtr->interfaceIndex = 0;
-            dialEntryPtr++;
+            selectedDialIndices.push_back({std::size_t(iCollection), std::size_t(0)});
           }
           else{
             // There are multiple dials, or there is a list of bins
@@ -2326,14 +2321,14 @@ void DataDispenser::loadEvent(int iThread_){
             auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex(
                 dialCollectionRef->getDialBinSet().getBinList());
             if( dialBinIdx != -1 ){
-              dialEntryPtr->collectionIndex = iCollection;
-              dialEntryPtr->interfaceIndex = dialBinIdx;
-              dialEntryPtr++;
+              selectedDialIndices.push_back({std::size_t(iCollection), std::size_t(dialBinIdx)});
             }
           }
         }
 
       } // dial collection loop
+
+      eventDialCacheEntry->dials.assign(selectedDialIndices.begin(), selectedDialIndices.end());
 
     }
 
