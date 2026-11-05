@@ -70,6 +70,14 @@ public:
   // DataDispenser.
   [[nodiscard]] bool isEventByEvent() const {return _isEventByEvent_;}
 
+  // Raw TGraph memoization is valid only for immutable, shareable definitions.
+  // ROOT splines and event-dependent factories retain their construction path.
+  [[nodiscard]] bool canReuseGraphInput() const{
+    return (_dialType_ == DialType::Graph or _dialType_ == DialType::Spline)
+        and _dialOptions_.find("ROOT") == std::string::npos
+        and _dialInputBufferList_.size() == 1 and _dialResponseSupervisorList_.size() == 1;
+  }
+
   // Check if the dial is enabled during this run
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
 
