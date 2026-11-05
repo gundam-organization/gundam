@@ -22,16 +22,6 @@ namespace {
 
 
 
-namespace {
-    void configurePredictionSample(Sample& sample_, const std::string& name_) {
-        JsonType config{
-            {"name", name_},
-            {"binning", {{"binningDefinition", {{{"name", "X"}, {"edges", {0, 1}}}}}}}
-        };
-        sample_.configure(ConfigReader(config));
-    }
-}
-
 TEST(jointProbability, PredictionValuesAreIndependentOfHostHistogram) {
     Sample model, data;
     configurePredictionSample(model, "model");
