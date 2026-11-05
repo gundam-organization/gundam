@@ -9,20 +9,21 @@
 #include "Propagator.h"
 #include "LikelihoodInterface.h"
 #include "MinimizerBase.h"
-#include "GundamApp.h"
+#include "ParameterScanner.h"
 
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
 
 #include "TDirectory.h"
-#include "Math/Functor.h"
-#include "Math/Minimizer.h"
 
 #include <string>
 #include <vector>
 #include <memory>
+#include <utility>
 
+
+class GundamApp;
 
 class FitterEngine : public JsonBaseClass {
 
@@ -53,7 +54,7 @@ public:
 
   // Setters
   void setSaveDir(TDirectory *saveDir){ _saveDir_ = saveDir; }
-  void setSaveDir(GundamApp& app_, const std::string& subFolder_){ _saveDir_ = GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_); }
+  void setSaveDir(GundamApp& app_, const std::string& subFolder_);
   void setIsDryRun(bool isDryRun_){ _isDryRun_ = isDryRun_; }
   void setEnablePca(bool enablePca_){ _enablePca_ = enablePca_; }
   void setEnablePreFitScan(bool enablePreFitScan){ _enablePreFitScan_ = enablePreFitScan; }
@@ -85,6 +86,9 @@ public:
   GenericToolbox::TFilePath getTFilePath(){ return GenericToolbox::TFilePath(_saveDir_); }
   bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
   bool& getDoAllParamVariations(){ return _doAllParamVariations_; }
+
+  [[nodiscard]] std::string getPropagationMonitorTitle() const;
+  [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const;
 
   // Core
   void fit();
