@@ -76,6 +76,8 @@ struct CanvasHolder{
 
 
 
+class TCanvas;
+
 class PlotGenerator : public JsonBaseClass {
 
 protected:
