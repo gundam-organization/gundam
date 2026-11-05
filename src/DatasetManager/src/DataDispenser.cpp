@@ -33,6 +33,7 @@
 #include <TClass.h>
 #include <TGraph.h>
 
+#include <exception>
 #include <unordered_map>
 #include <map>
 #include <set>
@@ -997,13 +998,16 @@ void DataDispenser::fetchRequestedLeaves(){
     }
   }
 
-  // sample binning -> indexing only
+  // Sample binning variables are also stored when dynamic binning is enabled.
   {
     std::vector<std::string> varForIndexingListBuffer{};
     for (const auto& sample : _cache_.propagatorPtr->getSampleSet().getSampleList()) {
       for (const auto& binContext : sample.getHistogram().getBinContextList()) {
         for (const auto& edges : binContext.bin.getEdgesList()) {
           GenericToolbox::addIfNotInVector(edges.varName, varForIndexingListBuffer);
+          if( sample.isUseDynamicBinning() ){
+            GenericToolbox::addIfNotInVector(edges.varName, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
+          }
         }
       }
       if( not sample.getSelectionCutsStr().empty() ){
@@ -2042,13 +2046,25 @@ void DataDispenser::loadEvent(int iThread_){
       // make sure we request a new entry and wait once we go for another loop
       GenericToolbox::ScopedGuard readerGuard{
         [&]{ threadSharedData.isEntryBufferReady.waitUntilEqual( true ); threadSharedData.isEntryBufferReady.setValue( false ); },
-        [&]{ threadSharedData.requestReadNextEntry.setValue( true ); }
+        [&]{
+          // Publish failure before waking the reader. Otherwise it can request
+          // another entry before the outer ready guard is destroyed, then wait
+          // forever for a filler that has already thrown.
+          if( std::uncaught_exceptions() > 0 ){
+            threadSharedData.isEventFillerReady.setValue( false );
+          }
+          threadSharedData.requestReadNextEntry.setValue( true );
+        }
       };
 
       // ***** from this point, the TChain reader is waiting *****
 
       // check if the reader has nothing else to do / end of the loop
-      if( threadSharedData.isDoneReading.getValue() ){ break; }
+      if( threadSharedData.isDoneReading.getValue() ){
+        // Publish shutdown before releasing the reader's handshake.
+        threadSharedData.isEventFillerReady.setValue(false);
+        break;
+      }
 
       // leafFormIndexingList is modified by the TChain reader
       for( size_t iVar = 0 ; iVar < threadSharedData.buffer.varIndexingList.size() ; iVar++ ){
@@ -2091,15 +2107,15 @@ void DataDispenser::loadEvent(int iThread_){
       sampleWeightList.clear(); sampleWeightList.reserve(sampleIdxList.size());
 
 
-      bool hasValidBin{false};
+      bool hasSampleToFill{false};
       for( auto& sampleIdx : sampleIdxList ) {
         Sample& eventSample{*_cache_.samplesToFillList[sampleIdx]};
         // look for the bin index
-        LoaderUtils::fillBinIndex(eventIndexingBuffer, eventSample.getHistogram().getBinContextList());
+        eventIndexingBuffer.getIndices().bin = eventSample.getHistogram().findBinIndex(eventIndexingBuffer);
         sampleBinIdxList.emplace_back(eventIndexingBuffer.getIndices().bin);
 
         // No bin found -> warning
-        if( sampleBinIdxList.back() == -1 ){
+        if( sampleBinIdxList.back() == -1 and not eventSample.isUseDynamicBinning() ){
           const int unbinnedEventThrottle = 5;
           if( this->_unbinnedEvents_++ < unbinnedEventThrottle ){
 
@@ -2134,10 +2150,12 @@ void DataDispenser::loadEvent(int iThread_){
           sampleWeightList.back() *= sampleWeight;
         }
 
-        hasValidBin = hasValidBin or ( sampleBinIdxList.back() != -1 and sampleWeightList.back() != 0 );
+        hasSampleToFill = hasSampleToFill or (
+            (sampleBinIdxList.back() != -1 or eventSample.isUseDynamicBinning())
+            and sampleWeightList.back() != 0 );
       }
 
-      if( not hasValidBin ){ continue; }
+      if( not hasSampleToFill ){ continue; }
 
       // now we are sure the entry should be read till the end
 
@@ -2201,7 +2219,9 @@ void DataDispenser::loadEvent(int iThread_){
 
     const auto& sampleIdxList = _cache_.entrySampleIndexList[eventIndexingBuffer.getIndices().entry];
     for( int iSample = 0 ; iSample < int(sampleIdxList.size()) ; iSample++ ){
-      if( sampleBinIdxList[iSample] == -1 or sampleWeightList[iSample] == 0. ){ continue; }
+      if( sampleWeightList[iSample] == 0. ){ continue; }
+      if( sampleBinIdxList[iSample] == -1
+          and not _cache_.samplesToFillList[sampleIdxList[iSample]]->isUseDynamicBinning() ){ continue; }
 
       // update for this specific sample
       eventIndexingBuffer.getIndices().sample = _cache_.samplesToFillList[sampleIdxList[iSample]]->getIndex();
@@ -2325,7 +2345,8 @@ void DataDispenser::loadEvent(int iThread_){
         LogAlertIf(iThread_ == 0) << "debugNbMaxEventsToLoad: Event number cap reached (";
         LogAlertIf(iThread_ == 0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
         threadSharedData.isDoneReading.setValue( true );
-        return;
+        // Drain the reader's next entry through the normal handshake. Returning
+        // here can leave it waiting forever on isEntryBufferReady.
       }
     }
 

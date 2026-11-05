@@ -158,9 +158,9 @@ endif( NOT nlohmann_json_FOUND )
 ####################
 cmessage( STATUS "Looking for YAML install..." )
 
-find_package(yaml-cpp 0.9.0 EXACT CONFIG)
+find_package(yaml-cpp 0.9.0 EXACT QUIET CONFIG)
 if( NOT yaml-cpp_FOUND )
-  cmessage( WARNING "System yaml-cpp package not found")
+  cmessage( WARNING "System yaml-cpp 0.9.0 not found; using FetchContent to download it.")
   FetchContent_Declare(
     yaml-cpp
     GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
@@ -229,11 +229,23 @@ endif( WITH_CUDA_LIB )
 # FetchContent packages.
 ####################
 
+function(makeDependencyAvailable dependencyName)
+  # JSON 3.11.3 has no option to silence its informational messages.
+  # Keep this setting local, and preserve stricter user-selected log levels.
+  if(dependencyName STREQUAL "nlohmann_json"
+      AND (NOT CMAKE_MESSAGE_LOG_LEVEL OR CMAKE_MESSAGE_LOG_LEVEL MATCHES "^(STATUS|VERBOSE|DEBUG|TRACE)$"))
+    set(CMAKE_MESSAGE_LOG_LEVEL NOTICE)
+  endif()
+  FetchContent_MakeAvailable(${dependencyName})
+endfunction()
+
 if (DeclaredContent)
   # Make any FetchContent available.  Fetched packages should be added
   # to the local DeclaredContent variable.
   cmessage(WARNING "FetchContent: Will build ${DeclaredContent}")
-  FetchContent_MakeAvailable(${DeclaredContent})
+  foreach(dependencyName IN LISTS DeclaredContent)
+    makeDependencyAvailable(${dependencyName})
+  endforeach()
 else()
   cmessage(WARNING "No content declared")
 endif (DeclaredContent)

@@ -229,15 +229,7 @@ void ParametersManager::throwParametersFromGlobalCovariance(bool quietVerbose_){
     initializeStrippedGlobalCov();
   }
 
-  bool isLoggerAlreadyMuted{Logger::isMuted()};
-  GenericToolbox::ScopedGuard g{
-      [&](){ if(quietVerbose_ and not isLoggerAlreadyMuted) Logger::setIsMuted(true); },
-      [&](){ if(quietVerbose_ and not isLoggerAlreadyMuted) Logger::setIsMuted(false); }
-  };
-
-  if(quietVerbose_){
-    Logger::setIsMuted(quietVerbose_);
-  }
+  Logger::ScopedMute muteLogger{quietVerbose_};
 
   if( _choleskyMatrix_ == nullptr ){
     LogInfo << "Generating global cholesky matrix" << std::endl;

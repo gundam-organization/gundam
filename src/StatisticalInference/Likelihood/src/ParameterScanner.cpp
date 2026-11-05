@@ -122,11 +122,7 @@ void ParameterScanner::initializeImpl() {
   }
   if( GenericToolbox::Json::fetchValue(_varsConfig_, "weightPerSamplePerBin", false) ){
     for( auto& sample : _likelihoodInterfacePtr_->getModelPropagator().getSampleSet().getSampleList() ){
-#if HAS_CPP_17
       for( auto [binContent, binContext] : sample.getHistogram().loop() ){
-#else
-        for( auto element : sample.getHistogram().loop() ){ auto& binContent = std::get<0>(element); auto& binContext = std::get<1>(element);
-#endif
         _scanDataDict_.emplace_back();
         auto& scanEntry = _scanDataDict_.back();
         scanEntry.yPoints = std::vector<double>(_nbPoints_+1,0);
@@ -255,10 +251,7 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
   LogWarning << "Scanning along a segment with " << nSteps_ << " steps." << std::endl;
 
   // don't shout while re-injecting parameters
-  GenericToolbox::ScopedGuard s(
-      []{ ParameterSet::muteLogger(); ParametersManager::muteLogger(); },
-      []{ ParameterSet::unmuteLogger(); ParametersManager::unmuteLogger(); }
-  );
+  Logger::ScopedMute muteLogger;
 
   LogThrowIf(end_.empty(), "Ending injector config is empty()");
   LogThrowIf(nSteps_ < 0, "Invalid nSteps");

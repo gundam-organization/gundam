@@ -11,10 +11,10 @@ next_page: "usage.html"
 There are several requirements for building the fitter:
 
 - CMake 3.12+
-- A C++14 enabled compiler
-  - Recommended GCC 8+ ( GCC 5 minumim )
-  - Recommended Clang 9+ ( Clang 3.4 minimum )
-- [ROOT 6, compiled with C++14 or later](https://github.com/root-project/root)
+- A compiler supporting C++17 or later
+  - Recommended GCC 8+
+  - Recommended Clang 9+
+- [ROOT 6, compiled with C++17 or later](https://github.com/root-project/root)
 - [JSON for Modern C++](https://github.com/nlohmann/json)
 - [yaml-cpp](https://github.com/jbeder/yaml-cpp)
 

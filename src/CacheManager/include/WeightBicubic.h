@@ -6,8 +6,6 @@
 
 #include "hemi/array.h"
 
-class SplineDial;
-
 #include <TSpline.h>
 
 #include <cstdint>

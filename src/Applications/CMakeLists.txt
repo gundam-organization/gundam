@@ -51,7 +51,7 @@ if( WITH_GUNDAM_ROOT_APP AND WITH_ROOT_DICT_BUILD )
     )
     #target_compile_features(GundamRootDict PRIVATE cxx_std_17)
 
-    target_link_libraries( GundamRootDict PRIVATE ${ROOT_LIBRARIES} )
+    target_link_libraries( GundamRootDict PRIVATE GenericToolbox::GenericToolbox SimpleCppLogger ${ROOT_LIBRARIES} )
     install(TARGETS GundamRootDict DESTINATION lib)
 
     # Also need to install dict files
@@ -72,6 +72,9 @@ endif()
 foreach( app ${APPLICATION_LIST} )
     cmessage( STATUS "Defining app: ${app}" )
     add_executable( ${app} src/${app}.cxx )
+    if(APPLE)
+      set_property(TARGET ${app} APPEND PROPERTY INSTALL_RPATH "@loader_path/../lib")
+    endif()
     install( TARGETS ${app} DESTINATION bin )
 endforeach()
 

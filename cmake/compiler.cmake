@@ -17,9 +17,15 @@ endif()
 cmessage( STATUS "CMAKE_INSTALL_PREFIX: \"${CMAKE_INSTALL_PREFIX}\"")
 
 
-# disable RPATH handling by CMake.
-# Binaries and libs should be set manually (check the tutorial)
-set(CMAKE_SKIP_INSTALL_RPATH TRUE)
+if(APPLE)
+  # Installed libraries (including Python modules) share the lib directory.
+  # Keep their sibling dependencies usable without DYLD_LIBRARY_PATH.
+  set(CMAKE_SKIP_INSTALL_RPATH FALSE)
+  list(APPEND CMAKE_INSTALL_RPATH "@loader_path")
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+else()
+  set(CMAKE_SKIP_INSTALL_RPATH TRUE)
+endif()
 
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
@@ -67,9 +73,13 @@ if(!IS_ROOT_CXX_STANDARD_SET)
     cmessage(STATUS "ROOT compiled with C++20")
     set(CMAKE_CXX_STANDARD 20)
   else ( ROOT_cxx14_FOUND )
-    cmessage( ALERT "ROOT C++ standard not set, use ROOT minimum (C++14)")
-    set(CMAKE_CXX_STANDARD 14)
+    cmessage( ALERT "ROOT C++ standard not set, use GUNDAM minimum (C++17)")
+    set(CMAKE_CXX_STANDARD 17)
   endif ( ROOT_cxx14_FOUND)
+endif()
+
+if(CMAKE_CXX_STANDARD LESS 17)
+  cmessage(FATAL_ERROR "GUNDAM requires C++17 or newer. Use a ROOT build with C++17 or newer.")
 endif()
 
 if(CXX_MARCH_FLAG)

@@ -37,11 +37,14 @@ public:
 
   // core
   void build(const ConfigReader& binningConfig_);
+  // Bin edge variable-index caches must match the event's variable layout.
+  // Rebinning can reuse the previous bin when it still contains the event.
+  [[nodiscard]] int findBinIndex(const Event& event_, int previousBinIndex_ = -1) const;
   void throwEventMcError();
   void throwStatError(bool useGaussThrow_ = false);
 
   // multi-thread
-  void updateBinEventList(std::vector<Event>& eventList_, int iThread_ = -1);
+  void updateBinEventList(std::vector<Event>& eventList_, int iThread_ = -1, int nThreads_ = -1);
   void refillHistogram(int iThread_ = -1);
 
   // utils

@@ -9,7 +9,6 @@
 #include "ParameterSet.h"
 #include <SampleSet.h>
 #include "PlotGenerator.h"
-#include "Propagator.h"
 
 #include <TChain.h>
 

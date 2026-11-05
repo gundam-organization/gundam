@@ -215,14 +215,14 @@ namespace ConfigUtils {
     return out;
   }
   template<> inline ConfigReader ConfigReader::fetchValue<ConfigReader>(const std::string& fieldName_) const{
-    auto keyValuePair = getConfigEntry(fieldName_);
-    if(keyValuePair.second == nullptr){
+    auto [fieldName, jsonField] = getConfigEntry(fieldName_);
+    if(jsonField == nullptr){
       throw std::runtime_error("Could not get field value \"" + fieldName_ + "\" in config " + toString());
       return {};
     }
-    auto out = ConfigReader(GenericToolbox::Json::get<JsonType>(*keyValuePair.second));
+    auto out = ConfigReader(GenericToolbox::Json::get<JsonType>(*jsonField));
     // using a config key so users can retrieve the path in their config
-    out.setParentPath(GenericToolbox::joinPath(_parentPath_, keyValuePair.first));
+    out.setParentPath(GenericToolbox::joinPath(_parentPath_, fieldName));
     return out;
   }
   template<> inline std::vector<ConfigReader> ConfigReader::fetchValue<std::vector<ConfigReader>>(const std::string& fieldName_) const{ return fetchValue<ConfigReader>(fieldName_).loop(); }
