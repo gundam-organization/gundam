@@ -3,6 +3,7 @@
 import json
 import math
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -46,8 +47,8 @@ def write_input(path, offset):
     graph->Set(points);
     for (int i = 0; i < points; ++i) {
       double knot = points == 1 ? 0. : -1. + 3. * i / (points - 1);
-      double response = group == 5 ? 1. : (group == 6 || points == 1 ? 1.5
-          : 1. + .125 * (group + 1 + OFFSET) * knot * knot);
+      double response = group == 7 ? knot : (group == 5 ? 1. : (group == 6 || points == 1 ? 1.5
+          : 1. + .125 * (group + 1 + OFFSET) * knot * knot));
       graph->SetPoint(i, knot, response);
     }
     for (int i = 0; i < 4; ++i) {
@@ -120,6 +121,16 @@ def exercise(paths, branch, dial_type, options, cached, threads):
 
 
 def main():
+    if '--worker' not in sys.argv:
+        # Debug builds log this API misuse but return an empty vector; Release
+        # throws. Catch both behaviours rather than accepting a false pass.
+        result = subprocess.run([sys.executable, __file__, '--worker'],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, errors='replace')
+        print(result.stdout)
+        assert result.returncode == 0, result.returncode
+        assert 'getDialData not implemented' not in result.stdout
+        return
     paths = [Path.cwd() / f'435DialsInputCache-{i}.root' for i in range(2)]
     for path, offset in zip(paths, (0, 16)):
         write_input(path, offset)
