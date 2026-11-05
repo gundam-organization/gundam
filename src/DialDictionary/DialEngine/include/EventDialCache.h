@@ -41,20 +41,19 @@ public:
   struct DialResponseCache {
     DialResponseCache() = delete; // prevent not setting up the interface ptr
     explicit DialResponseCache( DialInterface& interface_ )
-      : dialInterface(&interface_), inputRevisionPtr(interface_.getInputBufferRef()->getRevisionPtr()) {}
+      : dialInterface(&interface_) {}
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.
     bool appliesToVariable{false};
     double response{std::nan("unset")};
-    // Cache the revision address to avoid following the interface and input
-    // buffer pointers for every response, including unchanged parameters.
-    const std::uint64_t* inputRevisionPtr{nullptr};
+    // Keep the consumed revision, but obtain the current revision through the
+    // interface: storing its address here costs a pointer per event/dial pair.
     std::uint64_t inputRevision{std::uint64_t(-1)};
     void update(){
       // Retain changes until this response consumes them, even when the
       // input buffer has been updated again in the meantime.
-      auto revision = *inputRevisionPtr;
+      auto revision = dialInterface->getInputBufferRef()->getRevision();
       if( inputRevision != revision ) {
         response = dialInterface->evalResponse();
         inputRevision = revision;
@@ -200,6 +199,10 @@ public:
   /// cache multiple times (but for different Physics event objects).
   std::vector<CacheEntry> &getCache(){ return _cache_; }
   [[nodiscard]] const std::vector<CacheEntry> &getCache() const{ return _cache_; }
+
+  /// Allocated bytes in cache vector buffers, including unused capacity.
+  /// Excludes events, dial objects and allocator bookkeeping.
+  [[nodiscard]] size_t getCacheMemorySize() const;
 
   [[nodiscard]] const GlobalEventReweightCap& getGlobalEventReweightCap() const { return _globalEventReweightCap_; }
   GlobalEventReweightCap& getGlobalEventReweightCap(){ return _globalEventReweightCap_; }
