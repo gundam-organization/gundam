@@ -55,6 +55,7 @@ protected:
     std::string stateTitleMonitor{};
 
     GenericToolbox::Time::AveragedTimer<10> evalLlhTimer{};
+    GenericToolbox::Time::Timer propagationTimer{};
     GenericToolbox::Time::AveragedTimer<10> externalTimer{};
     GenericToolbox::Time::AveragedTimer<1> iterationCounterClock{};
 
