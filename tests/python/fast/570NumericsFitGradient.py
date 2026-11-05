@@ -23,6 +23,9 @@ def expect(message, value):
 
 def tolerance(message, value, reference, tolerance_value):
     global STATUS
+    if not math.isfinite(value) or not math.isfinite(reference):
+        expect(message + " must be finite", False)
+        return
     delta = abs(value - reference)
     scale = max(0.5 * (abs(value) + abs(reference)), tolerance_value * tolerance_value)
     residual = delta / scale
@@ -82,9 +85,15 @@ def make_fitter(script_dir):
     return app, fitter
 
 
-def main():
+def main(full=False):
     script_dir = str(Path(__file__).resolve().parents[2] / "fast-tests")
-    subprocess.run(["bash", str(Path(script_dir) / "100NormalizationTree.C")], check=True)
+    generator = Path(script_dir) / "100NormalizationTree.C"
+    if full:
+        subprocess.run(["bash", str(generator)], check=True)
+    else:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from GradientTestInputs import writeNormalization
+        writeNormalization()
     if not Path("100NormalizationTree.root").is_file():
         raise RuntimeError("Failed to generate 100NormalizationTree.root")
     os.environ["CONFIG_DIR"] = script_dir
@@ -131,6 +140,25 @@ def main():
             finite_diff,
             tolerance_value,
         )
+
+    # Exercise nonzero prior penalties, including their parameter-space scaling.
+    shifted_values = []
+    for value, parameter in zip(nominal_values, fit_parameters):
+        sigma = parameter.getStdDevValue()
+        displacement = 0.2 * sigma if math.isfinite(sigma) and sigma > 0 else 0.1 * max(1., abs(value))
+        shifted_values.append(value + displacement)
+    minimizer.evalFit(shifted_values)
+    minimizer.evalFitGradient()
+    shifted_gradients = [minimizer.getGradient().getValue(parameter) for parameter in fit_parameters]
+    for parameter, gradient in zip(fit_parameters, shifted_gradients):
+        index = next(i for i, candidate in enumerate(fit_parameters) if candidate is parameter)
+        probe = list(shifted_values)
+        probe[index] += step
+        up = minimizer.evalFit(probe)
+        probe[index] -= 2. * step
+        down = minimizer.evalFit(probe)
+        tolerance("Off-prior gradient for " + parameter.getFullTitle(),
+                  gradient, (up - down) / (2. * step), tolerance_value)
 
     minimizer.evalFit(nominal_values)
     return STATUS
