@@ -15,8 +15,33 @@
 #include <string>
 #include <memory>
 #include <vector>
+#include <utility>
 
-typedef GenericToolbox::PolymorphicObjectWrapper<DialBase> DialBaseObject;
+// Copies retain the historical deep-copy semantics. Sharing is explicit in
+// DialInterface::shareDial, for immutable dial definitions only.
+class DialBaseObject {
+public:
+  DialBaseObject() = default;
+  explicit DialBaseObject(std::unique_ptr<DialBase> dial_): dialPtr(std::move(dial_)) {}
+  explicit DialBaseObject(const DialBase& dial_): dialPtr(dial_.clone()) {}
+  DialBaseObject(const DialBaseObject& other_){
+    if( other_.dialPtr ){ dialPtr = other_.dialPtr->clone(); }
+  }
+  DialBaseObject& operator=(const DialBaseObject& other_){
+    if( this != &other_ ){
+      dialPtr = other_.dialPtr ? std::shared_ptr<DialBase>(other_.dialPtr->clone()) : nullptr;
+    }
+    return *this;
+  }
+  DialBaseObject(DialBaseObject&&) noexcept = default;
+  DialBaseObject& operator=(DialBaseObject&&) noexcept = default;
+
+  DialBase& operator*() const { return *dialPtr; }
+  DialBase* operator->() const { return dialPtr.get(); }
+  [[nodiscard]] DialBase* get() const { return dialPtr.get(); }
+
+  std::shared_ptr<DialBase> dialPtr;
+};
 
 
 /// This class is size critical and should not be used as a base class (no
@@ -27,6 +52,9 @@ public:
   DialInterface() = default;
 
   void setDial(const DialBaseObject& dial_){ _dial_ = dial_; }
+  void setDial(DialBaseObject&& dial_){ _dial_ = std::move(dial_); }
+  // Share the immutable curve; bin, inputs and response supervisor stay local.
+  void shareDial(const DialInterface& other_){ _dial_.dialPtr = other_._dial_.dialPtr; }
   void setInputBufferRef(DialInputBuffer *inputBufferRef){ _inputBufferPtr_ = inputBufferRef; }
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef){ _responseSupervisorPtr_ = responseSupervisorRef; }
   void setDialBinRef(const Bin *dialBinRef){ _dialBinRef_ = dialBinRef; }
