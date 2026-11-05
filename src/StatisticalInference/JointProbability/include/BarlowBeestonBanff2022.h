@@ -10,6 +10,8 @@
 
 #include "GenericToolbox.Map.h"
 
+#include <TMath.h>
+
 #include <cmath>
 
 namespace JointProbability{
