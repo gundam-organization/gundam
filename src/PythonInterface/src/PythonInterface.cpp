@@ -527,6 +527,7 @@ PYBIND11_MODULE(GUNDAM, module) {
      pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("minimize", &MinimizerBase::minimize)
   .def("getMinimizerStatus", &MinimizerBase::getMinimizerStatus)
+  .def("checkFlatDirections", &MinimizerBase::checkFlatDirections, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
