@@ -75,6 +75,8 @@ public:
   /// should either be skipped, or the covariance can be filled using
   /// information from the posterior.
   virtual void calcErrors();
+  /// Diagnose locally flat fit parameters and return their count.
+  virtual int checkFlatDirections() { return 0; }
 
   /// A virtual method that should scan the parameters used by the minimizer.
   /// This provides a view of the parameters seen by the minimizer, which may
@@ -108,6 +110,7 @@ public:
   void setDisableCalcError(bool disableCalcError_){ _isEnabledCalcError_ = not disableCalcError_; }
 
   // const getters
+  [[nodiscard]] bool isCheckFlatDirectionsBeforeMinimizeEnabled() const { return _checkFlatDirectionsBeforeMinimize_; }
   [[nodiscard]] bool disableCalcError() const{ return not _isEnabledCalcError_; }
 
   // Get the return status for the fitter.  The return value is specific
@@ -186,6 +189,7 @@ private:
   bool _throwOnBadLlh_{false};
   bool _useNormalizedFitSpace_{true};
   bool _checkParameterValidity_{false};
+  bool _checkFlatDirectionsBeforeMinimize_{false};
   bool _isEnabledCalcError_{true};
 
   /// Define what sort of validity the parameters have to have for a finite

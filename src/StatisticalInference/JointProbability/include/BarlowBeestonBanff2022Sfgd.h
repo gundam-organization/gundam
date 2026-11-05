@@ -15,6 +15,7 @@ namespace JointProbability{
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonBanff2022Sfgd"; }
     [[nodiscard]] double eval(double data_, double pred_, double err_, int bin_) const override;
     [[nodiscard]] double eval(const SamplePair& samplePair_, int bin_) const override;
+    [[nodiscard]] double evalWithPrediction(const SamplePair& samplePair_, double data_, double pred_, double err_, int bin_) const override;
   };
 
   double BarlowBeestonBanff2022Sfgd::eval(const SamplePair& samplePair_, int bin_) const {
@@ -23,6 +24,13 @@ namespace JointProbability{
     double dataVal = samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights;
     double predVal = samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights;
     double mcuncert = samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights;
+    return evalWithPrediction(samplePair_, dataVal, predVal, mcuncert, bin_);
+  }
+
+  inline double BarlowBeestonBanff2022Sfgd::evalWithPrediction(const SamplePair& samplePair_, double data_, double pred_, double err_, int bin_) const {
+    double dataVal = data_;
+    double predVal = pred_;
+    double mcuncert = err_;
 
     // SFGD detector uncertainty
     double sfgd_det_uncert = 0.;

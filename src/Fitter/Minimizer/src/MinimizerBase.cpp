@@ -14,6 +14,7 @@ void MinimizerBase::configureImpl(){
     {"writeLlhHistory"},
     {"likelihoodValidity"},
     {"checkParameterValidity"},
+    {"checkFlatDirectionsBeforeMinimize"},
   });
 
   // nested objects first
@@ -41,6 +42,7 @@ void MinimizerBase::configureImpl(){
   // Determine if the validity will be checked when the function is evaluated.
   // This must be true for the likelihoodValidity checks to be applied.
   _config_.fillValue(_checkParameterValidity_, "checkParameterValidity");
+  _config_.fillValue(_checkFlatDirectionsBeforeMinimize_, "checkFlatDirectionsBeforeMinimize");
 }
 
 void MinimizerBase::initializeImpl(){
