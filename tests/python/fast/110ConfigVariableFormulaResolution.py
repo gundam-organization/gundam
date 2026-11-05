@@ -9,17 +9,10 @@ from array import array
 from pathlib import Path
 from typing import Dict, List
 
-# Re-run inside the python environment built by 005PythonSetup.sh.  This
-# fails when the environment does not exist, which is what happens when the
-# test is run on its own instead of through gundam-tests.sh.  The helper
-# module name cannot be written in an import statement, so it is imported by
-# name, and the bytecode is not written so that a test run leaves nothing
-# behind in the test directory.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
 from importlib import import_module
 
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 FIELD_CASES = {
@@ -329,7 +322,6 @@ def run_case_subprocess(
 def main() -> int:
     script_path = Path(__file__).resolve()
     script_dir = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else script_path.parent
-    repo_root = script_dir.parents[1]
 
     if "--field" in sys.argv:
         field_name = sys.argv[sys.argv.index("--field") + 1]
@@ -339,7 +331,7 @@ def main() -> int:
         return 0
 
     work_dir = Path.cwd()
-    root_path = work_dir / "110VariableFormulaResolution.root"
+    root_path = work_dir / "110ConfigVariableFormulaResolution.root"
     write_input_root_file(root_path)
 
     summary_rows = []
