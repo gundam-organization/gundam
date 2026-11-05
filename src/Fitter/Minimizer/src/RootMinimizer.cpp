@@ -279,8 +279,8 @@ void RootMinimizer::minimize(){
   // calling the common routine
   this->MinimizerBase::minimize();
   updateFitParameterFixedStates();
-  LogAlertIf(checkFlatDirections() > 0)
-  << "Check the reported parameters: flat LLH directions were detected, the fit might fail."
+  LogAlertIf(isCheckFlatDirectionsBeforeMinimizeEnabled() and checkFlatDirections() > 0)
+  << "Flat LLH directions were detected, the fit might fail."
   << std::endl;
 
   GenericToolbox::Time::Timer minimizationStopWatch;

@@ -419,8 +419,8 @@ void FitterEngine::fit(){
 
   // Leaving now?
   if( _isDryRun_ ){
-    LogThrowIf(_minimizer_->checkFlatDirections() > 0,
-               "Cannot start fit: flat LLH directions were detected. Check the reported fit parameters.");
+    LogAlertIf(_minimizer_->isCheckFlatDirectionsBeforeMinimizeEnabled() and _minimizer_->checkFlatDirections() > 0)
+    << "Flat LLH directions were detected at the current point. Fit might fail." << std::endl;
     LogAlert << "Dry run requested. Leaving before the minimization." << std::endl;
     return;
   }

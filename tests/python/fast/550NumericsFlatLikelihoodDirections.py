@@ -5,7 +5,6 @@ import math
 import re
 import subprocess
 import sys
-from importlib import import_module
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -24,7 +23,7 @@ def child(mode):
         tree.extend({'X': np.full(10, .5, dtype=np.float64)})
     parameters = [{'name': 'curved', 'priorValue': 1., 'priorType': 'Flat',
                    'dialSetDefinitions': [{'dialType': 'Normalization'}]}]
-    if mode in ('dry', 'flatFit', 'probe'):
+    if mode in ('dry', 'dryDefault', 'flatFit', 'flatFitDefault', 'probe'):
         for name, fixed in [('plateau', False), ('fixedPlateau', True)]:
             parameters.append({'name': name, 'priorValue': 2., 'priorType': 'Flat',
                                'isFixed': fixed, 'parameterLimits': [2., 5.],
@@ -42,10 +41,12 @@ def child(mode):
               'generateOneSigmaPlots': False,
               'minimizerConfig': {'enablePostFitErrorFit': mode == 'fit', 'print_level': 0,
                                   'useNormalizedFitSpace': False}}
+    if mode in ('dry', 'flatFit'):
+        config['minimizerConfig']['checkFlatDirectionsBeforeMinimize'] = True
     engine = GUNDAM.FitterEngine()
     engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
     engine.initialize()
-    engine.setIsDryRun(mode in ('dry', 'dryClean'))
+    engine.setIsDryRun(mode in ('dry', 'dryDefault', 'dryClean'))
     llh = engine.getLikelihoodInterface()
     model = llh.getModelPropagator()
     curved = model.getParametersManager().getParameterSetsList()[0].getParameterList()[0]
@@ -64,20 +65,12 @@ def child(mode):
         try:
             engine.fit()
         except RuntimeError as error:
-            if mode == 'dry':
-                assert 'Cannot start fit' in str(error), str(error)
-                print('FIT_BLOCKED', mode, flush=True)
-            else:
-                # Migrad warns and continues. If ROOT cannot produce a
-                # covariance for this unconstrained plateau, require that
-                # specific failure rather than accepting arbitrary fit errors.
-                assert mode == 'flatFit', str(error)
-                assert 'Could not retrieve the post-fit covariance matrix' in str(error), str(error)
-                print('COVARIANCE_UNAVAILABLE', flush=True)
+            # ROOT may fail to produce a covariance for the plateau.
+            assert mode in ('flatFit', 'flatFitDefault'), str(error)
+            assert 'Could not retrieve the post-fit covariance matrix' in str(error), str(error)
+            print('COVARIANCE_UNAVAILABLE', flush=True)
         else:
-            assert mode != 'dry', 'Expected a flat-direction diagnostic'
-            if mode == 'flatFit':
-                # Some ROOT versions provide a regularized covariance.
+            if mode in ('flatFit', 'flatFitDefault'):
                 print('FLAT_FIT_COMPLETED', flush=True)
         if mode == 'dry':
             assert curved.getParameterValue() == 1.
@@ -86,7 +79,7 @@ def child(mode):
 
 
 def main():
-    for mode in ('dry', 'flatFit', 'dryClean', 'fit', 'restore', 'probe'):
+    for mode in ('dry', 'dryDefault', 'flatFit', 'flatFitDefault', 'dryClean', 'fit', 'restore', 'probe'):
         result = subprocess.run([sys.executable, __file__, mode], capture_output=True, text=True, errors='replace')
         rawLog = result.stdout + result.stderr
         log = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', rawLog)
@@ -94,7 +87,7 @@ def main():
         # Python markers can land inside buffered C++ ANSI sequences. Check
         # them before stripping escape codes, which can consume their first letter.
         assert result.returncode == 0 and f'CHILD_OK {mode}' in rawLog, (mode, result.returncode, log[-8000:])
-        assert log.count('Checking LLH flat directions...') == (2 if mode == 'fit' else 1), log[-8000:]
+        assert log.count('Checking LLH flat directions...') == (0 if mode in ('dryDefault', 'flatFitDefault', 'dryClean') else 1), log[-8000:]
         flat = [line for line in log.splitlines() if 'Flat LLH direction:' in line]
         if mode in ('dry', 'flatFit', 'probe'):
             assert len(flat) == 1 and 'ERROR' in flat[0] and 'response/#1_plateau' in flat[0], flat
@@ -106,13 +99,11 @@ def main():
                 assert 'Cannot start fit' not in log
             else:
                 assert 'Minimization ended' not in log
-            if mode == 'dry':
-                assert f'FIT_BLOCKED {mode}' in rawLog
         else:
             assert not flat, flat  # A zero gradient at a curved minimum is valid.
-    print('SUCCESS: flat dry-runs are blocked, Migrad warns and proceeds, error hooks run, and probe state is restored')
+    print('SUCCESS: pre-fit checks are optional and non-blocking, error hooks run, and probe state is restored')
 
 
 if __name__ == '__main__':
-    modes = ('dry', 'flatFit', 'dryClean', 'fit', 'restore', 'probe')
+    modes = ('dry', 'dryDefault', 'flatFit', 'flatFitDefault', 'dryClean', 'fit', 'restore', 'probe')
     child(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1] in modes else main()
