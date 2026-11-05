@@ -128,8 +128,8 @@ def exercise(probability):
     print(f'SUCCESS: {probability or "LeastSquares"} lifecycle preserves observables, binning, weights, errors and LLH without disk reads', flush=True)
 
 
-def main():
-    for probability in (None, 'PoissonLLH', 'BarlowLLH_BANFF_OA2021'):
+def main(full=False):
+    for probability in ((None, 'PoissonLLH', 'BarlowLLH_BANFF_OA2021') if full else ('PoissonLLH',)):
         exercise(probability)
 
 

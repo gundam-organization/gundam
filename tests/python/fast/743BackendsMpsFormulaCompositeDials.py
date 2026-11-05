@@ -9,7 +9,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
-def main():
+def main(full=False):
     if sys.platform != 'darwin':
         print('SKIP: Metal requires macOS.')
         return
@@ -23,10 +23,24 @@ def main():
     originalFormula = formula.compare
     for mode in ('cachedResponses', 'recomputeResponses'):
         options = dict(backendType='MPS', backendConfig={'propagationMode': mode})
-        composite.compare = partial(originalComposite, exact=False, **options)
-        formula.compare = partial(originalFormula, **options)
-        composite.main()
-        formula.main()
+        if full:
+            composite.compare = partial(originalComposite, exact=False, **options)
+            formula.compare = partial(originalFormula, **options)
+            composite.main()
+            formula.main()
+        else:
+            GUNDAM.setLightOutputMode(True)
+            GUNDAM.setNumberOfThreads(1)
+            path = Path.cwd() / '743BackendsMpsFormulaCompositeDials.root'
+            if mode == 'cachedResponses':
+                composite.helpers.write_input(path)
+            # A formula with parameter and event inputs feeds a composite
+            # that changes the observable, exercising bin migration too.
+            leaf = composite.helpers.formula('shift', '[arg0]+[arg1]',
+                                             {'eventVariable': 'X'}, {'parameterName': 'p'})
+            dial = composite.helpers.composite([leaf], 'shift', applyToVariable='X',
+                                                variableResponseMode='Override')
+            originalComposite(path, dial, exact=False, **options)
     print('SUCCESS: MPS formulas and composites match ROOT in both execution modes.')
 
 

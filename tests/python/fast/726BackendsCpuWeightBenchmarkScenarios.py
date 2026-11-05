@@ -11,7 +11,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
-def main():
+def main(full=False):
     import GUNDAM
     if not hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
         print('SKIP: GUNDAM was built without backends')
@@ -49,7 +49,7 @@ def main():
 '''.replace('OUTPUT', json.dumps(str(root))))
     subprocess.run(['root', '-n', '-l', '-b', '-q', str(macro)], check=True)
     benchmark = Path(__file__).resolve().parents[1] / 'benchmarks' / '721BackendsCpuWeightSchedulingBenchmark.py'
-    for eigen in (False, True):
+    for eigen in ((False, True) if full else (False,)):
         definitions = [dict(name=f'p{i}', priorValue=1., stdDev=.1 * (i + 1),
                             dialSetDefinitions=[{'dialType': 'Graph', 'dialBranchData': 'graph'}]) for i in range(3)]
         definitions += [dict(name='fixed', priorValue=1., stdDev=.1, isFixed=True,
@@ -67,13 +67,14 @@ def main():
         path = base / f'config-{eigen}.json'
         path.write_text(json.dumps(config))
         output = base / f'results-{eigen}-{os.getpid()}'
+        rounds = 2 if full else 1
         with (base / f'benchmark-{eigen}.log').open('w') as log:
             subprocess.run([sys.executable, str(benchmark), '--config', str(path), '--threads', '4',
                             '--factors', '2', '5', '10', '--calls', '7', '--global-calls', '3', '--warmup', '3',
-                            '--trials', '2', '--rounds', '2', '--output', str(output)],
+                            '--trials', str(2 if full else 1), '--rounds', str(rounds), '--output', str(output)],
                            stdout=log, stderr=subprocess.STDOUT, check=True)
         summary = json.loads((output / 'summary.json').read_text())
-        assert len(summary) == 32
+        assert len(summary) == 16 * rounds
         settings = json.loads((output / 'settings.json').read_text())
         assert settings['callsByScenario'] == {'constant': 7, 'local1': 7, 'local2': 7, 'global': 3}
         assert len({r['pid'] for r in summary}) == 1  # Same loaded engine for all workloads/layouts.
@@ -106,6 +107,9 @@ def main():
                 spread = max(raw['likelihoods']) - min(raw['likelihoods'])
                 assert spread == 0 if result['scenario'] == 'constant' else spread > 1e-12
         assert not list(output.glob('*.partial.json'))
+        if not full:
+            print('SUCCESS: workload replay preserves predictions across scheduling layouts.')
+            return
         cache_output = base / f'cache-results-{eigen}-{os.getpid()}'
         with (base / f'cache-benchmark-{eigen}.log').open('w') as log:
             subprocess.run([sys.executable, str(benchmark), '--benchmark', 'cache', '--config', str(path),
