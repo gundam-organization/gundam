@@ -207,6 +207,8 @@ protected:
   std::unique_ptr<DialBase> makeGraphDial(const std::vector<DialUtils::DialPoint>& pointList_) const;
 
 private:
+  void growEventDialIndex();
+
   // parameters
   bool _isEventByEvent_{false};
   bool _isEnabled_{true};
@@ -258,7 +260,14 @@ private:
 
   GenericToolbox::Atomic<size_t> _dialFreeSlot_{0};
   GenericToolbox::NoCopyWrapper<std::mutex> _eventDialMutex_{};
-  std::unordered_multimap<size_t, size_t> _eventDialIndex_{};
+  // Flat, open-addressed loading index: avoid a heap allocation per unique dial.
+  // The full signature is still compared before two interfaces are shared.
+  struct EventDialIndexEntry{
+    size_t hash{0};
+    size_t interfaceIndex{size_t(-1)};
+  };
+  std::vector<EventDialIndexEntry> _eventDialIndex_{};
+  size_t _eventDialIndexSize_{0};
   size_t _reusedEventDials_{0};
 
   // A pointer to dial specific data
