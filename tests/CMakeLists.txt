@@ -43,6 +43,22 @@ if(WITH_INTERFACE_TEST)
     NAME gundam-tests
     COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh ${GUNDAM_TESTS_ARGUMENT} -a ${CMAKE_BINARY_DIR}/Testing/gundam-tests.$(date +%Y-%m-%d-%H%M%S) )"
   )
+  # Label the shell suite separately from the Python suites. The shell runner
+  # defaults to fast; -r/-e/-s select increasingly inclusive suites.
+  set(shellTestLabel fast)
+  separate_arguments(shellTestArguments UNIX_COMMAND "${GUNDAM_TESTS_ARGUMENT}")
+  foreach(shellTestArgument IN LISTS shellTestArguments)
+    if(shellTestArgument STREQUAL "-f")
+      set(shellTestLabel fast)
+    elseif(shellTestArgument STREQUAL "-r")
+      set(shellTestLabel regular)
+    elseif(shellTestArgument STREQUAL "-e")
+      set(shellTestLabel extended)
+    elseif(shellTestArgument STREQUAL "-s")
+      set(shellTestLabel slow)
+    endif()
+  endforeach()
+  set_tests_properties(gundam-tests PROPERTIES LABELS "${shellTestLabel}")
 else(WITH_INTERFACE_TEST)
   cmessage( WARNING "WITH_INTERFACE_TEST is OFF: gundam-tests.sh will be skipped")
 endif(WITH_INTERFACE_TEST)
@@ -76,16 +92,28 @@ if(WITH_PYTHON_INTERFACE)
   foreach(pythonSuite fast regular)
     string(TOUPPER "${pythonSuite}" pythonSuiteOption)
     if(WITH_${pythonSuiteOption}_TEST)
-      add_test(
-        NAME gundam-python-${pythonSuite}
-        COMMAND ${pythonTestEnvironment} "${pythonTestInterpreter}"
-          "${CMAKE_CURRENT_SOURCE_DIR}/python/run.py" --suite "${pythonSuite}"
-      )
-      set_tests_properties(gundam-python-${pythonSuite} PROPERTIES LABELS python)
-      if(WITH_PYTHON_TEST_VENV)
-        set_tests_properties(gundam-python-${pythonSuite} PROPERTIES
-          FIXTURES_REQUIRED gundamPythonEnvironment)
-      endif()
+      # Match the scripts selected by python/run.py and register each separately.
+      file(GLOB pythonSuiteScripts CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/python/${pythonSuite}/*.py")
+      foreach(pythonScript IN LISTS pythonSuiteScripts)
+        get_filename_component(pythonScriptName "${pythonScript}" NAME)
+        if(NOT pythonScriptName MATCHES "^([0-9]|test)")
+          continue()
+        endif()
+        get_filename_component(pythonTestStem "${pythonScript}" NAME_WE)
+        set(pythonTestName "gundam-python-${pythonSuite}-${pythonTestStem}")
+        add_test(
+          NAME "${pythonTestName}"
+          COMMAND ${pythonTestEnvironment} "${pythonTestInterpreter}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/python/run.py"
+            --suite "${pythonSuite}" --test "${pythonScriptName}"
+        )
+        set_tests_properties("${pythonTestName}" PROPERTIES LABELS "python;python-${pythonSuite}")
+        if(WITH_PYTHON_TEST_VENV)
+          set_tests_properties("${pythonTestName}" PROPERTIES
+            FIXTURES_REQUIRED gundamPythonEnvironment)
+        endif()
+      endforeach()
     endif()
   endforeach()
 endif()
@@ -95,7 +123,7 @@ if( WITH_GOOGLE_TEST )
   include(GoogleTest)
   cmessage( STATUS "Compiling google tests" )
 
-  function(gundam_discover_tests target_)
+  function(gundam_discover_tests target_ category_)
     if(APPLE)
       # DYLD_LIBRARY_PATH overrides even the build RPATHs and can load an older
       # installed GUNDAM. Sanitize both discovery (which runs during the build)
@@ -115,63 +143,83 @@ if( WITH_GOOGLE_TEST )
       set_property(TARGET ${target_} PROPERTY ${launcher_property} "${launcher}")
     endif()
     gtest_discover_tests(${target_} ${ARGN})
+    # Apply list-valued labels after discovery; older GoogleTest modules flatten
+    # semicolon-separated PROPERTIES values when generating CTest commands.
+    string(TOLOWER "${category_}" categoryLabel)
+    set(testLabels unit "unit-${categoryLabel}")
+    set(discoveryArguments ${ARGN})
+    list(FIND discoveryArguments LABELS labelIndex)
+    if(NOT labelIndex EQUAL -1)
+      math(EXPR labelIndex "${labelIndex} + 1")
+      list(GET discoveryArguments ${labelIndex} existingLabel)
+      list(APPEND testLabels "${existingLabel}")
+    endif()
+    list(REMOVE_DUPLICATES testLabels)
+    set(labelFile "${CMAKE_CURRENT_BINARY_DIR}/${target_}_labels.cmake")
+    file(WRITE "${labelFile}"
+      "if(DEFINED ${target_}_TESTS AND NOT \"\${${target_}_TESTS}\" STREQUAL \"\")\n"
+      "  set_tests_properties(\${${target_}_TESTS} PROPERTIES LABELS \"${testLabels}\")\n"
+      "endif()\n")
+    set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES "${labelFile}")
   endfunction()
 
-  ## Create a list of all of the fast tests.  These are always
-  ## compiled, and are run when WITH_FAST_TEST is on.  The fast tests
-  ## are run during CI, so all of them should finish quickly, and we
-  ## should limit the total number.
-  list(APPEND FAST_TESTS "")
-  list(APPEND FAST_TESTS GTests/unitTest_JointProbability.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_CalculateCompactSpline.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_CalculateMonotonicSpline.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_CalculateGraph.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_CalculateGeneralSpline.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_CalculateUniformSpline.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_CalculateBilinearInterpolation.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_CalculateBicubicSpline.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_ApplyMonotonicCondition.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_DialUtils.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_FormulaEvaluator.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_DialDefinitions.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_DialResponseSupervisor.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_DataDispenser.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_RootMinimizerSimplex.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_DataDispenser.cpp)
-  list(APPEND FAST_TESTS GTests/unitTest_DialResponseSupervisor.cpp)
-
+  # Group sources by the functionality being tested, independently of backend
+  # or suite speed. Separate executables let discovery assign names and labels
+  # without maintaining a second mapping of GoogleTest suite names.
+  set(unitNumericsSources
+    GTests/unitTest_CalculateCompactSpline.cpp
+    GTests/unitTest_CalculateMonotonicSpline.cpp
+    GTests/unitTest_CalculateGraph.cpp
+    GTests/unitTest_CalculateGeneralSpline.cpp
+    GTests/unitTest_CalculateUniformSpline.cpp
+    GTests/unitTest_CalculateBilinearInterpolation.cpp
+    GTests/unitTest_CalculateBicubicSpline.cpp
+    GTests/unitTest_ApplyMonotonicCondition.cpp)
+  set(unitDialsSources
+    GTests/unitTest_DialUtils.cpp
+    GTests/unitTest_FormulaEvaluator.cpp
+    GTests/unitTest_DialDefinitions.cpp
+    GTests/unitTest_DialResponseSupervisor.cpp)
+  set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
+  set(unitLikelihoodSources GTests/unitTest_JointProbability.cpp)
+  set(unitMinimizerSources GTests/unitTest_RootMinimizerSimplex.cpp)
+  set(unitBackendsSources)
   if(WITH_BACKENDS)
-    list(APPEND FAST_TESTS GTests/unitTest_BackendManager.cpp)
+    set(unitBackendsSources
+      GTests/unitTest_BackendManager.cpp
+      GTests/unitTest_EngineLayout.cpp
+      GTests/unitTest_CpuComposite.cpp
+      GTests/unitTest_BackendFormula.cpp
+      GTests/unitTest_MpsFormula.cpp
+      GTests/unitTest_CpuWeightExecution.cpp
+      GTests/unitTest_ExternalWeightBackend.cpp
+      GTests/unitTest_BackendBinning.cpp
+      GTests/unitTest_BackendShared.cpp
+      GTests/unitTest_BackendLikelihood.cpp
+      GTests/unitTest_CpuBackendGradient.cpp
+      GTests/unitTest_BackendResponseSmoothing.cpp
+      GTests/unitTest_BackendSurface.cpp
+      GTests/unitTest_BackendTable.cpp)
     if(GUNDAM_CUDA_ENABLED)
-      list(APPEND FAST_TESTS GTests/unitTest_CudaBackend.cpp)
-      list(APPEND FAST_TESTS GTests/unitTest_CudaBackendPrograms.cpp)
+      list(APPEND unitBackendsSources
+        GTests/unitTest_CudaBackend.cpp
+        GTests/unitTest_CudaBackendPrograms.cpp)
     endif()
-    list(APPEND FAST_TESTS GTests/unitTest_EngineLayout.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_CpuComposite.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_BackendFormula.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_MpsFormula.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_CpuWeightExecution.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_ExternalWeightBackend.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_BackendBinning.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_BackendShared.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_BackendLikelihood.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_CpuBackendGradient.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_BackendResponseSmoothing.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_BackendSurface.cpp)
-    list(APPEND FAST_TESTS GTests/unitTest_BackendTable.cpp)
   endif()
 
-  # Compile the fast test executable, but only add them to ctest if
-  # WITH_FAST_TEST is on. This should NOT be "optimized" to skip compilation
-  # when WITH_FAST_TEST is off.
-  if(FAST_TESTS)
-    add_executable(gundamGTest_fastTest.exe ${FAST_TESTS})
-    target_link_libraries(gundamGTest_fastTest.exe GTest::gtest_main)
-    target_link_libraries(gundamGTest_fastTest.exe GundamFitter)
-    if(WITH_FAST_TEST)
-      gundam_discover_tests(gundamGTest_fastTest.exe PROPERTIES LABELS unit)
-    endif(WITH_FAST_TEST)
-  endif(FAST_TESTS)
+  # Always compile the tests; WITH_FAST_TEST controls CTest registration only.
+  foreach(unitCategory Numerics Dials DataLoading Likelihood Minimizer Backends)
+    if(unit${unitCategory}Sources)
+      set(unitTarget "gundamGTest_${unitCategory}.exe")
+      add_executable(${unitTarget} ${unit${unitCategory}Sources})
+      target_link_libraries(${unitTarget} PRIVATE GTest::gtest_main GundamFitter)
+      if(WITH_FAST_TEST)
+        gundam_discover_tests(${unitTarget} ${unitCategory}
+          TEST_PREFIX "${unitCategory}/"
+          PROPERTIES LABELS unit)
+      endif()
+    endif()
+  endforeach()
 
   if(WITH_BACKENDS AND GUNDAM_CUDA_ENABLED)
     add_executable(gundamGTest_cudaBackend.exe
@@ -190,18 +238,18 @@ if( WITH_GOOGLE_TEST )
     set_property(TARGET gundamGTest_cudaBackend.exe APPEND PROPERTY
         BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
     # Register without discovery: building must work without an allocated GPU.
-    add_test(NAME cuda-backend-programs COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPrograms.*)
-    add_test(NAME cuda-backend-gradient COMMAND gundamGTest_cudaBackend.exe --gtest_filter=DeviceGradient.Cuda*:DeviceGradient.Portable*:CpuBackendGradient.*)
-    add_test(NAME cuda-backend-likelihood COMMAND gundamGTest_cudaBackend.exe --gtest_filter=BackendLikelihood.*)
-    add_test(NAME cuda-backend-skeleton COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendDevice.*)
-    add_test(NAME cuda-compact-dial-model COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaCompactDialModel.*:CudaEventUpdates.*)
-    set_tests_properties(cuda-compact-dial-model PROPERTIES LABELS "cuda;host" TIMEOUT 120)
-    add_test(NAME cuda-backend-propagation COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPropagation.*)
-    add_test(NAME cuda-backend-surfaces COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSurface.*)
-    add_test(NAME cuda-backend-external COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendExternal.*)
-    add_test(NAME cuda-backend-observables COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendObservable.*)
-    add_test(NAME cuda-backend-smoothed COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSmoothed.*)
-    set_tests_properties(cuda-backend-programs cuda-backend-likelihood cuda-backend-skeleton cuda-backend-propagation cuda-backend-surfaces cuda-backend-external cuda-backend-observables cuda-backend-smoothed PROPERTIES LABELS "cuda;device" TIMEOUT 120)
+    add_test(NAME Backends/cuda-backend-programs COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPrograms.*)
+    add_test(NAME Backends/cuda-backend-gradient COMMAND gundamGTest_cudaBackend.exe --gtest_filter=DeviceGradient.Cuda*:DeviceGradient.Portable*:CpuBackendGradient.*)
+    add_test(NAME Backends/cuda-backend-likelihood COMMAND gundamGTest_cudaBackend.exe --gtest_filter=BackendLikelihood.*)
+    add_test(NAME Backends/cuda-backend-skeleton COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendDevice.*)
+    add_test(NAME Backends/cuda-compact-dial-model COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaCompactDialModel.*:CudaEventUpdates.*)
+    set_tests_properties(Backends/cuda-compact-dial-model PROPERTIES LABELS "unit;unit-backends;cuda;host" TIMEOUT 120)
+    add_test(NAME Backends/cuda-backend-propagation COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPropagation.*)
+    add_test(NAME Backends/cuda-backend-surfaces COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSurface.*)
+    add_test(NAME Backends/cuda-backend-external COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendExternal.*)
+    add_test(NAME Backends/cuda-backend-observables COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendObservable.*)
+    add_test(NAME Backends/cuda-backend-smoothed COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSmoothed.*)
+    set_tests_properties(Backends/cuda-backend-gradient Backends/cuda-backend-programs Backends/cuda-backend-likelihood Backends/cuda-backend-skeleton Backends/cuda-backend-propagation Backends/cuda-backend-surfaces Backends/cuda-backend-external Backends/cuda-backend-observables Backends/cuda-backend-smoothed PROPERTIES LABELS "unit;unit-backends;cuda;device" TIMEOUT 120)
   endif()
 
   ## Create a list of all of the regular tests.  These are always
@@ -224,7 +272,8 @@ if( WITH_GOOGLE_TEST )
     endif()
     if(WITH_REGULAR_TEST)
       file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/Testing/BackendFitCovariance")
-      gundam_discover_tests(gundamGTest_regularTest.exe
+      gundam_discover_tests(gundamGTest_regularTest.exe Backends
+          TEST_PREFIX "Backends/"
           WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/Testing/BackendFitCovariance"
           PROPERTIES LABELS regular TIMEOUT 120)
     endif(WITH_REGULAR_TEST)
@@ -241,7 +290,8 @@ if( WITH_GOOGLE_TEST )
     target_link_libraries(gundamGTest_host.exe GundamCacheManager)
     target_compile_definitions(gundamGTest_host.exe PUBLIC HEMI_CUDA_DISABLE)
     if (WITH_REGULAR_TEST)
-      gundam_discover_tests(gundamGTest_host.exe PROPERTIES LABELS host)
+      gundam_discover_tests(gundamGTest_host.exe Backends
+          TEST_PREFIX "Backends/" PROPERTIES LABELS host)
     endif(WITH_REGULAR_TEST)
 
     if(GUNDAM_CUDA_ENABLED)
@@ -255,7 +305,8 @@ if( WITH_GOOGLE_TEST )
       target_link_libraries(gundamGTest_device.exe GTest::gtest_main)
       target_link_libraries(gundamGTest_device.exe GundamCacheManager)
       if(WITH_REGULAR_TEST)
-        gundam_discover_tests(gundamGTest_device.exe DISCOVERY_MODE PRE_TEST PROPERTIES LABELS device)
+        gundam_discover_tests(gundamGTest_device.exe Backends DISCOVERY_MODE PRE_TEST
+            TEST_PREFIX "Backends/" PROPERTIES LABELS device)
       endif(WITH_REGULAR_TEST)
     endif(GUNDAM_CUDA_ENABLED)
 

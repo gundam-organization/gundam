@@ -7,6 +7,8 @@
 
 #include "JointProbabilityBase.h"
 
+#include <TMath.h>
+
 namespace JointProbability{
 
 

@@ -7,6 +7,10 @@
 #include <algorithm>
 #include <cmath>
 
+int MinimizerBase::fetchNbDegreeOfFreedom() const{
+  return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_;
+}
+
 void MinimizerBase::configureImpl(){
 
   _config_.defineFields({

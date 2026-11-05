@@ -3,6 +3,7 @@
 //
 
 #include "FitterEngine.h"
+#include "GundamApp.h"
 #include "GundamGlobals.h"
 #include "GundamUtils.h"
 #include "RootMinimizer.h"
@@ -22,6 +23,10 @@
 #include <cmath>
 #include <memory>
 
+
+void FitterEngine::setSaveDir(GundamApp& app_, const std::string& subFolder_){
+  _saveDir_ = GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_);
+}
 
 void FitterEngine::configureImpl(){
   GenericToolbox::setT2kPalette();

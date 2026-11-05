@@ -5,17 +5,16 @@
 #ifndef GUNDAM_MINIMIZER_BASE_H
 #define GUNDAM_MINIMIZER_BASE_H
 
-#include "Propagator.h"
-#include "ParameterScanner.h"
-#include "LikelihoodInterface.h"
-#include "Parameter.h"
+#include "ConfigUtils.h"
 #include "ParameterGradient.h"
 
 
 #include "GenericToolbox.Utils.h"
+#include "GenericToolbox.Time.h"
 
-#include "TDirectory.h"
+#include "TTree.h"
 
+#include <memory>
 #include <vector>
 #include <string>
 
@@ -33,6 +32,11 @@
 */
 
 class FitterEngine; // owner
+class Propagator;
+class ParameterScanner;
+class LikelihoodInterface;
+class Parameter;
+class TDirectory;
 
 class MinimizerBase : public JsonBaseClass {
 
@@ -149,7 +153,7 @@ public:
 
   // core
   void printParameters();
-  [[nodiscard]] int fetchNbDegreeOfFreedom() const { return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
+  [[nodiscard]] int fetchNbDegreeOfFreedom() const;
   std::vector<Parameter *> &getMinimizerFitParameterList(){ return _minimizerParameterPtrList_; }
   const std::vector<Parameter *> &getMinimizerFitParameterList() const{ return _minimizerParameterPtrList_; }
 
