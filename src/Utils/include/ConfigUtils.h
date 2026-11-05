@@ -10,11 +10,11 @@
 #include "FormulaUtils.h"
 #include "GenericToolbox.Json.h"
 
-#include "yaml-cpp/yaml.h"
-
 #include <map>
 #include <string>
 #include <utility>
+
+namespace YAML { class Node; }
 
 // shortcuts
 typedef GenericToolbox::Json::JsonType JsonType;

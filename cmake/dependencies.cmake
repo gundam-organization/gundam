@@ -42,12 +42,8 @@ if( ROOT_FOUND )
   # Grab functions such as generate dictionary
   include( ${ROOT_USE_FILE} )
 
-  # Add the libraries and include files here.  These "should" go in
-  # the target_link_libraries or target_include_directories for each library
-  # that uses them, but they all use them, so put them here. This keeps the
-  # symmetry when root-config (if find_package didn't work)
-  link_libraries(${ROOT_LIBRARIES})
-  include_directories(${ROOT_INCLUDE_DIRS})
+  # ROOT libraries reach every GUNDAM target through GundamUtils (linked
+  # PUBLIC there), so they are not linked globally here.
 
   if (ROOT_VERSION VERSION_GREATER_EQUAL 6.30.00)
     set(ROOT_minuit2_FOUND "yes")

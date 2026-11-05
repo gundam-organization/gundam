@@ -18,6 +18,21 @@
 #include <memory>
 #include <vector>
 
+std::vector<std::pair<std::string, std::string>> Propagator::getMonitorColumns() const {
+  std::vector<std::pair<std::string, std::string>> columns{
+      {"Dial Update", _dialManager_.getUpdateTimer().toString()}};
+#ifdef GUNDAM_USING_CACHE_MANAGER
+  if( Cache::Manager::Get() != nullptr ){
+    columns.emplace_back("Cache::Fill", Cache::Manager::GetCacheFillTimer().toString());
+    columns.emplace_back("Pull from device", Cache::Manager::GetPullFromDeviceTimer().toString());
+    return columns;
+  }
+#endif
+  columns.emplace_back("Re-weight", reweightTimer.toString());
+  columns.emplace_back("histograms fill", refillHistogramTimer.toString());
+  return columns;
+}
+
 void Propagator::muteLogger(){ Logger::setIsMuted( true ); }
 void Propagator::unmuteLogger(){ Logger::setIsMuted( false ); }
 

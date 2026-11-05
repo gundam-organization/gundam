@@ -2,11 +2,11 @@
 #include "FitterEngine.h"
 #include "GundamUtils.h"
 
-#ifdef GUNDAM_USING_CACHE_MANAGER
-#include "CacheManager.h"
-#endif
-
 #include "Logger.h"
+
+int MinimizerBase::fetchNbDegreeOfFreedom() const{
+  return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_;
+}
 
 void MinimizerBase::configureImpl(){
 
@@ -19,6 +19,7 @@ void MinimizerBase::configureImpl(){
     {"writeLlhHistory"},
     {"likelihoodValidity"},
     {"checkParameterValidity"},
+    {"checkFlatDirectionsBeforeMinimize"},
   });
 
   // nested objects first
@@ -46,6 +47,7 @@ void MinimizerBase::configureImpl(){
   // Determine if the validity will be checked when the function is evaluated.
   // This must be true for the likelihoodValidity checks to be applied.
   _config_.fillValue(_checkParameterValidity_, "checkParameterValidity");
+  _config_.fillValue(_checkFlatDirectionsBeforeMinimize_, "checkFlatDirectionsBeforeMinimize");
 }
 
 void MinimizerBase::initializeImpl(){
@@ -194,7 +196,10 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   }
 
   // Propagate the parameters
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  {
+    auto propagationTime = _monitor_.propagationTimer.scopeTime();
+    getLikelihoodInterface().propagateAndEvalLikelihood();
+  }
   _monitor_.evalLlhTimer.stop();
 
   // Monitor if enabled
@@ -220,43 +225,22 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
       ssHeader << std::endl;
 
+      const auto additionalColumns = getOwner().getMonitorColumns();
       GenericToolbox::TablePrinter t;
-
       t << "" << GenericToolbox::TablePrinter::NextColumn;
-      t << "Propagator" << GenericToolbox::TablePrinter::NextColumn;
-
-      t << "Dial Update" << GenericToolbox::TablePrinter::NextColumn;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      if( Cache::Manager::Get() != nullptr ){
-        t << "Cache::Fill" << GenericToolbox::TablePrinter::NextColumn;
-        t << "Pull from device" << GenericToolbox::TablePrinter::NextColumn;
+      t << getOwner().getPropagationMonitorTitle() << GenericToolbox::TablePrinter::NextColumn;
+      t << "Propagation + LLH" << GenericToolbox::TablePrinter::NextColumn;
+      for( const auto& column : additionalColumns ){
+        t << column.first << GenericToolbox::TablePrinter::NextColumn;
       }
-      else{
-#endif
-        t << "Re-weight" << GenericToolbox::TablePrinter::NextColumn;
-        t << "histograms fill" << GenericToolbox::TablePrinter::NextColumn;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      }
-#endif
       t << _monitor_.minimizerTitle << GenericToolbox::TablePrinter::NextLine;
 
       t << "Speed" << GenericToolbox::TablePrinter::NextColumn;
       t << _monitor_.iterationCounterClock.evalTickSpeed() << " it/s" << GenericToolbox::TablePrinter::NextColumn;
-
-      t << getModelPropagator().getDialManager().getUpdateTimer() << GenericToolbox::TablePrinter::NextColumn;
-
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      if( Cache::Manager::Get() != nullptr ){
-        t << Cache::Manager::GetCacheFillTimer() << GenericToolbox::TablePrinter::NextColumn;
-        t << Cache::Manager::GetPullFromDeviceTimer() << GenericToolbox::TablePrinter::NextColumn;
+      t << _monitor_.propagationTimer << GenericToolbox::TablePrinter::NextColumn;
+      for( const auto& column : additionalColumns ){
+        t << column.second << GenericToolbox::TablePrinter::NextColumn;
       }
-      else{
-#endif
-        t << getModelPropagator().reweightTimer << GenericToolbox::TablePrinter::NextColumn;
-        t << getModelPropagator().refillHistogramTimer << GenericToolbox::TablePrinter::NextColumn;
-#ifdef GUNDAM_USING_CACHE_MANAGER
-      }
-#endif
       t << _monitor_.externalTimer << GenericToolbox::TablePrinter::NextLine;
 
       ssHeader << t.generateTableString();
