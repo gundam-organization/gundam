@@ -3,6 +3,7 @@
 //
 
 #include "FitterEngine.h"
+#include "GundamApp.h"
 #include "GundamGlobals.h"
 #include "RootMinimizer.h"
 #include "SimpleMcmc.h"
@@ -22,6 +23,10 @@
 #include <cmath>
 #include <memory>
 
+
+void FitterEngine::setSaveDir(GundamApp& app_, const std::string& subFolder_){
+  _saveDir_ = GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_);
+}
 
 void FitterEngine::configureImpl(){
   GenericToolbox::setT2kPalette();
@@ -323,6 +328,14 @@ void FitterEngine::initializeImpl(){
 }
 
 // Core
+std::string FitterEngine::getPropagationMonitorTitle() const {
+  return "Propagator";
+}
+
+std::vector<std::pair<std::string, std::string>> FitterEngine::getMonitorColumns() const {
+  return _likelihoodInterface_.getModelPropagator().getMonitorColumns();
+}
+
 void FitterEngine::fit(){
   LogInfo << __METHOD_NAME__ << std::endl;
   LogThrowIf( not isInitialized() );
@@ -423,6 +436,8 @@ void FitterEngine::fit(){
 
   // Leaving now?
   if( _isDryRun_ ){
+    LogAlertIf(_minimizer_->isCheckFlatDirectionsBeforeMinimizeEnabled() and _minimizer_->checkFlatDirections() > 0)
+    << "Flat LLH directions were detected at the current point. Fit might fail." << std::endl;
     LogAlert << "Dry run requested. Leaving before the minimization." << std::endl;
     return;
   }

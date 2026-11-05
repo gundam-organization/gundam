@@ -19,6 +19,8 @@
 #include <vector>
 #include <map>
 #include <future>
+#include <string>
+#include <utility>
 
 class Propagator : public JsonBaseClass {
 
@@ -48,6 +50,8 @@ public:
   [[nodiscard]] auto& getParametersManager() const { return _parManager_; }
   [[nodiscard]] auto& getDialCollectionList() const{ return _dialManager_.getDialCollectionList(); }
   [[nodiscard]] auto& getParameterInjectorMc() const { return _parameterInjectorMc_; }
+
+  [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const;
 
   // mutable getters
   auto& getSampleSet(){ return _sampleSet_; }
