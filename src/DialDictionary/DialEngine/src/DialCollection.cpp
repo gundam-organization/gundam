@@ -381,6 +381,21 @@ void DialCollection::deduplicateBinnedDials(){
   }
 }
 
+void DialCollection::growEventDialIndex(){
+  // Power-of-two capacity permits masking; keep at least one empty slot so
+  // unsuccessful lookups always terminate. Called under _eventDialMutex_.
+  std::vector<EventDialIndexEntry> expanded(std::max(size_t(16), 2 * _eventDialIndex_.size()));
+  for( const auto& entry : _eventDialIndex_ ){
+    if( entry.interfaceIndex == size_t(-1) ){ continue; }
+    size_t slot = entry.hash & (expanded.size() - 1);
+    while( expanded[slot].interfaceIndex != size_t(-1) ){
+      slot = (slot + 1) & (expanded.size() - 1);
+    }
+    expanded[slot] = entry;
+  }
+  _eventDialIndex_.swap(expanded);
+}
+
 size_t DialCollection::storeEventDial(std::unique_ptr<DialBase> dial_){
   LogThrowIf(dial_ == nullptr, "Cannot store a null event dial");
   std::vector<double> signature;
@@ -392,20 +407,34 @@ size_t DialCollection::storeEventDial(std::unique_ptr<DialBase> dial_){
   const size_t hash = getDialSignatureHash(*dial_, signature);
 
   std::unique_lock<std::mutex> lock(_eventDialMutex_);
-  if( canShare ){
-    auto matches = _eventDialIndex_.equal_range(hash);
-    for( auto match = matches.first; match != matches.second; ++match ){
-      const auto* candidate = _dialInterfaceList_[match->second].getDialBaseRef();
-      if( matchesDialSignature(*candidate, *dial_, signature) ){
-        ++_reusedEventDials_;
-        return match->second;
+  if( canShare and not _eventDialIndex_.empty() ){
+    size_t slot = hash & (_eventDialIndex_.size() - 1);
+    while( _eventDialIndex_[slot].interfaceIndex != size_t(-1) ){
+      const auto& entry = _eventDialIndex_[slot];
+      if( entry.hash == hash ){
+        const auto* candidate = _dialInterfaceList_[entry.interfaceIndex].getDialBaseRef();
+        if( matchesDialSignature(*candidate, *dial_, signature) ){
+          ++_reusedEventDials_;
+          return entry.interfaceIndex;
+        }
       }
+      slot = (slot + 1) & (_eventDialIndex_.size() - 1);
     }
+  }
+  if( canShare and _eventDialIndexSize_ >= _eventDialIndex_.size() * 3 / 4 ){
+    growEventDialIndex();
   }
   const size_t index = getNextDialFreeSlot();
   if( _dialInterfaceList_.size() <= index ){ _dialInterfaceList_.resize(index + 1); }
   _dialInterfaceList_[index].getDial().dialPtr = std::move(dial_);
-  if( canShare ){ _eventDialIndex_.emplace(hash, index); }
+  if( canShare ){
+    size_t slot = hash & (_eventDialIndex_.size() - 1);
+    while( _eventDialIndex_[slot].interfaceIndex != size_t(-1) ){
+      slot = (slot + 1) & (_eventDialIndex_.size() - 1);
+    }
+    _eventDialIndex_[slot] = {hash, index};
+    ++_eventDialIndexSize_;
+  }
   return index;
 }
 
@@ -413,8 +442,8 @@ void DialCollection::clear(){
   _dialInterfaceList_.clear();
   _dialInterfaceList_.shrink_to_fit();
   _dialFreeSlot_.setValue(0);
-  _eventDialIndex_.clear();
-  _eventDialIndex_.rehash(0);
+  std::vector<EventDialIndexEntry>().swap(_eventDialIndex_);
+  _eventDialIndexSize_ = 0;
   _reusedEventDials_ = 0;
 }
 
@@ -423,8 +452,8 @@ void DialCollection::resizeContainers(){
     LogInfo << getTitle() << ": reused " << _reusedEventDials_
             << " event dials; stored " << _dialFreeSlot_.getValue() << " interfaces." << std::endl;
   }
-  _eventDialIndex_.clear();
-  _eventDialIndex_.rehash(0);
+  std::vector<EventDialIndexEntry>().swap(_eventDialIndex_);
+  _eventDialIndexSize_ = 0;
   _reusedEventDials_ = 0;
   LogDebugIf(GundamGlobals::isDebug()) << "Resizing containers of the dial collection \"" << this->getTitle() << "\" from "
                                        << _dialInterfaceList_.size() << " to " << _dialFreeSlot_.getValue() << std::endl;

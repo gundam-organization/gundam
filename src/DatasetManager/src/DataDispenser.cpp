@@ -33,6 +33,8 @@
 #include <TClass.h>
 #include <TGraph.h>
 
+#include <array>
+#include <cstring>
 #include <exception>
 #include <algorithm>
 #include <chrono>
@@ -543,6 +545,7 @@ void DataDispenser::prepareConfig(ConfigReader &config_){
     {"overridePropagatorConfig"},
     {"selectionCutFormula"},
     {"allowMultipleSamplesPerEntry"},
+    {"enableDialInputCache"},
     {"nominalWeightFormula", {"nominalTreeWeightFormula"}},
     {"variableDict", {"overrideLeafDict"}},
     {"fromModel", {"fromMc"}},
@@ -734,6 +737,7 @@ void DataDispenser::configureImpl(){
   _config_.fillValue(_parameters_.overridePropagatorConfig, "overridePropagatorConfig");
   _config_.fillValue(_parameters_.evalModelAt, "evalModelAt");
   _config_.fillValue(_parameters_.allowMultipleSamplesPerEntry, "allowMultipleSamplesPerEntry");
+  _config_.fillValue(_parameters_.enableDialInputCache, "enableDialInputCache");
 
   _config_.fillFormula(_parameters_.selectionCutFormulaStr, "selectionCutFormula", "&&");
   _config_.fillFormula(_parameters_.nominalWeightFormulaStr, "nominalWeightFormula", "*");
@@ -2123,6 +2127,62 @@ void DataDispenser::loadEvent(int iThread_){
 
   std::unordered_map<int, size_t> eventByEventDialBuffer{};
   eventByEventDialBuffer.reserve(_cache_.dialCollectionsRefList.size());
+
+  // Bounded per-worker memoization. Never identify curves by their ROOT address:
+  // GetEntry reuses the same object while replacing its points. Keep the exact
+  // bytes of at most 64 finite, ordered knots, plus the already stored result.
+  struct LastGraphInput{
+    std::array<double, 64> x;
+    std::array<double, 64> y;
+    int size{-1};
+    size_t interfaceIndex{size_t(-1)};
+  };
+  size_t graphInputCacheHits{0};
+  std::vector<LastGraphInput> lastGraphInputs(_cache_.dialCollectionsRefList.size());
+  auto loadDial = [&](const TObject* object_, size_t collectionSlot_) -> size_t {
+    auto& collection = *_cache_.dialCollectionsRefList[collectionSlot_];
+    auto& cached = lastGraphInputs[collectionSlot_];
+    const auto* graph = object_ != nullptr and object_->IsA() == TGraph::Class()
+        ? static_cast<const TGraph*>(object_) : nullptr;
+    bool reusable = _parameters_.enableDialInputCache and collection.canReuseGraphInput()
+        and graph != nullptr and graph->GetN() >= 0 and graph->GetN() <= int(cached.x.size());
+    if( reusable ){
+      for( int i = 0; i < graph->GetN(); ++i ){
+        if( not std::isfinite(graph->GetX()[i]) or not std::isfinite(graph->GetY()[i])
+            or (i != 0 and not (graph->GetX()[i] > graph->GetX()[i-1])) ){
+          reusable = false;
+          break;
+        }
+      }
+    }
+    if( reusable and cached.size == graph->GetN() ){
+      const auto bytes = size_t(cached.size) * sizeof(double);
+      if( bytes == 0 or (std::memcmp(cached.x.data(), graph->GetX(), bytes) == 0
+                        and std::memcmp(cached.y.data(), graph->GetY(), bytes) == 0) ){
+        ++graphInputCacheHits;
+        return cached.interfaceIndex;
+      }
+    }
+    auto dial = collection.makeDial(object_);
+    // Invalid derived coefficients are not a reusable definition, even when
+    // the source knots were finite (e.g. a degenerate interpolation).
+    if( reusable and dial != nullptr ){
+      for( double value : dial->getDialData() ){
+        if( not std::isfinite(value) ){ reusable = false; break; }
+      }
+    }
+    const auto index = dial == nullptr ? size_t(-1) : collection.storeEventDial(std::move(dial));
+    if( reusable ){
+      cached.size = graph->GetN();
+      cached.interfaceIndex = index; // Also remember an identity response omitted by the factory.
+      if( cached.size != 0 ){
+        std::copy_n(graph->GetX(), cached.size, cached.x.begin());
+        std::copy_n(graph->GetY(), cached.size, cached.y.begin());
+      }
+    }
+    return index;
+  };
+
   // Reuse one selection buffer per worker. Copying the selected range into
   // each cache entry avoids retaining capacity for every possible collection.
   std::vector<EventDialCache::DialIndexCacheEntry> selectedDialIndices;
@@ -2423,10 +2483,8 @@ void DataDispenser::loadEvent(int iThread_){
           for( int iPoint = 0; iPoint < parameterValues->GetSize(); ++iPoint ){
             graph.SetPoint(iPoint, parameterValues->GetAt(iPoint), responses->GetAt(iPoint));
           }
-          auto dial = dialCollectionRef->makeDial(&graph);
-          if( dial != nullptr ){
-            eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialCollectionRef->storeEventDial(std::move(dial));
-          }
+          const auto index = loadDial(&graph, iDialCollection);
+          if( index != size_t(-1) ){ eventByEventDialBuffer[dialCollectionRef->getIndex()] = index; }
           continue;
         }
 
@@ -2444,10 +2502,8 @@ void DataDispenser::loadEvent(int iThread_){
           dialObjectPtr = ((const TClonesArray *) dialObjectPtr)->At(dialCloneArrayIndex);
         }
 
-        auto dial = dialCollectionRef->makeDial(dialObjectPtr);
-        if( dial != nullptr ){
-          eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialCollectionRef->storeEventDial(std::move(dial));
-        }
+        const auto index = loadDial(dialObjectPtr, iDialCollection);
+        if( index != size_t(-1) ){ eventByEventDialBuffer[dialCollectionRef->getIndex()] = index; }
       }
 
     }
@@ -2566,6 +2622,8 @@ void DataDispenser::loadEvent(int iThread_){
     }
 
   } // while ok
+
+  LogInfo << "Graph input cache hits for worker #" << iThread_ << ": " << graphInputCacheHits << std::endl;
 
 }
 

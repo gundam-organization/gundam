@@ -23,6 +23,7 @@
 struct DataDispenserParameters{
 
   // should be load dials and request the associate variables?
+  bool enableDialInputCache{true};
   bool useReweightEngine{false};
   bool isData{false}; // shall fetch slpit vars?
   bool allowMultipleSamplesPerEntry{false};
