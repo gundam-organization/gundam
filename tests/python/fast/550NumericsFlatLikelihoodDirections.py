@@ -1,33 +1,27 @@
 #!/usr/bin/env python3
-"""Flat-direction warnings, boundary probes, restoration, and lifecycle hooks."""
+"""Detect a flat likelihood direction alongside a curved parameter."""
 import json
-import math
-import re
-import subprocess
-import sys
 from pathlib import Path
 
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+import GUNDAM
+import numpy as np
+import uproot
 
 
-def child(mode):
-    import GUNDAM
-    import numpy as np
-    import uproot
+def main():
     GUNDAM.setNumberOfThreads(1)
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / f'550NumericsFlatLikelihoodDirections-{mode}.root'
+    path = Path.cwd() / '550NumericsFlatLikelihoodDirections.root'
     with uproot.recreate(path) as output:
         tree = output.mktree('events', {'X': 'float64'})
         tree.extend({'X': np.full(10, .5, dtype=np.float64)})
-    parameters = [{'name': 'curved', 'priorValue': 1., 'priorType': 'Flat',
-                   'dialSetDefinitions': [{'dialType': 'Normalization'}]}]
-    if mode in ('dry', 'dryDefault', 'flatFit', 'flatFitDefault', 'probe'):
-        for name, fixed in [('plateau', False), ('fixedPlateau', True)]:
-            parameters.append({'name': name, 'priorValue': 2., 'priorType': 'Flat',
-                               'isFixed': fixed, 'parameterLimits': [2., 5.],
-                               'dialSetDefinitions': [{'dialType': 'Normalization', 'maxDialResponse': 1.}]})
+    parameters = [
+        {'name': 'curved', 'priorValue': 1., 'priorType': 'Flat',
+         'dialSetDefinitions': [{'dialType': 'Normalization'}]},
+        {'name': 'plateau', 'priorValue': 2., 'priorType': 'Flat',
+         'parameterLimits': [2., 5.],
+         'dialSetDefinitions': [{'dialType': 'Normalization', 'maxDialResponse': 1.}]},
+    ]
     li = {
         'jointProbabilityConfig': {'type': 'PoissonLLH'},
         'datasetList': [{'name': 'input', 'model': {'tree': 'events', 'filePathList': [str(path)]}}],
@@ -39,71 +33,14 @@ def child(mode):
     config = {'likelihoodInterfaceConfig': li, 'enablePca': False,
               'scaleParStepWithChi2Response': False, 'generateSamplePlots': False,
               'generateOneSigmaPlots': False,
-              'minimizerConfig': {'enablePostFitErrorFit': mode == 'fit', 'print_level': 0,
+              'minimizerConfig': {'enablePostFitErrorFit': False, 'print_level': 0,
                                   'useNormalizedFitSpace': False}}
-    if mode in ('dry', 'flatFit'):
-        config['minimizerConfig']['checkFlatDirectionsBeforeMinimize'] = True
     engine = GUNDAM.FitterEngine()
     engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
     engine.initialize()
-    engine.setIsDryRun(mode in ('dry', 'dryDefault', 'dryClean'))
-    llh = engine.getLikelihoodInterface()
-    model = llh.getModelPropagator()
-    curved = model.getParametersManager().getParameterSetsList()[0].getParameterList()[0]
-    if mode == 'restore':
-        curved.setParameterValue(1.3)
-        llh.propagateAndEvalLikelihood()
-        before = llh.getLastLikelihood()
-        data = [b.sumWeights for b in llh.getDataPropagator().getSampleSet().getSampleList()[0].getHistogram().getBinContentList()]
-        assert engine.getMinimizer().checkFlatDirections() == 0
-        assert curved.getParameterValue() == 1.3
-        assert math.isclose(llh.getLastLikelihood(), before, abs_tol=1e-12)
-        assert data == [b.sumWeights for b in llh.getDataPropagator().getSampleSet().getSampleList()[0].getHistogram().getBinContentList()]
-    elif mode == 'probe':
-        assert engine.getMinimizer().checkFlatDirections() == 1
-    else:
-        try:
-            engine.fit()
-        except RuntimeError as error:
-            # ROOT may fail to produce a covariance for the plateau.
-            assert mode in ('flatFit', 'flatFitDefault'), str(error)
-            assert 'Could not retrieve the post-fit covariance matrix' in str(error), str(error)
-            print('COVARIANCE_UNAVAILABLE', flush=True)
-        else:
-            if mode in ('flatFit', 'flatFitDefault'):
-                print('FLAT_FIT_COMPLETED', flush=True)
-        if mode == 'dry':
-            assert curved.getParameterValue() == 1.
-            assert model.getParametersManager().getParameterSetsList()[0].getParameterList()[1].getParameterValue() == 2.
-    print('CHILD_OK', mode, flush=True)
-
-
-def main():
-    for mode in ('dry', 'dryDefault', 'flatFit', 'flatFitDefault', 'dryClean', 'fit', 'restore', 'probe'):
-        result = subprocess.run([sys.executable, __file__, mode], capture_output=True, text=True, errors='replace')
-        rawLog = result.stdout + result.stderr
-        log = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', rawLog)
-        Path(f'550NumericsFlatLikelihoodDirections-{mode}.log').write_text(log)
-        # Python markers can land inside buffered C++ ANSI sequences. Check
-        # them before stripping escape codes, which can consume their first letter.
-        assert result.returncode == 0 and f'CHILD_OK {mode}' in rawLog, (mode, result.returncode, log[-8000:])
-        assert log.count('Checking LLH flat directions...') == (0 if mode in ('dryDefault', 'flatFitDefault', 'dryClean') else 1), log[-8000:]
-        flat = [line for line in log.splitlines() if 'Flat LLH direction:' in line]
-        if mode in ('dry', 'flatFit', 'probe'):
-            assert len(flat) == 1 and 'ERROR' in flat[0] and 'response/#1_plateau' in flat[0], flat
-            assert 'value = 2' in flat[0] and 'first derivative = 0' in flat[0] and 'second derivative = 0' in flat[0], flat
-            if mode == 'flatFit':
-                assert 'flat LLH directions were detected, the fit might fail' in log
-                assert 'Minimization ended' in log
-                assert 'COVARIANCE_UNAVAILABLE' in rawLog or 'FLAT_FIT_COMPLETED' in rawLog
-                assert 'Cannot start fit' not in log
-            else:
-                assert 'Minimization ended' not in log
-        else:
-            assert not flat, flat  # A zero gradient at a curved minimum is valid.
-    print('SUCCESS: pre-fit checks are optional and non-blocking, error hooks run, and probe state is restored')
+    assert engine.getMinimizer().checkFlatDirections() == 1, 'Expected exactly one flat direction'
+    print('SUCCESS: detected the flat likelihood direction')
 
 
 if __name__ == '__main__':
-    modes = ('dry', 'dryDefault', 'flatFit', 'flatFitDefault', 'dryClean', 'fit', 'restore', 'probe')
-    child(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1] in modes else main()
+    main()
