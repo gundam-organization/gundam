@@ -8,7 +8,6 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
-import_module("005PythonSetup-utils").requireVenv(__file__)
 
 
 def write_input(path):
@@ -112,7 +111,7 @@ def main():
 
     print("Testing module:", GUNDAM.__file__, flush=True)
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / "216DynamicBinningLoading.root"
+    path = Path.cwd() / "320ModelDynamicBinningLoading.root"
     write_input(path)
     static = ("static", False, "raw < 3", "1")
     dynamic = ("dynamic", True, "raw < 3", "1")

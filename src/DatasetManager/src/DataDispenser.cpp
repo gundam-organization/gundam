@@ -33,6 +33,7 @@
 #include <TClass.h>
 #include <TGraph.h>
 
+#include <exception>
 #include <unordered_map>
 #include <map>
 #include <set>
@@ -2045,13 +2046,25 @@ void DataDispenser::loadEvent(int iThread_){
       // make sure we request a new entry and wait once we go for another loop
       GenericToolbox::ScopedGuard readerGuard{
         [&]{ threadSharedData.isEntryBufferReady.waitUntilEqual( true ); threadSharedData.isEntryBufferReady.setValue( false ); },
-        [&]{ threadSharedData.requestReadNextEntry.setValue( true ); }
+        [&]{
+          // Publish failure before waking the reader. Otherwise it can request
+          // another entry before the outer ready guard is destroyed, then wait
+          // forever for a filler that has already thrown.
+          if( std::uncaught_exceptions() > 0 ){
+            threadSharedData.isEventFillerReady.setValue( false );
+          }
+          threadSharedData.requestReadNextEntry.setValue( true );
+        }
       };
 
       // ***** from this point, the TChain reader is waiting *****
 
       // check if the reader has nothing else to do / end of the loop
-      if( threadSharedData.isDoneReading.getValue() ){ break; }
+      if( threadSharedData.isDoneReading.getValue() ){
+        // Publish shutdown before releasing the reader's handshake.
+        threadSharedData.isEventFillerReady.setValue(false);
+        break;
+      }
 
       // leafFormIndexingList is modified by the TChain reader
       for( size_t iVar = 0 ; iVar < threadSharedData.buffer.varIndexingList.size() ; iVar++ ){
@@ -2332,7 +2345,8 @@ void DataDispenser::loadEvent(int iThread_){
         LogAlertIf(iThread_ == 0) << "debugNbMaxEventsToLoad: Event number cap reached (";
         LogAlertIf(iThread_ == 0) << _parameters_.debugNbMaxEventsToLoad << ")" << std::endl;
         threadSharedData.isDoneReading.setValue( true );
-        return;
+        // Drain the reader's next entry through the normal handshake. Returning
+        // here can leave it waiting forever on isEntryBufferReady.
       }
     }
 
