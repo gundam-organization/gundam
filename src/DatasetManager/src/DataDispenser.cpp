@@ -2164,14 +2164,14 @@ void DataDispenser::loadEvent(int iThread_){
       }
     }
     auto dial = collection.makeDial(object_);
-    // Invalid derived coefficients are not a reusable definition, even when
-    // the source knots were finite (e.g. a degenerate interpolation).
-    if( reusable and dial != nullptr ){
-      for( double value : dial->getDialData() ){
-        if( not std::isfinite(value) ){ reusable = false; break; }
-      }
+    size_t index{size_t(-1)};
+    if( dial != nullptr ){
+      // The collection validates the actual factory result through its typed
+      // signature. Norm and Shift have no spline payload to inspect here.
+      bool hasFiniteSignature{false};
+      index = collection.storeEventDial(std::move(dial), reusable ? &hasFiniteSignature : nullptr);
+      reusable = reusable and hasFiniteSignature;
     }
-    const auto index = dial == nullptr ? size_t(-1) : collection.storeEventDial(std::move(dial));
     if( reusable ){
       cached.size = graph->GetN();
       cached.interfaceIndex = index; // Also remember an identity response omitted by the factory.

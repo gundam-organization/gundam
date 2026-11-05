@@ -188,7 +188,9 @@ public:
 
   // Loading only: store a branch dial, reusing an identical lightweight dial.
   // Returns an interface index; no interface pointers may be retained while loading.
-  size_t storeEventDial(std::unique_ptr<DialBase> dial_);
+  // Optionally report whether the stored definition has a finite, shareable
+  // signature. Norm/Shift signatures do not use the spline payload API.
+  size_t storeEventDial(std::unique_ptr<DialBase> dial_, bool* hasFiniteSignature_ = nullptr);
 
   // Return the next preallocated slot. Thread safe for event dial factories.
   size_t getNextDialFreeSlot(){ return _dialFreeSlot_++; }
