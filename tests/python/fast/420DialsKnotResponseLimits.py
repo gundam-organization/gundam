@@ -53,7 +53,7 @@ def write_input(path, limits=None):
     subprocess.run(["root", "-n", "-l", "-b", "-q", str(macro)], check=True)
 
 
-def main():
+def main(full=False):
     raw = Path.cwd() / "420DialsKnotResponseLimits-raw.root"
     clipped = Path.cwd() / "420DialsKnotResponseLimits-clipped.root"
     write_input(raw)
@@ -62,11 +62,14 @@ def main():
              ({"max": 1.5}, {"max": 1.5}),
              ([1., 1.], {"min": 1., "max": 1.}),
              ([0., 10.], {"min": 0., "max": 10.})]
+    if not full:
+        cases = cases[:1]  # Both lower and upper clipping on representative dials.
     for limits, bounds in cases:
         write_input(clipped, bounds)
-        for dial_type, options in [("Graph", ""), ("Spline", ""),
-                                   ("Spline", "akima"), ("Spline", "ROOT"),
-                                   ("Spline", "monotonic")]:
+        interpolations = [("Graph", ""), ("Spline", "")]
+        if full:
+            interpolations += [("Spline", "akima"), ("Spline", "ROOT"), ("Spline", "monotonic")]
+        for dial_type, options in interpolations:
             reference = evaluate([clipped], "dialBranchData: graph", False, dial_type, options)
             # RootSpline is supported only by the legacy propagator.
             for backend in ([False] if options == "ROOT" else [False, True]):

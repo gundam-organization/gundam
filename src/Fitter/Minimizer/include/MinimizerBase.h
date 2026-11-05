@@ -5,17 +5,16 @@
 #ifndef GUNDAM_MINIMIZER_BASE_H
 #define GUNDAM_MINIMIZER_BASE_H
 
-#include "Propagator.h"
-#include "ParameterScanner.h"
-#include "LikelihoodInterface.h"
-#include "Parameter.h"
+#include "ConfigUtils.h"
 #include "ParameterGradient.h"
 
 
 #include "GenericToolbox.Utils.h"
+#include "GenericToolbox.Time.h"
 
-#include "TDirectory.h"
+#include "TTree.h"
 
+#include <memory>
 #include <vector>
 #include <string>
 
@@ -33,6 +32,11 @@
 */
 
 class FitterEngine; // owner
+class Propagator;
+class ParameterScanner;
+class LikelihoodInterface;
+class Parameter;
+class TDirectory;
 
 class MinimizerBase : public JsonBaseClass {
 
@@ -56,6 +60,7 @@ protected:
     std::string stateTitleMonitor{};
 
     GenericToolbox::Time::AveragedTimer<10> evalLlhTimer{};
+    GenericToolbox::Time::Timer propagationTimer{};
     GenericToolbox::Time::AveragedTimer<10> externalTimer{};
     GenericToolbox::Time::AveragedTimer<1> iterationCounterClock{};
 
@@ -75,6 +80,8 @@ public:
   /// should either be skipped, or the covariance can be filled using
   /// information from the posterior.
   virtual void calcErrors();
+  /// Diagnose locally flat fit parameters and return their count.
+  virtual int checkFlatDirections() { return 0; }
 
   /// A virtual method that should scan the parameters used by the minimizer.
   /// This provides a view of the parameters seen by the minimizer, which may
@@ -112,6 +119,7 @@ public:
   void setDisableCalcError(bool disableCalcError_){ _isEnabledCalcError_ = not disableCalcError_; }
 
   // const getters
+  [[nodiscard]] bool isCheckFlatDirectionsBeforeMinimizeEnabled() const { return _checkFlatDirectionsBeforeMinimize_; }
   [[nodiscard]] bool disableCalcError() const{ return not _isEnabledCalcError_; }
 
   // Get the return status for the fitter.  The return value is specific
@@ -145,7 +153,8 @@ public:
 
   // core
   void printParameters();
-  [[nodiscard]] int fetchNbDegreeOfFreedom() const { return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_; }
+  [[nodiscard]] int fetchNbDegreeOfFreedom() const;
+
   std::vector<Parameter *> &getMinimizerFitParameterList(){ return _minimizerParameterPtrList_; }
   const std::vector<Parameter *> &getMinimizerFitParameterList() const{ return _minimizerParameterPtrList_; }
 
@@ -193,6 +202,7 @@ private:
   bool _throwOnBadLlh_{false};
   bool _useNormalizedFitSpace_{true};
   bool _checkParameterValidity_{false};
+  bool _checkFlatDirectionsBeforeMinimize_{false};
   bool _isEnabledCalcError_{true};
 
   /// Define what sort of validity the parameters have to have for a finite

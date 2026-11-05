@@ -10,7 +10,8 @@ through `PYTHONPATH` (or source the installed GUNDAM `setup.sh`).
 With `WITH_TESTS=ON` and `WITH_PYTHON_INTERFACE=ON`, `make test` (or `ctest`)
 includes the Python fast suite when `WITH_FAST_TEST=ON`, and the regular suite
 when `WITH_REGULAR_TEST=ON`. Benchmarks are run manually. With the Python interface
-disabled, no Python tests are registered.
+disabled, no Python tests are registered. Each script is registered separately as
+`gundam-python-<suite>-<script>`, with its own result and duration.
 
 CTest uses the last interpreter that successfully configured a Python interface,
 and loads the module from the build directory.
@@ -164,3 +165,13 @@ Set `DYLD_PRINT_LIBRARIES=1` to inspect the actual native library paths on macOS
 Checking only `GUNDAM.__file__` is insufficient to establish their provenance.
 A script that exits successfully after skipping unsupported features does not
 validate compatibility with those features.
+
+Fast tests `110`, `410` and `420` keep representative cases. Their matching
+`*Full.py` tests in `regular/` preserve the full scenario matrices. Run them with
+`python tests/python/run.py --suite regular --test <name>Full.py` or enable
+`WITH_REGULAR_TEST` for CTest.
+
+CTest labels Python scripts with `python` and `python-fast` or `python-regular`.
+The `fast`, `regular`, `extended` and `slow` labels identify the selected shell
+suite run by `gundam-tests`; broader shell suites include the faster suites.
+Label totals overlap: `python` includes both Python suites and environment setup.
