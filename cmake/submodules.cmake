@@ -26,8 +26,11 @@ checkSubmodule( simple-cpp-cmd-line-parser )
 
 ## Add the CmdLineParser
 # Reproduce needed parts of the simple-cpp-cmd-line-parser CMakeLists.txt
-include_directories(submodules/simple-cpp-cmd-line-parser/include)
-add_definitions( -D CMDLINEPARSER_YAML_CPP_ENABLED=1 )
+add_library( GundamCmdLineParser INTERFACE )
+target_include_directories( GundamCmdLineParser INTERFACE
+  ${CMAKE_SOURCE_DIR}/submodules/simple-cpp-cmd-line-parser/include )
+target_compile_definitions( GundamCmdLineParser INTERFACE CMDLINEPARSER_YAML_CPP_ENABLED=1 )
+target_link_libraries( GundamCmdLineParser INTERFACE yaml-cpp::yaml-cpp )
 
 ## Configure the GenericToolbox
 add_definitions( -D PROGRESS_BAR_FILL_TAG="\\\"GUNDAM"\\\" )
