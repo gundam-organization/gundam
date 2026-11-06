@@ -60,7 +60,7 @@ def config(path, script, binned, mode):
                 'sampleSetConfig': {'sampleList': [{'name': 'sample', 'binning': {
                     'binningDefinition': [{'name': 'X', 'edges': [0, .5, 1]}]}}]},
                 'parametersManagerConfig': {'parameterSetList': [{
-                    'name': 'parameters', 'nominalStepSize': .05,
+                    'name': 'parameters', 'isEnabled': True, 'nominalStepSize': .05,
                     'parameterDefinitions': [
                         {'name': 'a', 'priorValue': .4, 'priorType': 'Flat'},
                         {'name': 'b', 'priorValue': .2, 'priorType': 'Flat'}],

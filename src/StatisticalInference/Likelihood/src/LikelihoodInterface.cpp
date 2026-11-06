@@ -386,7 +386,8 @@ void LikelihoodInterface::evalPenaltyLikelihoodGradient(const ParameterSet& parS
   for( const auto& par : parSet_.getParameterList() ){
     if( not ParameterSet::isValidCorrelatedParameter(par) ){ continue; }
     if( gradient_.values.count(&par) != 0 ){
-      // The delta vector is normalized by each parameter standard deviation.
+      // updateDeltaVector() uses (value-prior)/sigma. Convert its derivative
+      // back to the physical parameter coordinate.
       gradient_.addValue(&par, penaltyGradient[iFit] / par.getStdDevValue());
     }
     iFit++;

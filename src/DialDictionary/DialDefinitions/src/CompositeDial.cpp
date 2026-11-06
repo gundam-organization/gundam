@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <map>
 #include <sstream>
+#include <stdexcept>
 
 CompositeDial::CompositeDial(ConfigReader config_, const std::vector<std::string>& parameterNames_): _inputCount_(int(parameterNames_.size())){
   config_.clearFields();
@@ -186,7 +187,11 @@ bool CompositeDial::hasAnalyticGradient() const {
       }
     }
     catch( const std::exception& error ){
-      LogThrow("Composite node " << node.name << ": " << error.what());
+      // LogThrow stringifies its stream expression for what(), losing the
+      // evaluated node name. Preserve the complete path for callers too.
+      const std::string message = "Composite node " + node.name + ": " + error.what();
+      LogError << message << std::endl;
+      throw std::runtime_error(message);
     }
   }
   return true;
