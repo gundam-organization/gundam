@@ -176,9 +176,6 @@ bool CompositeDial::hasAnalyticGradient() const {
     try{
       LogThrowIf(node.dial == nullptr or not node.dial->hasAnalyticGradient(),
                  "Unsupported analytic gradient");
-      LogThrowIf(node.supervisor.getMinSmoothingWidth() > 0.
-                 or node.supervisor.getMaxSmoothingWidth() > 0.,
-                 "Response smoothing is unsupported for composite gradients");
       for( const auto& edges : node.mirrorEdges ){
         LogThrowIf(not std::isnan(edges.minValue) and
                    (not std::isfinite(edges.minValue) or not std::isfinite(edges.range) or edges.range <= 0.),

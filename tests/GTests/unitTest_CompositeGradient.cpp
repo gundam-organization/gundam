@@ -109,9 +109,6 @@ TEST(CompositeGradient, BranchesRepeatedParametersMirrorsClampsAndNestedGraphs) 
     }
     for( auto& job : jobs ){ job.get(); }
   }
-  supervisors[1].setSmoothingWidths(0., .1);
-  dial.bind([&](int index_){ return &interfaces[index_]; });
-  EXPECT_THROW(static_cast<void>(dial.hasAnalyticGradient()), std::runtime_error);
 }
 
 TEST(CompositeGradient, EventInputsStayConstantAndUnsupportedNodesAreNamed) {

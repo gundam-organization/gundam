@@ -45,6 +45,7 @@ private:
   void checkInputsBound() const;
 
   TFormula _formula_{};
+  std::string _formulaStr_;
   int _inputCount_{-1};
   bool _isInputOrderMatching_{false};
   // One entry per ROOT parameter; -1 keeps a configured constant.

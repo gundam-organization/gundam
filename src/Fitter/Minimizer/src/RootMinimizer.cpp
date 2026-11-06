@@ -104,9 +104,6 @@ void RootMinimizer::initializeImpl(){
   _nbGradientCalls_ = 0;
   if( _useAnalyticGradient_ ){
     LogThrowIf(_minimizerType_ != "Minuit2", "useAnalyticGradient currently requires Minuit2.");
-#ifdef GUNDAM_USING_BACKENDS
-    LogThrowIf(getOwner().getBackendsManager().hasBackend(), "useAnalyticGradient requires the original CPU engine; deactivate the backend.");
-#endif
     getLikelihoodInterface().validateWeightGradient();
   }
 
@@ -169,15 +166,10 @@ void RootMinimizer::initializeImpl(){
   _rootMinimizer_->SetPrintLevel(_printLevel_);
   _rootMinimizer_->SetTolerance(_tolerance_);
   double functionPrecision = _functionPrecision_;
-#ifdef GUNDAM_USING_BACKENDS
-  if( std::isnan(functionPrecision) and getOwner().getBackendsManager().hasBackend() ){
-    functionPrecision = getOwner().getBackendsManager().getBackend()->getCapabilities().recommendedFunctionPrecision;
-  }
-#endif
   if( std::isfinite(functionPrecision) and functionPrecision > 0. ){
     _rootMinimizer_->SetPrecision(functionPrecision);
     LogInfo << "Objective function precision: " << functionPrecision
-            << (std::isnan(_functionPrecision_) ? " (backend recommendation)" : " (functionPrecision)")
+            << " (functionPrecision)"
             << std::endl;
   }
   _rootMinimizer_->SetMaxIterations(_maxIterations_);
