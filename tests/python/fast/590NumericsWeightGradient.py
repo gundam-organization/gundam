@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CPU Gaussian Barlow-Beeston gradients in serial and parallel propagation."""
+"""Original-engine weight gradients in serial and parallel propagation."""
 import copy
 from importlib import import_module
 import json
@@ -13,11 +13,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 helpers = import_module('470DialsComposite')
 
 
-def check_threads(threads):
+def make_fixture(threads):
     import GUNDAM
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(threads)
-    path = Path.cwd() / '700BackendsCommonWeightGradient.root'
+    path = Path.cwd() / '590NumericsWeightGradient.root'
     helpers.write_input(path)
     macro = path.with_suffix('.C')
     macro.write_text('''#include <TFile.h>
@@ -46,9 +46,10 @@ def check_threads(threads):
         {'name': 'q', 'parameterIndex': 1, 'priorValue': 1., 'dialSetDefinitions': [{'dialType': 'Normalization'}]},
         {'name': 'r', 'parameterIndex': 2, 'priorValue': 1., 'dialSetDefinitions': [{'dialType': 'Normalization', 'applyCondition': 'X < 1.5'}]}])
 
-    def build(configuration, normalized, eigen):
+    def build(configuration, normalized, eigen, analytic=False):
         cfg = copy.deepcopy(configuration)
-        cfg['minimizerConfig'] = {'useNormalizedFitSpace': normalized, 'writeLlhHistory': False}
+        cfg['minimizerConfig'] = {'useNormalizedFitSpace': normalized, 'writeLlhHistory': False,
+                                  'useAnalyticGradient': analytic}
         cfg['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['enableEigenDecomp'] = eigen
         engine = GUNDAM.FitterEngine()
         engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(cfg))))
@@ -60,7 +61,7 @@ def check_threads(threads):
         assert math.isfinite(actual) and math.isfinite(expected), (actual, expected)
         assert math.isclose(actual, expected, rel_tol=3e-5, abs_tol=3e-6), (actual, expected)
 
-    def check(engine, point, one_sided=()):
+    def check(engine, point, one_sided=(), preserve_likelihood=True):
         minimizer = engine.getMinimizer()
         # Deliberately leave the engine at another point: the callback must refresh it.
         minimizer.evalFit([value + .02 for value in point])
@@ -68,7 +69,7 @@ def check_threads(threads):
         previous = (likelihood.getLastLikelihood(), likelihood.getLastStatLikelihood(),
                     likelihood.getLastPenaltyLikelihood())
         gradient = minimizer.evalFitGradientAt(point)
-        if not hasattr(engine, 'getBackendsManager') or not engine.getBackendsManager().hasBackend():
+        if preserve_likelihood:
             # The original gradient path propagates without evaluating scalar likelihoods.
             current = (likelihood.getLastLikelihood(), likelihood.getLastStatLikelihood(),
                        likelihood.getLastPenaltyLikelihood())
@@ -105,6 +106,11 @@ def check_threads(threads):
         close(likelihood.getLastStatLikelihood(), stat)
         return gradient
 
+    return config, build, check, close
+
+
+def check_threads(threads):
+    config, build, check, close = make_fixture(threads)
     for normalized in (False, True):
         for eigen in (False, True):
             engine = build(config, normalized, eigen)
@@ -198,12 +204,12 @@ def check_threads(threads):
     check(engine, [.3, 0., 0.], (1, 2))
 
     unsupported = copy.deepcopy(config)
-    unsupported['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'] = [helpers.formula('unsupported', '1+.1*[arg0]', {'parameterName': 'p'})]
+    unsupported['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'] = [helpers.formula('unsupported', '2+TMath::BesselJ0([arg0])', {'parameterName': 'p'})]
     engine = build(unsupported, False, False)
     try:
         engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
     except RuntimeError as error:
-        assert 'unsupported' in str(error)
+        assert 'numerical' in str(error).lower() or 'generate' in str(error).lower(), str(error)
     else:
         raise AssertionError('Unsupported dial silently differentiated')
     for kind in ('smooth', 'observable'):
@@ -222,17 +228,7 @@ def check_threads(threads):
             assert 'bins' in str(error) or 'observable' in str(error), str(error)
         else:
             raise AssertionError('Unsupported binning/observable gradient was accepted')
-    if hasattr(engine, 'getBackendsManager'):
-        engine = build(config, False, False)
-        engine.getBackendsManager().activate('CPU')
-        try:
-            engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
-        except RuntimeError as error:
-            assert 'Deactivate the backend' in str(error), str(error)
-        else:
-            raise AssertionError('CPU callback used while a backend was active')
-
-    print(f'SUCCESS: Gaussian BB CPU gradients, fit coordinates, eigenvectors, zero products and freshness ({threads} threads)')
+    print(f'SUCCESS: original-engine weight gradients ({threads} threads)')
 
 
 def main():
