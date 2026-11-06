@@ -40,6 +40,9 @@ public:
   /// Evaluate d(response)/d(input[iInput_]) at the current input point.
   [[nodiscard]] virtual double evalGradient(const DialInputBuffer& input_, int iInput_) const;
 
+  /// Full gradient; composed dials override this to share their evaluation.
+  [[nodiscard]] virtual std::vector<double> evalGradients(const DialInputBuffer& input_) const;
+
   [[nodiscard]] virtual bool hasAnalyticGradient() const { return false; }
 
   /// Allow extrapolation of the data. The default should be to forbid extrapolation.

@@ -35,6 +35,9 @@ public:
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<CompositeDial>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return "Composite"; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] bool hasAnalyticGradient() const override;
+  [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override;
+  [[nodiscard]] std::vector<double> evalGradients(const DialInputBuffer& input_) const override;
   [[nodiscard]] std::string getSummary() const override;
 
   auto& getNodes(){ return _nodes_; }
@@ -46,6 +49,8 @@ public:
   void bind(const std::function<const DialInterface*(int)>& findInterface_);
 
 private:
+  [[nodiscard]] DialInputBuffer makeNodeInputs(const Node& node_, const DialInputBuffer& input_,
+      const std::vector<double>& responses_, std::vector<double>* mirrorGradients_ = nullptr) const;
   int _inputCount_{0};
   int _outputIndex_{-1};
   bool _isBound_{false};

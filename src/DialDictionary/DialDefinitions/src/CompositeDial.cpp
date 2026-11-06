@@ -7,6 +7,7 @@
 #include "Logger.h"
 
 #include <cmath>
+#include <exception>
 #include <algorithm>
 #include <map>
 #include <sstream>
@@ -125,35 +126,112 @@ void CompositeDial::bind(const std::function<const DialInterface*(int)>& findInt
   _isBound_ = true;
 }
 
+DialInputBuffer CompositeDial::makeNodeInputs(
+    const Node& node_, const DialInputBuffer& input_, const std::vector<double>& responses_,
+    std::vector<double>* mirrorGradients_) const {
+  std::vector<double> values;
+  values.reserve(node_.inputs.size());
+  size_t iParameter = 0;
+  for( const auto& source : node_.inputs ){
+    // EventFormula supplies its loaded event values itself.
+    if( not source.eventVariable.empty() ){ continue; }
+    double value = source.bufferIndex >= 0 ? input_.getInputBuffer()[source.bufferIndex]
+                                          : responses_[source.nodeIndex];
+    const auto& edges = node_.mirrorEdges[iParameter++];
+    double slope = 1.;
+    if( not std::isnan(edges.minValue) ){
+      const double raw = std::fmod(value - edges.minValue, 2 * edges.range);
+      value = std::abs(raw);
+      slope = raw < 0 ? -1. : 1.;
+      if( value > edges.range ){
+        value = 2 * edges.range - value;
+        slope = -slope;
+      }
+      value += edges.minValue;
+    }
+    values.emplace_back(value);
+    if( mirrorGradients_ != nullptr ){ mirrorGradients_->emplace_back(slope); }
+  }
+  DialInputBuffer buffer;
+  buffer.setInputValues(std::move(values));
+  return buffer;
+}
+
 double CompositeDial::evalResponse(const DialInputBuffer& input_) const {
   LogThrowIf(not _isBound_, "Composite: graph has not been bound to an event");
   LogThrowIf(input_.getBufferSize() != _inputCount_, "Composite: input count mismatch");
-  // Scratch storage belongs to the call: shared curves remain safe when
-  // different events are evaluated concurrently.
   std::vector<double> responses(_nodes_.size());
-  DialInputBuffer buffer;
   for( int index : _evaluationOrder_ ){
     const auto& node = _nodes_[index];
-    std::vector<double> values;
-    values.reserve(node.inputs.size());
-    size_t iParameter = 0;
-    for( const auto& source : node.inputs ){
-      // EventFormula supplies its own event inputs; this buffer contains
-      // only the parameter/response inputs, in their original relative order.
-      if( not source.eventVariable.empty() ){ continue; }
-      double value = source.bufferIndex >= 0 ? input_.getInputBuffer()[source.bufferIndex] : responses[source.nodeIndex];
-      const auto& edges = node.mirrorEdges[iParameter++];
-      if( not std::isnan(edges.minValue) ){
-        value = std::abs(std::fmod(value - edges.minValue, 2 * edges.range));
-        if( value > edges.range ){ value = 2 * edges.range - value; }
-        value += edges.minValue;
-      }
-      values.emplace_back(value);
-    }
-    buffer.setInputValues(std::move(values));
+    const auto buffer = makeNodeInputs(node, input_, responses);
     responses[index] = node.supervisor.process(node.dial->evalResponse(buffer));
   }
   return responses[_outputIndex_];
+}
+
+bool CompositeDial::hasAnalyticGradient() const {
+  LogThrowIf(not _isBound_, "Composite: analytic gradient requires an event-bound graph");
+  for( int index : _evaluationOrder_ ){
+    const auto& node = _nodes_[index];
+    try{
+      LogThrowIf(node.dial == nullptr or not node.dial->hasAnalyticGradient(),
+                 "Unsupported analytic gradient");
+      LogThrowIf(node.supervisor.getMinSmoothingWidth() > 0.
+                 or node.supervisor.getMaxSmoothingWidth() > 0.,
+                 "Response smoothing is unsupported for composite gradients");
+      for( const auto& edges : node.mirrorEdges ){
+        LogThrowIf(not std::isnan(edges.minValue) and
+                   (not std::isfinite(edges.minValue) or not std::isfinite(edges.range) or edges.range <= 0.),
+                   "Invalid mirror bounds for composite gradient");
+      }
+    }
+    catch( const std::exception& error ){
+      LogThrow("Composite node " << node.name << ": " << error.what());
+    }
+  }
+  return true;
+}
+
+std::vector<double> CompositeDial::evalGradients(const DialInputBuffer& input_) const {
+  LogThrowIf(not _isBound_, "Composite: graph has not been bound to an event");
+  LogThrowIf(input_.getBufferSize() != _inputCount_, "Composite: input count mismatch");
+  // All scratch is call-local: bound curves and graphs may be shared by workers.
+  std::vector<double> responses(_nodes_.size());
+  std::vector<DialInputBuffer> inputs(_nodes_.size());
+  std::vector<std::vector<double>> mirrorGradients(_nodes_.size());
+  std::vector<bool> clamped(_nodes_.size());
+  for( int index : _evaluationOrder_ ){
+    const auto& node = _nodes_[index];
+    inputs[index] = makeNodeInputs(node, input_, responses, &mirrorGradients[index]);
+    const double raw = node.dial->evalResponse(inputs[index]);
+    responses[index] = node.supervisor.process(raw);
+    clamped[index] = responses[index] != raw;
+  }
+  std::vector<double> adjoints(_nodes_.size(), 0.);
+  std::vector<double> result(_inputCount_, 0.);
+  adjoints[_outputIndex_] = 1.;
+  for( auto position = _evaluationOrder_.rbegin(); position != _evaluationOrder_.rend(); ++position ){
+    const int index = *position;
+    if( clamped[index] or adjoints[index] == 0. ){ continue; }
+    const auto& node = _nodes_[index];
+    const auto local = node.dial->evalGradients(inputs[index]);
+    LogThrowIf(local.size() != mirrorGradients[index].size(),
+               "Composite node " << node.name << ": gradient size mismatch");
+    size_t iParameter = 0;
+    for( const auto& source : node.inputs ){
+      if( not source.eventVariable.empty() ){ continue; }
+      const double contribution = adjoints[index] * local[iParameter] * mirrorGradients[index][iParameter];
+      ++iParameter;
+      if( source.bufferIndex >= 0 ){ result[source.bufferIndex] += contribution; }
+      else{ adjoints[source.nodeIndex] += contribution; }
+    }
+  }
+  return result;
+}
+
+double CompositeDial::evalGradient(const DialInputBuffer& input_, int iInput_) const {
+  LogThrowIf(iInput_ < 0 or iInput_ >= _inputCount_, "Composite: invalid gradient input index " << iInput_);
+  return evalGradients(input_)[iInput_];
 }
 
 std::string CompositeDial::getSummary() const {
