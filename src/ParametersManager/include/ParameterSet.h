@@ -81,6 +81,7 @@ public:
   [[nodiscard]] auto getInvertedEigenVectors() const{ return _eigenVectorsInv_.get(); }
   [[nodiscard]] auto getEigenVectors() const{ return _eigenVectors_.get(); }
   [[nodiscard]] auto getDeltaVectorPtr() const{ return _deltaVectorPtr_.get(); }
+  [[nodiscard]] auto getNominalStepSize() const{ return _nominalStepSize_; }
   [[nodiscard]] auto& getName() const{ return _name_; }
   [[nodiscard]] auto& getDialSetDefinitions() const{ return _dialSetDefinitions_; }
   [[nodiscard]] auto& getCustomParThrow() const{ return _customParThrow_; }
@@ -91,7 +92,7 @@ public:
   [[nodiscard]] auto& getInversePriorCorrelationMatrix() const{ return _priorCorrelationMatrixInv_; }
 
   // derive from correlation and std-devs
-  std::shared_ptr<TMatrixD> generatePriorCovarianceMatrix() const;
+  std::shared_ptr<TMatrixDSym> generatePriorCovarianceMatrix() const;
 
   /// Get the vector of parameters for this parameter set in the real
   /// parameter space.  These parameters are not eigendecomposed.  WARNING:
@@ -172,10 +173,11 @@ public:
   static double toRealParValue(double normParValue, const Parameter& par);
   static double toRealParRange(double normParRange, const Parameter& par);
 
-  /// A convenience function to check if a parameter is enabled, not free, and
-  /// not fix.  This is true if the parameter should be in the stripped
+  /// A convenience function to check if a parameter is enabled, not free
+  /// This is true if the parameter should be in the stripped
   /// covariance matrix.
   static bool isValidCorrelatedParameter(const Parameter& par_);
+  static bool isValidAndNotFixedCorrelatedParameter(const Parameter& par_);
 
   // print
   void printConfiguration() const;
@@ -262,14 +264,15 @@ private:
   std::vector<Parameter*> _correlatedParameterList_{}; // list of references for the corr matrices
   std::shared_ptr<TMatrixDSym> _priorCorrelationMatrix_{nullptr};
   std::shared_ptr<TMatrixD> _priorCorrelationMatrixInv_{nullptr};
-  std::shared_ptr<TMatrixD> _priorCovarianceMatrixInv_{nullptr};
 
   std::shared_ptr<TVectorD>  _parameterPriorList_{nullptr};
   std::shared_ptr<TVectorD>  _parameterLowerBoundsList_{nullptr};
   std::shared_ptr<TVectorD>  _parameterUpperBoundsList_{nullptr};
   std::shared_ptr<TObjArray> _parameterNamesList_{nullptr};
 
-  std::shared_ptr<TVectorD>  _deltaVectorPtr_{nullptr}; // difference from prior
+  // penalty chi2
+  // matrices stripped from fixed/freed parameters
+  std::shared_ptr<TVectorD> _deltaVectorPtr_{nullptr}; // difference from prior + normed by std-dev
 
   std::shared_ptr<TMatrixD> _choleskyMatrix_{nullptr};
   GenericToolbox::CorrelatedVariablesSampler _correlatedVariableThrower_{};

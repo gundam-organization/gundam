@@ -299,6 +299,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getName", &Parameter::getName)
   .def("getFullTitle", &Parameter::getFullTitle)
   .def("isEnabled", &Parameter::isEnabled)
+  .def("isFree", &Parameter::isFree)
   .def("getStepSize", &Parameter::getStepSize)
   .def("getPriorValue", &Parameter::getPriorValue)
   .def("getStdDevValue", &Parameter::getStdDevValue)
