@@ -31,6 +31,8 @@ public:
   [[nodiscard]] const std::vector<double>& getDialData() const override { return _splineData_; }
 
   // methods
+  [[nodiscard]] const GenericToolbox::Range& getSplineBounds() const { return _splineBounds_; }
+
   void buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_);
 
 protected:
