@@ -349,7 +349,7 @@ void LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterGradient& gradi
 void LikelihoodInterface::evalPenaltyLikelihoodGradient(const ParameterSet& parSet_,
                                                         ParameterGradient& gradient_) const {
   if( not parSet_.isEnabled() ){ return; }
-  if( parSet_.getPriorCovarianceMatrix() == nullptr ){ return; }
+  if( parSet_.getPriorCorrelationMatrix() == nullptr ){ return; }
 
   if( parSet_.isEnableEigenDecomp() ){
     bool hasRequestedOriginalParameter{false};
@@ -373,12 +373,12 @@ void LikelihoodInterface::evalPenaltyLikelihoodGradient(const ParameterSet& parS
     if( not hasRequestedOriginalParameter ){ return; }
   }
 
-  if( parSet_.getInverseCovarianceMatrix() == nullptr or parSet_.getDeltaVectorPtr() == nullptr ){
+  if( parSet_.getInversePriorCorrelationMatrix() == nullptr or parSet_.getDeltaVectorPtr() == nullptr ){
     return;
   }
 
   parSet_.updateDeltaVector();
-  TVectorD penaltyGradient = (*parSet_.getInverseCovarianceMatrix()) * (*parSet_.getDeltaVectorPtr());
+  TVectorD penaltyGradient = (*parSet_.getInversePriorCorrelationMatrix()) * (*parSet_.getDeltaVectorPtr());
   penaltyGradient *= 2.;
 
   int iFit{0};
