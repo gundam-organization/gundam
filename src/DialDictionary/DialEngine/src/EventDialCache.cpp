@@ -325,9 +325,10 @@ void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
     if( dialInterface == nullptr or dialInterface->getInputBufferRef() == nullptr ){ continue; }
 
     const auto* inputBuffer = dialInterface->getInputBufferRef();
+    const auto dialGradients = dialInterface->evalGradients();
     for( int iInput = 0 ; iInput < inputBuffer->getInputSize() ; iInput++ ){
       auto* parameterPtr = &inputBuffer->getParameter(iInput);
-      const double dialGradient = dialInterface->evalGradient(iInput);
+      const double dialGradient = dialGradients[iInput];
       const double inputGradient = inputBuffer->evalInputGradient(iInput);
       addGradient(parameterPtr, gradientScale_ * baseWeight * productExcludingDial * dialGradient * inputGradient);
     }
@@ -377,10 +378,11 @@ void EventDialCache::evalEventWeightGradients(
         const auto* interface = entry.dialResponseCacheList[i].dialInterface;
         const auto* input = interface->getInputBufferRef();
         if( input == nullptr or factor == 0. ){ continue; }
+        const auto dialGradients = interface->evalGradients();
         for( int j = 0; j < input->getInputSize(); ++j ){
           const auto found = indices.find(&input->getParameter(j));
           if( found == indices.end() ){ continue; }
-          sums[found->second] += factor * interface->evalGradient(j) * input->evalInputGradient(j);
+          sums[found->second] += factor * dialGradients[j] * input->evalInputGradient(j);
         }
       }
     }
