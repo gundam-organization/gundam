@@ -33,6 +33,8 @@
 #include <TClass.h>
 #include <TGraph.h>
 
+#include <array>
+#include <cstring>
 #include <exception>
 #include <unordered_map>
 #include <map>
@@ -549,6 +551,7 @@ void DataDispenser::prepareConfig(ConfigReader &config_){
     {"overridePropagatorConfig"},
     {"selectionCutFormula"},
     {"allowMultipleSamplesPerEntry"},
+    {"enableDialInputCache"},
     {"nominalWeightFormula", {"nominalTreeWeightFormula"}},
     {"variableDict", {"overrideLeafDict"}},
     {"fromModel", {"fromMc"}},
@@ -740,6 +743,7 @@ void DataDispenser::configureImpl(){
   _config_.fillValue(_parameters_.overridePropagatorConfig, "overridePropagatorConfig");
   _config_.fillValue(_parameters_.evalModelAt, "evalModelAt");
   _config_.fillValue(_parameters_.allowMultipleSamplesPerEntry, "allowMultipleSamplesPerEntry");
+  _config_.fillValue(_parameters_.enableDialInputCache, "enableDialInputCache");
 
   _config_.fillFormula(_parameters_.selectionCutFormulaStr, "selectionCutFormula", "&&");
   _config_.fillFormula(_parameters_.nominalWeightFormulaStr, "nominalWeightFormula", "*");
@@ -1174,10 +1178,8 @@ void DataDispenser::preAllocateMemory(){
   }
 
   size_t nTotalSlots{0};
-  size_t nDialsMaxPerEvent{0};
   for( auto& dialCollection : _cache_.dialCollectionsRefList ){
     LogScopeIndent;
-    nDialsMaxPerEvent += 1;
 
     // Branch dials grow on demand in storeEventDial, according to unique count.
     if (dialCollection->isEventByEvent() and not dialCollection->hasDialBranchData()) {
@@ -1203,7 +1205,7 @@ void DataDispenser::preAllocateMemory(){
     LogInfo << "Created "  << nTotalSlots << " slots (" << _cache_.totalNbEvents << " per set) for event-by-event dials:" << std::endl;
   }
 
-  _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, nDialsMaxPerEvent);
+  _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, 0);
 }
 void DataDispenser::readAndFill(){
   LogInfo << "Reading dataset and loading..." << std::endl;
@@ -1910,6 +1912,66 @@ void DataDispenser::loadEvent(int iThread_){
   std::unordered_map<int, size_t> eventByEventDialBuffer{};
   eventByEventDialBuffer.reserve(_cache_.dialCollectionsRefList.size());
 
+  // Bounded per-worker memoization. Never identify curves by their ROOT address:
+  // GetEntry reuses the same object while replacing its points. Keep the exact
+  // bytes of at most 64 finite, ordered knots, plus the already stored result.
+  struct LastGraphInput{
+    std::array<double, 64> x;
+    std::array<double, 64> y;
+    int size{-1};
+    size_t interfaceIndex{size_t(-1)};
+  };
+  size_t graphInputCacheHits{0};
+  std::vector<LastGraphInput> lastGraphInputs(_cache_.dialCollectionsRefList.size());
+  auto loadDial = [&](const TObject* object_, size_t collectionSlot_) -> size_t {
+    auto& collection = *_cache_.dialCollectionsRefList[collectionSlot_];
+    auto& cached = lastGraphInputs[collectionSlot_];
+    const auto* graph = object_ != nullptr and object_->IsA() == TGraph::Class()
+        ? static_cast<const TGraph*>(object_) : nullptr;
+    bool reusable = _parameters_.enableDialInputCache and collection.canReuseGraphInput()
+        and graph != nullptr and graph->GetN() >= 0 and graph->GetN() <= int(cached.x.size());
+    if( reusable ){
+      for( int i = 0; i < graph->GetN(); ++i ){
+        if( not std::isfinite(graph->GetX()[i]) or not std::isfinite(graph->GetY()[i])
+            or (i != 0 and not (graph->GetX()[i] > graph->GetX()[i-1])) ){
+          reusable = false;
+          break;
+        }
+      }
+    }
+    if( reusable and cached.size == graph->GetN() ){
+      const auto bytes = size_t(cached.size) * sizeof(double);
+      if( bytes == 0 or (std::memcmp(cached.x.data(), graph->GetX(), bytes) == 0
+                        and std::memcmp(cached.y.data(), graph->GetY(), bytes) == 0) ){
+        ++graphInputCacheHits;
+        return cached.interfaceIndex;
+      }
+    }
+    auto dial = collection.makeDial(object_);
+    size_t index{size_t(-1)};
+    if( dial != nullptr ){
+      // The collection validates the actual factory result through its typed
+      // signature. Norm and Shift have no spline payload to inspect here.
+      bool hasFiniteSignature{false};
+      index = collection.storeEventDial(std::move(dial), reusable ? &hasFiniteSignature : nullptr);
+      reusable = reusable and hasFiniteSignature;
+    }
+    if( reusable ){
+      cached.size = graph->GetN();
+      cached.interfaceIndex = index; // Also remember an identity response omitted by the factory.
+      if( cached.size != 0 ){
+        std::copy_n(graph->GetX(), cached.size, cached.x.begin());
+        std::copy_n(graph->GetY(), cached.size, cached.y.begin());
+      }
+    }
+    return index;
+  };
+
+
+  // Reuse per-worker scratch space; retained event lists contain selected dials only.
+  std::vector<EventDialCache::DialIndexCacheEntry> selectedDialIndices;
+  selectedDialIndices.reserve(_cache_.dialCollectionsRefList.size());
+
   if(iThread_ == 0){
 
     LogInfo << "Feeding event variables with:" << std::endl;
@@ -2205,10 +2267,8 @@ void DataDispenser::loadEvent(int iThread_){
           for( int iPoint = 0; iPoint < parameterValues->GetSize(); ++iPoint ){
             graph.SetPoint(iPoint, parameterValues->GetAt(iPoint), responses->GetAt(iPoint));
           }
-          auto dial = dialCollectionRef->makeDial(&graph);
-          if( dial != nullptr ){
-            eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialCollectionRef->storeEventDial(std::move(dial));
-          }
+          const auto index = loadDial(&graph, iDialCollection);
+          if( index != size_t(-1) ){ eventByEventDialBuffer[dialCollectionRef->getIndex()] = index; }
           continue;
         }
 
@@ -2226,10 +2286,8 @@ void DataDispenser::loadEvent(int iThread_){
           dialObjectPtr = ((const TClonesArray *) dialObjectPtr)->At(dialCloneArrayIndex);
         }
 
-        auto dial = dialCollectionRef->makeDial(dialObjectPtr);
-        if( dial != nullptr ){
-          eventByEventDialBuffer[dialCollectionRef->getIndex()] = dialCollectionRef->storeEventDial(std::move(dial));
-        }
+        const auto index = loadDial(dialObjectPtr, iDialCollection);
+        if( index != size_t(-1) ){ eventByEventDialBuffer[dialCollectionRef->getIndex()] = index; }
       }
 
     }
@@ -2267,7 +2325,7 @@ void DataDispenser::loadEvent(int iThread_){
       eventDialCacheEntry->event.sampleIndex = std::size_t(eventIndexingBuffer.getIndices().sample);
       eventDialCacheEntry->event.eventIndex = sampleEventIndex;
 
-      auto *dialEntryPtr = eventDialCacheEntry->dials.data();
+      selectedDialIndices.clear();
       for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
         auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
 
@@ -2276,9 +2334,7 @@ void DataDispenser::loadEvent(int iThread_){
 
           const auto dial = eventByEventDialBuffer.find(dialCollectionRef->getIndex());
           if( dial != eventByEventDialBuffer.end() ){
-            dialEntryPtr->collectionIndex = dialCollectionRef->getIndex();
-            dialEntryPtr->interfaceIndex = dial->second;
-            dialEntryPtr++;
+            selectedDialIndices.push_back({std::size_t(dialCollectionRef->getIndex()), dial->second});
           }
 
           continue; // skip the rest
@@ -2309,9 +2365,7 @@ void DataDispenser::loadEvent(int iThread_){
             dialCollectionRef->getDialInterfaceList()[freeSlotDial].getDial().dialPtr =
               std::unique_ptr<DialBase>(dialBase.release());
 
-            dialEntryPtr->collectionIndex = iCollection;
-            dialEntryPtr->interfaceIndex = freeSlotDial;
-            dialEntryPtr++;
+            selectedDialIndices.push_back({std::size_t(iCollection), std::size_t(freeSlotDial)});
           }
         }
         else{
@@ -2321,9 +2375,7 @@ void DataDispenser::loadEvent(int iThread_){
             // There isn't any binning, and there is only one dial.
             // In this case we don't need to check if the dial is in
             // a bin.
-            dialEntryPtr->collectionIndex = iCollection;
-            dialEntryPtr->interfaceIndex = 0;
-            dialEntryPtr++;
+            selectedDialIndices.push_back({std::size_t(iCollection), std::size_t(0)});
           }
           else{
             // There are multiple dials, or there is a list of bins
@@ -2333,14 +2385,14 @@ void DataDispenser::loadEvent(int iThread_){
             auto dialBinIdx = eventIndexingBuffer.getVariables().findBinIndex(
                 dialCollectionRef->getDialBinSet().getBinList());
             if( dialBinIdx != -1 ){
-              dialEntryPtr->collectionIndex = iCollection;
-              dialEntryPtr->interfaceIndex = dialBinIdx;
-              dialEntryPtr++;
+              selectedDialIndices.push_back({std::size_t(iCollection), std::size_t(dialBinIdx)});
             }
           }
         }
 
       } // dial collection loop
+
+      eventDialCacheEntry->dials.assign(selectedDialIndices.begin(), selectedDialIndices.end());
 
     }
 
@@ -2358,6 +2410,8 @@ void DataDispenser::loadEvent(int iThread_){
     }
 
   } // while ok
+
+  LogInfo << "Graph input cache hits for worker #" << iThread_ << ": " << graphInputCacheHits << std::endl;
 
 }
 

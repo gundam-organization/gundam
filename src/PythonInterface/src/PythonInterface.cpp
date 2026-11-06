@@ -289,6 +289,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::bind_vector<std::vector<EventDialCache::CacheEntry>>(module, "EventDialCacheEntryList");
 
   pybind11::class_<EventDialCache>(module, "EventDialCache")
+  .def("getCacheMemorySize", &EventDialCache::getCacheMemorySize,
+       "Allocated bytes in cache vector buffers; excludes events, dial objects and allocator overhead.")
   .def("getFillIndex", &EventDialCache::getFillIndex)
   .def("getCache", pybind11::overload_cast<>(&EventDialCache::getCache), pybind11::return_value_policy::reference_internal)
   ;

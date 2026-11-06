@@ -296,7 +296,7 @@ void DialCollection::growEventDialIndex(){
   _eventDialIndex_.swap(expanded);
 }
 
-size_t DialCollection::storeEventDial(std::unique_ptr<DialBase> dial_){
+size_t DialCollection::storeEventDial(std::unique_ptr<DialBase> dial_, bool* hasFiniteSignature_){
   LogThrowIf(dial_ == nullptr, "Cannot store a null event dial");
   std::vector<double> signature;
   // Interface sharing is only valid when every interface uses the same inputs
@@ -304,6 +304,10 @@ size_t DialCollection::storeEventDial(std::unique_ptr<DialBase> dial_){
   bool canShare = _dialInputBufferList_.size() == 1
       and _dialResponseSupervisorList_.size() == 1
       and getDialSignature(*dial_, signature);
+  if( hasFiniteSignature_ != nullptr ){
+    *hasFiniteSignature_ = canShare and std::all_of(signature.begin(), signature.end(),
+        [](double value_){ return std::isfinite(value_); });
+  }
   const size_t hash = getDialSignatureHash(*dial_, signature);
 
   std::unique_lock<std::mutex> lock(_eventDialMutex_);

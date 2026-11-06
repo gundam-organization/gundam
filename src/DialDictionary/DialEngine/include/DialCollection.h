@@ -70,6 +70,14 @@ public:
   // DataDispenser.
   [[nodiscard]] bool isEventByEvent() const {return _isEventByEvent_;}
 
+  // Raw TGraph memoization is valid only for immutable, shareable definitions.
+  // ROOT splines and event-dependent factories retain their construction path.
+  [[nodiscard]] bool canReuseGraphInput() const{
+    return (_dialType_ == DialType::Graph or _dialType_ == DialType::Spline)
+        and _dialOptions_.find("ROOT") == std::string::npos
+        and _dialInputBufferList_.size() == 1 and _dialResponseSupervisorList_.size() == 1;
+  }
+
   // Check if the dial is enabled during this run
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
 
@@ -158,7 +166,9 @@ public:
 
   // Loading only: store a branch dial, reusing an identical lightweight dial.
   // Returns an interface index; no interface pointers may be retained while loading.
-  size_t storeEventDial(std::unique_ptr<DialBase> dial_);
+  // Optionally report whether the stored definition has a finite, shareable
+  // signature. Norm/Shift signatures do not use the spline payload API.
+  size_t storeEventDial(std::unique_ptr<DialBase> dial_, bool* hasFiniteSignature_ = nullptr);
 
   // Return the next preallocated slot. Thread safe for event dial factories.
   size_t getNextDialFreeSlot(){ return _dialFreeSlot_++; }
