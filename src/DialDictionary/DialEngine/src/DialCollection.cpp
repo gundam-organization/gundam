@@ -342,6 +342,26 @@ size_t DialCollection::storeEventDial(std::unique_ptr<DialBase> dial_, bool* has
   return index;
 }
 
+void DialCollection::resetForLoad(){
+  if( not _dialCollectionData_.empty() ){
+    // Factories may own event inputs, shared-memory buffers or external workers.
+    // Recreate them rather than retaining state shared with a copied propagator.
+    DialCollection fresh(_parameterSetListPtr_);
+    fresh.setIndex(_index_);
+    fresh.setSupervisedParameterSetIndex(_supervisedParameterSetIndex_);
+    fresh.setSupervisedParameterIndex(_supervisedParameterIndex_);
+    fresh.configure(_config_);
+    *this = std::move(fresh);
+    initialize();
+  }
+  else{
+    if( isEventByEvent() ){ clear(); }
+    // Also repairs references after copying the model propagator to data.
+    if( isEnabled() ){ setupDialInterfaceReferences(); }
+  }
+  invalidateCachedInputBuffers();
+}
+
 void DialCollection::clear(){
   _dialInterfaceList_.clear();
   _dialInterfaceList_.shrink_to_fit();

@@ -66,7 +66,7 @@ void DialManager::shrinkDialContainers(){
 }
 void DialManager::clearEventByEventDials(){
   for( auto& dialCollection: _dialCollectionList_ ) {
-    if( dialCollection.hasDialBranchData() ) { dialCollection.clear(); }
+    dialCollection.resetForLoad();
   }
   invalidateInputBuffers();
 }

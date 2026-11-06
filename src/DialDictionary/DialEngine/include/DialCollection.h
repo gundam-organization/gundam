@@ -61,6 +61,7 @@ public:
   void setIndex(int index){ _index_ = index; }
   void setSupervisedParameterIndex(int supervisedParameterIndex){ _supervisedParameterIndex_ = supervisedParameterIndex; }
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex){ _supervisedParameterSetIndex_ = supervisedParameterSetIndex; }
+  void setParameterSetList(std::vector<ParameterSet>* parameterSetList_){ _parameterSetListPtr_ = parameterSetList_; }
 
   // const getters
   auto getSupervisedParameterSetIndex() const{ return _supervisedParameterSetIndex_; }
@@ -132,6 +133,8 @@ public:
 
   // core
   void clear();
+  // Preserve static definitions, but discard state belonging to the previous load.
+  void resetForLoad();
 
   // Called after the DialCollection has been fully initialized, and reclaims
   // any unused space.
