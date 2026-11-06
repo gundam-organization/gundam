@@ -110,6 +110,7 @@ def make_fixture(threads):
 
 
 def check_threads(threads):
+    import GUNDAM
     config, build, check, close = make_fixture(threads)
     for normalized in (False, True):
         for eigen in (False, True):
