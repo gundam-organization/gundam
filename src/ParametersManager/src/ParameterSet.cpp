@@ -290,6 +290,7 @@ void ParameterSet::processCovarianceMatrix(){
 
     LogExitIf(failed, "Failed inverting prior covariance matrix of par set: " << getName() );
 
+
   }
   else {
     LogInfo << "Decomposing the stripped covariance matrix..." << std::endl;

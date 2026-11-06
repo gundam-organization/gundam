@@ -40,6 +40,7 @@ TEST(jointProbability, BarlowBeestonResolvesPoissonDevianceNearTheMinimum) {
     }
 }
 
+
 TEST(jointProbability, BarlowBeestonResolvesMcUncertaintyNearTheMinimum) {
     std::unique_ptr<JointProbability::JointProbabilityBase> probability(
         JointProbability::makeJointProbability("BarlowLLH_BANFF_OA2021"));
