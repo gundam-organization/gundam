@@ -83,4 +83,4 @@ at initialization**, with no automatic fallback to numerical gradients.
 The log reports `Supplied gradient calls`.
 
 Comparisons against finite differences are covered in particular by
-[`903CpuWeightGradient.py`](../../tests/fast-tests/903CpuWeightGradient.py).
+[`590NumericsWeightGradient.py`](../../tests/python/fast/590NumericsWeightGradient.py).
