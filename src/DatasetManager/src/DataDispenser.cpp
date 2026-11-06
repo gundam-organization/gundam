@@ -763,17 +763,18 @@ void DataDispenser::load(Propagator& propagator_){
   _cache_.propagatorPtr = &propagator_;
 
   if( not _parameters_.overridePropagatorConfig.empty() ){
-    LogWarning << "Reload the propagator config with override options" << std::endl;
     ConfigUtils::ConfigBuilder configHandler( _cache_.propagatorPtr->getConfig().getConfig() );
     configHandler.override( _parameters_.overridePropagatorConfig );
 
-    ConfigReader ch( configHandler.getConfig() );
-    ch.setParentPath(_cache_.propagatorPtr->getConfig().getParentPath());
-    _cache_.propagatorPtr->setConfig(ch);
+    if( not _cache_.propagatorPtr->isConfiguredWith(configHandler.getConfig()) ){
+      ConfigReader ch( configHandler.getConfig() );
+      ch.setParentPath(_cache_.propagatorPtr->getConfig().getParentPath());
+      _cache_.propagatorPtr->setConfig(ch);
 
-    LogWarning << "Re-configuring the propagator with overriden parameters..." << std::endl;
-    _cache_.propagatorPtr->configure();
-    _cache_.propagatorPtr->initialize();
+      LogWarning << "Re-configuring the propagator with overriden parameters..." << std::endl;
+      _cache_.propagatorPtr->configure();
+      _cache_.propagatorPtr->initialize();
+    }
   }
 
   this->buildSampleToFillList();
