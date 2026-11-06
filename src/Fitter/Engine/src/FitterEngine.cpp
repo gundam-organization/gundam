@@ -387,11 +387,6 @@ void FitterEngine::evalGradient(ParameterGradient& gradient_){
   getLikelihoodInterface().propagateAndEvalGradient(gradient_);
 }
 
-// Core
-void FitterEngine::evalGradient(ParameterGradient& gradient_){
-  getLikelihoodInterface().propagateAndEvalGradient(gradient_);
-}
-
 std::string FitterEngine::getPropagationMonitorTitle() const {
 #ifdef GUNDAM_USING_BACKENDS
   if( _backendsManager_.hasBackend() ){

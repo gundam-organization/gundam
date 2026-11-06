@@ -41,7 +41,7 @@ public:
   struct DialResponseCache {
     DialResponseCache() = delete; // prevent not setting up the interface ptr
     explicit DialResponseCache( DialInterface& interface_ )
-      : dialInterface(&interface_), inputRevisionPtr(interface_.getInputBufferRef()->getRevisionPtr()) {}
+      : dialInterface(&interface_) {}
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.

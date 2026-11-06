@@ -157,10 +157,6 @@ public:
   std::vector<Parameter *> &getMinimizerFitParameterList(){ return _minimizerParameterPtrList_; }
   const std::vector<Parameter *> &getMinimizerFitParameterList() const{ return _minimizerParameterPtrList_; }
 
-  std::vector<Parameter *> &getMinimizerFitParameterList(){ return _minimizerParameterPtrList_; }
-  const std::vector<Parameter *> &getMinimizerFitParameterList() const{ return _minimizerParameterPtrList_; }
-
-
 protected:
   /// Get a reference to the FitterEngine that owns this minimizer.
   FitterEngine& getOwner() { return *_owner_; }
