@@ -450,6 +450,9 @@ void DialCollection::resetForLoad(){
     fresh.setIndex(_index_);
     fresh.setSupervisedParameterSetIndex(_supervisedParameterSetIndex_);
     fresh.setSupervisedParameterIndex(_supervisedParameterIndex_);
+    // Preserve graph membership before configuring node response limits.
+    fresh.setIsCompositeNode(_isCompositeNode_);
+    fresh.setCompositeParentIndex(_compositeParentIndex_);
     fresh.configure(_config_);
     *this = std::move(fresh);
     initialize();
