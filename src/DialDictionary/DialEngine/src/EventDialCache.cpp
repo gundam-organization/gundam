@@ -14,6 +14,20 @@
 #include <algorithm>
 #include <unordered_map>
 
+#include <algorithm>
+
+
+size_t EventDialCache::getCacheMemorySize() const{
+  size_t bytes = _indexedCache_.capacity() * sizeof(IndexedCacheEntry)
+      + _cache_.capacity() * sizeof(CacheEntry);
+  for( const auto& entry : _indexedCache_ ){
+    bytes += entry.dials.capacity() * sizeof(DialIndexCacheEntry);
+  }
+  for( const auto& entry : _cache_ ){
+    bytes += entry.dialResponseCacheList.capacity() * sizeof(DialResponseCache);
+  }
+  return bytes;
+}
 
 void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
@@ -27,21 +41,23 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
   {
     LogScopeIndent;
     LogInfo << "Breaking down indexed cache per sample..." << std::endl;
+    for( size_t iSample = 0; iSample < sampleIndexCacheList.size(); ++iSample ){
+      sampleIndexCacheList[iSample].reserve(sampleSet_.getSampleList()[iSample].getEventList().size());
+    }
     for( auto& entry : _indexedCache_ ){
       if( entry.event.sampleIndex == size_t(-1) ){ continue; }
       if( entry.event.eventIndex == size_t(-1) ){ continue; }
 
-      sampleIndexCacheList[entry.event.sampleIndex].emplace_back( entry );
-      sampleIndexCacheList[entry.event.sampleIndex].back().dials.clear();
-      for( auto& dial : entry.dials ){
-        if( dial.collectionIndex == size_t(-1) ){ continue; }
-        if( dial.interfaceIndex == size_t(-1)  ){ continue; }
-        sampleIndexCacheList[entry.event.sampleIndex].back().dials.emplace_back(dial);
-      }
+      auto& sampleCache = sampleIndexCacheList[entry.event.sampleIndex];
+      sampleCache.emplace_back(std::move(entry));
+      auto& dials = sampleCache.back().dials;
+      dials.erase(std::remove_if(dials.begin(), dials.end(), [](const DialIndexCacheEntry& dial_){
+        return dial_.collectionIndex == size_t(-1) or dial_.interfaceIndex == size_t(-1);
+      }), dials.end());
     }
 
     LogInfo << "Cleaning up the index cache..." << std::endl;
-    _indexedCache_.clear();
+    std::vector<IndexedCacheEntry>().swap(_indexedCache_);
 
     LogInfo << "Performing per sample sorting..." << std::endl;
     int iSample{-1};
@@ -191,10 +207,17 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
           target->overrideDial = responseIndex;
         }
       }
+      // Release consumed index buffers while constructing the final cache.
+      std::vector<DialIndexCacheEntry>().swap(indexCache.dials);
     }
+    std::vector<IndexedCacheEntry>().swap(sampleIndexCache);
   }
 
-  LogInfo << "Reference cache has been setup." << std::endl;
+  size_t responseCount{0};
+  for( const auto& entry : _cache_ ){ responseCount += entry.dialResponseCacheList.size(); }
+  LogInfo << "Reference cache has been setup: " << _cache_.size() << " events, "
+          << responseCount << " responses (" << sizeof(DialResponseCache)
+          << " bytes/response), " << getCacheMemorySize() << " bytes in cache buffers." << std::endl;
 }
 void EventDialCache::allocateCacheEntries( size_t nEvent_, size_t nDialsMaxPerEvent_) {
     _indexedCache_.resize(

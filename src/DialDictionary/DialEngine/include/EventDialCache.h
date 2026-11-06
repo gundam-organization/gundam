@@ -201,6 +201,9 @@ public:
   std::vector<CacheEntry> &getCache(){ return _cache_; }
   [[nodiscard]] const std::vector<CacheEntry> &getCache() const{ return _cache_; }
 
+  /// Allocated cache vector buffers, excluding events, dial objects and allocator overhead.
+  [[nodiscard]] size_t getCacheMemorySize() const;
+
   GlobalEventReweightCap& getGlobalEventReweightCap(){ return _globalEventReweightCap_; }
 
   /// Allocate entries for events in the indexed cache.  The first parameter

@@ -5,6 +5,7 @@
 #include "FitterEngine.h"
 #include "GundamApp.h"
 #include "GundamGlobals.h"
+#include "GundamUtils.h"
 #include "RootMinimizer.h"
 #include "SimpleMcmc.h"
 
@@ -231,20 +232,20 @@ void FitterEngine::initializeImpl(){
     for( auto& parSet : getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList() ){
       if(not parSet.isEnabled()) continue;
 
-      auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-          parSet.getPriorCovarianceMatrix().get(), "covarianceMatrix"
-      );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
-          GenericToolbox::toCorrelationMatrix(parSet.getPriorCovarianceMatrix().get()),
-          "correlationMatrix"
-      );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-          parSet.getInverseCovarianceMatrix().get(), "invCovarianceMatrix"
-      );
+    auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        parSet.generatePriorCovarianceMatrix().get(), "priorCovarianceMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
+        parSet.getPriorCorrelationMatrix().get(),
+        "priorCorrelationMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        parSet.getInversePriorCorrelationMatrix().get(), "priorCorrelationMatrixInv"
+    );
 
       auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
       for( auto& par : parSet.getParameterList() ){
@@ -258,7 +259,7 @@ void FitterEngine::initializeImpl(){
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "index", std::to_string( par.getParameterIndex() ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( par.getPriorValue() ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( par.getStdDevValue() ).c_str() ) );
-        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( par.getPriorType().value ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( par.isFree() ? 1 : 0 ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( par.getParameterLimits().min ).c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( par.getParameterLimits().max ).c_str() ) );
       }
@@ -276,7 +277,7 @@ void FitterEngine::initializeImpl(){
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "index", std::to_string( eigen.getParameterIndex() ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( eigen.getPriorValue() ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( eigen.getStdDevValue() ).c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( eigen.getPriorType().value ).c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( eigen.isFree() ? 1 : 0 ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( eigen.getParameterLimits().min ).c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( eigen.getParameterLimits().max ).c_str() ) );
         }
@@ -320,6 +321,14 @@ void FitterEngine::initializeImpl(){
     LogInfo << "Saving all objects to disk..." << std::endl;
     GenericToolbox::triggerTFileWrite(_saveDir_);
   }
+
+  // Loading, PCA and output serialization can leave large freed allocations
+  // resident. Return unused allocator pages once, before scans/minimization.
+  LogInfo << "RAM before releasing unused allocator pages: "
+          << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
+  GundamUtils::releaseUnusedMemory();
+  LogInfo << "RAM after releasing unused allocator pages: "
+          << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
 
 }
 
@@ -402,7 +411,7 @@ void FitterEngine::fit(){
           auto& parList = parSet.getParameterList();
           double pushVal =
               parList[parIndex].getParameterValue()
-              + parList[parIndex].getStdDevValue()
+              + ParameterSet::toRealParRange(1., parList[parIndex])
                 * GenericToolbox::Json::fetchValue<double>(entry, "nbSigmaAway");
 
           LogAlert << "Pushing #" << parIndex << " to " << pushVal << std::endl;
@@ -589,7 +598,7 @@ void FitterEngine::runPcaCheck(){
 
       if( par.isEnabled() and not par.isPenaltyDisabled() ){
         double currentParValue = par.getParameterValue();
-        par.setParameterValue( currentParValue + par.getStdDevValue() );
+        par.setParameterValue( currentParValue + ParameterSet::toRealParRange(1., par) );
 
         ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
@@ -670,7 +679,7 @@ void FitterEngine::rescaleParametersStepSize(){
       if( not par.isEnabled() ){ continue; }
 
       double currentParValue = par.getParameterValue();
-      par.setParameterValue( currentParValue + par.getStdDevValue() );
+      par.setParameterValue( currentParValue + ParameterSet::toRealParRange(1., par) );
 
       getLikelihoodInterface().propagateAndEvalLikelihood();
 
@@ -688,7 +697,7 @@ void FitterEngine::rescaleParametersStepSize(){
               << " -> σ x " << _parStepGain_ << " x " << stepSize
               << " -> Δχ² = " << deltaChi2 << " = " << deltaChi2 - deltaChi2Pulls << "(stat) + " << deltaChi2Pulls << "(pulls)";
 
-      stepSize *= par.getStdDevValue() * _parStepGain_;
+      stepSize *= ParameterSet::toRealParRange(1., par) * _parStepGain_;
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );

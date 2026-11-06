@@ -22,6 +22,8 @@ public:
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override { return _shiftValue_; }
   [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override { return 0.; }
 
+  [[nodiscard]] double getShiftValue() const { return _shiftValue_; }
+
   // setters
   void setShiftValue(double shift_){ _shiftValue_ = shift_; }
 

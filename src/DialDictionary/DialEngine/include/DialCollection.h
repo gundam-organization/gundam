@@ -19,6 +19,8 @@
 #include <string>
 #include <memory>
 #include <sstream>
+#include <mutex>
+#include <unordered_map>
 
 class DialCollection : public JsonBaseClass {
 
@@ -79,6 +81,14 @@ public:
   // shared between events.  Used to decide how to attach to events in
   // DataDispenser.
   [[nodiscard]] bool isEventByEvent() const {return _isEventByEvent_;}
+
+  // Raw TGraph memoization is valid only for immutable, shareable definitions.
+  // ROOT splines and event-dependent factories retain their construction path.
+  [[nodiscard]] bool canReuseGraphInput() const{
+    return (_dialType_ == DialType::Graph or _dialType_ == DialType::Spline)
+        and _dialOptions_.find("ROOT") == std::string::npos
+        and _dialInputBufferList_.size() == 1 and _dialResponseSupervisorList_.size() == 1;
+  }
 
   // Check if the dial is enabled during this run
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
@@ -153,6 +163,9 @@ public:
   // DialCollection has changed to fix any pointer issues.
   void setupDialInterfaceReferences();
 
+  // Keep one interface per bin while sharing identical immutable curves.
+  void deduplicateBinnedDials();
+
   // Update the dial collection.  Most dial collections don't need an update,
   // but this provides a handle for collections that precalculate values prior
   // to doing the event reweighting.  An example of that would be the
@@ -172,8 +185,13 @@ public:
   // reweight calculation has been "frozen".
   void updateInputBuffers();
 
-  // Return the next slot in the DialBaseList that can b filled. Its
-  // thread safe, so multiple threads can fill the list.
+  // Loading only: store a branch dial, reusing an identical lightweight dial.
+  // Returns an interface index; no interface pointers may be retained while loading.
+  // Optionally report whether the stored definition has a finite, shareable
+  // signature. Norm/Shift signatures do not use the spline payload API.
+  size_t storeEventDial(std::unique_ptr<DialBase> dial_, bool* hasFiniteSignature_ = nullptr);
+
+  // Return the next preallocated slot. Thread safe for event dial factories.
   size_t getNextDialFreeSlot(){ return _dialFreeSlot_++; }
   size_t getDialFreeSlotIndex() const { return _dialFreeSlot_.getValue(); }
 
@@ -222,6 +240,8 @@ protected:
   std::unique_ptr<DialBase> makeGraphDial(const std::vector<DialUtils::DialPoint>& pointList_) const;
 
 private:
+  void growEventDialIndex();
+
   // parameters
   bool _isEventByEvent_{false};
   bool _isCompositeNode_{false};
@@ -278,6 +298,16 @@ private:
   std::vector<DialResponseSupervisor> _dialResponseSupervisorList_{};
 
   GenericToolbox::Atomic<size_t> _dialFreeSlot_{0};
+  GenericToolbox::NoCopyWrapper<std::mutex> _eventDialMutex_{};
+  // Flat, open-addressed loading index: avoid a heap allocation per unique dial.
+  // The full signature is still compared before two interfaces are shared.
+  struct EventDialIndexEntry{
+    size_t hash{0};
+    size_t interfaceIndex{size_t(-1)};
+  };
+  std::vector<EventDialIndexEntry> _eventDialIndex_{};
+  size_t _eventDialIndexSize_{0};
+  size_t _reusedEventDials_{0};
 
   // A pointer to dial specific data
   std::vector<std::shared_ptr<DialCollection::CollectionData>>  _dialCollectionData_;
