@@ -48,6 +48,10 @@ protected:
   [[nodiscard]] const std::vector<std::unique_ptr<SharedMemoryBuffer>>& getInputBufferList() const { return _inputBufferList_; }
   [[nodiscard]] const SharedMemoryBuffer* getParameterBuffer() const { return _parameterBuffer_.get(); }
   [[nodiscard]] const SharedMemoryBuffer* getWeightBuffer() const { return _weightBuffer_.get(); }
+  [[nodiscard]] const SharedMemoryBuffer* getGradientBuffer() const { return _gradientBuffer_.get(); }
+  [[nodiscard]] bool isGradientRequested() const { return _weightSource_->isGradientRequested(); }
+  [[nodiscard]] std::uint64_t getEvaluationGeneration() const { return _weightSource_->getGeneration() + 1; }
+  void setSupportsGradient(bool supported_){ _weightSource_->_supportsGradient_ = supported_; }
   [[nodiscard]] std::size_t getEventCount() const { return _eventCount_; }
   [[nodiscard]] std::size_t getWeightCount() const { return _weightCount_; }
 
@@ -66,6 +70,7 @@ private:
   std::vector<std::unique_ptr<SharedMemoryBuffer>> _inputBufferList_{};
   std::unique_ptr<SharedMemoryBuffer> _parameterBuffer_{nullptr};
   std::shared_ptr<SharedMemoryBuffer> _weightBuffer_{nullptr};
+  std::shared_ptr<SharedMemoryBuffer> _gradientBuffer_{nullptr};
   std::size_t _eventCount_{0};
   std::size_t _weightCount_{0};
   bool _useBinnedWeights_{false};

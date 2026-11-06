@@ -69,6 +69,9 @@ public:
   // core
   void invalidateBuffers();
 
+  // An external producer may update responses at unchanged parameter values.
+  void markUpdated(){ ++_revision_; _isDialUpdateRequested_ = true; }
+
   /// Make sure everything is ready for use
   void initialise();
 

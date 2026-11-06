@@ -20,6 +20,9 @@ public:
   [[nodiscard]] std::string getDialTypeName() const override { return {"ExternalWeightDispatcher"}; }
 
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] bool hasAnalyticGradient() const override;
+  [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override;
+  [[nodiscard]] std::vector<double> evalGradients(const DialInputBuffer& input_) const override;
   [[nodiscard]] std::string getSummary() const override;
 
   [[nodiscard]] const std::shared_ptr<const ExternalWeightBuffer>& getWeightSource() const { return _weightSource_; }

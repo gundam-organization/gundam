@@ -11,6 +11,8 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
+#include <limits>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -177,11 +179,17 @@ void ExternalWeightWorker::updateWeights(DialInputBuffer& inputBuffer_) {
   if( not _areEventsLoaded_ ){
     this->finalizeEventLoading();
   }
-  else if( not _isEvaluationPending_ and not inputBuffer_.isDialUpdateRequested() ){
+  else if( not _isEvaluationPending_ and not inputBuffer_.isDialUpdateRequested()
+           and (not isGradientRequested() or _weightSource_->hasCurrentGradient()) ){
+    _weightSource_->_gradientRequested_ = false;
     return;
   }
   _isEvaluationPending_ = true;
   this->evaluate(inputBuffer_);
+  // A first gradient request can recompute weights at unchanged inputs. Make
+  // every response cache consume this publication, including on a retry.
+  inputBuffer_.markUpdated();
+  _weightSource_->_gradientRequested_ = false;
   _isEvaluationPending_ = false;
 }
 
@@ -204,7 +212,39 @@ void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
     _parameterBuffer_->ptr[iPar] = inputBuffer_.getInputBuffer().at(iPar);
   }
 
+  _weightSource_->_gradientValid_ = false;
+  LogThrowIf(_weightSource_->_generation_ == std::numeric_limits<std::uint64_t>::max(),
+             "ExternalWeight generation overflow.");
+  if( isGradientRequested() ){
+    LogThrowIf(not _weightSource_->supportsGradient(), "ExternalWeight worker does not provide analytic gradients.");
+    const auto inputs = std::size_t(inputBuffer_.getInputSize());
+    LogThrowIf(inputs != 0 and _weightCount_ > std::numeric_limits<std::size_t>::max() / sizeof(double) / inputs,
+               "ExternalWeight gradient buffer size overflow.");
+    const auto count = _weightCount_ * inputs;
+    if( _gradientBuffer_ == nullptr ){
+      _gradientBuffer_ = std::make_shared<SharedMemoryBuffer>(
+          "gdmEW_" + std::to_string(getpid()) + "_gradients", count);
+      _weightSource_->_gradients_ = std::shared_ptr<double>(_gradientBuffer_, _gradientBuffer_->ptr);
+      _weightSource_->_gradientInputCount_ = inputs;
+    }
+    LogThrowIf(_gradientBuffer_->nbDoubles != count or _weightSource_->_gradientInputCount_ != inputs,
+               "ExternalWeight gradient buffer shape mismatch.");
+    // A missing or partially filled derivative must never look like zero.
+    std::fill(_gradientBuffer_->ptr, _gradientBuffer_->ptr + count, std::numeric_limits<double>::quiet_NaN());
+    std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, std::numeric_limits<double>::quiet_NaN());
+  }
   this->evaluateImpl(inputBuffer_);
+  if( isGradientRequested() ){
+    for( std::size_t i = 0; i < _weightCount_; ++i ){
+      LogThrowIf(not std::isfinite(_weightBuffer_->ptr[i]), "ExternalWeight worker returned a non-finite weight at row " << i);
+    }
+    for( std::size_t i = 0; i < _gradientBuffer_->nbDoubles; ++i ){
+      LogThrowIf(not std::isfinite(_gradientBuffer_->ptr[i]), "ExternalWeight worker returned a missing/non-finite gradient at entry " << i);
+    }
+    _weightSource_->_gradientGeneration_ = getEvaluationGeneration();
+    _weightSource_->_gradientValid_ = true;
+  }
+  _weightSource_->_inputValues_ = inputBuffer_.getInputBuffer();
   ++_weightSource_->_generation_;
 }
 
@@ -340,10 +380,23 @@ void ExternalWeightPythonWorker::evaluateImpl(const DialInputBuffer& inputBuffer
   }
   JsonType command;
   command["command"] = "evaluate";
+  command["withGradient"] = isGradientRequested();
+  command["generation"] = getEvaluationGeneration();
+  if( isGradientRequested() ){
+    const auto* gradients = getGradientBuffer();
+    LogThrowIf(gradients == nullptr, "ExternalWeight gradient buffer is not initialized.");
+    command["gradients"] = {{"shmName", gradients->name}, {"dtype", "float64"},
+        {"shape", {getWeightCount(), std::size_t(inputBuffer_.getInputSize())}}};
+  }
   this->sendWorkerCommand(command);
   auto response = this->readWorkerResponse();
   LogThrowIf(response.value("status", std::string{}) != "ok",
              "ExternalWeight worker evaluation failed: " << response.dump());
+  if( isGradientRequested() ){
+    LogThrowIf(not response.contains("gradientGeneration") or not response["gradientGeneration"].is_number_integer()
+               or response["gradientGeneration"] != command["generation"],
+               "ExternalWeight worker must acknowledge gradientGeneration for the current evaluation: " << response.dump());
+  }
 }
 
 void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& inputBuffer_) {
@@ -421,6 +474,8 @@ def _worker():
     parameter_names = []
     parameter_buffer = None
     weights = None
+    gradients = None
+    gradient_name = None
     parameters = {}
     user_command = None
     read_line = sys.stdin.buffer.readline
@@ -448,10 +503,23 @@ def _worker():
             user_command["inputs"] = inputs
             user_command["parameters"] = parameters
             user_command["weights"] = weights
+            user_command["gradients"] = None
+            user_command["withGradient"] = False
         elif command_name == "evaluate":
             # Reuse the command and parameter dictionary. This avoids
             # allocating three dictionaries on every propagation.
             user_command["command"] = "evaluate"
+            user_command["withGradient"] = command.get("withGradient", False)
+            user_command["generation"] = command.get("generation")
+            if user_command["withGradient"]:
+                description = command["gradients"]
+                if gradient_name != description["shmName"]:
+                    shm, gradients = _attach(description)
+                    shared_memory_list.append(shm)
+                    gradient_name = description["shmName"]
+                user_command["gradients"] = gradients
+            else:
+                user_command["gradients"] = None
             parameters.clear()
             parameters.update(zip(parameter_names, parameter_buffer))
         elif command_name == "shutdown":
@@ -544,6 +612,9 @@ except Exception as error:
   auto response = this->readWorkerResponse();
   LogThrowIf(response.value("status", std::string{}) != "ok",
              "ExternalWeight worker initialization failed: " << response.dump());
+  LogThrowIf(response.contains("supportsGradient") and not response["supportsGradient"].is_boolean(),
+             "ExternalWeight supportsGradient must be a boolean.");
+  setSupportsGradient(response.value("supportsGradient", false));
 }
 
 void ExternalWeightPythonWorker::sendWorkerCommand(const JsonType& command_) {
