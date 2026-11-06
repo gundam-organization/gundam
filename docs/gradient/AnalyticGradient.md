@@ -33,7 +33,7 @@ fit; fewer iterations are not guaranteed.
 | `CompiledLibDial` | ❌ | |
 | `Tabulated` | ❌ | |
 | `Kriged` | ❌ | |
-| `ExternalWeightDispatcher` | ❌ | |
+| `ExternalWeight` | ⚠️ | Worker must declare gradient support and fill a dense derivative matrix per event/bin. See [worker API](../configuration/ExternalWeightDials.md#analytic-gradients). |
 | Weight products | ✅ | Handles zero responses and repeated parameters. The derivative is zero when the global reweight cap is exceeded. |
 | Mirrors, bounds and interpolation knots | ⚠️ | Piecewise conventions; derivatives may not be unique at discontinuities in slope. |
 
