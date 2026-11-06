@@ -27,6 +27,13 @@ double RootSpline::evalResponse(const DialInputBuffer& input_) const {
   return _spline_.Eval( dialInput );
 }
 
+double RootSpline::evalGradient(const DialInputBuffer& input_, int iInput_) const {
+  if( iInput_ != 0 ){ return 0.; }
+  const double x = input_.getInputBuffer()[0];
+  if( not _allowExtrapolation_ and (x <= _spline_.GetXmin() or x >= _spline_.GetXmax()) ){ return 0.; }
+  return _spline_.Derivative(x);
+}
+
 //  A Lesser GNU Public License
 
 //  Copyright (C) 2023 GUNDAM DEVELOPERS
