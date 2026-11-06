@@ -68,13 +68,13 @@ namespace {
       double x = .5;
       TTree tree("events", "events");
       tree.Branch("X", &x, "X/D");
-      for( int i = 0; i < 10; ++i ){ tree.Fill(); }
+      for( int i = 0; i < 10; ++i ){ x = .05 + .09 * i; tree.Fill(); }
       tree.Write();
     }
     void TearDown() override { std::remove(_path_.c_str()); }
 
     void initializeEngine(FitterEngine& engine_, const std::string& likelihood_ = "LeastSquares",
-                          const std::string& formula_ = "") {
+                          const std::string& formula_ = "", bool eventInputs_ = false) {
       auto config = JsonType::parse(R"({
         "enablePca": false, "scaleParStepWithChi2Response": false,
         "generateSamplePlots": false, "generateOneSigmaPlots": false,
@@ -107,6 +107,12 @@ namespace {
               {"dialType", "Formula"}, {"options", {{"formulaStr", formula_}}},
               {"dialInputList", JsonType::array({{{"name", "value"},
                   {"parameterName", parameter.at("name")}}})}}});
+          if( eventInputs_ ){
+            auto& inputs = parameter["dialSetDefinitions"][0]["dialInputList"];
+            inputs.insert(inputs.begin(), JsonType{{"name", "energy"}, {"eventVariable", "X"}});
+            // Two named formula inputs can reference the same fit parameter.
+            inputs.push_back({{"name", "alias"}, {"parameterName", parameter.at("name")}});
+          }
         }
       }
       config["likelihoodInterfaceConfig"]["datasetList"][0]["model"]["filePathList"] = {_path_};
@@ -255,6 +261,58 @@ TEST_F(RootMinimizerSimplex, RootFormulaNumericalFallbackStopsAnalyticGradientIn
   FitterEngine engine;
   // Value-only initialization must remain usable for unsupported derivatives.
   initializeEngine(engine, "LeastSquares", "2+TMath::BesselJ0([value])");
+  RecordingMinimizer minimizer(&engine);
+  minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}}));
+  EXPECT_THROW(minimizer.initialize(), std::exception);
+  EXPECT_EQ(0u, minimizer.getNbGradientCalls());
+}
+
+
+TEST_F(RootMinimizerSimplex, EventFormulaGradientMatchesFullLikelihoodFiniteDifferences) {
+#ifndef R__HAS_CLAD
+  GTEST_SKIP() << "ROOT was built without Clad";
+#endif
+  const int previousThreads = GundamGlobals::getNbCpuThreads();
+  for( int threads : {1, 4} ){
+    GundamGlobals::setNumberOfThreads(threads);
+    for( const std::string expression : {
+        "exp(.2*[value])+[energy]*[alias]*[value]", "1+[energy]*[energy]"} ){
+      FitterEngine engine;
+      initializeEngine(engine, "BarlowBeestonLiteGaussian", expression, true);
+      for( bool normalized : {false, true} ){
+        RecordingMinimizer minimizer(&engine);
+        minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true},
+            {"useNormalizedFitSpace", normalized}}));
+        minimizer.initialize();
+        std::vector<double> point;
+        for( auto* parameter : minimizer.getMinimizerFitParameterList() ){
+          double value = parameter->getParameterValue() + (parameter->isFixed() ? 0. : .07);
+          if( normalized ){ value = ParameterSet::toNormalizedParValue(value, *parameter); }
+          point.push_back(value);
+        }
+        std::vector<double> gradient(point.size());
+        minimizer.evalFitGradientAt(point.data(), gradient.data());
+        for( size_t i = 0; i < point.size(); ++i ){
+          if( minimizer.getMinimizerFitParameterList()[i]->isFixed() ){
+            EXPECT_EQ(0., gradient[i]);
+            continue;
+          }
+          auto up = point, down = point;
+          up[i] += 1e-5;
+          down[i] -= 1e-5;
+          const double numeric = (minimizer.evalFit(up.data()) - minimizer.evalFit(down.data())) / 2e-5;
+          EXPECT_NEAR(numeric, gradient[i], 1e-5)
+              << expression << " threads=" << threads << " normalized=" << normalized << " input=" << i;
+        }
+      }
+    }
+  }
+  GundamGlobals::setNumberOfThreads(previousThreads);
+}
+
+TEST_F(RootMinimizerSimplex, EventFormulaNumericalFallbackStopsAnalyticGradientInitialization) {
+  FitterEngine engine;
+  initializeEngine(engine, "LeastSquares", "2+TMath::BesselJ0([value])+[energy]", true);
   RecordingMinimizer minimizer(&engine);
   minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}}));
   EXPECT_THROW(minimizer.initialize(), std::exception);
