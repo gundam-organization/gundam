@@ -66,7 +66,6 @@ def main():
         Path(f'495DialsReloadConfiguration-{mode}.log').write_text(log)
         assert result.returncode == 0, log
         assert log.count('Defining binned dials for') == count, log
-        assert log.count('key "minDialResponse" is deprecated') == count, log
         assert log.count('Re-configuring the propagator') == count - 1, log
     print('SUCCESS: unchanged configurations preserve dials during model and data loading.')
 

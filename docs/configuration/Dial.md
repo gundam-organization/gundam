@@ -150,6 +150,42 @@ deprecated but still read with a warning. If combined with `dialResponseLimits`,
 their values must agree with it. Set `enableResponseSmoothing: false` to disable
 smoothing rather than supplying zero widths.
 
+### Smooth response limits
+
+Smooth the evaluated response near its bounds using centered quartic transitions
+(original engine only):
+
+```yaml
+dialResponseLimits: [0.0, 2.0]
+enableResponseSmoothing: true
+dialResponseSmoothingWidth: 0.1
+```
+
+Limits also accept `{min: ...}` or `{max: ...}`; omitted bounds are unbounded.
+Widths accept a scalar for both bounds, `[lowerWidth, upperWidth]`, or
+`{min: ..., max: ...}`. Widths keep their order and must be finite and strictly
+positive. Each finite bound needs a width; widths for unbounded sides are unused.
+With two finite bounds, require `lowerWidth + upperWidth <= max - min`.
+
+For a lower bound `L`, half-width `c`, and raw response `w`:
+
+```text
+t = (w - L + c) / (2 * c)
+F(w; L, c) = L                       if w <= L - c
+             L + c * t^3 * (2 - t)  if L - c < w < L + c
+             w                       if w >= L + c
+```
+
+An upper bound `U` uses `U - F(U - w; 0, c)`. The transitions are C^2, with slopes
+between 0 and 1. At `L = 0`, `F(0) = 3*c/16`; zero is reached at `w = -c`.
+Kinks in the input dial itself can remain.
+
+Smoothing is disabled by default; limits then use hard clamping.
+`minDialResponse` (also `minimumSplineResponse`) and `maxDialResponse` are
+deprecated but still read with a warning. If combined with `dialResponseLimits`,
+their values must agree with it. Set `enableResponseSmoothing: false` to disable
+smoothing rather than supplying zero widths.
+
 ### Config options that apply to specific types of dials
 
 | Option                 | Type         | Description                                                            | Default |
