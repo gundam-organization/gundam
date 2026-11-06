@@ -28,7 +28,7 @@ fit; fewer iterations are not guaranteed.
 | `Bilinear`, `Bicubic` | ✅ | |
 | `RootGraph` | ✅ | Right-hand slope at interior knots; last segment at the final knot when extrapolation is enabled. |
 | `RootSpline` | ✅ | |
-| `RootFormula` | ❌ | |
+| `RootFormula` | ⚠️ | Requires ROOT/Clad automatic differentiation. Unsupported generation or a numerical fallback raises an initialization error. Derivative calls share a lock per formula. |
 | `EventFormula` | ❌ | |
 | `CompositeDial` | ❌ | |
 | `CompiledLibDial` | ❌ | |
