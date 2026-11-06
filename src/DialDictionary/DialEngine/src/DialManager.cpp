@@ -5,6 +5,7 @@
 #include "DialManager.h"
 #include "CompositeDial.h"
 #include "GundamUtils.h"
+#include "CompositeDial.h"
 
 
 void DialManager::configureImpl(){

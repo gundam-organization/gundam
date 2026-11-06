@@ -21,6 +21,9 @@ public:
   [[nodiscard]] std::string getDialTypeName() const override { return {"RootGraph"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
 
+  [[nodiscard]] bool hasAnalyticGradient() const override { return true; }
+  [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override;
+
   // other overrides
   void setAllowExtrapolation(bool allowExtrapolation) override { _allowExtrapolation_ = allowExtrapolation; }
   [[nodiscard]] bool getAllowExtrapolation() const override { return _allowExtrapolation_; }

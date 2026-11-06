@@ -89,9 +89,15 @@ def is_spline_parameter(parameter):
     return parameter.getName() in ["spline_C", "spline_D"]
 
 
-def main():
+def main(full=False):
     script_dir = str(Path(__file__).resolve().parents[2] / "fast-tests")
-    subprocess.run(["bash", str(Path(script_dir) / "100CovarianceTree.C")], check=True)
+    generator = Path(script_dir) / "100CovarianceTree.C"
+    if full:
+        subprocess.run(["bash", str(generator)], check=True)
+    else:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from GradientTestInputs import writeCovariance
+        writeCovariance()
     if not Path("100CovarianceTree.root").is_file():
         raise RuntimeError("Failed to generate 100CovarianceTree.root")
     os.environ["CONFIG_DIR"] = script_dir

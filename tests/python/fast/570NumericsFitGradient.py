@@ -85,9 +85,15 @@ def make_fitter(script_dir):
     return app, fitter
 
 
-def main():
+def main(full=False):
     script_dir = str(Path(__file__).resolve().parents[2] / "fast-tests")
-    subprocess.run(["bash", str(Path(script_dir) / "100NormalizationTree.C")], check=True)
+    generator = Path(script_dir) / "100NormalizationTree.C"
+    if full:
+        subprocess.run(["bash", str(generator)], check=True)
+    else:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from GradientTestInputs import writeNormalization
+        writeNormalization()
     if not Path("100NormalizationTree.root").is_file():
         raise RuntimeError("Failed to generate 100NormalizationTree.root")
     os.environ["CONFIG_DIR"] = script_dir

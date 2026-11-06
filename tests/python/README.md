@@ -201,5 +201,8 @@ The `fast`, `regular`, `extended` and `slow` labels identify the selected shell
 suite run by `gundam-tests`; broader shell suites include the faster suites.
 Label totals overlap: `python` includes both Python suites and environment setup.
 
+Fast tests `570` and `580` use representative cases or small deterministic inputs.
+Their matching `*Full.py` tests in `regular/` retain the full validation.
+
 Fast tests `711`, `726` and `743` keep representative backend scenarios; their
 matching `*Full.py` tests in `regular/` retain the complete validation.
