@@ -23,6 +23,7 @@
 #include "Norm.h"
 #include "RootSpline.h"
 #include "RootGraph.h"
+#include "RootFormula.h"
 #include <future>
 
 TEST(DialDefinitions,CompactSplineTruncated) {
@@ -504,4 +505,22 @@ TEST(DialDefinitions, RootSplineAnalyticGradient) {
       EXPECT_DOUBLE_EQ(extrapolate ? spline.Derivative(point) : 0., dial.evalGradient(input, 0));
     }
   }
+}
+
+
+TEST(DialDefinitions, RootFormulaAnalyticGradient){
+#ifndef R__HAS_CLAD
+  GTEST_SKIP() << "ROOT was built without Clad";
+#endif
+  RootFormula dial;
+  dial.setFormulaStr("[a]*exp([b])+[a]*[a]");
+  dial.setInputNames({"b", "a", "unused"});
+  ASSERT_TRUE(dial.hasAnalyticGradient());
+  auto clone = dial.clone();
+  DialInputBuffer input;
+  input.getInputBuffer() = {.3, 1.2, 0.};
+  EXPECT_NEAR(1.2 * std::exp(.3), dial.evalGradient(input, 0), 1e-12);
+  EXPECT_NEAR(std::exp(.3) + 2.4, clone->evalGradient(input, 1), 1e-12);
+  EXPECT_EQ(0., dial.evalGradient(input, 2));
+  EXPECT_NEAR(1.2 * std::exp(.3) + 1.44, dial.evalResponse(input), 1e-12);
 }

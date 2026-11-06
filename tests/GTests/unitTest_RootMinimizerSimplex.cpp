@@ -73,7 +73,8 @@ namespace {
     }
     void TearDown() override { std::remove(_path_.c_str()); }
 
-    void initializeEngine(FitterEngine& engine_, const std::string& likelihood_ = "LeastSquares") {
+    void initializeEngine(FitterEngine& engine_, const std::string& likelihood_ = "LeastSquares",
+                          const std::string& formula_ = "") {
       auto config = JsonType::parse(R"({
         "enablePca": false, "scaleParStepWithChi2Response": false,
         "generateSamplePlots": false, "generateOneSigmaPlots": false,
@@ -101,6 +102,12 @@ namespace {
                                ["parametersManagerConfig"]["parameterSetList"][0]["parameterDefinitions"];
       for( auto& parameter : definitions ){
         parameter["dialSetDefinitions"] = JsonType::array({{{"dialType", "Normalization"}}});
+        if( not formula_.empty() ){
+          parameter["dialSetDefinitions"] = JsonType::array({{
+              {"dialType", "Formula"}, {"options", {{"formulaStr", formula_}}},
+              {"dialInputList", JsonType::array({{{"name", "value"},
+                  {"parameterName", parameter.at("name")}}})}}});
+        }
       }
       config["likelihoodInterfaceConfig"]["datasetList"][0]["model"]["filePathList"] = {_path_};
       engine_.configure(ConfigReader(config));
@@ -213,4 +220,43 @@ TEST_F(RootMinimizerSimplex, UnsupportedLikelihoodStopsAnalyticGradientInitializ
     EXPECT_NE(std::string(error.what()).find("Analytic bin gradients are unsupported for likelihood"), std::string::npos);
   }
   EXPECT_EQ(minimizer.getNbGradientCalls(), 0u);
+}
+
+
+TEST_F(RootMinimizerSimplex, RootFormulaGradientMatchesFullLikelihoodFiniteDifferences) {
+#ifndef R__HAS_CLAD
+  GTEST_SKIP() << "ROOT was built without Clad";
+#endif
+  FitterEngine engine;
+  initializeEngine(engine, "BarlowBeestonLiteGaussian", "exp(.2*[value])+[value]*[value]");
+  RecordingMinimizer minimizer(&engine);
+  minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}, {"useNormalizedFitSpace", false}}));
+  minimizer.initialize();
+  std::vector<double> point;
+  for( auto* parameter : minimizer.getMinimizerFitParameterList() ){
+    point.push_back(parameter->getParameterValue() + (parameter->isFixed() ? 0. : .15));
+  }
+  std::vector<double> gradient(point.size());
+  minimizer.evalFitGradientAt(point.data(), gradient.data());
+  for( size_t i = 0; i < point.size(); ++i ){
+    if( minimizer.getMinimizerFitParameterList()[i]->isFixed() ){
+      EXPECT_EQ(0., gradient[i]);
+      continue;
+    }
+    auto up = point, down = point;
+    up[i] += 1e-5;
+    down[i] -= 1e-5;
+    const double numeric = (minimizer.evalFit(up.data()) - minimizer.evalFit(down.data())) / 2e-5;
+    EXPECT_NEAR(numeric, gradient[i], 1e-5);
+  }
+}
+
+TEST_F(RootMinimizerSimplex, RootFormulaNumericalFallbackStopsAnalyticGradientInitialization) {
+  FitterEngine engine;
+  // Value-only initialization must remain usable for unsupported derivatives.
+  initializeEngine(engine, "LeastSquares", "2+TMath::BesselJ0([value])");
+  RecordingMinimizer minimizer(&engine);
+  minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}}));
+  EXPECT_THROW(minimizer.initialize(), std::exception);
+  EXPECT_EQ(0u, minimizer.getNbGradientCalls());
 }

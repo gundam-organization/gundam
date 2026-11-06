@@ -3,6 +3,7 @@
 
 #include <TFormula.h>
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -11,6 +12,7 @@
 // This utility does not depend on events, fit parameters or dials.
 class FormulaEvaluator {
 public:
+  FormulaEvaluator();
   void setFormulaStr(const std::string& formulaStr_);
   void setInputNames(const std::vector<std::string>& names_, const std::vector<std::string>& constantNames_ = {});
 
@@ -21,6 +23,11 @@ public:
   const TFormula& getFormula() const{ return _formula_; }
 
   [[nodiscard]] double eval(const std::vector<double>& inputs_) const;
+
+  // Generate once during analytic-gradient validation, before worker calls.
+  // Throws when ROOT cannot generate the derivative; no numerical fallback.
+  void prepareGradient() const;
+  [[nodiscard]] double evalGradient(const std::vector<double>& inputs_, int iInput_) const;
 
   // Read only inputs referenced by the expression, without copying the
   // complete source layout (e.g. an event's variable collection).
@@ -36,6 +43,7 @@ public:
   }
 
 private:
+  struct GradientState;
   void checkInputsBound() const;
 
   TFormula _formula_{};
@@ -44,6 +52,9 @@ private:
   bool _isInputOrderMatching_{false};
   // One entry per ROOT parameter; -1 keeps a configured constant.
   std::vector<int> _parameterInputIndices_;
+  // Copies share the generated derivative and its evaluation lock. Replacing
+  // the expression detaches this state, preserving already configured clones.
+  std::shared_ptr<GradientState> _gradientState_;
 };
 
 #endif
