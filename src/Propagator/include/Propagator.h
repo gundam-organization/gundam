@@ -64,6 +64,9 @@ public:
 
   // Core
   void clearContent();
+  [[nodiscard]] bool isConfiguredWith(const JsonType& config_) const{
+    return isInitialized() and _configuredConfig_ == config_;
+  }
   void buildDialCache();
   /// Reassign events in dynamic samples using their current stored variables.
   /// Rebuild bin event lists; the next propagation refills the histograms.
@@ -115,6 +118,8 @@ protected:
   void refillHistograms();
 
 private:
+  // Snapshot of the last successfully configured content, including after overrides.
+  JsonType _configuredConfig_{};
 
   // Parameters
   bool _showTimeStats_{false};
