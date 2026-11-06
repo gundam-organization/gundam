@@ -17,6 +17,14 @@ double DialInterface::evalGradient(int iInput_) const {
   return _dial_->evalGradient(*_inputBufferPtr_, iInput_);
 }
 
+std::vector<double> DialInterface::evalGradients() const {
+  const double rawResponse = _dial_->evalResponse(*_inputBufferPtr_);
+  if( _responseSupervisorPtr_->process(rawResponse) != rawResponse ){
+    return std::vector<double>(_inputBufferPtr_->getInputBuffer().size(), 0.);
+  }
+  return _dial_->evalGradients(*_inputBufferPtr_);
+}
+
 std::string DialInterface::getSummary(bool shallow_) const {
   std::stringstream ss;
   ss << _dial_->getDialTypeName() << ":";

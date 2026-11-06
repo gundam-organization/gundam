@@ -27,6 +27,12 @@ double DialBase::evalGradient(const DialInputBuffer& input_, int iInput_) const 
 }
 
 
+std::vector<double> DialBase::evalGradients(const DialInputBuffer& input_) const {
+    std::vector<double> result(input_.getInputBuffer().size());
+    for( size_t i = 0; i < result.size(); ++i ){ result[i] = evalGradient(input_, int(i)); }
+    return result;
+}
+
 const std::vector<double>& DialBase::getDialData() const {
     LogError << "getDialData not implemented for "
              << this->getDialTypeName()

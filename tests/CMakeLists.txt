@@ -173,7 +173,7 @@ if( WITH_GOOGLE_TEST )
   set(unitDialsSources
     GTests/unitTest_DialUtils.cpp
     GTests/unitTest_DialDefinitions.cpp
-    GTests/unitTest_DialDefinitions.cpp
+    GTests/unitTest_CompositeGradient.cpp
     GTests/unitTest_FormulaEvaluator.cpp
   )
   set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
