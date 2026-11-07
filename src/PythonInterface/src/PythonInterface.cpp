@@ -289,6 +289,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::bind_vector<std::vector<EventDialCache::CacheEntry>>(module, "EventDialCacheEntryList");
 
   pybind11::class_<EventDialCache>(module, "EventDialCache")
+  .def("getCacheMemorySize", &EventDialCache::getCacheMemorySize,
+       "Allocated bytes in cache vector buffers; excludes events, dial objects and allocator overhead.")
   .def("getFillIndex", &EventDialCache::getFillIndex)
   .def("getCache", pybind11::overload_cast<>(&EventDialCache::getCache), pybind11::return_value_policy::reference_internal)
   ;
@@ -297,6 +299,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getName", &Parameter::getName)
   .def("getFullTitle", &Parameter::getFullTitle)
   .def("isEnabled", &Parameter::isEnabled)
+  .def("isFree", &Parameter::isFree)
   .def("getStepSize", &Parameter::getStepSize)
   .def("getPriorValue", &Parameter::getPriorValue)
   .def("getStdDevValue", &Parameter::getStdDevValue)
@@ -329,7 +332,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getName", &ParameterSet::getName)
   .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
   .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
-  .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCovarianceMatrix, pybind11::const_))
+  .def("getPriorCorrelationMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCorrelationMatrix, pybind11::const_))
+  .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::generatePriorCovarianceMatrix, pybind11::const_))
   .def("getPriorFullCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorFullCovarianceMatrix, pybind11::const_))
   .def("propagateOriginalToEigen", &ParameterSet::propagateOriginalToEigen)
   .def("propagateEigenToOriginal", &ParameterSet::propagateEigenToOriginal)
