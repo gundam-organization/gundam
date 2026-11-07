@@ -532,17 +532,27 @@ std::string LikelihoodInterface::getSampleBreakdownTable() const{
   t << "Sample" << GenericToolbox::TablePrinter::NextColumn;
   t << "Model (# binned)" << GenericToolbox::TablePrinter::NextColumn;
   t << "Data (# binned)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Model (weighted)" << GenericToolbox::TablePrinter::NextColumn;
-  t << "Data (weighted)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Model (histogram)" << GenericToolbox::TablePrinter::NextColumn;
+  t << "Data (histogram)" << GenericToolbox::TablePrinter::NextColumn;
   t << "Diff. (%)" << GenericToolbox::TablePrinter::NextLine;
 
   for( auto& samplePair : _samplePairList_ ){
+    // The likelihood uses histogram contents. Event weights may differ from
+    // them for histogram-only toys and fractional/dynamic binning.
+    const auto sumBins = [](const Sample& sample_){
+      double sum{0.};
+      for( const auto& bin : sample_.getHistogram().getBinContentList() ){ sum += bin.sumWeights; }
+      return sum;
+    };
+    const double modelRate = sumBins(*samplePair.model);
+    const double dataRate = sumBins(*samplePair.data);
     t << samplePair.model->getName() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.model->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
     t << samplePair.data->getNbBinnedEvents() << GenericToolbox::TablePrinter::NextColumn;
-    t << samplePair.model->getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
-    t << samplePair.data->getSumWeights() << GenericToolbox::TablePrinter::NextColumn;
-    t << 100*(samplePair.data->getSumWeights() - samplePair.model->getSumWeights())/samplePair.model->getSumWeights() << GenericToolbox::TablePrinter::NextLine;
+    t << modelRate << GenericToolbox::TablePrinter::NextColumn;
+    t << dataRate << GenericToolbox::TablePrinter::NextColumn;
+    t << (modelRate == 0. and dataRate == 0. ? 0. : 100*(dataRate - modelRate)/modelRate)
+      << GenericToolbox::TablePrinter::NextLine;
   }
 
   return t.generateTableString();

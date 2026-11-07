@@ -189,7 +189,7 @@ TEST_F(RootMinimizerSimplex, ReportsReevaluatedBestfitLikelihood) {
   testing::internal::CaptureStdout();
   minimizer.minimize();
   const auto output = testing::internal::GetCapturedStdout();
-  EXPECT_NE(output.find("Best-fit likelihood (-2 log L):"), std::string::npos);
+  EXPECT_NE(output.find("Best-fit likelihood:"), std::string::npos);
   const std::string minuitLabel{"Minuit FVAL: "};
   const std::string reevaluatedLabel{"Re-evaluated total: "};
   const auto minuitPosition = output.find(minuitLabel);
@@ -204,6 +204,57 @@ TEST_F(RootMinimizerSimplex, ReportsReevaluatedBestfitLikelihood) {
   EXPECT_NE(output.find("Statistical: "), std::string::npos);
   EXPECT_NE(output.find("Penalty: "), std::string::npos);
   EXPECT_EQ(output.find("does not match Minuit FVAL"), std::string::npos);
+}
+
+TEST_F(RootMinimizerSimplex, SampleRatesUseHistogramContentsRatherThanEventWeights) {
+  FitterEngine engine;
+  initializeEngine(engine);
+  auto& likelihood = engine.getLikelihoodInterface();
+  auto& model = likelihood.getModelPropagator().getSampleSet().getSampleList().front();
+  auto& data = likelihood.getDataPropagator().getSampleSet().getSampleList().front();
+  // Model-only and data-only bin updates must both appear in the report,
+  // even though all event weights still sum to the initial 10 events.
+  model.getHistogram().getBinContentList().front().sumWeights = 23.;
+  data.getHistogram().getBinContentList().front().sumWeights = 42.;
+  EXPECT_DOUBLE_EQ(model.getSumWeights(), 10.);
+  EXPECT_DOUBLE_EQ(data.getSumWeights(), 10.);
+  const auto output = likelihood.getSampleBreakdownTable();
+  EXPECT_NE(output.find("Model (histogram)"), std::string::npos);
+  EXPECT_NE(output.find("Data (histogram)"), std::string::npos);
+  EXPECT_NE(output.find("23"), std::string::npos);
+  EXPECT_NE(output.find("42"), std::string::npos);
+  EXPECT_NE(output.find("82.6087"), std::string::npos);
+}
+
+TEST_F(RootMinimizerSimplex, InterruptCheckpointStopsScalarAndGradientEvaluations) {
+  FitterEngine engine;
+  initializeEngine(engine);
+  auto& minimizer = engine.getMinimizer();
+  const auto& parameters = minimizer.getMinimizerFitParameterPtr();
+  std::vector<double> point(parameters.size(), 0.);
+  std::vector<double> gradient(parameters.size());
+  int checkpoints{0};
+  auto previous = minimizer.setInterruptCheckCallback([&](){
+    ++checkpoints;
+    throw std::runtime_error("Requested interruption");
+  });
+  EXPECT_THROW(minimizer.evalFit(point.data()), std::runtime_error);
+  EXPECT_THROW(minimizer.evalFitGradientAt(point.data(), gradient.data()), std::runtime_error);
+  EXPECT_EQ(checkpoints, 2);
+  minimizer.setInterruptCheckCallback(std::move(previous));
+}
+
+TEST_F(RootMinimizerSimplex, InterruptCheckpointUnwindsMinimize) {
+  FitterEngine engine;
+  initializeEngine(engine);
+  int checkpoints{0};
+  auto& minimizer = engine.getMinimizer();
+  auto previous = minimizer.setInterruptCheckCallback([&](){
+    if( ++checkpoints == 4 ){ throw std::runtime_error("Requested interruption"); }
+  });
+  EXPECT_THROW(minimizer.minimize(), std::runtime_error);
+  EXPECT_EQ(checkpoints, 4);
+  minimizer.setInterruptCheckCallback(std::move(previous));
 }
 
 TEST_F(RootMinimizerSimplex, RestoresMainMinimizerAfterAnObjectiveException) {
