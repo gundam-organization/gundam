@@ -174,7 +174,7 @@ if( WITH_GOOGLE_TEST )
     GTests/unitTest_DialUtils.cpp
     GTests/unitTest_DialDefinitions.cpp
     GTests/unitTest_DialResponseSupervisor.cpp)
-  set(unitDataLoadingSources)
+  set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
   set(unitLikelihoodSources GTests/unitTest_JointProbability.cpp)
   set(unitMinimizerSources GTests/unitTest_RootMinimizerSimplex.cpp)
   set(unitBackendsSources)

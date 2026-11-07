@@ -38,18 +38,14 @@ public:
   struct DialResponseCache {
     DialResponseCache() = delete; // prevent not setting up the interface ptr
     explicit DialResponseCache( DialInterface& interface_ )
-      : dialInterface(&interface_) {
-      this->updateRequested = (bool*) dialInterface->getInputBufferRef()->isDialUpdateRequestedPtr();
-    }
+      : dialInterface(&interface_) {}
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.
     double response{std::nan("unset")};
-    // A cached boolean to check if the dial needs to be updated.
-    bool *updateRequested{nullptr};
     void update(){
       // Reevaluate the dial if an update has been requested
-      if( *(this->updateRequested) ) {
+      if( dialInterface->getInputBufferRef()->isDialUpdateRequested() ) {
         response = dialInterface->evalResponse();
       }
     }
@@ -179,6 +175,9 @@ public:
   /// cache multiple times (but for different Physics event objects).
   std::vector<CacheEntry> &getCache(){ return _cache_; }
   [[nodiscard]] const std::vector<CacheEntry> &getCache() const{ return _cache_; }
+
+  /// Allocated cache vector buffers, excluding events, dial objects and allocator overhead.
+  [[nodiscard]] size_t getCacheMemorySize() const;
 
   GlobalEventReweightCap& getGlobalEventReweightCap(){ return _globalEventReweightCap_; }
 
