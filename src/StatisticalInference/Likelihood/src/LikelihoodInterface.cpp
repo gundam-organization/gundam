@@ -24,9 +24,9 @@ void LikelihoodInterface::configureImpl(){
     {"jointProbabilityConfig"},
     {"plotGeneratorConfig"},
     {"eventTreeWriter"},
-    {"enableStatThrowInToys"},
-    {"gaussStatThrowInToys"},
-    {"enableEventMcThrow"},
+    {FieldFlag::RELOCATED, "enableStatThrowInToys", "propagatorConfig/enableStatThrowInToys"},
+    {FieldFlag::RELOCATED, "gaussStatThrowInToys", "propagatorConfig/gaussStatThrowInToys"},
+    {FieldFlag::RELOCATED, "enableEventMcThrow", "propagatorConfig/enableEventMcThrow"},
     {"applyInfinitePenaltyOnOutOfBoundPar"},
   });
   _config_.checkConfiguration();
@@ -34,6 +34,10 @@ void LikelihoodInterface::configureImpl(){
   // reading the configuration of the propagator
   // allows to implement
   _config_.fillValue(_modelPropagator_.getConfig(), "propagatorConfig");
+  // Read legacy options first; the official propagator config takes precedence.
+  _config_.fillValue(_modelPropagator_.getEnableStatThrowInToys(), "enableStatThrowInToys");
+  _config_.fillValue(_modelPropagator_.getGaussStatThrowInToys(), "gaussStatThrowInToys");
+  _config_.fillValue(_modelPropagator_.getEnableEventMcThrow(), "enableEventMcThrow");
   _modelPropagator_.configure();
 
   ConfigReader datasetListConfig{};
@@ -42,10 +46,7 @@ void LikelihoodInterface::configureImpl(){
 
   // prior to this version a few parameters were set in the propagator itself
   // relocated
-  _modelPropagator_.getConfig().fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
   _modelPropagator_.getConfig().fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
-  _modelPropagator_.getConfig().fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
-  _modelPropagator_.getConfig().fillValue(_enableEventMcThrow_, "enableEventMcThrow");
   _modelPropagator_.getConfig().fillValue(_plotGenerator_.getConfig(), "plotGeneratorConfig");
   _modelPropagator_.getConfig().fillValue(datasetListConfig, "dataSetList");
   _modelPropagator_.getSampleSet().getConfig().fillValue(jointProbabilityTypeStr, "llhStatFunction");
@@ -76,9 +77,6 @@ void LikelihoodInterface::configureImpl(){
   _eventTreeWriter_.configure();
 
   // reading local parameters
-  _config_.fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
-  _config_.fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
-  _config_.fillValue(_enableEventMcThrow_, "enableEventMcThrow");
   _config_.fillValue(_applyInfinitePenaltyOnOutOfBoundPar_, "applyInfinitePenaltyOnOutOfBoundPar");
 
 }
@@ -387,7 +385,7 @@ void LikelihoodInterface::loadDataPropagator(){
   if( isAsimov ){
     // don't reload, just use the _modelPropagator_
     if( _dataType_ == DataType::Toy ){
-      throwToyParameters(_modelPropagator_);
+      _modelPropagator_.throwToyParameters();
     }
 
     // copy the events directly from the model
@@ -450,7 +448,7 @@ void LikelihoodInterface::loadDataPropagator(){
     _dataPropagator_.buildDialCache();
 
     if( _dataType_ == DataType::Toy ){
-      throwToyParameters(_dataPropagator_);
+      _dataPropagator_.throwToyParameters();
     } // throw asimov?
 
     LogInfo << "Propagating weights on data events..." << std::endl;
@@ -472,7 +470,7 @@ void LikelihoodInterface::loadDataPropagator(){
     }
   });
 
-  if( _dataType_ == DataType::Toy ){ throwStatErrors(_dataPropagator_); }
+  if( _dataType_ == DataType::Toy ){ _dataPropagator_.throwStatErrors(); }
 
   _dataPropagator_.printBreakdowns();
 
@@ -537,74 +535,6 @@ DataDispenser* LikelihoodInterface::getDataDispenser( DatasetDefinition& dataset
 
   // invalid
   return nullptr;
-}
-void LikelihoodInterface::throwToyParameters(Propagator& propagator_){
-
-  LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
-  propagator_.reweightEvents();
-
-  LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
-  std::cout << propagator_.getSampleSet().getSampleBreakdown() << std::endl;
-
-  if( propagator_.isDebugPrintLoadedEvents() ){
-    LogInfo << "Toy events:" << std::endl;
-    LogInfo << GET_VAR_NAME_VALUE(propagator_.getDebugPrintLoadedEventsNbPerSample()) << std::endl;
-    int iEvt{0};
-    for( auto& entry : propagator_.getEventDialCache().getCache() ) {
-      LogInfo << "Event #" << iEvt++ << "{" << std::endl;
-      {
-        LogScopeIndent;
-        LogInfo << entry.getSummary() << std::endl;
-      }
-      LogInfo << "}" << std::endl;
-      if( iEvt >= propagator_.getDebugPrintLoadedEventsNbPerSample() ) break;
-    }
-  }
-
-  if( not _toyParameterInjector_.empty() ){
-    LogInfo << "Injecting parameters..." << std::endl;
-    propagator_.getParametersManager().injectParameterValues( _toyParameterInjector_ );
-  }
-  else{
-    LogInfo << "Throwing toy parameters according to covariance matrices..." << std::endl;
-    propagator_.getParametersManager().throwParameters();
-  }
-
-  // reweighting the events accordingly
-  propagator_.reweightEvents();
-}
-void LikelihoodInterface::throwStatErrors(Propagator& propagator_){
-  LogInfo << "Throwing statistical error..." << std::endl;
-
-  // TODO: those config parameters should be handled here, not within the propagator...
-  if( not _enableStatThrowInToys_ ){
-    LogAlert << "Stat error throw is disabled. Skipping..." << std::endl;
-    return;
-  }
-
-  if( _enableEventMcThrow_ ){
-    // Take into account the finite amount of event in MC
-    LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
-    for( auto& sample : propagator_.getSampleSet().getSampleList() ) {
-      if( sample.isEventMcThrowDisabled() ){
-        LogAlert << "MC event throw is disabled for sample: " << sample.getName() << std::endl;
-      }
-
-      sample.getHistogram().throwEventMcError();
-    }
-  }
-  else{
-    LogWarning << "enableEventMcThrow is disabled. Not throwing individual MC events" << std::endl;
-  }
-
-  LogInfo << "Throwing statistical error on histograms..." << std::endl;
-  if( _gaussStatThrowInToys_ ) {
-    LogWarning << "Using Gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
-  }
-  for( auto& sample : propagator_.getSampleSet().getSampleList() ){
-    // Asimov bin content -> toy data
-    sample.getHistogram().throwStatError( _gaussStatThrowInToys_ );
-  }
 }
 
 // An MIT Style License

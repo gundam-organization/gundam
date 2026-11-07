@@ -349,7 +349,8 @@ int main(int argc, char** argv){
   // toyParInjector
   if( not toyParInjector.empty() ){
     auto injectConfig = ConfigUtils::readConfigFile( toyParInjector );
-    fitter.getLikelihoodInterface().setToyParameterInjector( injectConfig );
+    fitter.getLikelihoodInterface().getModelPropagator().setToyParameterInjector( injectConfig );
+    fitter.getLikelihoodInterface().getDataPropagator().setToyParameterInjector( injectConfig );
   }
 
   // Also check app level config options
