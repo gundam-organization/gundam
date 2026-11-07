@@ -177,6 +177,7 @@ if( WITH_GOOGLE_TEST )
     GTests/unitTest_FormulaEvaluator.cpp
     GTests/unitTest_CompositeGradient.cpp
     GTests/unitTest_ExternalWeightGradient.cpp
+    GTests/unitTest_TableGradient.cpp
   )
   set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
   set(unitDataLoadingSources)
@@ -197,6 +198,11 @@ if( WITH_GOOGLE_TEST )
       endif()
     endif()
   endforeach()
+
+  add_library(gundamTableGradientPlugin SHARED GTests/TableGradientPlugin.cpp)
+  add_dependencies(gundamGTest_Dials.exe gundamTableGradientPlugin)
+  target_compile_definitions(gundamGTest_Dials.exe PRIVATE
+    GUNDAM_TABLE_GRADIENT_PLUGIN="$<TARGET_FILE:gundamTableGradientPlugin>")
 
   ## Create a list of all of the regular tests.  These are always
   ## compiled and are run when WITH_REGULAR_TEST is on.

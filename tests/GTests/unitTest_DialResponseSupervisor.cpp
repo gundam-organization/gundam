@@ -202,7 +202,8 @@ TEST(DialResponseSupervisor, InterfaceAppliesResponseChainRule){
     const auto gradient = interface.evalGradients();
     ASSERT_EQ(1U, gradient.size());
     EXPECT_DOUBLE_EQ(interface.evalGradient(0), gradient[0]);
-    EXPECT_DOUBLE_EQ(2. * supervisor.evalDerivative(2. * x), gradient[0]);
+    // Graph interpolation can round differently from the equivalent 2*x.
+    EXPECT_NEAR(2. * supervisor.evalDerivative(2. * x), gradient[0], 1E-14);
     input.setInputValues({x + 1E-6});
     const double upper = interface.evalResponse();
     input.setInputValues({x - 1E-6});
