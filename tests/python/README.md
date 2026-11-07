@@ -175,3 +175,6 @@ CTest labels Python scripts with `python` and `python-fast` or `python-regular`.
 The `fast`, `regular`, `extended` and `slow` labels identify the selected shell
 suite run by `gundam-tests`; broader shell suites include the faster suites.
 Label totals overlap: `python` includes both Python suites and environment setup.
+
+Fast tests `560` use representative cases or small deterministic inputs.
+Their matching `*Full.py` tests in `regular/` retain the full validation.
