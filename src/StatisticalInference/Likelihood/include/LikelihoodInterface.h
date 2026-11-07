@@ -64,7 +64,6 @@ public:
   // setters
   void setForceAsimovData(bool forceAsimovData_){ _forceAsimovData_ = forceAsimovData_; }
   void setDataType(const DataType& dataType_){ _dataType_ = dataType_; }
-  void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const getters
   [[nodiscard]] auto& getExternalConstraints() const{ return _externalConstraints_; }
@@ -113,10 +112,6 @@ public:
   void printBreakdowns() const;
   std::string getSampleBreakdownTable() const;
 
-
-  void throwToyParameters(Propagator& propagator_);
-  void throwStatErrors(Propagator& propagator_);
-
   // utils for gradient
   [[nodiscard]] ParameterGradient prepareGradient(const ParameterGradient& gradient_);
   void finalizeGradient(const ParameterGradient& statGradient_, ParameterGradient& gradient_);
@@ -135,12 +130,8 @@ protected:
 private:
   // parameters
   bool _forceAsimovData_{false};
-  bool _enableStatThrowInToys_{true};
-  bool _gaussStatThrowInToys_{false};
-  bool _enableEventMcThrow_{true};
   bool _applyInfinitePenaltyOnOutOfBoundPar_{false};
   DataType _dataType_{DataType::Asimov};
-  JsonType _toyParameterInjector_{};
 
   // internals
   int _nbParameters_{0};
