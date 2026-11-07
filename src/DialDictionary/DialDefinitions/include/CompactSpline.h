@@ -35,6 +35,8 @@ public:
   void buildSplineData(TGraph& graph_);
   [[nodiscard]] double evaluateSpline(const DialInputBuffer& input_) const;
 
+  [[nodiscard]] const GenericToolbox::Range& getSplineBounds() const { return _splineBounds_; }
+
   void buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_);
 
 

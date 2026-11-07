@@ -92,6 +92,8 @@ void Propagator::configureImpl(){
   _config_.fillValue(_devSingleThreadHistFill_, "devSingleThreadHistFill");
   _config_.fillValue(_eventDialCache_.getGlobalEventReweightCap().maxReweight, "globalEventReweightCap");
 
+  _configuredConfig_ = _config_.getConfig();
+
 }
 void Propagator::initializeImpl(){
 
@@ -99,6 +101,7 @@ void Propagator::initializeImpl(){
 
   _parManager_.initialize();
   _sampleSet_.initialize();
+  _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.initialize();
   _eventVariableResponseCache_.prepare(_sampleSet_, _dialManager_.getDialCollectionList());
 
@@ -114,11 +117,9 @@ void Propagator::clearContent(){
   // clearing events in MC containers
   _sampleSet_.clearEventLists();
 
-  // also wiping event-by-event dials...
-  // _dialManager_.clearEventByEventDials();
+  // Keep static dial definitions and reset only load-dependent state.
   _dialManager_.setParametersManager(&_parManager_);
-  _dialManager_.configure();
-  _dialManager_.initialize();
+  _dialManager_.clearEventByEventDials();
   _eventVariableResponseCache_.prepare(_sampleSet_, _dialManager_.getDialCollectionList());
 
   // Reset event associations while preserving the configured weight cap.
