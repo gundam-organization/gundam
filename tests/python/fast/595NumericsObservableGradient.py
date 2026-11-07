@@ -73,11 +73,11 @@ def check_threads(threads):
         'applyCondition': 'X < .3 && rawQ3 >= 0'})
     for width in ({'width': .4}, {'widthFraction': .3}):
         sample['binningResponse'] = {'isEnabled': True, 'variables': [dict(name='X', **width)]}
-        for normalized, eigen in ((False, False), (True, False), (False, True)):
+        for normalized, eigen in ((False, False), (True, False), (False, True), (True, True)):
             engine = build(config, normalized, eigen, analytic=True)
             data = engine.getLikelihoodInterface().getDataPropagator().getSampleSet().getSampleList()[0]
             before = [(b.sumWeights, b.sqrtSumSqWeights) for b in data.getHistogram().getBinContentList()]
-            points = ([.1, -.13], [-.08, .05]) if eigen else (
+            points = fixture.nearby_fit_points(engine, normalized) if eigen else (
                 [.36, .92, 1.1], [-.1, .85, .45], [1.95, 1.05, 1.2])
             for point in points:
                 engine.getMinimizer().evalFit(point)

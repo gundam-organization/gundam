@@ -13,6 +13,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 helpers = import_module('470DialsComposite')
 
 
+def nearby_fit_points(engine, normalized):
+    """Small shifts around the current point in the actual minimizer basis."""
+    parameters = list(engine.getMinimizer().getMinimizerFitParameterList())
+    center = [0. if normalized else p.getParameterValue() for p in parameters]
+    return [[value + shift * (1. if normalized else p.getStdDevValue()) * (-1. if i % 2 else 1.)
+             for i, (value, p) in enumerate(zip(center, parameters))]
+            for shift in (.07, -.05)]
+
+
 def make_fixture(threads):
     import GUNDAM
     GUNDAM.setLightOutputMode(True)
@@ -63,6 +72,8 @@ def make_fixture(threads):
 
     def check(engine, point, one_sided=(), preserve_likelihood=True):
         minimizer = engine.getMinimizer()
+        parameter_count = len(minimizer.getMinimizerFitParameterList())
+        assert len(point) == parameter_count, ('Wrong fit-point dimension', len(point), parameter_count, point)
         # Deliberately leave the engine at another point: the callback must refresh it.
         minimizer.evalFit([value + .02 for value in point])
         likelihood = engine.getLikelihoodInterface()

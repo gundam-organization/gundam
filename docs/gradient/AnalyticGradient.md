@@ -61,7 +61,7 @@ See [observable gradient method and limitations](ObservableGradients.md).
 | Feature | Status | Details / remaining work |
 | --- | :---: | --- |
 | Correlated Gaussian penalties | ✅ | Parameter-set constraints. |
-| External constraints | ❌ | Add their gradient contributions. |
+| External Gaussian constraints | ⚠️ | Formula derivatives require ROOT/Clad; no numerical fallback. See [external constraint gradients](ExternalConstraintGradients.md). |
 | Physical, normalized and eigen coordinates | ✅ | Transform the gradient to fit coordinates. |
 
 ### Minuit2 / MIGRAD

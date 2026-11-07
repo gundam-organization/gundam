@@ -18,7 +18,7 @@ then evaluates its derivatives. The current execution order is:
 | 4 | Calculate standard event weights, including the global weight cap. | Current event weights `w_e`. |
 | 5 | Fill model histograms from `c_eb = w_e f_eb`. | Complete bin contents `μ_b` and MC uncertainties `σ_b`. |
 | 6 | Evaluate the statistical LLH derivatives with respect to each bin's prediction and uncertainty. | Bin coefficients used to combine event derivatives. |
-| 7 | Differentiate bin fractions and observable responses, and accumulate weight derivatives. | Statistical gradient with respect to the physical parameters. |
+| 7 | Differentiate bin fractions and observable responses, accumulate weight derivatives, and add external constraint derivatives. | Statistical and external-measurement gradient in physical coordinates. |
 | 8 | Transform the statistical gradient as needed, add penalty derivatives, and return it in fit coordinates. | Total gradient supplied to the minimizer. |
 
 Thus, standard weights and histograms are available before the event derivative
@@ -122,7 +122,8 @@ With `A_b = ∂LLH/∂μ_b` and `B_b = (∂LLH/∂σ_b)/σ_b`, each contribution
 `A_b + B_b*c_eb`. This supplies both weight and observable derivatives without
 storing a dense event-by-parameter Jacobian. At zero MC uncertainty, the existing
 zero-uncertainty convention is retained. Statistical likelihood classes are
-unchanged, as are Gaussian penalties and fit-coordinate transformations.
+unchanged. External measurement derivatives are added in physical coordinates;
+internal Gaussian penalties and fit-coordinate transformations retain their existing rules.
 
 ### From histogram derivatives to the LLH
 

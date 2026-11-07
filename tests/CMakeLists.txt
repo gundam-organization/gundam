@@ -182,7 +182,9 @@ if( WITH_GOOGLE_TEST )
   )
   set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
   set(unitDataLoadingSources)
-  set(unitLikelihoodSources GTests/unitTest_JointProbability.cpp)
+  set(unitLikelihoodSources
+    GTests/unitTest_JointProbability.cpp
+    GTests/unitTest_ExternalConstraintGradient.cpp)
   set(unitMinimizerSources GTests/unitTest_RootMinimizerSimplex.cpp)
   set(unitBackendsSources)
 

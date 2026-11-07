@@ -190,8 +190,7 @@ double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const
 void LikelihoodInterface::validateWeightGradient() const {
   LogThrowIf(not _jointProbabilityPtr_->hasAnalyticBinGradient(),
              "Analytic bin gradients are unsupported for likelihood " << _jointProbabilityPtr_->getType());
-  LogThrowIf(_externalConstraints_.isEnabled() and not _externalConstraints_.getGaussianConstraintList().empty(),
-             "CPU weight gradients do not yet support external constraints.");
+  _externalConstraints_.validateGradient();
   const auto& samples = _modelPropagator_.getSampleSet().getSampleList();
   for( const auto& sample : samples ){
     LogThrowIf(sample.isUseDynamicBinning() and not sample.getHistogram().isBinningResponseEnabled(),
@@ -219,6 +218,9 @@ void LikelihoodInterface::propagateAndEvalGradient(ParameterGradient& gradient_)
   LogThrowIf(not propagation.get(), "Gradient propagation failed.");
   auto statGradient = prepareGradient(gradient_);
   evalStatLikelihoodGradient(statGradient);
+  // External measurements use physical parameters, including originals in
+  // eigen-decomposed sets. Add them before projecting to fit coordinates.
+  _externalConstraints_.evalGradient(statGradient);
   finalizeGradient(statGradient, gradient_);
 }
 
