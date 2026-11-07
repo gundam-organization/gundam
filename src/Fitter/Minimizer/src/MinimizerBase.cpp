@@ -1,5 +1,6 @@
 #include "MinimizerBase.h"
 #include "FitterEngine.h"
+#include "GundamUtils.h"
 
 #include "Logger.h"
 
@@ -218,7 +219,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
       ssHeader << std::endl << GenericToolbox::getNowDateString("%Y.%m.%d %H:%M:%S");
       ssHeader << std::endl << __METHOD_NAME__ << ": call #" << _monitor_.nbEvalLikelihoodCalls;
       ssHeader << std::endl << _monitor_.stateTitleMonitor << " / Nb of parameters to fit: " << nbValidPars;
-      ssHeader << std::endl << "RAM: " << GenericToolbox::parseSizeUnits(double(GenericToolbox::getProcessMemoryUsage()));
+      ssHeader << std::endl << "RAM: " << GundamUtils::getProcessMemoryUsageSummary();
       double cpuPercent = GenericToolbox::getCpuUsageByProcess();
       ssHeader << " / CPU: " << cpuPercent << "% / " << cpuPercent / GundamGlobals::getNbCpuThreads() << "% efficiency";
       ssHeader << std::endl << "Avg log-likelihood computation time: " << _monitor_.evalLlhTimer;
@@ -345,8 +346,8 @@ void MinimizerBase::printParameters(){
       else if( par.isPenaltyDisabled() )  { statusStr = "Fixed (penalty not applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else if( par.isFixed() )  { statusStr = "Fixed (penalty applied)";    colorStr = GenericToolbox::ColorCodes::yellowLightText; }
       else                      {
-        statusStr = Parameter::PriorType::toString(par.getPriorType()) + " Prior";
-        if(par.getPriorType()==Parameter::PriorType::Flat) colorStr = GenericToolbox::ColorCodes::blueLightText;
+        statusStr = par.isFree() ? "Free" : "Gaussian Prior";
+        if(par.isFree()) colorStr = GenericToolbox::ColorCodes::blueLightText;
       }
 
 #ifdef NOCOLOR
