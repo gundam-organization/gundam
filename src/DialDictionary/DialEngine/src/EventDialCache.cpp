@@ -14,7 +14,6 @@
 #include <algorithm>
 #include <unordered_map>
 
-#include <algorithm>
 
 
 size_t EventDialCache::getCacheMemorySize() const{
