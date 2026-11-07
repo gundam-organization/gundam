@@ -5,6 +5,33 @@ existing smoothed binning response. This differentiates the **same smoothed
 prediction and likelihood** used for value evaluation. It does not differentiate
 an unsmoothed histogram or remove finite-MC fluctuations.
 
+## Execution order in GUNDAM
+
+A gradient request first propagates the model at the requested parameter point,
+then evaluates its derivatives. The current execution order is:
+
+| Step | Operation | Result |
+| --- | --- | --- |
+| 1 | Set the requested parameters and convert fit coordinates as needed. | Current physical parameter values. |
+| 2 | Update dial inputs and collection state, including external response tables. | Dial responses can be evaluated at the current point. |
+| 3 | Apply observable-response dials and update event binning contributions. | Current observables and smoothed fractions `f_eb`. |
+| 4 | Calculate standard event weights, including the global weight cap. | Current event weights `w_e`. |
+| 5 | Fill model histograms from `c_eb = w_e f_eb`. | Complete bin contents `μ_b` and MC uncertainties `σ_b`. |
+| 6 | Evaluate the statistical LLH derivatives with respect to each bin's prediction and uncertainty. | Bin coefficients used to combine event derivatives. |
+| 7 | Differentiate bin fractions and observable responses, and accumulate weight derivatives. | Statistical gradient with respect to the physical parameters. |
+| 8 | Transform the statistical gradient as needed, add penalty derivatives, and return it in fit coordinates. | Total gradient supplied to the minimizer. |
+
+Thus, standard weights and histograms are available before the event derivative
+pass. Dial responses already cached at the current input revision can be reused,
+but the derivative calculation remains a separate pass. In particular, smoothed
+bin fractions are evaluated again when their derivatives are requested.
+
+A gradient request does **not** require a prior scalar LLH evaluation: it computes
+the necessary bin derivatives directly and leaves the stored scalar LLH values
+unchanged. A value request and a gradient request each invoke model propagation,
+even when they refer to the same parameter point. Observed data remain fixed
+throughout both operations.
+
 ## Calculation
 
 | Stage | Forward value | Derivative propagated |
