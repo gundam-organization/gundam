@@ -204,20 +204,20 @@ std::vector<double> CompositeDial::evalGradients(const DialInputBuffer& input_) 
   std::vector<double> responses(_nodes_.size());
   std::vector<DialInputBuffer> inputs(_nodes_.size());
   std::vector<std::vector<double>> mirrorGradients(_nodes_.size());
-  std::vector<bool> clamped(_nodes_.size());
+  std::vector<double> supervisorGradients(_nodes_.size());
   for( int index : _evaluationOrder_ ){
     const auto& node = _nodes_[index];
     inputs[index] = makeNodeInputs(node, input_, responses, &mirrorGradients[index]);
     const double raw = node.dial->evalResponse(inputs[index]);
     responses[index] = node.supervisor.process(raw);
-    clamped[index] = responses[index] != raw;
+    supervisorGradients[index] = node.supervisor.evalDerivative(raw);
   }
   std::vector<double> adjoints(_nodes_.size(), 0.);
   std::vector<double> result(_inputCount_, 0.);
   adjoints[_outputIndex_] = 1.;
   for( auto position = _evaluationOrder_.rbegin(); position != _evaluationOrder_.rend(); ++position ){
     const int index = *position;
-    if( clamped[index] or adjoints[index] == 0. ){ continue; }
+    if( supervisorGradients[index] == 0. or adjoints[index] == 0. ){ continue; }
     const auto& node = _nodes_[index];
     const auto local = node.dial->evalGradients(inputs[index]);
     LogThrowIf(local.size() != mirrorGradients[index].size(),
@@ -225,7 +225,7 @@ std::vector<double> CompositeDial::evalGradients(const DialInputBuffer& input_) 
     size_t iParameter = 0;
     for( const auto& source : node.inputs ){
       if( not source.eventVariable.empty() ){ continue; }
-      const double contribution = adjoints[index] * local[iParameter] * mirrorGradients[index][iParameter];
+      const double contribution = adjoints[index] * supervisorGradients[index] * local[iParameter] * mirrorGradients[index][iParameter];
       ++iParameter;
       if( source.bufferIndex >= 0 ){ result[source.bufferIndex] += contribution; }
       else{ adjoints[source.nodeIndex] += contribution; }

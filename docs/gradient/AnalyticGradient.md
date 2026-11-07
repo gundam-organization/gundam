@@ -29,12 +29,12 @@ fit; fewer iterations are not guaranteed.
 | `RootGraph` | ✅ | Right-hand slope at interior knots; last segment at the final knot when extrapolation is enabled. |
 | `RootSpline` | ✅ | |
 | `Formula` | ⚠️ | Requires ROOT/Clad automatic differentiation. `eventVariable` inputs remain fixed when differentiating fit parameters. Unsupported generation or a numerical fallback raises an initialization error. Derivative calls share a lock per formula. |
-| `CompositeDial` | ⚠️ | All nested dials must support analytic gradients. Event inputs remain fixed; response smoothing is unsupported. |
+| `CompositeDial` | ✅️ | All nested dials must support analytic gradients. Event inputs remain fixed. |
 | `CompiledLibDial` | ❌ | |
-| `Tabulated` | ❌ | |
-| `Kriged` | ❌ | |
-| `ExternalWeight` | ⚠️ | Worker must declare gradient support and fill a dense derivative matrix per event/bin. See [worker API](../configuration/ExternalWeightDials.md#analytic-gradients). |
+| `Tabulated`, `Kriged` | ⚠️ | External library must provide `gradientFunction` for each table. Event interpolation coefficients remain fixed. See [table gradient API](../configuration/TableDialGradients.md). |
+| `ExternalWeight` | ✅️ | Worker must declare gradient support and fill a dense derivative matrix per event/bin. See [worker API](../configuration/ExternalWeightDials.md#analytic-gradients). |
 | Weight products | ✅ | Handles zero responses and repeated parameters. The derivative is zero when the global reweight cap is exceeded. |
+| Response smoothing | ✅ | Applies the supervisor derivative through the chain rule, including nested composite nodes. |
 | Mirrors, bounds and interpolation knots | ⚠️ | Piecewise conventions; derivatives may not be unique at discontinuities in slope. |
 
 ### Events → histograms
@@ -42,8 +42,10 @@ fit; fewer iterations are not guaranteed.
 | Feature | Status | Details / remaining work |
 | --- | :---: | --- |
 | Fixed-bin histograms | ✅ | Bin contents, MC uncertainties and ignored bins. |
-| Dynamic binning / smoothing / migration | ❌ | Differentiate bin assignments and contributions. |
-| Dials modifying observables | ❌ | Propagate observable derivatives. |
+| Dynamic binning / smoothing / migration | ⚠️ | Smoothing required on every moving histogram axis; fixed widths and bin edges. |
+| Dials modifying observables | ⚠️ | Existing add/multiply/override composition; all attached dials must support gradients. |
+
+See [observable gradient method and limitations](ObservableGradients.md).
 
 ### Histograms → LLH
 
@@ -59,7 +61,7 @@ fit; fewer iterations are not guaranteed.
 | Feature | Status | Details / remaining work |
 | --- | :---: | --- |
 | Correlated Gaussian penalties | ✅ | Parameter-set constraints. |
-| External constraints | ❌ | Add their gradient contributions. |
+| External Gaussian constraints | ⚠️ | Formula derivatives require ROOT/Clad; no numerical fallback. See [external constraint gradients](ExternalConstraintGradients.md). |
 | Physical, normalized and eigen coordinates | ✅ | Transform the gradient to fit coordinates. |
 
 ### Minuit2 / MIGRAD

@@ -191,15 +191,20 @@ double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const
 void LikelihoodInterface::validateWeightGradient() const {
   LogThrowIf(not _jointProbabilityPtr_->hasAnalyticBinGradient(),
              "Analytic bin gradients are unsupported for likelihood " << _jointProbabilityPtr_->getType());
-  LogThrowIf(_externalConstraints_.isEnabled() and not _externalConstraints_.getGaussianConstraintList().empty(),
-             "CPU weight gradients do not yet support external constraints.");
-  LogThrowIf(_modelPropagator_.getEventDialCache().hasVariableResponses(),
-             "CPU weight gradients do not support observable-response dials.");
-  for( const auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
-    LogThrowIf(sample.isUseDynamicBinning() or sample.getHistogram().isBinningResponseEnabled(),
-               "CPU weight gradients require fixed, unsmoothed bins.");
+  _externalConstraints_.validateGradient();
+  const auto& samples = _modelPropagator_.getSampleSet().getSampleList();
+  for( const auto& sample : samples ){
+    LogThrowIf(sample.isUseDynamicBinning() and not sample.getHistogram().isBinningResponseEnabled(),
+               "Dynamic binning gradients require bin smoothing");
   }
   for( const auto& entry : _modelPropagator_.getEventDialCache().getCache() ){
+    if( entry.event != nullptr ){
+      const auto& histogram = samples.at(entry.event->getIndices().sample).getHistogram();
+      for( const auto& target : entry.variableResponseCacheList ){
+        const auto& name = entry.event->getVariables().getNameListPtr()->at(target.variableIndex);
+        histogram.validateGradientVariable(name);
+      }
+    }
     for( const auto& response : entry.dialResponseCacheList ){
       const auto* dial = response.dialInterface->getDialBaseRef();
       LogThrowIf(not dial->hasAnalyticGradient(), "CPU weight gradient is unsupported for dial " << dial->getDialTypeName());
@@ -214,6 +219,9 @@ void LikelihoodInterface::propagateAndEvalGradient(ParameterGradient& gradient_)
   LogThrowIf(not propagation.get(), "Gradient propagation failed.");
   auto statGradient = prepareGradient(gradient_);
   evalStatLikelihoodGradient(statGradient);
+  // External measurements use physical parameters, including originals in
+  // eigen-decomposed sets. Add them before projecting to fit coordinates.
+  _externalConstraints_.evalGradient(statGradient);
   finalizeGradient(statGradient, gradient_);
 }
 
@@ -315,12 +323,36 @@ void LikelihoodInterface::evalStatLikelihoodGradient(ParameterGradient& gradient
   auto& cache = _modelPropagator_.getEventDialCache();
   std::vector<double> eventScales(cache.getCache().size(), 0.);
   for( std::size_t i = 0; i < cache.getCache().size(); ++i ){
-    const auto& cacheEntry = cache.getCache()[i];
+    auto& cacheEntry = cache.getCache()[i];
     if( cacheEntry.event == nullptr ){ continue; }
 
     const int sampleIndex{cacheEntry.event->getIndices().sample};
     const int binIndex{cacheEntry.event->getIndices().bin};
     if( sampleIndex < 0 or sampleIndex >= int(binGradientScaleList.size()) ){ continue; }
+    const auto& histogram = _modelPropagator_.getSampleSet().getSampleList()[sampleIndex].getHistogram();
+    if( histogram.isBinningResponseEnabled() ){
+      const auto binning = histogram.evalBinningGradient(*cacheEntry.event);
+      std::vector<double> observableScales(binning.variableIndices.size(), 0.);
+      const double weight = cacheEntry.event->getEventWeight();
+      for( size_t row = 0; row < binning.response.binFractions.size(); ++row ){
+        const auto& fraction = binning.response.binFractions[row];
+        if( fraction.binIndex < 0 or fraction.binIndex >= int(binGradientScaleList[sampleIndex].size()) ){ continue; }
+        const auto& binScale = binGradientScaleList[sampleIndex][fraction.binIndex];
+        const double scale = binScale.sumWeights + binScale.sqrtSumSqWeightsOverError * weight * fraction.fraction;
+        eventScales[i] += scale * fraction.fraction;
+        for( size_t column = 0; column < observableScales.size(); ++column ){
+          observableScales[column] += scale * weight * binning.fractionGradients[row][column];
+        }
+      }
+      for( const auto& target : cacheEntry.variableResponseCacheList ){
+        for( size_t column = 0; column < observableScales.size(); ++column ){
+          if( binning.variableIndices[column] == target.variableIndex ){
+            cache.evalVariableResponseGradient(cacheEntry, target, gradient_, observableScales[column]);
+          }
+        }
+      }
+      continue;
+    }
     if( binIndex < 0 or binIndex >= int(binGradientScaleList[sampleIndex].size()) ){ continue; }
 
     const auto& gradientScale = binGradientScaleList[sampleIndex][binIndex];

@@ -45,3 +45,13 @@ double ExternalConstraints::eval() const{
   for( const auto& constraint : _gaussianConstraintList_ ){ penalty += constraint.eval(); }
   return penalty;
 }
+
+void ExternalConstraints::validateGradient() const{
+  if( not _isEnabled_ ){ return; }
+  for( const auto& constraint : _gaussianConstraintList_ ){ constraint.validateGradient(); }
+}
+
+void ExternalConstraints::evalGradient(ParameterGradient& gradient_) const{
+  if( not _isEnabled_ ){ return; }
+  for( const auto& constraint : _gaussianConstraintList_ ){ constraint.evalGradient(gradient_); }
+}

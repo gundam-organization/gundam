@@ -15,6 +15,8 @@ public:
   [[nodiscard]] auto& getGaussianConstraintList() const{ return _gaussianConstraintList_; }
   void bindParameters(const ParametersManager& parametersManager_);
   [[nodiscard]] double eval() const;
+  void validateGradient() const;
+  void evalGradient(ParameterGradient& gradient_) const;
 
 protected:
   void configureImpl() override;

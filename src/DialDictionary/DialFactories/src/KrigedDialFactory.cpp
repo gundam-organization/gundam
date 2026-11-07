@@ -25,6 +25,7 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
         {"maxWeights"},
         {"weightNormalization"},
         {"bins"},
+        {"gradientFunction"},
     });
     tableConfig.checkConfiguration();
 
@@ -96,11 +97,25 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
         }
         bins = result;
     }
+    if( bins < 1 ){
+        throw std::runtime_error("Kriged table " + _name_ + ": insufficient table entries");
+    }
     _table_.resize(bins);
 
     // Make sure things are going to fail badly if the table is used before
     // it is filled.
     for (auto& t : _table_) t = std::nan("not-set");
+
+    _gradientFuncName_ = tableConfig.fetchValue<std::string>("gradientFunction", "");
+    TableGradientBuffer::UpdateFunction gradientFunction = nullptr;
+    if( not _gradientFuncName_.empty() ){
+        gradientFunction = reinterpret_cast<TableGradientBuffer::UpdateFunction>(
+            dlsym(library, _gradientFuncName_.c_str()));
+        if( gradientFunction == nullptr ){
+            throw std::runtime_error("Table " + _name_ + ": gradientFunction symbol not found: " + _gradientFuncName_);
+        }
+    }
+    _gradientBuffer_ = std::make_shared<TableGradientBuffer>(gradientFunction);
 
     // Get the update function
     void* updateFunc = dlsym(library, getUpdateFunction().c_str());
@@ -134,11 +149,7 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
 
 void KrigedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
     std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
-    _updateFunc_(_name_.c_str(),
-                 _table_.data(),
-                 (int) _table_.size(),
-                 inputBuffer.getInputBuffer().data(),
-                 (int) inputBuffer.getInputBuffer().size());
+    _gradientBuffer_->update(_table_, inputBuffer.getInputBuffer(), _updateFunc_, _name_);
 }
 
 DialBase* KrigedDialFactory::makeDial(const Event& event) {
@@ -185,6 +196,14 @@ DialBase* KrigedDialFactory::makeDial(const Event& event) {
 #undef KRIGED_DIAL_FACTORY_DUMP
 
     if (entries < 1) return nullptr;
+    if( entries > int(_indexCache_.size()) ){
+        throw std::runtime_error("Kriged table " + _name_ + ": weightFunction returned too many entries");
+    }
+    for( int j = 0; j < entries; ++j ){
+        if( _indexCache_[j] < 0 or _indexCache_[j] >= int(_table_.size()) or not std::isfinite(_weightCache_[j]) ){
+            throw std::runtime_error("Kriged table " + _name_ + ": invalid interpolation index/weight");
+        }
+    }
 
     if (_weightNormalization_ > 0.0) {
         double sum = 0.0;
@@ -203,7 +222,7 @@ DialBase* KrigedDialFactory::makeDial(const Event& event) {
 
     // Do the unique_ptr dance in case there are exceptions.
     std::unique_ptr<Kriged> dialBase
-        = std::make_unique<Kriged>(&_table_, entries, _indexCache_, _weightCache_);
+        = std::make_unique<Kriged>(&_table_, entries, _indexCache_, _weightCache_, "", _gradientBuffer_);
 
     return dialBase.release();
 }

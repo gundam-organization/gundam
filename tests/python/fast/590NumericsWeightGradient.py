@@ -13,6 +13,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 helpers = import_module('470DialsComposite')
 
 
+def nearby_fit_points(engine, normalized):
+    """Small shifts around the current point in the actual minimizer basis."""
+    parameters = list(engine.getMinimizer().getMinimizerFitParameterList())
+    center = [0. if normalized else p.getParameterValue() for p in parameters]
+    return [[value + shift * (1. if normalized else p.getStdDevValue()) * (-1. if i % 2 else 1.)
+             for i, (value, p) in enumerate(zip(center, parameters))]
+            for shift in (.07, -.05)]
+
+
 def make_fixture(threads):
     import GUNDAM
     GUNDAM.setLightOutputMode(True)
@@ -63,6 +72,8 @@ def make_fixture(threads):
 
     def check(engine, point, one_sided=(), preserve_likelihood=True):
         minimizer = engine.getMinimizer()
+        parameter_count = len(minimizer.getMinimizerFitParameterList())
+        assert len(point) == parameter_count, ('Wrong fit-point dimension', len(point), parameter_count, point)
         # Deliberately leave the engine at another point: the callback must refresh it.
         minimizer.evalFit([value + .02 for value in point])
         likelihood = engine.getLikelihoodInterface()
@@ -213,22 +224,23 @@ def check_threads(threads):
         assert 'numerical' in str(error).lower() or 'generate' in str(error).lower(), str(error)
     else:
         raise AssertionError('Unsupported dial silently differentiated')
-    for kind in ('smooth', 'observable'):
-        cfg = copy.deepcopy(config)
-        prop = cfg['likelihoodInterfaceConfig']['propagatorConfig']
-        if kind == 'smooth':
-            prop['sampleSetConfig']['sampleList'][0]['binningResponse'] = {
-                'isEnabled': True, 'variables': [{'name': 'X', 'width': .2}]}
-        else:
-            prop['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'][0].update(
-                applyToVariable='X', variableResponseMode='Override')
-        engine = build(cfg, False, False)
-        try:
-            engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
-        except RuntimeError as error:
-            assert 'bins' in str(error) or 'observable' in str(error), str(error)
-        else:
-            raise AssertionError('Unsupported binning/observable gradient was accepted')
+    smooth = copy.deepcopy(config)
+    smooth['likelihoodInterfaceConfig']['propagatorConfig']['sampleSetConfig']['sampleList'][0]['binningResponse'] = {
+        'isEnabled': True, 'variables': [{'name': 'X', 'width': .2}]}
+    engine = build(smooth, False, False)
+    check(engine, [.4, .95, 1.08])
+
+    # Observable migration through hard bin boundaries remains forbidden.
+    cfg = copy.deepcopy(config)
+    cfg['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'][0].update(
+        applyToVariable='X', variableResponseMode='Override')
+    engine = build(cfg, False, False)
+    try:
+        engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
+    except RuntimeError as error:
+        assert 'smoothing' in str(error).lower(), str(error)
+    else:
+        raise AssertionError('Hard-binned observable gradient was accepted')
     print(f'SUCCESS: original-engine weight gradients ({threads} threads)')
 
 

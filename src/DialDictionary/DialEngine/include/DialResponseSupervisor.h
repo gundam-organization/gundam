@@ -28,6 +28,9 @@ public:
   [[nodiscard]] double getMaxSmoothingWidth() const{ return _maxSmoothingWidth_; }
 
   [[nodiscard]] double process(double response_) const;
+  // Derivative with respect to the raw response. Hard-limit knots use the
+  // interior slope (one); smoothed transitions have a continuous derivative.
+  [[nodiscard]] double evalDerivative(double response_) const;
   [[nodiscard]] std::string getSummary(bool shallow_ = true) const;
 
 

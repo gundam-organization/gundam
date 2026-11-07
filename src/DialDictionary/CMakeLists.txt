@@ -54,6 +54,7 @@ set( HEADERS
 
     DialDefinitions/include/Norm.h
     DialDefinitions/include/Shift.h
+    DialDefinitions/include/TableGradientBuffer.h
     DialDefinitions/include/Tabulated.h
     DialDefinitions/include/Kriged.h
 

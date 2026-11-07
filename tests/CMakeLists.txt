@@ -182,10 +182,13 @@ if( WITH_GOOGLE_TEST )
     GTests/unitTest_FormulaEvaluator.cpp
     GTests/unitTest_CompositeGradient.cpp
     GTests/unitTest_ExternalWeightGradient.cpp
+    GTests/unitTest_TableGradient.cpp
+    GTests/unitTest_BinningGradient.cpp
   )
   set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
-  set(unitDataLoadingSources)
-  set(unitLikelihoodSources GTests/unitTest_JointProbability.cpp)
+  set(unitLikelihoodSources
+    GTests/unitTest_JointProbability.cpp
+    GTests/unitTest_ExternalConstraintGradient.cpp)
   set(unitMinimizerSources GTests/unitTest_RootMinimizerSimplex.cpp)
   set(unitBackendsSources)
   if(WITH_BACKENDS)
@@ -255,6 +258,10 @@ if( WITH_GOOGLE_TEST )
     add_test(NAME Backends/cuda-backend-smoothed COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSmoothed.*)
     set_tests_properties(Backends/cuda-backend-gradient Backends/cuda-backend-programs Backends/cuda-backend-likelihood Backends/cuda-backend-skeleton Backends/cuda-backend-propagation Backends/cuda-backend-surfaces Backends/cuda-backend-external Backends/cuda-backend-observables Backends/cuda-backend-smoothed PROPERTIES LABELS "unit;unit-backends;cuda;device" TIMEOUT 120)
   endif()
+  add_library(gundamTableGradientPlugin SHARED GTests/TableGradientPlugin.cpp)
+  add_dependencies(gundamGTest_Dials.exe gundamTableGradientPlugin)
+  target_compile_definitions(gundamGTest_Dials.exe PRIVATE
+    GUNDAM_TABLE_GRADIENT_PLUGIN="$<TARGET_FILE:gundamTableGradientPlugin>")
 
   ## Create a list of all of the regular tests.  These are always
   ## compiled and are run when WITH_REGULAR_TEST is on.

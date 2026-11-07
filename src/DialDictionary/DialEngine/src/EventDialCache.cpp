@@ -299,7 +299,8 @@ void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
   std::vector<double> responseList(entry_.dialResponseCacheList.size(), 1.);
   std::vector<double> prefix(responseList.size() + 1, 1.);
   for( size_t iDial = 0; iDial < responseList.size(); ++iDial ){
-    responseList[iDial] = entry_.dialResponseCacheList[iDial].getResponse();
+    responseList[iDial] = entry_.dialResponseCacheList[iDial].appliesToVariable ? 1.
+        : entry_.dialResponseCacheList[iDial].getResponse();
     prefix[iDial + 1] = prefix[iDial] * responseList[iDial];
   }
   const double responseProduct = prefix.back();
@@ -324,6 +325,7 @@ void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
     auto* dialInterface = dialResponseCache.dialInterface;
     if( dialInterface == nullptr or dialInterface->getInputBufferRef() == nullptr ){ continue; }
 
+    if( dialResponseCache.appliesToVariable ){ continue; }
     const auto* inputBuffer = dialInterface->getInputBufferRef();
     const auto dialGradients = dialInterface->evalGradients();
     for( int iInput = 0 ; iInput < inputBuffer->getInputSize() ; iInput++ ){
@@ -366,7 +368,8 @@ void EventDialCache::evalEventWeightGradients(
       prefix.resize(count + 1);
       prefix[0] = 1.;
       for( std::size_t i = 0; i < count; ++i ){
-        responses[i] = entry.dialResponseCacheList[i].getResponse();
+        responses[i] = entry.dialResponseCacheList[i].appliesToVariable ? 1.
+            : entry.dialResponseCacheList[i].getResponse();
         prefix[i+1] = prefix[i] * responses[i];
       }
       if( _globalEventReweightCap_.isEnabled and prefix.back() > _globalEventReweightCap_.maxReweight ){ continue; }
@@ -375,6 +378,7 @@ void EventDialCache::evalEventWeightGradients(
       for( std::size_t i = count; i-- > 0; ){
         const double factor = baseScale * prefix[i] * suffix;
         suffix *= responses[i];
+        if( entry.dialResponseCacheList[i].appliesToVariable ){ continue; }
         const auto* interface = entry.dialResponseCacheList[i].dialInterface;
         const auto* input = interface->getInputBufferRef();
         if( input == nullptr or factor == 0. ){ continue; }
@@ -394,4 +398,35 @@ void EventDialCache::evalEventWeightGradients(
   for( std::size_t i = 0; i < result.size(); ++i ){
     gradient_.addValue(parameterList[i], result[i]);
   }
+}
+
+void EventDialCache::evalVariableResponseGradient(CacheEntry& entry_, const VariableResponseCache& target_,
+                                                  ParameterGradient& gradient_, double scale_){
+  if( scale_ == 0. ){ return; }
+  const auto addDial = [&](size_t index_, double factor_){
+    if( factor_ == 0. ){ return; }
+    const auto* interface = entry_.dialResponseCacheList.at(index_).dialInterface;
+    const auto* input = interface->getInputBufferRef();
+    const auto local = interface->evalGradients();
+    for( int j = 0; j < input->getInputSize(); ++j ){
+      const auto* parameter = &input->getParameter(j);
+      if( gradient_.values.count(parameter) != 0 ){
+        gradient_.addValue(parameter, scale_ * factor_ * local.at(j) * input->evalInputGradient(j));
+      }
+    }
+  };
+  const auto response = [&](size_t index_){ return entry_.dialResponseCacheList.at(index_).getResponse(); };
+  std::vector<double> prefix(target_.multiplyDials.size() + 1, 1.);
+  for( size_t j = 0; j < target_.multiplyDials.size(); ++j ){
+    prefix[j+1] = prefix[j] * response(target_.multiplyDials[j]);
+  }
+  const bool overridden = target_.overrideDial != size_t(-1);
+  const double reference = overridden ? response(target_.overrideDial) : target_.referenceValue;
+  if( overridden ){ addDial(target_.overrideDial, prefix.back()); }
+  double suffix = 1.;
+  for( size_t j = target_.multiplyDials.size(); j-- > 0; ){
+    addDial(target_.multiplyDials[j], reference * prefix[j] * suffix);
+    suffix *= response(target_.multiplyDials[j]);
+  }
+  for( auto index : target_.addDials ){ addDial(index, 1.); }
 }
