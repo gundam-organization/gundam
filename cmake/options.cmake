@@ -3,7 +3,6 @@
 message("")
 cmessage( STATUS "Setting up options...")
 
-
 # general options
 option( ENABLE_COLOR_OUTPUT "Enable colored terminal output." ON )
 option( ENABLE_TTY_CHECK "Enable check if output is being sent to terminal/TTY." ON )
@@ -16,7 +15,7 @@ option( WITH_ROOT_DICT_BUILD "Build the targets that require ROOT_GENERATE_DICTI
 option( WITH_GUNDAM_ROOT_APP "Build app gundamRoot." ON )
 option( WITH_GUNDAM_SANDBOX_APP "Build app gundamRoot." OFF )
 option( WITH_CACHE_MANAGER "Enable compiling of the cache manager (required for GPU computing)." ON )
-option( WITH_CUDA_LIB "Enable CUDA language check (Cache::Manager requires a GPU if CUDA is found)." OFF )
+option( WITH_BACKENDS "Enable compiling of the experimental backend library." ON )
 option( WITH_MINUIT2_MISSING "Allow MINUIT2 to be missing" OFF )
 option( WITH_PYTHON_INTERFACE "Compile the python interface modules" OFF )
 set( GUNDAM_PYTHON_VERSIONS "AUTO" CACHE STRING "Python interfaces: AUTO (three newest usable versions in PATH), or a semicolon-separated list of versions/executable paths." )
@@ -36,6 +35,11 @@ option( YAMLCPP_DIR "Set custom path to yaml-cpp lib." OFF )
 # dev options
 option( USE_STATIC_LINKS "Use static link of libraries and apps instead of shared." OFF )
 option( CXX_WARNINGS "Enable most C++ warning flags." ON )
+
+# Multi-value options (validated in cuda.cmake).
+set(WITH_CUDA_LIB "AUTO" CACHE STRING "CUDA support: OFF, ON (required), or AUTO (if available).")
+set_property(CACHE WITH_CUDA_LIB PROPERTY TYPE STRING)
+set_property(CACHE WITH_CUDA_LIB PROPERTY STRINGS OFF ON AUTO)
 
 
 # Reading options
@@ -85,6 +89,12 @@ if( WITH_CACHE_MANAGER )
   endif( NOT WITH_CUDA_LIB )
 else()
   cmessage( STATUS "Cache manager is disabled. Use -D WITH_CACHE_MANAGER=ON if needed." )
+endif()
+
+if( WITH_BACKENDS )
+  add_definitions( -D GUNDAM_USING_BACKENDS )
+else()
+  cmessage( STATUS "Experimental backend library is disabled. Use -D WITH_BACKENDS=ON if needed." )
 endif()
 
 

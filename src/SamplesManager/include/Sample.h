@@ -8,10 +8,13 @@
 
 #include "Event.h"
 #include "Histogram.h"
+
 #include "BinSet.h"
 #include "GundamGlobals.h"
 
 
+#include <functional>
+#include <memory>
 #include <vector>
 #include <string>
 
@@ -65,6 +68,8 @@ public:
   // core
   void reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Event &eventBuffer_);
   void shrinkEventList(size_t newTotalSize_);
+  // Keep the returned handle alive to receive notifications; dropping it unsubscribes.
+  [[nodiscard]] std::shared_ptr<std::function<void()>> addBinningUpdateListener(std::function<void()> listener_);
   void updateEventBinning();
   void updateEventBinning(GenericToolbox::ParallelWorker& threadPool_);
 
@@ -75,6 +80,7 @@ public:
 
   // multi-thread
   void indexEventInHistogramBin( int iThread_ = -1);
+  void indexEventInHistogramBin(GenericToolbox::ParallelWorker& threadPool_);
 
 private:
   // configuration
@@ -89,6 +95,7 @@ private:
   std::vector<std::string> _enabledDatasetList_;
 
   // Internals
+  std::vector<std::weak_ptr<std::function<void()>>> _binningUpdateListeners_;
   std::vector<size_t> _dataSetIndexList_;
 
   Histogram _histogram_{};

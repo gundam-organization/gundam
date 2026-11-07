@@ -1,4 +1,9 @@
 #!/bin/bash
+
+if command -v gundamFitter >/dev/null 2>&1 && ! gundamFitter --help 2>&1 | grep -q -- '--cache-manager'; then
+    echo 'SKIP: this test requires a GUNDAM build with WITH_CACHE_MANAGER=ON'
+    exit 0
+fi
 # Wrap a ROOT macro as a script.
 #
 #  Check the output of GUNDAM 200CovarianceFit.sh against the

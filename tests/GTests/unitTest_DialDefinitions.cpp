@@ -22,6 +22,8 @@
 #include "Graph.h"
 #include "Norm.h"
 #include "RootSpline.h"
+#include "RootGraph.h"
+#include "RootFormula.h"
 #include <future>
 
 TEST(DialDefinitions,CompactSplineTruncated) {
@@ -426,4 +428,99 @@ TEST(DialLoading, LeavesBinnedRootSplinesUnique){
   }
   collection.deduplicateBinnedDials();
   EXPECT_NE(interfaces[0].getDialBaseRef(), interfaces[1].getDialBaseRef());
+}
+
+
+TEST(DialDefinitions, RootGraphAnalyticGradient) {
+  const double x[]{-1., 0., 2., 3.};
+  const double y[]{2., 1., 5., 4.};
+  for( bool sorted : {false, true} ){
+    TGraph graph(4, x, y);
+    if( sorted ){ graph.SetBit(TGraph::kIsSortedX); }
+    RootGraph dial;
+    dial.setGraph(graph);
+    ASSERT_TRUE(dial.hasAnalyticGradient());
+    DialInputBuffer input;
+    input.getInputBuffer().resize(1);
+    for( bool extrapolate : {false, true} ){
+      dial.setAllowExtrapolation(extrapolate);
+      for( double point : {-2., -.5, .5, 2.5, 4.} ){
+        input.getInputBuffer()[0] = point + 1e-5;
+        const double up = dial.evalResponse(input);
+        input.getInputBuffer()[0] = point - 1e-5;
+        const double down = dial.evalResponse(input);
+        input.getInputBuffer()[0] = point;
+        EXPECT_NEAR((up - down) / 2e-5, dial.evalGradient(input, 0), 1e-9);
+        EXPECT_EQ(0., dial.evalGradient(input, 1));
+      }
+      for( double point : {-1., 0., 2., 3.} ){
+        input.getInputBuffer()[0] = point;
+        double expected = point == 0. ? 2. : -1.;
+        if( not extrapolate and (point == -1. or point == 3.) ){ expected = 0.; }
+        EXPECT_DOUBLE_EQ(expected, dial.evalGradient(input, 0));
+      }
+    }
+    // A graph with only one point is constant, including extrapolation.
+    graph.Set(1);
+    dial.setGraph(graph);
+    EXPECT_EQ(0., dial.evalGradient(input, 0));
+  }
+  // ROOT accepts unsorted graphs; preserve its segment selection off knots.
+  const double unsortedX[]{2., -1., 3., 0.};
+  const double unsortedY[]{5., 2., 4., 1.};
+  RootGraph dial;
+  dial.setGraph(TGraph(4, unsortedX, unsortedY));
+  dial.setAllowExtrapolation(true);
+  DialInputBuffer input;
+  input.getInputBuffer() = {0.5};
+  EXPECT_DOUBLE_EQ(2., dial.evalGradient(input, 0));
+  input.getInputBuffer()[0] = -2.;
+  EXPECT_DOUBLE_EQ(-1., dial.evalGradient(input, 0));
+  input.getInputBuffer()[0] = 4.;
+  EXPECT_DOUBLE_EQ(-1., dial.evalGradient(input, 0));
+}
+
+TEST(DialDefinitions, RootSplineAnalyticGradient) {
+  double x[]{-1., 0., 2., 3.};
+  double y[]{2., 1., 5., 4.};
+  TSpline3 spline("gradient", x, y, 4);
+  RootSpline dial;
+  dial.setSpline(spline);
+  ASSERT_TRUE(dial.hasAnalyticGradient());
+  DialInputBuffer input;
+  input.getInputBuffer().resize(1);
+  for( bool extrapolate : {false, true} ){
+    dial.setAllowExtrapolation(extrapolate);
+    for( double point : {-2., -.5, 0., .5, 2., 2.5, 4.} ){
+      input.getInputBuffer()[0] = point + 1e-5;
+      const double up = dial.evalResponse(input);
+      input.getInputBuffer()[0] = point - 1e-5;
+      const double down = dial.evalResponse(input);
+      input.getInputBuffer()[0] = point;
+      EXPECT_NEAR((up - down) / 2e-5, dial.evalGradient(input, 0), 1e-8);
+      EXPECT_EQ(0., dial.evalGradient(input, 1));
+    }
+    for( double point : {-1., 3.} ){
+      input.getInputBuffer()[0] = point;
+      EXPECT_DOUBLE_EQ(extrapolate ? spline.Derivative(point) : 0., dial.evalGradient(input, 0));
+    }
+  }
+}
+
+
+TEST(DialDefinitions, RootFormulaAnalyticGradient){
+#ifndef R__HAS_CLAD
+  GTEST_SKIP() << "ROOT was built without Clad";
+#endif
+  RootFormula dial;
+  dial.setFormulaStr("[a]*exp([b])+[a]*[a]");
+  dial.setInputNames({"b", "a", "unused"});
+  ASSERT_TRUE(dial.hasAnalyticGradient());
+  auto clone = dial.clone();
+  DialInputBuffer input;
+  input.getInputBuffer() = {.3, 1.2, 0.};
+  EXPECT_NEAR(1.2 * std::exp(.3), dial.evalGradient(input, 0), 1e-12);
+  EXPECT_NEAR(std::exp(.3) + 2.4, clone->evalGradient(input, 1), 1e-12);
+  EXPECT_EQ(0., dial.evalGradient(input, 2));
+  EXPECT_NEAR(1.2 * std::exp(.3) + 1.44, dial.evalResponse(input), 1e-12);
 }

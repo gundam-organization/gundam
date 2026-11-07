@@ -5,9 +5,11 @@
 #ifndef GUNDAM_LIKELIHOOD_INTERFACE_H
 #define GUNDAM_LIKELIHOOD_INTERFACE_H
 
+#include "ExternalConstraints.h"
 #include "SamplePair.h"
 #include "Propagator.h"
 #include "ParameterSet.h"
+#include "ParameterGradient.h"
 #include "JointProbability.h"
 #include "Propagator.h"
 #include "EventTreeWriter.h"
@@ -18,6 +20,7 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 
 
 /// Evaluate the likelihood between data and MC.  The calculation is buffered
@@ -64,6 +67,7 @@ public:
   void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
 
   // const getters
+  [[nodiscard]] auto& getExternalConstraints() const{ return _externalConstraints_; }
   [[nodiscard]] auto getNbParameters() const{ return _nbParameters_; }
   [[nodiscard]] auto getNbSampleBins() const{ return _nbSampleBins_; }
   [[nodiscard]] auto getLastLikelihood() const{ return _buffer_.totalLikelihood; }
@@ -91,7 +95,11 @@ public:
   void propagateAndEvalLikelihood();
 
   // core
+  /// Propagate and fill the requested derivatives without evaluating scalar likelihoods.
+  /// Likelihood buffers retain the values from their last explicit evaluation.
+  void propagateAndEvalGradient(ParameterGradient& gradient_);
   double evalLikelihood(std::future<bool>& propagation) const;
+  void validateWeightGradient() const;
   double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
@@ -109,11 +117,18 @@ public:
   void throwToyParameters(Propagator& propagator_);
   void throwStatErrors(Propagator& propagator_);
 
+  // utils for gradient
+  [[nodiscard]] ParameterGradient prepareGradient(const ParameterGradient& gradient_);
+  void finalizeGradient(const ParameterGradient& statGradient_, ParameterGradient& gradient_);
+
 protected:
   void load();
   void loadModelPropagator();
   void loadDataPropagator();
   void buildSamplePairList();
+  void evalStatLikelihoodGradient(ParameterGradient& gradient_);
+  void evalPenaltyLikelihoodGradient(ParameterGradient& gradient_) const;
+  void evalPenaltyLikelihoodGradient(const ParameterSet& parSet_, ParameterGradient& gradient_) const;
 
   DataDispenser* getDataDispenser( DatasetDefinition& dataset_ );
 
@@ -143,6 +158,8 @@ private:
 
   EventTreeWriter _eventTreeWriter_{};
   PlotGenerator _plotGenerator_{};
+
+  ExternalConstraints _externalConstraints_{};
 
   /// Statistical likelihood
   std::shared_ptr<JointProbability::JointProbabilityBase> _jointProbabilityPtr_{nullptr};

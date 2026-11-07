@@ -2,8 +2,9 @@
 
 Kriged::Kriged(const std::vector<double>* table_,
                int entries_, std::vector<int> index_, std::vector<double> weight_,
-               const std::string& options_)
-    : _table_{table_} {
+               const std::string& options_,
+               std::shared_ptr<TableGradientBuffer> gradientBuffer_)
+    : _table_{table_}, _gradientBuffer_{std::move(gradientBuffer_)} {
     _weights_.resize(entries_);
     for (int i=0; i<entries_; ++i) {
         _weights_[i].first = index_[i];

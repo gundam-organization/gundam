@@ -1,5 +1,5 @@
 # Directories
-tests/output*
+tests/output**
 build/
 site/
 # inputs
@@ -52,3 +52,11 @@ work/
 *.exe
 *.out
 *.app
+
+# Benchmarks
+cpu-**
+mps-**
+
+benchmark*
+!tests/benchmarks/
+tests/benchmarks/__pycache__/

@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""Compare resident backend weight gradients with the original engine and finite differences."""
+import argparse
+import copy
+from importlib import import_module
+from pathlib import Path
+import sys
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+checks = import_module('590NumericsWeightGradient')
+
+
+def check_threads(threads, backend_name):
+    config, build, check, close = checks.make_fixture(threads)
+    splines = copy.deepcopy(config)
+    splines['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'][0]['dialType'] = 'Spline'
+    mixed = copy.deepcopy(config)
+    mixed['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][1]['priorType'] = 'Flat'
+    for normalized in (False, True):
+        for eigen in (False, True):
+            for configuration in (config, splines, mixed):
+                if configuration is mixed and not eigen:
+                    continue
+                engine = build(configuration, normalized, eigen)
+                minimizer = engine.getMinimizer()
+                parameters = list(minimizer.getMinimizerFitParameterList())
+                point = [.07*(i+1) if normalized else p.getParameterValue()+.07*p.getStdDevValue()
+                         for i, p in enumerate(parameters)]
+                reference = check(engine, point)
+                manager = engine.getBackendsManager()
+                manager.activate(backend_name)
+                manager.setEnableAutoMaterialize(False)
+                actual = check(engine, point, preserve_likelihood=False)
+                for a, b in zip(actual, reference):
+                    close(a, b)
+                manager.deactivateBackend()
+                for a, b in zip(check(engine, point), reference):
+                    close(a, b)
+
+    least_squares = copy.deepcopy(config)
+    least_squares['likelihoodInterfaceConfig']['jointProbabilityConfig'] = {'type': 'LeastSquares'}
+    engine = build(least_squares, False, False)
+    engine.getBackendsManager().activate(backend_name)
+    try:
+        engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
+    except RuntimeError as error:
+        assert 'BarlowBeestonLiteGaussian' in str(error), str(error)
+    else:
+        raise AssertionError('Unsupported backend likelihood gradient was accepted')
+
+    # Formula is supported by the original engine, but remains unsupported by
+    # the resident backend gradient path. Keep this rejection backend-specific.
+    formula = copy.deepcopy(config)
+    formula['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'] = [
+        checks.helpers.formula('formula', '1+.1*[arg0]', {'parameterName': 'p'})]
+    for configuration, message in ((least_squares, 'BarlowBeestonLiteGaussian'), (formula, 'Unsupported')):
+        cfg = copy.deepcopy(configuration)
+        cfg['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend_name}
+        try:
+            build(cfg, False, False, analytic=True)
+        except RuntimeError as error:
+            assert message in str(error), str(error)
+        else:
+            raise AssertionError('Incompatible analytic backend configuration initialized')
+    print(f'SUCCESS: backend weight gradients ({threads} threads, {backend_name})')
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('testDirectory', nargs='?', help=argparse.SUPPRESS)
+    parser.add_argument('--backend', choices=['CPU', 'MPS', 'CUDA'], default='CPU')
+    args = parser.parse_args()
+    for threads in (1, 4):
+        check_threads(threads, args.backend)
+
+
+if __name__ == '__main__':
+    main()

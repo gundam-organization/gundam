@@ -10,6 +10,11 @@
 cmessage( STATUS "Setting up tests..." )
 enable_testing()
 
+# Explicit CTest registration: configuration/build must not execute a GPU test.
+if(GUNDAM_CUDA_ENABLED)
+  add_subdirectory(cuda)
+endif()
+
 # Run the gundam-tests.sh script which runs scripted tests.  The
 # COMMAND is a little complicated since the testing script needs to
 # run in the source directory, but puts the output in a sub-directory
@@ -172,11 +177,42 @@ if( WITH_GOOGLE_TEST )
     GTests/unitTest_ApplyMonotonicCondition.cpp)
   set(unitDialsSources
     GTests/unitTest_DialUtils.cpp
-    GTests/unitTest_DialDefinitions.cpp)
+    GTests/unitTest_DialDefinitions.cpp
+    GTests/unitTest_DialResponseSupervisor.cpp
+    GTests/unitTest_FormulaEvaluator.cpp
+    GTests/unitTest_CompositeGradient.cpp
+    GTests/unitTest_ExternalWeightGradient.cpp
+    GTests/unitTest_TableGradient.cpp
+    GTests/unitTest_BinningGradient.cpp
+  )
   set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
-  set(unitLikelihoodSources GTests/unitTest_JointProbability.cpp)
+  set(unitLikelihoodSources
+    GTests/unitTest_JointProbability.cpp
+    GTests/unitTest_ExternalConstraintGradient.cpp)
   set(unitMinimizerSources GTests/unitTest_RootMinimizerSimplex.cpp)
   set(unitBackendsSources)
+  if(WITH_BACKENDS)
+    set(unitBackendsSources
+      GTests/unitTest_BackendManager.cpp
+      GTests/unitTest_EngineLayout.cpp
+      GTests/unitTest_CpuComposite.cpp
+      GTests/unitTest_BackendFormula.cpp
+      GTests/unitTest_MpsFormula.cpp
+      GTests/unitTest_CpuWeightExecution.cpp
+      GTests/unitTest_ExternalWeightBackend.cpp
+      GTests/unitTest_BackendBinning.cpp
+      GTests/unitTest_BackendShared.cpp
+      GTests/unitTest_BackendLikelihood.cpp
+      GTests/unitTest_CpuBackendGradient.cpp
+      GTests/unitTest_BackendResponseSmoothing.cpp
+      GTests/unitTest_BackendSurface.cpp
+      GTests/unitTest_BackendTable.cpp)
+    if(GUNDAM_CUDA_ENABLED)
+      list(APPEND unitBackendsSources
+        GTests/unitTest_CudaBackend.cpp
+        GTests/unitTest_CudaBackendPrograms.cpp)
+    endif()
+  endif()
 
   # Always compile the tests; WITH_FAST_TEST controls CTest registration only.
   foreach(unitCategory Numerics Dials DataLoading Likelihood Minimizer Backends)
@@ -192,9 +228,45 @@ if( WITH_GOOGLE_TEST )
     endif()
   endforeach()
 
+  if(WITH_BACKENDS AND GUNDAM_CUDA_ENABLED)
+    add_executable(gundamGTest_cudaBackend.exe
+        GTests/unitTest_CpuBackendGradient.cpp
+        GTests/unitTest_CudaBackendPrograms.cpp
+        GTests/unitTest_BackendLikelihood.cpp
+        GTests/unitTest_CudaBackendDevice.cpp
+        GTests/unitTest_CudaBackendPropagation.cpp
+        GTests/unitTest_CudaBackendSurface.cpp
+        GTests/unitTest_CudaBackendExternal.cpp
+        GTests/unitTest_CudaBackendObservable.cpp
+        GTests/unitTest_CudaBackendSmoothed.cpp)
+    target_compile_definitions(gundamGTest_cudaBackend.exe PRIVATE GUNDAM_TEST_CUDA_DEVICE)
+    target_link_libraries(gundamGTest_cudaBackend.exe PRIVATE
+        GTest::gtest_main GundamBackends CUDA::cudart)
+    set_property(TARGET gundamGTest_cudaBackend.exe APPEND PROPERTY
+        BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
+    # Register without discovery: building must work without an allocated GPU.
+    add_test(NAME Backends/cuda-backend-programs COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPrograms.*)
+    add_test(NAME Backends/cuda-backend-gradient COMMAND gundamGTest_cudaBackend.exe --gtest_filter=DeviceGradient.Cuda*:DeviceGradient.Portable*:CpuBackendGradient.*)
+    add_test(NAME Backends/cuda-backend-likelihood COMMAND gundamGTest_cudaBackend.exe --gtest_filter=BackendLikelihood.*)
+    add_test(NAME Backends/cuda-backend-skeleton COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendDevice.*)
+    add_test(NAME Backends/cuda-compact-dial-model COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaCompactDialModel.*:CudaEventUpdates.*)
+    set_tests_properties(Backends/cuda-compact-dial-model PROPERTIES LABELS "unit;unit-backends;cuda;host" TIMEOUT 120)
+    add_test(NAME Backends/cuda-backend-propagation COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendPropagation.*)
+    add_test(NAME Backends/cuda-backend-surfaces COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSurface.*)
+    add_test(NAME Backends/cuda-backend-external COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendExternal.*)
+    add_test(NAME Backends/cuda-backend-observables COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendObservable.*)
+    add_test(NAME Backends/cuda-backend-smoothed COMMAND gundamGTest_cudaBackend.exe --gtest_filter=CudaBackendSmoothed.*)
+    set_tests_properties(Backends/cuda-backend-gradient Backends/cuda-backend-programs Backends/cuda-backend-likelihood Backends/cuda-backend-skeleton Backends/cuda-backend-propagation Backends/cuda-backend-surfaces Backends/cuda-backend-external Backends/cuda-backend-observables Backends/cuda-backend-smoothed PROPERTIES LABELS "unit;unit-backends;cuda;device" TIMEOUT 120)
+  endif()
+  add_library(gundamTableGradientPlugin SHARED GTests/TableGradientPlugin.cpp)
+  add_dependencies(gundamGTest_Dials.exe gundamTableGradientPlugin)
+  target_compile_definitions(gundamGTest_Dials.exe PRIVATE
+    GUNDAM_TABLE_GRADIENT_PLUGIN="$<TARGET_FILE:gundamTableGradientPlugin>")
+
   ## Create a list of all of the regular tests.  These are always
   ## compiled and are run when WITH_REGULAR_TEST is on.
   list(APPEND REGULAR_TESTS "")
+  list(APPEND REGULAR_TESTS GTests/unitTest_BackendFitCovariance.cpp)
 
   # Compile the regular test executable, but only add them to ctest if
   # WITH_REGULAR_TEST is on. This should NOT be "optimized" to skip
@@ -203,9 +275,17 @@ if( WITH_GOOGLE_TEST )
     add_executable(gundamGTest_regularTest.exe ${REGULAR_TESTS})
     target_link_libraries(gundamGTest_regularTest.exe GTest::gtest_main)
     target_link_libraries(gundamGTest_regularTest.exe GundamFitter)
+    if(WITH_BACKENDS AND GUNDAM_CUDA_ENABLED)
+      target_compile_definitions(gundamGTest_regularTest.exe PRIVATE GUNDAM_TEST_HAS_CUDA)
+      target_link_libraries(gundamGTest_regularTest.exe CUDA::cudart)
+      set_property(TARGET gundamGTest_regularTest.exe APPEND PROPERTY
+          BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
+    endif()
     if(WITH_REGULAR_TEST)
+      file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/Testing/BackendFitCovariance")
       gundam_discover_tests(gundamGTest_regularTest.exe Backends
           TEST_PREFIX "Backends/"
+          WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/Testing/BackendFitCovariance"
           PROPERTIES LABELS regular TIMEOUT 120)
     endif(WITH_REGULAR_TEST)
   endif(REGULAR_TESTS)
@@ -225,7 +305,7 @@ if( WITH_GOOGLE_TEST )
           TEST_PREFIX "Backends/" PROPERTIES LABELS host)
     endif(WITH_REGULAR_TEST)
 
-    if(CMAKE_CUDA_COMPILER)
+    if(GUNDAM_CUDA_ENABLED)
       # Setup the hemi test suite for the device.
       add_executable(gundamGTest_device.exe
         GTests/hemiArrayTest.cu
@@ -239,7 +319,7 @@ if( WITH_GOOGLE_TEST )
         gundam_discover_tests(gundamGTest_device.exe Backends DISCOVERY_MODE PRE_TEST
             TEST_PREFIX "Backends/" PROPERTIES LABELS device)
       endif(WITH_REGULAR_TEST)
-    endif(CMAKE_CUDA_COMPILER)
+    endif(GUNDAM_CUDA_ENABLED)
 
   else( WITH_CACHE_MANAGER )
 
