@@ -117,6 +117,15 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
   _isBuilt_ = true;
 }
 
+void Backends::CpuBackend::updateDataHistograms(std::shared_ptr<const EngineView> engineView_) {
+  LogThrowIf(not _isBuilt_ or engineView_.get() != _engineView_.get(),
+             "CPU data updates require the existing shared engine layout.");
+  _lastResult_.token.isValid = false;
+  _lastResult_.status = {};
+  _isGradientValidated_ = false;
+  // dataSums are shared with the manager. Keep all response/propagation caches.
+}
+
 Backends::PropagationToken Backends::CpuBackend::requestPropagation(const PropagationInputs& inputs_) {
 
   LogThrowIf(not _isBuilt_, "CpuBackend has not been built.");

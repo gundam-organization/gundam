@@ -1,6 +1,9 @@
 #include "FitterEngine.h"
 #include "RootMinimizer.h"
 #include "GundamGlobals.h"
+#ifdef GUNDAM_USING_BACKENDS
+#include "BackendManager.h"
+#endif
 
 #include <Fit/ParameterSettings.h>
 #include <TFile.h>
@@ -225,6 +228,43 @@ TEST_F(RootMinimizerSimplex, SampleRatesUseHistogramContentsRatherThanEventWeigh
   EXPECT_NE(output.find("42"), std::string::npos);
   EXPECT_NE(output.find("82.6087"), std::string::npos);
 }
+
+#ifdef GUNDAM_USING_BACKENDS
+TEST_F(RootMinimizerSimplex, BackendDataUpdatesPreserveModelAndInvalidateDeferredResults) {
+  FitterEngine engine;
+  initializeEngine(engine);
+  auto& manager = engine.getBackendsManager();
+  auto& likelihood = engine.getLikelihoodInterface();
+  EXPECT_NO_THROW(manager.updateDataHistograms()); // No active backend.
+  manager.activate("CPU");
+  engine.evaluateLikelihood();
+  auto pending = manager.propagate();
+  const auto* backend = manager.getBackend();
+  const auto* events = manager.getEngineView().propagation.events.data();
+  const auto masks = manager.getEngineView().likelihood.samples.front().ignoredBins;
+  const auto variances = manager.getEngineView().likelihood.samples.front().nominalVariances;
+  auto& dataBins = likelihood.getDataPropagator().getSampleSet().getSampleList().front().getHistogram().getBinContentList();
+  for( double value : {8., 14., 10.} ){
+    dataBins.front().sumWeights = value;
+    manager.updateDataHistograms();
+    EXPECT_EQ(manager.getBackend(), backend);
+    EXPECT_EQ(manager.getEngineView().propagation.events.data(), events);
+    EXPECT_EQ(manager.getEngineView().likelihood.samples.front().ignoredBins, masks);
+    EXPECT_EQ(manager.getEngineView().likelihood.samples.front().nominalVariances, variances);
+    EXPECT_DOUBLE_EQ(manager.getEngineView().likelihood.samples.front().dataSums.front(), value);
+    EXPECT_THROW(manager.materialize(Backends::OutputRequest::Histograms), std::exception);
+    likelihood.propagateAndEvalLikelihood();
+    const double reference = likelihood.getLastLikelihood();
+    engine.evaluateLikelihood();
+    EXPECT_NEAR(likelihood.getLastLikelihood(), reference, 1.e-12);
+  }
+  EXPECT_THROW(pending.get(), std::exception);
+  dataBins.push_back({});
+  EXPECT_THROW(manager.updateDataHistograms(), std::exception);
+  dataBins.pop_back();
+  EXPECT_TRUE(manager.hasBackend()); // Rejected dimensions leave backend intact.
+}
+#endif
 
 TEST_F(RootMinimizerSimplex, RestoresMainMinimizerAfterAnObjectiveException) {
   FitterEngine engine;

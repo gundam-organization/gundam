@@ -27,6 +27,7 @@ namespace Backends {
     [[nodiscard]] std::string getExecutionState() const;
     [[nodiscard]] const std::map<std::string, double>& getDiagnosticStageGpuSeconds() const { return _diagnosticStageGpuSeconds_; }
     void build(const PropagationView& model_, const LikelihoodView& likelihood_ = {});
+    void updateDataHistograms(const LikelihoodView& likelihood_);
     std::vector<double> getLikelihoodGradient(const EngineView& view_);
     void materializeHistograms(PropagationResult& result_, BackendTimingSummary& timing_);
     void clear();

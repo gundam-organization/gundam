@@ -267,6 +267,42 @@ void Backends::BackendManager::initializeImpl() {
   if( _isEnabled_ ){ activate(_type_); }
 }
 
+void Backends::BackendManager::updateDataHistograms() {
+  if( not hasBackend() ){ return; }
+  LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for data histogram updates.");
+  auto& samples = _backendEngineLayout_->view.likelihood.samples;
+  const auto& pairs = _likelihoodInterfacePtr_->getSamplePairList();
+  LogThrowIf(samples.size() != pairs.size(), "Cannot change the data sample list after backend initialization.");
+  std::vector<std::vector<double>> contents(samples.size());
+  // Validate all dimensions and allocate before touching the current snapshot.
+  for( std::size_t i = 0; i < samples.size(); ++i ){
+    const auto& bins = pairs[i].data->getHistogram().getBinContentList();
+    LogThrowIf(bins.size() != samples[i].dataSums.size(), "Cannot change the data bin count after backend initialization.");
+    contents[i].reserve(bins.size());
+    for( const auto& bin : bins ){ contents[i].push_back(bin.sumWeights); }
+  }
+  // Wait without materializing: host histograms may already contain a new toy.
+  if( _lastPropagationToken_.isValid ){ _activeBackendPtr_->wait(_lastPropagationToken_); }
+  ++_backendGeneration_; // Invalidate deferred results made with the previous data.
+  _lastPropagationToken_ = {};
+  // A native toy generator may also have moved host event state. The next
+  // explicit materialization must not skip restoring an unchanged device state.
+  _lastMaterializedStateRevision_ = _lastMaterializedVariableRevision_ = 0;
+  _lastMaterializedSampleRevisions_.clear();
+  for( std::size_t i = 0; i < samples.size(); ++i ){ samples[i].dataSums.swap(contents[i]); }
+  try{
+    _activeBackendPtr_->updateDataHistograms(
+        std::shared_ptr<const EngineView>(_backendEngineLayout_, &_backendEngineLayout_->view));
+  }
+  catch(...){
+    // Fail closed if an upload fails; the next use must explicitly reactivate.
+    // In particular, never silently fit the previous toy after a failed update.
+    _activeBackendPtr_ = nullptr;
+    _activeBackendName_.clear();
+    throw;
+  }
+}
+
 void Backends::BackendManager::buildEngineLayout() {
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendManager requires a LikelihoodInterface before activation.");
   auto layout = std::make_shared<EngineLayout>();

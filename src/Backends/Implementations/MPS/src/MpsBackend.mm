@@ -85,6 +85,17 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
   _impl_->isBuilt = true;
 }
 
+void Backends::MpsBackend::updateDataHistograms(std::shared_ptr<const EngineView> engineView_) {
+  LogThrowIf(not _impl_->isBuilt or engineView_ == nullptr, "MPS data updates require a built backend.");
+  _impl_->lastResult.token.isValid = false;
+  _impl_->lastResult.status = {};
+  _impl_->gradientValidated = false;
+  if( _impl_->useEventPropagation ){
+    _impl_->eventPropagation->updateDataHistograms(engineView_->likelihood);
+  }
+  _impl_->likelihoodModel = engineView_->likelihood;
+}
+
 Backends::PropagationToken Backends::MpsBackend::requestPropagation(const PropagationInputs& inputs_) {
   LogThrowIf(not _impl_->isBuilt, "MpsBackend has not been built.");
   inputs_.validate(_impl_->model);

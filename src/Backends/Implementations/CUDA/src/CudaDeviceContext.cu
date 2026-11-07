@@ -1099,6 +1099,23 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
   catch(...){ b.cachePrimed = false; b.stateCache.invalidate(); cudaStreamSynchronize(stream); throw; }
 }
 
+void Backends::CudaDeviceContext::updateDataHistograms(const LikelihoodView& likelihood_) {
+  DeviceScope scope(_impl_->deviceIndex);
+  auto& b = *_impl_->buffers;
+  const auto bins = packLikelihood<double>(likelihood_, int(b.histogramBins));
+  if( bins.size() != b.likelihoodBins.size ){
+    throw std::runtime_error("Cannot change the CUDA likelihood layout during a data update.");
+  }
+  checkCuda(cudaStreamSynchronize(_impl_->stream), "data histogram update synchronization");
+  if( not bins.empty() ){
+    checkCuda(cudaMemcpyAsync(b.likelihoodBins.data, bins.data(), bins.size()*sizeof(bins.front()),
+                            cudaMemcpyHostToDevice, _impl_->stream), "data histogram upload");
+    checkCuda(cudaStreamSynchronize(_impl_->stream), "data histogram upload completion");
+  }
+  b.gradient.reset(); // Gradient bins contain data counts too.
+  invalidate(); // Do not reuse a scalar likelihood computed with previous data.
+}
+
 double Backends::CudaDeviceContext::readLikelihood() {
   DeviceScope scope(_impl_->deviceIndex);
   double total = 0.;

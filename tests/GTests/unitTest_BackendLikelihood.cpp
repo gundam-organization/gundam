@@ -222,6 +222,68 @@ TEST(BackendLikelihood, CpuUsesPortableEvaluatorWithoutCallback) {
   EXPECT_EQ(cpu.getLikelihood(cpu.requestPropagation(inputs)), 0.);
 }
 
+namespace {
+  void checkDataHistogramUpdates(Backends::Backend& backend_, double tolerance_) {
+    using namespace Backends;
+    auto view = std::make_shared<EngineView>(likelihoodView(LikelihoodKind::BarlowBeestonLiteGaussian));
+    backend_.buildShared(view);
+    PropagationInputs inputs;
+    inputs.parameters.values = {1.};
+    auto token = backend_.requestPropagation(inputs);
+    backend_.wait(token);
+    const double original = backend_.getLikelihood(token);
+    auto* modelEvents = backend_.getEngineView().propagation.events.data();
+    // Prime gradient buffers before updating, to catch stale gradient data.
+    const auto oldGradient = backend_.getLikelihoodGradient(token);
+    for( double factor : {1.2, .7, 1.} ){
+      for( auto& sample : view->likelihood.samples ){
+        for( std::size_t i = 0; i < sample.dataSums.size(); ++i ){
+          sample.dataSums[i] = (2. + .02*i)*factor;
+        }
+      }
+      const auto previous = token;
+      backend_.updateDataHistograms(view);
+      EXPECT_FALSE(backend_.isReady(previous));
+      EXPECT_THROW((void)backend_.getLikelihood(previous), std::exception);
+      EXPECT_EQ(backend_.getEngineView().propagation.events.data(), modelEvents);
+      token = backend_.requestPropagation(inputs); // Identical MC parameters!
+      backend_.wait(token);
+      CpuBackend reference;
+      reference.build(*view);
+      const auto refToken = reference.requestPropagation(inputs);
+      EXPECT_NEAR(backend_.getLikelihood(token), reference.getLikelihood(refToken), tolerance_);
+      const auto gradient = backend_.getLikelihoodGradient(token);
+      const auto expectedGradient = reference.getLikelihoodGradient(refToken);
+      ASSERT_EQ(gradient.size(), expectedGradient.size());
+      for( std::size_t i = 0; i < gradient.size(); ++i ){
+        EXPECT_NEAR(gradient[i], expectedGradient[i], tolerance_);
+      }
+      if( factor == 1. ){ EXPECT_NEAR(backend_.getLikelihood(token), original, tolerance_); }
+      else{ EXPECT_GT(backend_.getLikelihood(token), original + 1.e-3); }
+    }
+  }
+}
+
+TEST(BackendLikelihood, CpuUpdatesDataWithoutRebuildingPropagation) {
+  Backends::CpuBackend backend;
+  checkDataHistogramUpdates(backend, 1.e-10);
+}
+
+#ifdef __APPLE__
+TEST(BackendLikelihood, MpsUpdatesDataAndGradientBuffers) {
+  Backends::MpsBackend backend;
+  if( not backend.getCapabilities().supportsLikelihoodGradient ){ GTEST_SKIP() << "Metal is unavailable"; }
+  checkDataHistogramUpdates(backend, 1.e-7);
+}
+#endif
+
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(BackendLikelihood, CudaUpdatesDataAndGradientBuffers) {
+  Backends::CudaBackend backend;
+  checkDataHistogramUpdates(backend, 1.e-10);
+}
+#endif
+
 #ifdef __APPLE__
 TEST(BackendLikelihood, MetalPreservesInfinityEmptyBinsAndHostFallback) {
   MpsBackend gpu;

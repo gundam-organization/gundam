@@ -658,6 +658,9 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
   pybind11::class_<Backends::BackendManager>(module, "BackendManager")
   .def("hasBackend", &Backends::BackendManager::hasBackend)
+  .def("updateDataHistograms", &Backends::BackendManager::updateDataHistograms,
+       "Upload current host data bins; preserves the model and invalidates previous results.",
+       pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getType", &Backends::BackendManager::getType)
   .def("getLastPreparationSeconds", &Backends::BackendManager::getLastPreparationSeconds)
   .def("setEnableAutoMaterialize", &Backends::BackendManager::setEnableAutoMaterialize)

@@ -32,8 +32,10 @@ namespace Backends {
     }
 
     virtual void build(const EngineView& engineView_) = 0;
-    // Shared immutable model; implementations may retain it or use their own packing.
     virtual void buildShared(std::shared_ptr<const EngineView> engineView_) { build(*engineView_); }
+    virtual void updateDataHistograms(std::shared_ptr<const EngineView>) {
+      throw std::runtime_error(getName() + " does not support data histogram updates.");
+    }
     virtual PropagationToken requestPropagation(const PropagationInputs& inputs_) = 0;
 
     virtual bool isReady(const PropagationToken& token_) const = 0;

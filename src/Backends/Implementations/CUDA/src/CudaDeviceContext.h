@@ -29,6 +29,7 @@ namespace Backends {
     void build(const CudaWeightModel& model_, const PropagationView& original_, const LikelihoodView& likelihood_, unsigned int likelihoodBlockSize_, int eventWeightMode_ = 0, double eventWeightSparseFraction_ = 0.25);
     void propagate(const PropagationInputs& inputs_, bool recomputeResponses_, bool reusePrediction_, BackendTimingSummary& timing_);
     double readLikelihood();
+    void updateDataHistograms(const LikelihoodView& likelihood_);
     std::vector<double> readGradient(const EngineView& view_);
     void readWeights(std::vector<double>& weights_);
     void readHistograms(std::vector<double>& sums_, std::vector<double>& sumSquares_,

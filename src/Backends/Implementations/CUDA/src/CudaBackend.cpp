@@ -278,6 +278,17 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
 
 std::string Backends::CudaBackend::getDiagnostics() const { return _impl_->diagnostics.dump(); }
 
+void Backends::CudaBackend::updateDataHistograms(std::shared_ptr<const EngineView> engineView_) {
+  if( not engineView_ or engineView_.get() != _impl_->engineView.get() ){
+    throw std::runtime_error("CUDA data updates require the existing shared engine layout.");
+  }
+  invalidateResult();
+  _impl_->gradientValidated = false;
+#ifdef GUNDAM_USING_CUDA
+  _impl_->context->updateDataHistograms(engineView_->likelihood);
+#endif
+}
+
 void Backends::CudaBackend::invalidateResult() const {
   _impl_->result.token.isValid = false;
   _impl_->result.status = {};

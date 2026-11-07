@@ -53,6 +53,7 @@ namespace Backends {
     void setMaterializeOutputList(const std::vector<OutputRequest>& materializeOutputList_){ _materializeOutputList_ = materializeOutputList_; }
     void setMaterializeOutputList(std::initializer_list<OutputRequest> materializeOutputList_);
     void materialize(OutputRequest outputRequest_);
+    void updateDataHistograms();
     std::future<BackendPropagationResult> propagate();
     void validateLikelihoodGradient() const;
     void evalGradient(ParameterGradient& gradient_);

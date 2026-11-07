@@ -44,6 +44,26 @@ void Backends::MpsEventPropagation::clear() {
   _valid_ = false;
 }
 
+void Backends::MpsEventPropagation::updateDataHistograms(const LikelihoodView& likelihood_) {
+  LogThrowIf(_model_ == nullptr, "Metal data updates require a built model.");
+  const auto bins = packLikelihood<ObservableScalar>(likelihood_, _model_->totalBins);
+  LogThrowIf(bins.size() != _likelihoodWork_.binCount
+             or hasPortableLikelihood(likelihood_) != _deviceLikelihood_,
+             "Cannot change the Metal likelihood layout during a data update.");
+  if( not bins.empty() ){
+    auto updated = makePrivateBuffer(_device_, _queue_, bins);
+    LogThrowIf(updated == nil, "Metal data histogram upload failed.");
+    releaseBuffer(_buffers_[std::size_t(Buffer::LikelihoodBins)]);
+    _buffers_[std::size_t(Buffer::LikelihoodBins)] = updated;
+  }
+  // Gradient bins also contain data counts. Recreate gradient-only buffers on
+  // demand; retain event, dial, geometry and histogram allocations.
+  for( std::size_t i = std::size_t(Buffer::GradientDials); i <= std::size_t(Buffer::GradientWork); ++i ){
+    releaseBuffer(_buffers_[i]);
+  }
+  _valid_ = false; // Force a fresh likelihood even for identical MC parameters.
+}
+
 void Backends::MpsEventPropagation::build(const PropagationView& model_, const LikelihoodView& likelihood_) {
   clearBuffers();
   _model_ = &model_;
