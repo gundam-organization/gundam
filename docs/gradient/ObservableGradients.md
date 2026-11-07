@@ -7,6 +7,16 @@ an unsmoothed histogram or remove finite-MC fluctuations.
 
 ## Calculation
 
+| Stage | Forward value | Derivative propagated |
+| --- | --- | --- |
+| Weight dials | Event weight `w_e` | `∂w_e/∂θ` |
+| Observable dials | Current coordinate `x_ek` | `∂x_ek/∂θ` |
+| Smoothed binning | Fraction `f_eb(x_e)` | `∂f_eb/∂x_ek` |
+| Event → bin | Contribution `c_eb = w_e f_eb` | Weight term + migration term |
+| Histogram | `μ_b = Σc_eb`, `Q_b = Σc_eb²` | `∂μ_b/∂θ`, `∂Q_b/∂θ` |
+| Statistical LLH | LLH evaluated from `μ_b` and `σ_b = √Q_b` | Bin adjoints accumulated into `∂LLH/∂θ` |
+
+
 For event `e`, let `w_e` be its weight, `x_e` its vector of current observables,
 and `f_eb(x_e)` its fractional contribution to bin `b`. The bin contribution is
 
@@ -15,12 +25,33 @@ c_eb = w_e * f_eb
 ∂c_eb/∂θ = f_eb * ∂w_e/∂θ + w_e * Σk (∂f_eb/∂x_ek) * (∂x_ek/∂θ)
 ```
 
+| Contribution to `∂c_eb/∂θ` | Expression | Physical effect |
+| --- | --- | --- |
+| Weight | `f_eb ∂w_e/∂θ` | Changes the weight assigned to the event. |
+| Migration | `w_e Σk (∂f_eb/∂x_ek)(∂x_ek/∂θ)` | Redistributes the event across bins as its coordinates move. |
+
+![One event's bin contributions and the two terms of their derivative](figures/ObservableContributionGradient.png)
+
+The left panel follows a single event crossing the boundary at `x = 1`.
+The right panel separates the derivative in bin 1: the migration term is localized
+near the boundary, while the weight term remains after the event has crossed.
+
 Observable responses use the existing composition:
 
 ```text
 x = (override response or loaded reference) * product(multiply responses)
     + sum(add responses)
 ```
+
+Writing `r` for the loaded reference or override response, `m_i` for multiply
+responses, and `a_j` for add responses:
+
+| Observable operation | Contribution to `∂x/∂θ` |
+| --- | --- |
+| Loaded reference | Zero: the reference is fixed. |
+| Override response `r` | `(∂r/∂θ) Π_i m_i` |
+| Multiply response `m_i` | `r (∂m_i/∂θ) Π_{j≠i} m_j` |
+| Add response `a_j` | `∂a_j/∂θ` |
 
 The derivative follows this composition, including each dial's response
 supervisor and parameter mirrors. Prefix/suffix products handle zero responses
@@ -45,6 +76,13 @@ widths at each edge when the binning is built. These widths are not fit
 parameters. Derivatives follow the value evaluator's clipping and small
 roundoff correction to the total fraction.
 
+![Smoothed bin fractions and their coordinate derivatives](figures/ObservableBinFractions.png)
+
+The shaded band marks the transition around the shared edge at `x = 1`.
+The two derivatives cancel there: probability is transferred between bins.
+At the outer boundaries, the outside fraction completes the partition, so
+`Σ_b f_b + f_outside = 1` and `Σ_b ∂f_b/∂x + ∂f_outside/∂x = 0`.
+
 The histogram quantities remain:
 
 ```text
@@ -58,6 +96,25 @@ With `A_b = ∂LLH/∂μ_b` and `B_b = (∂LLH/∂σ_b)/σ_b`, each contribution
 storing a dense event-by-parameter Jacobian. At zero MC uncertainty, the existing
 zero-uncertainty convention is retained. Statistical likelihood classes are
 unchanged, as are Gaussian penalties and fit-coordinate transformations.
+
+### From histogram derivatives to the LLH
+
+| Quantity | Derivative | Role |
+| --- | --- | --- |
+| `μ_b` | `Σ_e ∂c_eb/∂θ` | Variation of the predicted bin content. |
+| `Q_b` | `2 Σ_e c_eb ∂c_eb/∂θ` | Variation of the diagonal MC variance. |
+| `σ_b`, when positive | `(∂Q_b/∂θ)/(2σ_b)` | Input to LLHs that depend on MC uncertainty. |
+| Statistical LLH | `Σ_b [A_b ∂μ_b/∂θ + (∂LLH/∂σ_b) ∂σ_b/∂θ]` | Sum of prediction and uncertainty contributions. |
+
+![Toy histogram moments, Poisson likelihood and analytic gradient](figures/ObservableHistogramLikelihood.png)
+
+This deterministic example uses three stationary reference events and three
+moving events. The observed reference is fixed at `θ = 0`. The top panels show
+both histogram moments; the bottom panels illustrate a **Poisson-only LLH** and
+its analytic derivative. The tangent has the slope supplied by the gradient.
+The plotted MC variance is shown for context and is **not used** by this toy
+Poisson likelihood; the implementation also propagates its derivative for
+supported MC-aware likelihoods.
 
 ## Requirements
 
@@ -134,3 +191,17 @@ Finite differences validate the implementation against its own objective.
 Statistical validation additionally requires independent MC or bootstrap
 replicas, width scans, and checks of fitted parameter bias and uncertainty
 coverage. These studies are not supplied by the regression tests.
+
+## Regenerating the figures
+
+The figures are illustrative calculations using the same kernel equations;
+they do not run GUNDAM or its regression tests. Install `numpy` and `matplotlib`
+in your Python environment, then run from the repository root:
+
+```bash
+python3 docs/gradient/GenerateObservableGradientPlots.py
+```
+
+The script writes three PNG files to `docs/gradient/figures/`, independently of
+the working directory. Use `--output-dir /path/to/figures` to choose another
+output directory. No input dataset or ROOT installation is required.
