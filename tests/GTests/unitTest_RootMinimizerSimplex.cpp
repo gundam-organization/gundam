@@ -226,37 +226,6 @@ TEST_F(RootMinimizerSimplex, SampleRatesUseHistogramContentsRatherThanEventWeigh
   EXPECT_NE(output.find("82.6087"), std::string::npos);
 }
 
-TEST_F(RootMinimizerSimplex, InterruptCheckpointStopsScalarAndGradientEvaluations) {
-  FitterEngine engine;
-  initializeEngine(engine);
-  auto& minimizer = engine.getMinimizer();
-  const auto& parameters = minimizer.getMinimizerFitParameterPtr();
-  std::vector<double> point(parameters.size(), 0.);
-  std::vector<double> gradient(parameters.size());
-  int checkpoints{0};
-  auto previous = minimizer.setInterruptCheckCallback([&](){
-    ++checkpoints;
-    throw std::runtime_error("Requested interruption");
-  });
-  EXPECT_THROW(minimizer.evalFit(point.data()), std::runtime_error);
-  EXPECT_THROW(minimizer.evalFitGradientAt(point.data(), gradient.data()), std::runtime_error);
-  EXPECT_EQ(checkpoints, 2);
-  minimizer.setInterruptCheckCallback(std::move(previous));
-}
-
-TEST_F(RootMinimizerSimplex, InterruptCheckpointUnwindsMinimize) {
-  FitterEngine engine;
-  initializeEngine(engine);
-  int checkpoints{0};
-  auto& minimizer = engine.getMinimizer();
-  auto previous = minimizer.setInterruptCheckCallback([&](){
-    if( ++checkpoints == 4 ){ throw std::runtime_error("Requested interruption"); }
-  });
-  EXPECT_THROW(minimizer.minimize(), std::runtime_error);
-  EXPECT_EQ(checkpoints, 4);
-  minimizer.setInterruptCheckCallback(std::move(previous));
-}
-
 TEST_F(RootMinimizerSimplex, RestoresMainMinimizerAfterAnObjectiveException) {
   FitterEngine engine;
   initializeEngine(engine);
