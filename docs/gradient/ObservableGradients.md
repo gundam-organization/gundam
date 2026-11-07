@@ -97,6 +97,13 @@ fixed during parameter variations.
   derivative dominated by a few events near bin edges; large widths can introduce
   appreciable smoothing bias. No universal width or minimum MC occupancy is
   imposed automatically.
+- Compact-support smoothing does not guarantee a finite likelihood. A bin with
+  positive observed data can lose all MC support after migration. For example,
+  Gaussian Barlow–Beeston with zero prediction and zero MC uncertainty then has
+  infinite LLH and an undefined gradient. This remains an explicit error; no
+  positive floor or zero-gradient replacement is introduced. Finite-difference
+  regression fixtures include stationary MC support in each bin, with a separate
+  check that the unsupported case is rejected.
 - Splitting one event across bins introduces correlated MC fluctuations. The
   existing per-bin MC treatment is retained. Under independent Poisson
   resampling of MC events, `Cov(b,b') = Σe w_e² f_eb f_eb'`; its off-diagonal
