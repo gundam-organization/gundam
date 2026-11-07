@@ -278,6 +278,106 @@ CUDA resource management is isolated in
 Common descriptor and numerical-semantics code is available for future CUDA
 kernels, but its presence does not constitute CUDA execution support.
 
+## Analytic gradients
+
+Gradient support as of 2026-11-07. These tables describe the **backend gradient
+path**, independently of the value-propagation tables above. Features available
+in the [original engine's analytic gradient](../gradient/AnalyticGradient.md)
+are not automatically available in a backend.
+
+✅ Implemented · ⚠️ Supported with restrictions · ❌ Not implemented/supported.
+These statuses describe the code, not a new validation run on each device.
+
+### Dials → event weights
+
+| Feature | CPU | MPS | CUDA | Comments |
+| --- | :---: | :---: | :---: | --- |
+| `Norm` | ✅ | ✅ | ✅ | Single parameter input. |
+| `Shift` | ✅ | ✅ | ✅ | |
+| `Graph` | ✅ | ✅ | ✅ | Single parameter input. |
+| `CompactSpline`, `UniformSpline`, `MonotonicSpline`, `GeneralSpline` | ✅ | ✅ | ✅ | Single parameter input. |
+| `Bilinear`, `Bicubic` | ❌ | ❌ | ❌ | Multi-input derivatives remain to be ported. |
+| `RootGraph`, `RootSpline` | ❌ | ❌ | ❌ | Original-engine support does not extend to the backend gradient path. |
+| `Formula` (`RootFormula`, `EventFormula`) | ❌ | ❌ | ❌ | Formula-program derivatives remain to be implemented. |
+| `CompositeDial` | ❌ | ❌ | ❌ | Composite-program derivative propagation remains to be implemented. |
+| `Polynomial` | ❌ | ❌ | ❌ | No backend gradient implementation. |
+| `Tabulated`, `Kriged` | ❌ | ❌ | ❌ | Table Jacobians are not consumed by backend gradient evaluation. |
+| `ExternalWeightDispatcher` | ❌ | ❌ | ❌ | Worker gradient buffers are not consumed by backend gradient evaluation. |
+| `CompiledLibDial` | ❌ | ❌ | ❌ | No backend gradient implementation. |
+| Weight products | ✅ | ✅ | ✅ | Handles zero responses and repeated parameter occurrences without division. |
+| Parameter mirroring | ⚠️ | ⚠️ | ⚠️ | Requires a positive finite mirror range; piecewise derivative conventions. |
+| Extrapolation and hard response limits | ✅ | ✅ | ✅ | Piecewise conventions at knots and limits. |
+| Response smoothing | ❌ | ❌ | ❌ | Rejected even though value propagation supports it. |
+| Global event reweight cap | ✅ | ✅ | ✅ | Weight derivative is zero above the cap. |
+
+### Events → histograms → statistical LLH
+
+| Feature | CPU | MPS | CUDA | Comments |
+| --- | :---: | :---: | :---: | --- |
+| Fixed, unsmoothed histograms | ✅ | ✅ | ✅ | Derivatives of bin contents and MC uncertainties. |
+| Ignored likelihood bins | ✅ | ✅ | ✅ | Follow the prepared likelihood's ignored-bin mask. |
+| Observable-response dials | ❌ | ❌ | ❌ | Observable Jacobians remain to be ported. |
+| Dynamic binning / migration | ❌ | ❌ | ❌ | Gradient validation rejects models requiring event binning. |
+| Smoothed binning / fractional contributions | ❌ | ❌ | ❌ | Fraction derivatives remain to be ported. |
+| `BarlowBeestonLiteGaussian` | ✅ | ✅ | ✅ | Includes derivatives with respect to prediction and MC uncertainty. |
+| `PoissonLLH` / `PoissonLogLikelihood` | ❌ | ❌ | ❌ | Value support does not imply gradient support. |
+| `BarlowBeestonLitePoisson` | ❌ | ❌ | ❌ | No backend gradient implementation. |
+| `LeastSquares` and other statistical LLHs | ❌ | ❌ | ❌ | Gradient validation currently requires Gaussian Barlow–Beeston. |
+
+### Penalties → fit coordinates → minimizer
+
+These stages belong to the shared host-side integration rather than the device
+kernels. Their status applies when using the corresponding backend.
+
+| Feature | CPU | MPS | CUDA | Comments |
+| --- | :---: | :---: | :---: | --- |
+| Internal correlated Gaussian penalties | ✅ | ✅ | ✅ | Added through `LikelihoodInterface::finalizeGradient()`. |
+| Physical, normalized and eigen coordinates | ✅ | ✅ | ✅ | Shared parameter bindings and fit-coordinate transformations. |
+| External Gaussian constraints | ❌ | ❌ | ❌ | Their scalar penalty is evaluated, but their physical derivatives are not added by `BackendManager::evalGradient()`. |
+| Minuit2 / MIGRAD supplied gradient | ✅ | ✅ | ✅ | Activated with `useAnalyticGradient: true`. |
+| G2 / analytic Hessian | ❌ | ❌ | ❌ | Only first derivatives are supplied. |
+| Shared value + gradient propagation | ❌ | ❌ | ❌ | Gradient requests invoke propagation independently of value requests. |
+
+**External constraints are a current integration gap:** their formulas are
+validated for differentiation, but the backend manager does not call
+`ExternalConstraints::evalGradient()` before finalizing the gradient. The result
+therefore omits that contribution even though the scalar LLH includes it. Do
+not use the backend analytic-gradient path with enabled external constraints
+until this contribution is connected; current validation does not reject this
+combination automatically.
+
+### Execution and regression coverage
+
+| Stage | CPU | MPS | CUDA |
+| --- | --- | --- | --- |
+| Statistical derivative execution | Host, double precision | Resident Metal kernels, `ObservableScalar` float pairs | CUDA kernels, native double precision |
+| Event derivative accumulation | Thread-local parameter sums and host reduction | Device contributions and reduction by parameter | Device contributions and reduction by parameter |
+| Result returned to the host | Statistical parameter-gradient vector | Statistical parameter-gradient vector, reconstructed as doubles | Statistical parameter-gradient vector, copied as doubles |
+| Model requirement | Built backend and current propagation token | Built resident event-propagation model and current token | Built device model and current token |
+| Regression sources | Native backend tests and Python comparisons | Conditional native comparisons and explicit Python backend selection | Conditional device comparisons and explicit Python backend selection |
+
+GPU gradient evaluation reads resident weights and histogram moments; the final
+parameter-gradient vector is returned to the host for penalties and minimizer
+integration. It does not require transferring every event derivative to the host.
+
+Regression sources are
+[`unitTest_CpuBackendGradient.cpp`](../../tests/GTests/unitTest_CpuBackendGradient.cpp)
+(which also contains conditional MPS/CUDA comparisons) and
+[`700BackendsCommonWeightGradient.py`](../../tests/python/fast/700BackendsCommonWeightGradient.py)
+(`--backend CPU|MPS|CUDA`, default `CPU`). The Python regression compares with the
+original engine and finite differences, including normalized/eigen coordinates
+and backend activation/deactivation. Having these tests in the repository does
+not establish that they have passed on every GPU; the CUDA propagation validation
+reported elsewhere in this document is not itself gradient validation.
+
+The restrictions above are enforced in
+[`CpuBackendGradient.cpp`](../../src/Backends/Implementations/CPU/src/CpuBackendGradient.cpp)
+and the shared device
+[`GradientModel.h`](../../src/Backends/Common/Execution/include/GradientModel.h).
+Unsupported dial, likelihood and binning combinations fail explicitly; there is
+no automatic fallback to the original engine's gradient. The external-constraint
+integration gap described above is an exception to this rejection behavior.
+
 ## Connection to the engine
 
 `BackendManager` connects the likelihood interface to a backend: it prepares
