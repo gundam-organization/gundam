@@ -172,8 +172,13 @@ if( WITH_GOOGLE_TEST )
     GTests/unitTest_ApplyMonotonicCondition.cpp)
   set(unitDialsSources
     GTests/unitTest_DialUtils.cpp
-    GTests/unitTest_DialDefinitions.cpp)
-  set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
+    GTests/unitTest_DialDefinitions.cpp
+    GTests/unitTest_FormulaEvaluator.cpp
+  )
+  set(unitDataLoadingSources
+    GTests/unitTest_DataDispenser.cpp
+    GTests/unitTest_DialDefinitions.cpp
+  )
   set(unitLikelihoodSources GTests/unitTest_JointProbability.cpp)
   set(unitMinimizerSources GTests/unitTest_RootMinimizerSimplex.cpp)
   set(unitBackendsSources)
