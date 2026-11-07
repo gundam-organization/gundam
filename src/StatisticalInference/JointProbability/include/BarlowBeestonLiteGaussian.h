@@ -19,6 +19,7 @@ namespace JointProbability {
   public:
     using JointProbabilityBase::eval;
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonLiteGaussian"; }
+    [[nodiscard]] bool hasAnalyticBinGradient() const override { return true; }
 
     struct Evaluation {
       double value{0};
@@ -98,6 +99,14 @@ namespace JointProbability {
       const auto& bin = pair_.model->getHistogram().getBinContentList().at(bin_);
       return evalSqrtSumSqWeightsGradient(pair_.data->getHistogram().getBinContentList().at(bin_).sumWeights,
                                          bin.sumWeights, bin.sqrtSumSqWeights, bin_);
+    }
+
+    [[nodiscard]] BinGradient evalBinGradient(const SamplePair& pair_, int bin_) const override {
+      if( isBinIgnored(pair_, bin_) ){ return {}; }
+      const auto& bin = pair_.model->getHistogram().getBinContentList().at(bin_);
+      const auto result = evaluate(pair_.data->getHistogram().getBinContentList().at(bin_).sumWeights,
+                                   bin.sumWeights, bin.sqrtSumSqWeights);
+      return {result.predictionGradient, result.uncertaintyGradient};
     }
 
   protected:

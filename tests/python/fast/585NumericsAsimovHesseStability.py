@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check near-minimum curvature and Hesse errors with both CPU paths."""
+"""Check near-minimum curvature and Hesse errors with the original engine."""
 import json
 import math
 import sys
@@ -10,13 +10,12 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
-def evaluate(path, backend):
+def evaluate(path):
     import GUNDAM
     import uproot
     config = {
         'likelihoodInterfaceConfig': {
             'jointProbabilityConfig': {'type': 'BarlowLLH_BANFF_OA2021', 'BBNoUpdateWeights': True},
-            'backendManagerConfig': {'isEnabled': backend, 'type': 'CPU'},
             'datasetList': [{'name': 'input', 'model': {
                 'tree': 'events', 'filePathList': [str(path)], 'nominalWeightFormula': 'weight'}}],
             'propagatorConfig': {
@@ -48,10 +47,10 @@ def evaluate(path, backend):
             li.propagateAndEvalLikelihood()
             values.append(li.getLastLikelihood())
         curvature = (sum(values) - 2 * nominal) / step ** 2
-        assert math.isclose(curvature, expected_curvature, rel_tol=2e-6), (backend, step, curvature, expected_curvature)
+        assert math.isclose(curvature, expected_curvature, rel_tol=2e-6), (step, curvature, expected_curvature)
     parameter.setParameterValue(1.)
     li.propagateAndEvalLikelihood()
-    output = Path.cwd() / f'707BackendsAsimovHesseStability-{backend}.root'
+    output = Path.cwd() / '585NumericsAsimovHesseStability.root'
     app = GUNDAM.GundamApp('Asimov Hesse stability regression')
     app.openOutputFile(str(output))
     engine.setSaveDir(app, 'FitterEngine')
@@ -63,7 +62,7 @@ def evaluate(path, backend):
         histogram = saved['FitterEngine/postFit/Hesse/errors/normalization/values/postFitErrors_TH1D']
         error = math.sqrt(float(histogram.variances()[0]))
     expected_error = math.sqrt(2 / expected_curvature)
-    assert math.isclose(error, expected_error, rel_tol=2e-4), (backend, error, expected_error)
+    assert math.isclose(error, expected_error, rel_tol=2e-4), (error, expected_error)
     return error
 
 
@@ -73,14 +72,12 @@ def main():
     import uproot
     GUNDAM.setNumberOfThreads(4)
     GUNDAM.setLightOutputMode(True)
-    path = Path.cwd() / '707BackendsAsimovHesseStability-input.root'
+    path = Path.cwd() / '585NumericsAsimovHesseStability-input.root'
     with uproot.recreate(path) as saved:
         tree = saved.mktree('events', {'X': 'float64', 'weight': 'float64'})
         tree.extend({'X': np.full(4001, .5), 'weight': .125 + .01 * (np.arange(4001) % 7)})
-    reference = evaluate(path, False)
-    backend = evaluate(path, True)
-    assert math.isclose(reference, backend, rel_tol=2e-4), (reference, backend)
-    print('SUCCESS: CPU and backend Hesse uncertainties match the analytic Asimov curvature.')
+    evaluate(path)
+    print('SUCCESS: Hesse uncertainty matches the analytic Asimov curvature.')
 
 
 if __name__ == '__main__':

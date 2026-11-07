@@ -55,11 +55,12 @@ public:
   void setDial(DialBaseObject&& dial_){ _dial_ = std::move(dial_); }
   // Share the immutable curve; bin, inputs and response supervisor stay local.
   void shareDial(const DialInterface& other_){ _dial_.dialPtr = other_._dial_.dialPtr; }
-  void setInputBufferRef(DialInputBuffer *inputBufferRef){ _inputBufferPtr_ = inputBufferRef; }
+  void setInputBufferRef(const DialInputBuffer *inputBufferRef){ _inputBufferPtr_ = inputBufferRef; }
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef){ _responseSupervisorPtr_ = responseSupervisorRef; }
   void setDialBinRef(const Bin *dialBinRef){ _dialBinRef_ = dialBinRef; }
 
   auto& getDial(){ return _dial_; }
+  const auto& getDial() const{ return _dial_; }
 
   /// Return the input buffer containing the connection to the Parameter(s)
   /// used by this dial.  The number of Parameters contained in the input
@@ -83,6 +84,8 @@ public:
   [[nodiscard]] const Bin* getDialBinRef() const {return _dialBinRef_;}
 
   [[nodiscard]] double evalResponse() const { return _responseSupervisorPtr_->process(_dial_->evalResponse(*_inputBufferPtr_)); }
+  [[nodiscard]] double evalGradient(int iInput_) const;
+  [[nodiscard]] std::vector<double> evalGradients() const;
   [[nodiscard]] std::string getSummary(bool shallow_=true) const;
 
 private:
