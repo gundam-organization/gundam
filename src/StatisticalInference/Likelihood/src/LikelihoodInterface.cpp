@@ -343,9 +343,12 @@ void LikelihoodInterface::loadModelPropagator(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
-      sample.indexEventInHistogramBin(iThread);
+      if( not sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(iThread); }
     }
   });
+  for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
+    if( sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(_threadPool_); }
+  }
 
   LogInfo << "Filling up model sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){
@@ -461,9 +464,12 @@ void LikelihoodInterface::loadDataPropagator(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
-      sample.indexEventInHistogramBin(iThread);
+      if( not sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(iThread); }
     }
   });
+  for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
+    if( sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(_threadPool_); }
+  }
 
   LogInfo << "Filling up data sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){
