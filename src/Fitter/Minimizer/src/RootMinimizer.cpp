@@ -404,7 +404,6 @@ void RootMinimizer::minimize(){
 
   int nbMinimizeCalls = getMonitor().nbEvalLikelihoodCalls - nbFitCallOffset;
 
-  LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
   LogInfo << "Minimization ended after " << nbMinimizeCalls << " calls." << std::endl;
   if( _useAnalyticGradient_ ){
     LogInfo << "Supplied gradient calls: " << _nbGradientCalls_ - nbGradientCallOffset << std::endl;
@@ -430,6 +429,30 @@ void RootMinimizer::minimize(){
     backendsManager.materialize(Backends::OutputRequest::Histograms);
   }
 #endif
+
+  // The convergence monitor is sampled during minimization and can still
+  // describe an earlier callback. Report the live buffers only after restoring
+  // the best-fit point and materializing backend outputs used by reporting.
+  const auto& bestFitLikelihood = getLikelihoodInterface().getBuffer();
+  const double likelihoodDifference = bestFitLikelihood.totalLikelihood - postfitCache.minValue;
+  const double comparisonTolerance = 1.e-8 * std::max(
+      1., std::max(std::abs(postfitCache.minValue), std::abs(bestFitLikelihood.totalLikelihood)));
+  std::ostringstream bestFitSummary;
+  bestFitSummary << std::setprecision(std::numeric_limits<double>::max_digits10)
+                 << "Best-fit likelihood:"
+                 << "\n  Minuit FVAL: " << postfitCache.minValue
+                 << "\n  Re-evaluated total: " << bestFitLikelihood.totalLikelihood
+                 << "\n  Statistical: " << bestFitLikelihood.statLikelihood
+                 << "\n  Penalty: " << bestFitLikelihood.penaltyLikelihood
+                 << "\n  Difference (total - FVAL): " << likelihoodDifference
+                 << "\n  Comparison tolerance: " << comparisonTolerance;
+  LogInfo << bestFitSummary.str() << std::endl;
+  if( not std::isfinite(postfitCache.minValue) or not bestFitLikelihood.isValid()
+      or std::abs(likelihoodDifference) > comparisonTolerance ){
+    LogAlert << "Re-evaluated best-fit likelihood does not match Minuit FVAL. "
+             << "Check propagation and backend synchronization; see best-fit likelihood summary above."
+             << std::endl;
+  }
 
   // export bf point
   if( getOwner().getSaveDir() != nullptr ) {

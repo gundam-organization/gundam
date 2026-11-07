@@ -178,6 +178,34 @@ TEST_F(RootMinimizerSimplex, UsesSeparateAlgorithmsWithIdenticalPrecisionAndPres
   }
 }
 
+TEST_F(RootMinimizerSimplex, ReportsReevaluatedBestfitLikelihood) {
+  FitterEngine engine;
+  initializeEngine(engine);
+  auto& minimizer = dynamic_cast<RootMinimizer&>(engine.getMinimizer());
+  auto& parameter = *minimizer.getMinimizerFitParameterPtr().front();
+  parameter.setParameterValue(0.8, true);
+  minimizer.updateFitParameterSettings();
+
+  testing::internal::CaptureStdout();
+  minimizer.minimize();
+  const auto output = testing::internal::GetCapturedStdout();
+  EXPECT_NE(output.find("Best-fit likelihood (-2 log L):"), std::string::npos);
+  const std::string minuitLabel{"Minuit FVAL: "};
+  const std::string reevaluatedLabel{"Re-evaluated total: "};
+  const auto minuitPosition = output.find(minuitLabel);
+  const auto reevaluatedPosition = output.find(reevaluatedLabel);
+  ASSERT_NE(minuitPosition, std::string::npos);
+  ASSERT_NE(reevaluatedPosition, std::string::npos);
+  const double reportedMinuit = std::stod(output.substr(minuitPosition + minuitLabel.size()));
+  const double reportedTotal = std::stod(output.substr(reevaluatedPosition + reevaluatedLabel.size()));
+  EXPECT_DOUBLE_EQ(reportedMinuit, minimizer.getMinimizer()->MinValue());
+  EXPECT_DOUBLE_EQ(reportedTotal, engine.getLikelihoodInterface().getLastLikelihood());
+  EXPECT_NEAR(reportedTotal, reportedMinuit, 1.e-8 * std::max(1., std::abs(reportedMinuit)));
+  EXPECT_NE(output.find("Statistical: "), std::string::npos);
+  EXPECT_NE(output.find("Penalty: "), std::string::npos);
+  EXPECT_EQ(output.find("does not match Minuit FVAL"), std::string::npos);
+}
+
 TEST_F(RootMinimizerSimplex, RestoresMainMinimizerAfterAnObjectiveException) {
   FitterEngine engine;
   initializeEngine(engine);
