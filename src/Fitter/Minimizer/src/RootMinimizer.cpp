@@ -440,7 +440,7 @@ void RootMinimizer::minimize(){
   std::ostringstream bestFitSummary;
   bestFitSummary << std::setprecision(std::numeric_limits<double>::max_digits10)
                  << "Best-fit likelihood:"
-                 << "\n  Minuit FVAL: " << postfitCache.minValue
+                 << "\n  Minuit FVAL: " << postfitCache.minValue << "(reduced: " << postfitCache.minValue/(*getNbFreeParametersPtr()) << ")"
                  << "\n  Re-evaluated total: " << bestFitLikelihood.totalLikelihood
                  << "\n  Statistical: " << bestFitLikelihood.statLikelihood
                  << "\n  Penalty: " << bestFitLikelihood.penaltyLikelihood
