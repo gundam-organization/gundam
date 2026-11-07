@@ -1,4 +1,6 @@
 #include "DialCollection.h"
+#include "DialInterface.h"
+#include "Graph.h"
 #include "DialResponseSupervisor.h"
 
 #include <gtest/gtest.h>
@@ -140,5 +142,71 @@ TEST(DialResponseSmoothingConfig, LegacyLimitsWarnWithoutRejectingConfigurations
     EXPECT_NE(std::string::npos, output.find("key \"" + minKey + "\" is deprecated"));
     EXPECT_NE(std::string::npos, output.find("key \"maxDialResponse\" is deprecated"));
     EXPECT_NE(std::string::npos, output.find("dialResponseLimits"));
+  }
+}
+
+TEST(DialResponseSupervisor, AnalyticDerivativeMatchesSmoothedResponse){
+  for( const auto& widths : {std::make_pair(.1, .1), std::make_pair(.4, .1)} ){
+    DialResponseSupervisor supervisor;
+    supervisor.setMinResponse(0.);
+    supervisor.setMaxResponse(2.);
+    supervisor.setSmoothingWidths(widths.first, widths.second);
+    for( int i = 0; i <= 300; ++i ){
+      const double x = -.5 + .01 * i;
+      const double h = 1E-6;
+      const double slope = supervisor.evalDerivative(x);
+      EXPECT_GE(slope, 0.);
+      EXPECT_LE(slope, 1.);
+      EXPECT_NEAR(slope, (supervisor.process(x + h) - supervisor.process(x - h)) / (2. * h), 1E-8);
+    }
+    EXPECT_DOUBLE_EQ(.5, supervisor.evalDerivative(0.));
+    EXPECT_DOUBLE_EQ(.5, supervisor.evalDerivative(2.));
+    for( double x : {-widths.first, widths.first, 2. - widths.second, 2. + widths.second} ){
+      EXPECT_NEAR(supervisor.evalDerivative(x - 1E-7), supervisor.evalDerivative(x + 1E-7), 1E-10);
+    }
+    EXPECT_TRUE(std::isnan(supervisor.evalDerivative(std::nan(""))));
+  }
+}
+
+TEST(DialResponseSupervisor, DerivativeWithoutSmoothingAndWithOneSidedLimits){
+  DialResponseSupervisor supervisor;
+  EXPECT_DOUBLE_EQ(1., supervisor.evalDerivative(-3.));
+  supervisor.setMinResponse(0.);
+  supervisor.setMaxResponse(2.);
+  EXPECT_DOUBLE_EQ(0., supervisor.evalDerivative(-.1));
+  EXPECT_DOUBLE_EQ(0., supervisor.evalDerivative(2.1));
+  for( double x : {0., 1., 2.} ){ EXPECT_DOUBLE_EQ(1., supervisor.evalDerivative(x)); }
+  supervisor = DialResponseSupervisor();
+  supervisor.setMaxResponse(2.);
+  supervisor.setSmoothingWidths(std::nan(""), .1);
+  EXPECT_DOUBLE_EQ(1., supervisor.evalDerivative(-3.));
+  EXPECT_DOUBLE_EQ(.5, supervisor.evalDerivative(2.));
+  EXPECT_DOUBLE_EQ(0., supervisor.evalDerivative(3.));
+}
+
+TEST(DialResponseSupervisor, InterfaceAppliesResponseChainRule){
+  Graph curve;
+  curve.buildDial(std::vector<DialUtils::DialPoint>{{-2., -4., 0.}, {2., 4., 0.}});
+  curve.setAllowExtrapolation(true);
+  DialResponseSupervisor supervisor;
+  supervisor.setMinResponse(0.);
+  supervisor.setMaxResponse(2.);
+  supervisor.setSmoothingWidths(.1, .1);
+  DialInputBuffer input;
+  DialInterface interface;
+  interface.setDial(DialBaseObject(curve));
+  interface.setInputBufferRef(&input);
+  interface.setResponseSupervisorRef(&supervisor);
+  for( double x : {-.2, -.04, 0., .04, .5, .96, 1., 1.04, 1.2} ){
+    input.setInputValues({x});
+    const auto gradient = interface.evalGradients();
+    ASSERT_EQ(1U, gradient.size());
+    EXPECT_DOUBLE_EQ(interface.evalGradient(0), gradient[0]);
+    EXPECT_DOUBLE_EQ(2. * supervisor.evalDerivative(2. * x), gradient[0]);
+    input.setInputValues({x + 1E-6});
+    const double upper = interface.evalResponse();
+    input.setInputValues({x - 1E-6});
+    const double lower = interface.evalResponse();
+    EXPECT_NEAR(gradient[0], (upper - lower) / 2E-6, 1E-8);
   }
 }

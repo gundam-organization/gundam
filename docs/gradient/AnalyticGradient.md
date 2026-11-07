@@ -29,12 +29,13 @@ fit; fewer iterations are not guaranteed.
 | `RootGraph` | ✅ | Right-hand slope at interior knots; last segment at the final knot when extrapolation is enabled. |
 | `RootSpline` | ✅ | |
 | `Formula` | ⚠️ | Requires ROOT/Clad automatic differentiation. `eventVariable` inputs remain fixed when differentiating fit parameters. Unsupported generation or a numerical fallback raises an initialization error. Derivative calls share a lock per formula. |
-| `CompositeDial` | ✅️ | All nested dials must support analytic gradients. Event inputs remain fixed; response smoothing is unsupported. |
+| `CompositeDial` | ✅️ | All nested dials must support analytic gradients. Event inputs remain fixed. |
 | `CompiledLibDial` | ❌ | |
 | `Tabulated` | ❌ | |
 | `Kriged` | ❌ | |
 | `ExternalWeight` | ✅️ | Worker must declare gradient support and fill a dense derivative matrix per event/bin. See [worker API](../configuration/ExternalWeightDials.md#analytic-gradients). |
 | Weight products | ✅ | Handles zero responses and repeated parameters. The derivative is zero when the global reweight cap is exceeded. |
+| Response smoothing | ✅ | Applies the supervisor derivative through the chain rule, including nested composite nodes. |
 | Mirrors, bounds and interpolation knots | ⚠️ | Piecewise conventions; derivatives may not be unique at discontinuities in slope. |
 
 ### Events → histograms

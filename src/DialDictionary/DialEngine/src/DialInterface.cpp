@@ -12,17 +12,20 @@
 
 double DialInterface::evalGradient(int iInput_) const {
   const double rawResponse{_dial_->evalResponse(*_inputBufferPtr_)};
-  const double processedResponse{_responseSupervisorPtr_->process(rawResponse)};
-  if( processedResponse != rawResponse ){ return 0.; }
-  return _dial_->evalGradient(*_inputBufferPtr_, iInput_);
+  const double slope = _responseSupervisorPtr_->evalDerivative(rawResponse);
+  if( slope == 0. ){ return 0.; }
+  return slope * _dial_->evalGradient(*_inputBufferPtr_, iInput_);
 }
 
 std::vector<double> DialInterface::evalGradients() const {
   const double rawResponse = _dial_->evalResponse(*_inputBufferPtr_);
-  if( _responseSupervisorPtr_->process(rawResponse) != rawResponse ){
+  const double slope = _responseSupervisorPtr_->evalDerivative(rawResponse);
+  if( slope == 0. ){
     return std::vector<double>(_inputBufferPtr_->getInputBuffer().size(), 0.);
   }
-  return _dial_->evalGradients(*_inputBufferPtr_);
+  auto gradient = _dial_->evalGradients(*_inputBufferPtr_);
+  for( auto& value : gradient ){ value *= slope; }
+  return gradient;
 }
 
 std::string DialInterface::getSummary(bool shallow_) const {

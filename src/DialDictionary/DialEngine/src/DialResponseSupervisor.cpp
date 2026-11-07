@@ -54,6 +54,21 @@ double DialResponseSupervisor::process(double response_) const {
   }
   return response_;
 }
+double DialResponseSupervisor::evalDerivative(double response_) const {
+  if( std::isnan(response_) ){ return response_; }
+  if( not std::isnan(_minTransitionStart_) and response_ < _minTransitionStart_ ){
+    if( response_ <= _minResponse_ - _minSmoothingWidth_ ){ return 0.; }
+    const double t = 0.5 + (response_ - _minResponse_) * _minInverseTransitionWidth_;
+    return t * t * (3. - 2. * t);
+  }
+  else if( not std::isnan(_maxTransitionStart_) and response_ > _maxTransitionStart_ ){
+    if( response_ >= _maxResponse_ + _maxSmoothingWidth_ ){ return 0.; }
+    const double t = 0.5 + (_maxResponse_ - response_) * _maxInverseTransitionWidth_;
+    return t * t * (3. - 2. * t);
+  }
+  return 1.;
+}
+
 std::string DialResponseSupervisor::getSummary(bool shallow_ ) const{
   std::stringstream ss;
 

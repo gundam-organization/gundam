@@ -77,8 +77,18 @@ TEST(CompositeGradient, BranchesRepeatedParametersMirrorsClampsAndNestedGraphs) 
     interfaces[i].setResponseSupervisorRef(&supervisors[i]);
     dial.getNodes()[i].collectionIndex = i;
   }
-  for( bool clamp : {false, true} ){
-    if( clamp ){ supervisors[1].setMaxResponse(.3); }
+  for( int mode : {0, 1, 2} ){
+    if( mode >= 1 ){ supervisors[1].setMaxResponse(.3); }
+    if( mode == 2 ){
+      // Smooth intermediate branches and the output independently. The same
+      // graph is also checked through an enclosing composite below.
+      supervisors[0].setMinResponse(0.);
+      supervisors[0].setSmoothingWidths(.5, .5);
+      supervisors[1].setSmoothingWidths(.2, .2);
+      supervisors[2].setMinResponse(0.);
+      supervisors[2].setMaxResponse(1.);
+      supervisors[2].setSmoothingWidths(.3, .3);
+    }
     dial.bind([&](int index_){ return &interfaces[index_]; });
     ASSERT_TRUE(dial.hasAnalyticGradient());
     CompositeDial nested(ConfigReader(JsonType{{"nodes", {
