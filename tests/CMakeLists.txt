@@ -178,6 +178,7 @@ if( WITH_GOOGLE_TEST )
     GTests/unitTest_CompositeGradient.cpp
     GTests/unitTest_ExternalWeightGradient.cpp
     GTests/unitTest_TableGradient.cpp
+    GTests/unitTest_BinningGradient.cpp
   )
   set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
   set(unitDataLoadingSources)

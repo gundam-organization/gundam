@@ -231,6 +231,8 @@ public:
   void applyVariableResponses(CacheEntry& entry_);
   [[nodiscard]] bool hasVariableResponses() const{ return _hasVariableResponses_; }
 
+  void evalVariableResponseGradient(CacheEntry& entry_, const VariableResponseCache& target_,
+                                    ParameterGradient& gradient_, double scale_);
   void reweightEntry( CacheEntry& entry_);
   /// Bulk CPU gradient: independent thread-local sums, followed by an ordered reduction.
   void evalEventWeightGradients(ParameterGradient& gradient_,

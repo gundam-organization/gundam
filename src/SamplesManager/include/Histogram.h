@@ -53,6 +53,10 @@ public:
   [[nodiscard]] int findBinIndex(const Event& event_, int previousBinIndex_ = -1) const;
   [[nodiscard]] BinningResponse::EventResponse evaluateEventBinningResponse(const Event& event_) const;
   [[nodiscard]] std::vector<BinningResponse::BinFraction> evaluateBinningResponse(const Event& event_) const;
+  void validateGradientVariable(const std::string& name_) const;
+  [[nodiscard]] BinningResponse::ResponseGradient evalBinningGradient(const Event& event_) const{
+    return _binningResponse_.evalGradient(event_.getVariables());
+  }
   void throwEventMcError();
   // With a binning response, fluctuates bin contents only; refilling discards the throw.
   void throwStatError(bool useGaussThrow_ = false);

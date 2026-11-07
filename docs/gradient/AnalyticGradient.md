@@ -42,8 +42,10 @@ fit; fewer iterations are not guaranteed.
 | Feature | Status | Details / remaining work |
 | --- | :---: | --- |
 | Fixed-bin histograms | ✅ | Bin contents, MC uncertainties and ignored bins. |
-| Dynamic binning / smoothing / migration | ❌ | Differentiate bin assignments and contributions. |
-| Dials modifying observables | ❌ | Propagate observable derivatives. |
+| Dynamic binning / smoothing / migration | ⚠️ | Smoothing required on every moving histogram axis; fixed widths and bin edges. |
+| Dials modifying observables | ⚠️ | Existing add/multiply/override composition; all attached dials must support gradients. |
+
+See [observable gradient method and limitations](ObservableGradients.md).
 
 ### Histograms → LLH
 

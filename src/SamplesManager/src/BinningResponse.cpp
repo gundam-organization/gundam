@@ -7,6 +7,7 @@
 #include <iterator>
 #include <limits>
 #include <numeric>
+#include <stdexcept>
 #include <utility>
 
 void BinningResponse::configureImpl(){
@@ -334,4 +335,77 @@ double BinningResponse::evaluateRelativeResponse(EvaluationBuffer& buffer_) cons
     total += fraction;
   }
   return total;
+}
+
+void BinningResponse::validateGradientVariable(const std::string& name_) const{
+  // Variables absent from the histogram do not need a binning derivative.
+  if( std::find(_variableNames_.begin(), _variableNames_.end(), name_) == _variableNames_.end() ){ return; }
+  if( findAxis(name_) == nullptr ){
+    throw std::runtime_error("Observable gradient requires bin smoothing for variable " + name_);
+  }
+}
+
+BinningResponse::ResponseGradient BinningResponse::evalGradient(const VariableCollection& variables_) const{
+  LogThrowIf(not _isEnabled_, "Binning gradients require an enabled binning response");
+  EvaluationBuffer buffer;
+  prepareEvaluation(variables_, buffer);
+  evaluate(variables_, buffer);
+  ResponseGradient result;
+  result.response = buffer.response;
+  result.variableIndices = buffer.variableIndices;
+  result.fractionGradients.resize(result.response.binFractions.size(),
+                                 std::vector<double>(_variableNames_.size(), 0.));
+  // Derivative of the existing compact-support cumulative kernel.
+  const auto kernelDerivative = [](double position_){
+    if( position_ <= -1. or position_ >= 1. ){ return 0.; }
+    const double t = .5 * (position_ + 1.);
+    return 15. * t * t * (1. - t) * (1. - t);
+  };
+  double total = 0.;
+  double largestFraction = -1.;
+  size_t largestRow = 0;
+  std::vector<double> totalGradient(_variableNames_.size(), 0.);
+  for( size_t row = 0; row < result.response.binFractions.size(); ++row ){
+    const int index = result.response.binFractions[row].binIndex;
+    std::vector<double> factors, slopes;
+    std::vector<size_t> columns;
+    const auto append = [&](size_t column_, double lower_, double upper_, double lowerInverse_, double upperInverse_){
+      const double value = buffer.values[column_];
+      const double upper = (upper_ - value) * upperInverse_;
+      const double lower = (lower_ - value) * lowerInverse_;
+      const double raw = cumulativeKernel(upper) - cumulativeKernel(lower);
+      factors.push_back(std::max(0., raw));
+      slopes.push_back(raw > 0. ? kernelDerivative(lower) * lowerInverse_
+                                   - kernelDerivative(upper) * upperInverse_ : 0.);
+      columns.push_back(column_);
+    };
+    if( _hasRelativeWidths_ ){
+      for( const auto& interval : _relativeResponseBins_[index].intervals ){
+        append(interval.variableIndex, interval.lowerBound, interval.upperBound,
+               interval.lowerInverseWidth, interval.upperInverseWidth);
+      }
+    }
+    else{
+      for( const auto& interval : _responseBins_[index].intervals ){
+        append(interval.variableIndex, interval.lowerBound, interval.upperBound,
+               interval.inverseWidth, interval.inverseWidth);
+      }
+    }
+    // Prefix/suffix products also work when one factor vanishes.
+    std::vector<double> prefix(factors.size() + 1, 1.);
+    for( size_t j = 0; j < factors.size(); ++j ){ prefix[j+1] = prefix[j] * factors[j]; }
+    double suffix = 1.;
+    for( size_t j = factors.size(); j-- > 0; ){
+      result.fractionGradients[row][columns[j]] += prefix[j] * slopes[j] * suffix;
+      suffix *= factors[j];
+    }
+    total += prefix.back();
+    if( prefix.back() > largestFraction ){ largestFraction = prefix.back(); largestRow = row; }
+    for( size_t j = 0; j < totalGradient.size(); ++j ){ totalGradient[j] += result.fractionGradients[row][j]; }
+  }
+  // Match the value evaluator's roundoff correction to the largest fraction.
+  if( total > 1. and not result.response.binFractions.empty() ){
+    for( size_t j = 0; j < totalGradient.size(); ++j ){ result.fractionGradients[largestRow][j] -= totalGradient[j]; }
+  }
+  return result;
 }

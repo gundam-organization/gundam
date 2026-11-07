@@ -213,22 +213,23 @@ def check_threads(threads):
         assert 'numerical' in str(error).lower() or 'generate' in str(error).lower(), str(error)
     else:
         raise AssertionError('Unsupported dial silently differentiated')
-    for kind in ('smooth', 'observable'):
-        cfg = copy.deepcopy(config)
-        prop = cfg['likelihoodInterfaceConfig']['propagatorConfig']
-        if kind == 'smooth':
-            prop['sampleSetConfig']['sampleList'][0]['binningResponse'] = {
-                'isEnabled': True, 'variables': [{'name': 'X', 'width': .2}]}
-        else:
-            prop['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'][0].update(
-                applyToVariable='X', variableResponseMode='Override')
-        engine = build(cfg, False, False)
-        try:
-            engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
-        except RuntimeError as error:
-            assert 'bins' in str(error) or 'observable' in str(error), str(error)
-        else:
-            raise AssertionError('Unsupported binning/observable gradient was accepted')
+    smooth = copy.deepcopy(config)
+    smooth['likelihoodInterfaceConfig']['propagatorConfig']['sampleSetConfig']['sampleList'][0]['binningResponse'] = {
+        'isEnabled': True, 'variables': [{'name': 'X', 'width': .2}]}
+    engine = build(smooth, False, False)
+    check(engine, [.4, .95, 1.08])
+
+    # Observable migration through hard bin boundaries remains forbidden.
+    cfg = copy.deepcopy(config)
+    cfg['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'][0].update(
+        applyToVariable='X', variableResponseMode='Override')
+    engine = build(cfg, False, False)
+    try:
+        engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
+    except RuntimeError as error:
+        assert 'smoothing' in str(error).lower(), str(error)
+    else:
+        raise AssertionError('Hard-binned observable gradient was accepted')
     print(f'SUCCESS: original-engine weight gradients ({threads} threads)')
 
 
