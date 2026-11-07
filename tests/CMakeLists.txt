@@ -181,7 +181,6 @@ if( WITH_GOOGLE_TEST )
     GTests/unitTest_BinningGradient.cpp
   )
   set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
-  set(unitDataLoadingSources)
   set(unitLikelihoodSources
     GTests/unitTest_JointProbability.cpp
     GTests/unitTest_ExternalConstraintGradient.cpp)
