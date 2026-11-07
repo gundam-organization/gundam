@@ -225,7 +225,8 @@ mkdir -p $REPO_DIR
       implemented.  After you figure out a fancy new idea, create a
       `feature` branch and cherry-pick the required changes.
 - Commit messages must be explicit.
-- Commit content must contain a few modifications to the code.
+- To facilitate review, please limit the number of changes in each pull request, and make sure individual commits will compile.
+  When possible, each commit should also pass the tests (expected failures should be noted).
 - Make your `feature` and `fix` branches short-lived with one new feature
   or fix per branch.  Fix branches should reference a specific issue that
   has been documented on by the gundam [issue
