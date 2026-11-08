@@ -38,6 +38,11 @@ if( WITH_ROOT_DICT_BUILD )
     OPTIONS "${CMAKE_CXX_FLAGS_DICT}"
   )
 
+  # ROOT_GENERATE_DICTIONARY copies the module's include directories to its
+  # object target without preserving their SYSTEM status. Restore it for ROOT
+  # so its bundled nlohmann headers do not override our selected JSON version.
+  target_include_directories(SimpleMcmc_Dict SYSTEM PRIVATE ${ROOT_INCLUDE_DIRS})
+
   target_link_libraries(
       ${LIB_NAME}
       PUBLIC
