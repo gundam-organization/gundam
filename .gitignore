@@ -57,6 +57,4 @@ work/
 cpu-**
 mps-**
 
-benchmark*
-!tests/benchmarks/
-tests/benchmarks/__pycache__/
+benchmark-*
