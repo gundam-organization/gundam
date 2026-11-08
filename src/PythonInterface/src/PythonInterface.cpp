@@ -461,10 +461,12 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("empty", &SampleSet::empty)
   .def("getNbOfEvents", &SampleSet::getNbOfEvents)
   .def("getSampleBreakdown", &SampleSet::getSampleBreakdown)
+  .def("copyHistBinContentFrom", &SampleSet::copyHistBinContentFrom)
   ;
 
   pybind11::class_<Propagator>(module, "Propagator")
   .def(pybind11::init())
+  .def("propagateParameters", &Propagator::propagateParameters)
   .def("throwToyParameters", &Propagator::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwStatErrors", &Propagator::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("updateEventSampleBinning", &Propagator::updateEventSampleBinning,
@@ -777,6 +779,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getParameterScanner", pybind11::overload_cast<>(&FitterEngine::getParameterScanner), pybind11::return_value_policy::reference)
   .def("getTFilePath", &FitterEngine::getTFilePath)
   .def("evaluateLikelihood", &FitterEngine::evaluateLikelihood)
+  .def("evalGradient", &FitterEngine::evalGradient, pybind11::arg("gradient"))
 #ifdef GUNDAM_USING_BACKENDS
   .def("getBackendsManager", pybind11::overload_cast<>(&FitterEngine::getBackendsManager), pybind11::return_value_policy::reference_internal)
 #endif
