@@ -179,7 +179,7 @@ def main():
             'binningDefinition': [{'name': 'X', 'edges': [0, 1]}]}}, 'does not match the number of bins'),
         ({'binnedDialsPath': f'{path}:curves:response', 'dialsBinningDefinition': [
             {'name': 'X', 'minValueBranch': 'maxEnu', 'maxBranchValue': 'minEnu'}]}, 'Invalid bin bounds'),
-        ({'binnedDialsPath': f'{path}:curves'}, 'file:tree:branch'),
+        ({'binnedDialsPath': f'{path}:curves'}, 'file.root:tree:branch'),
         ({'binnedDialsPath': f'{path}:curves:'}, 'Empty dialsBranch'),
         ({'binnedDialsPath': f'{path}:curves:response', 'dialsBranch': 'otherResponse'}, 'Conflicting dialsBranch'),
         ({'binnedDialsPath': f'{path}:curves:response', 'dialsTreePath': 'legacy'}, 'Conflicting dialsTreePath'),
