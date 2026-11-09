@@ -1160,14 +1160,13 @@ bool DialCollection::initializeBinnedDials(const ConfigReader& dialsDefinition) 
   }
   if( dialsDefinition.hasField("binnedDialsPath") ){
     const auto path = dialsDefinition.fetchValue<std::string>("binnedDialsPath");
-    const auto lastSeparator = path.rfind(':');
-    const auto treeSeparator = lastSeparator == std::string::npos or lastSeparator == 0
-                               ? std::string::npos : path.rfind(':', lastSeparator - 1);
-    LogThrowIf(treeSeparator == std::string::npos,
-               "binnedDialsPath must use file:tree:branch syntax: " << path);
-    mergePath(filePath, path.substr(0, treeSeparator), "dialsFilePath");
-    mergePath(objPath, path.substr(treeSeparator + 1, lastSeparator - treeSeparator - 1), "dialsTreePath");
-    mergePath(branchName, path.substr(lastSeparator + 1), "dialsBranch");
+    const auto source = GenericToolbox::parseRootObjectPath(path);
+    const auto branchSeparator = source.objectPath.rfind(':');
+    LogThrowIf(not source.hasObjectPath or branchSeparator == std::string::npos,
+               "binnedDialsPath must use file.root:tree:branch syntax: " << path);
+    mergePath(filePath, source.filePath, "dialsFilePath");
+    mergePath(objPath, source.objectPath.substr(0, branchSeparator), "dialsTreePath");
+    mergePath(branchName, source.objectPath.substr(branchSeparator + 1), "dialsBranch");
   }
   LogThrowIf(not branchName.empty() and (objPath.empty() or dialsDefinition.hasField("dialsList")),
              "An explicit binned dial branch requires a tree and cannot be combined with dialsList");
