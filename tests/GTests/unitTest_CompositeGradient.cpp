@@ -121,7 +121,8 @@ TEST(CompositeGradient, BranchesRepeatedParametersMirrorsClampsAndNestedGraphs) 
   }
   supervisors[1].setSmoothingWidths(0., .1);
   dial.bind([&](int index_){ return &interfaces[index_]; });
-  EXPECT_THROW(static_cast<void>(dial.hasAnalyticGradient()), std::runtime_error);
+  ASSERT_TRUE(dial.hasAnalyticGradient());
+  checkCompositeGradient(dial, {.2, .4});
 }
 
 TEST(CompositeGradient, EventInputsStayConstantAndUnsupportedNodesAreNamed) {

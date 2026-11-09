@@ -101,7 +101,7 @@ def exercise(path, gaussian, toy):
         # Use identical random streams to check both distributions bin by bin.
         expected = reference_throws(nominal, gaussian)
         GUNDAM.FitterEngine.setRandomSeed(12345)
-        li.throwStatErrors(data)
+        data.throwStatErrors()
         assert contents(data) == expected, (contents(data), expected)
     thrown = contents(data)
     assert thrown != nominal
