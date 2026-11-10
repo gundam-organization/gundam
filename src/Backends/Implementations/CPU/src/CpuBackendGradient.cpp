@@ -214,13 +214,92 @@ namespace {
     return result;
   }
 
+  struct FractionGradient {
+    int binIndex;
+    double fraction;
+    std::vector<double> slopes;
+  };
+
+  // Differentiate the same compact-support geometry used by propagation.
+  // Strict selection coordinates are constant; moving them is rejected below.
+  std::vector<FractionGradient> binningGradient(const Backends::BinningGeometry& layout_,
+      const Backends::BinningIndex& index_, const double* values_, std::vector<std::size_t>& candidates_) {
+    index_.findCandidates(values_, candidates_);
+    std::vector<FractionGradient> rows;
+    std::vector<double> factors, slopes, prefix;
+    const auto kernelSlope = [](double x_){
+      if( x_ <= -1. or x_ >= 1. ){ return 0.; }
+      const double t = .5*(x_+1.);
+      return 15.*t*t*(1.-t)*(1.-t);
+    };
+    double total = 0.;
+    std::size_t largest = 0;
+    for( auto position : candidates_ ){
+      const auto& bin = layout_.bins[position];
+      factors.resize(bin.intervalCount); slopes.assign(bin.intervalCount, 0.);
+      prefix.assign(bin.intervalCount+1, 1.);
+      for( std::size_t j = 0; j < bin.intervalCount; ++j ){
+        const auto& interval = layout_.intervals[bin.firstInterval+j];
+        const double value = values_[interval.variableIndex];
+        factors[j] = GundamBinningMath::intervalFraction(interval.lowerBound, interval.upperBound,
+            interval.lowerInverseWidth, interval.upperInverseWidth, value);
+        if( factors[j] > 0. and interval.lowerInverseWidth > 0. ){
+          slopes[j] = kernelSlope((interval.lowerBound-value)*interval.lowerInverseWidth)*interval.lowerInverseWidth
+              - kernelSlope((interval.upperBound-value)*interval.upperInverseWidth)*interval.upperInverseWidth;
+        }
+        prefix[j+1] = prefix[j]*factors[j];
+      }
+      if( prefix.back() == 0. ){ continue; }
+      rows.push_back({bin.binIndex, prefix.back(), std::vector<double>(layout_.variableNames.size(), 0.)});
+      auto& row = rows.back();
+      double suffix = 1.;
+      for( std::size_t j = bin.intervalCount; j-- > 0; ){
+        row.slopes[layout_.intervals[bin.firstInterval+j].variableIndex] += prefix[j]*slopes[j]*suffix;
+        suffix *= factors[j];
+      }
+      total += row.fraction;
+      if( row.fraction > rows[largest].fraction ){ largest = rows.size()-1; }
+    }
+    // Propagation removes tiny excesses from the largest contribution. Apply
+    // the same correction to its Jacobian; the outside remainder has no LLH.
+    if( total > 1. and not rows.empty() ){
+      rows[largest].fraction -= total-1.;
+      for( std::size_t j = 0; j < layout_.variableNames.size(); ++j ){
+        double sum = 0.;
+        for( const auto& row : rows ){ sum += row.slopes[j]; }
+        rows[largest].slopes[j] -= sum;
+      }
+    }
+    return rows;
+  }
+
 }
 
 void Backends::CpuBackend::validateLikelihoodGradient() const {
   LogThrowIf(not _isBuilt_, "CPU gradient requires a built backend.");
   if( _isGradientValidated_ ){ return; }
   const auto& model = _engineView_->propagation;
-  LogThrowIf(model.requiresEventBinning(), "CPU backend gradients require fixed, unsmoothed bins without observable-response dials.");
+  for( const auto& sample : model.samples ){
+    LogThrowIf(sample.useDynamicBinning and not sample.binning.isSmoothed,
+               "CPU dynamic binning gradients require bin smoothing.");
+  }
+  for( const auto& event : model.events ){
+    for( std::size_t i = 0; i < event.variableResponseCount; ++i ){
+      const auto& target = model.variableResponses.at(event.firstVariableResponse+i);
+      const auto& sample = model.samples.at(event.samplePosition);
+      const auto column = target.variableIndex-event.firstVariable;
+      // Non-histogram observables have no statistical contribution.
+      if( column >= sample.binning.variableNames.size() ){ continue; }
+      LogThrowIf(not sample.useDynamicBinning or not sample.binning.isSmoothed,
+                 "CPU observable gradients require dynamic binning and bin smoothing.");
+      for( const auto& interval : sample.binning.intervals ){
+        LogThrowIf(interval.variableIndex == column and
+                   (interval.lowerInverseWidth <= 0. or interval.upperInverseWidth <= 0.),
+                   "CPU observable gradients require bin smoothing for every moving axis: "
+                   << sample.binning.variableNames[column]);
+      }
+    }
+  }
   LogThrowIf(_engineView_->likelihood.empty(), "CPU backend gradient requires a statistical likelihood.");
   for( const auto& sample : _engineView_->likelihood.samples ){
     LogThrowIf(sample.portableOptions.kind != LikelihoodKind::BarlowBeestonLiteGaussian,
@@ -321,32 +400,76 @@ std::vector<double> Backends::CpuBackend::getLikelihoodGradient(const Propagatio
   std::vector<std::vector<double>> partials(threadCount, std::vector<double>(model.parameterCount, 0.));
   _threadPool_.runJob([&](int thread_){
     auto& sums = partials[thread_];
-    std::vector<double> prefix;
+    std::vector<double> prefix, observableScales;
+    std::vector<std::size_t> candidates;
+    const auto addDial = [&](std::size_t index_, double scale_){
+      if( scale_ == 0. ){ return; }
+      const auto& dial = model.dials[index_];
+      for( std::size_t j = 0; j < dial.inputCount; ++j ){
+        sums[model.dialInputs[dial.firstInput+j].parameterIndex] += scale_*derivatives[index_][j];
+      }
+    };
     const auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(thread_, threadCount, model.events.size());
     for( auto i = bounds.beginIndex; i < bounds.endIndex; ++i ){
       const auto& event = model.events[i];
-      if( event.globalBinIndex < 0 ){ continue; }
-      const auto& weight = model.eventWeights[event.resultIndex];
-      const auto first = weight.firstDial;
-      prefix.resize(weight.dialCount + 1);
-      prefix[0] = 1.;
-      for( std::size_t j = 0; j < weight.dialCount; ++j ){
-        prefix[j+1] = prefix[j] * responses[model.eventDialIndices[first+j]];
-      }
-      if( model.hasReweightCap and prefix.back() > model.maxReweight ){ continue; }
-      const double scale = weight.baseWeight * (predictionScales[event.globalBinIndex]
-          + _lastResult_.eventWeights[event.resultIndex] * uncertaintyScales[event.globalBinIndex]);
-      if( scale == 0. ){ continue; }
-      double suffix = 1.;
-      for( std::size_t j = weight.dialCount; j-- > 0; ){
-        const auto dialIndex = model.eventDialIndices[first+j];
-        const auto& dial = model.dials[dialIndex];
-        if( dial.type != BackendDialType::Shift ){
-          for( std::size_t axis = 0; axis < dial.inputCount; ++axis ){
-            sums[model.dialInputs[dial.firstInput + axis].parameterIndex] += scale * prefix[j] * suffix * derivatives[dialIndex][axis];
+      const double eventWeight = _lastResult_.eventWeights[event.resultIndex];
+      double weightScale = 0.;
+      const bool smoothed = event.samplePosition < model.samples.size()
+          and model.samples[event.samplePosition].binning.isSmoothed;
+      if( smoothed ){
+        const auto& sample = model.samples[event.samplePosition];
+        observableScales.assign(sample.binning.variableNames.size(), 0.);
+        const auto rows = binningGradient(sample.binning, _binningIndices_[event.samplePosition],
+            _eventState_.variables.data()+event.firstVariable, candidates);
+        for( const auto& row : rows ){
+          if( row.binIndex < 0 ){ continue; }
+          const auto bin = sample.binOffset+row.binIndex;
+          const double scale = predictionScales[bin]+eventWeight*row.fraction*uncertaintyScales[bin];
+          weightScale += scale*row.fraction;
+          for( std::size_t j = 0; j < observableScales.size(); ++j ){
+            observableScales[j] += scale*eventWeight*row.slopes[j];
           }
         }
-        suffix *= responses[dialIndex];
+        for( std::size_t j = 0; j < event.variableResponseCount; ++j ){
+          const auto& target = model.variableResponses[event.firstVariableResponse+j];
+          const auto column = target.variableIndex-event.firstVariable;
+          if( column >= observableScales.size() ){ continue; }
+          const double scale = observableScales[column];
+          // (override or reference) * product(multipliers) + sum(additions).
+          // Prefix/suffix products preserve zero and repeated multipliers.
+          prefix.resize(target.multiplyDialCount+1);
+          prefix[0] = target.overrideDial == std::size_t(-1) ? target.referenceValue : responses[target.overrideDial];
+          for( std::size_t k = 0; k < target.multiplyDialCount; ++k ){
+            prefix[k+1] = prefix[k]*responses[model.variableDialIndices[target.firstMultiplyDial+k]];
+          }
+          double suffix = 1.;
+          for( std::size_t k = target.multiplyDialCount; k-- > 0; ){
+            const auto dial = model.variableDialIndices[target.firstMultiplyDial+k];
+            addDial(dial, scale*prefix[k]*suffix);
+            suffix *= responses[dial];
+          }
+          if( target.overrideDial != std::size_t(-1) ){ addDial(target.overrideDial, scale*suffix); }
+          for( std::size_t k = 0; k < target.addDialCount; ++k ){
+            addDial(model.variableDialIndices[target.firstAddDial+k], scale);
+          }
+        }
+      }
+      else if( event.globalBinIndex >= 0 ){
+        weightScale = predictionScales[event.globalBinIndex]+eventWeight*uncertaintyScales[event.globalBinIndex];
+      }
+      const auto& weight = model.eventWeights[event.resultIndex];
+      prefix.resize(weight.dialCount+1);
+      prefix[0] = 1.;
+      for( std::size_t j = 0; j < weight.dialCount; ++j ){
+        prefix[j+1] = prefix[j]*responses[model.eventDialIndices[weight.firstDial+j]];
+      }
+      // A weight cap suppresses weight derivatives, but never migration.
+      if( model.hasReweightCap and prefix.back() > model.maxReweight ){ continue; }
+      double suffix = 1.;
+      for( std::size_t j = weight.dialCount; j-- > 0; ){
+        const auto dial = model.eventDialIndices[weight.firstDial+j];
+        addDial(dial, weight.baseWeight*weightScale*prefix[j]*suffix);
+        suffix *= responses[dial];
       }
     }
   });

@@ -315,7 +315,8 @@ propagation. Within each transition the local derivative is multiplied by
 `t²(3 − 2t)`; it is zero beyond the outer edge and one on the identity side.
 Hard limits retain their existing piecewise conventions when widths are zero.
 This applies to formula and surface derivatives, producer Jacobians, and every
-level of nested composites. Histogram/bin smoothing remains unsupported.
+level of nested composites. Histogram/bin smoothing is differentiated separately
+as described below.
 
 CPU Formula gradients apply the chain rule directly to compiled bytecode,
 for standalone dials and composite nodes. All supported formula opcodes have
@@ -330,13 +331,30 @@ gradient evaluation do not request ROOT/Clad differentiation.
 | --- | :---: | :---: | :---: | --- |
 | Fixed, unsmoothed histograms | ✅ | ✅ | ✅ | Derivatives of bin contents and MC uncertainties. |
 | Ignored likelihood bins | ✅ | ✅ | ✅ | Follow the prepared likelihood's ignored-bin mask. |
-| Observable-response dials | ❌ | ❌ | ❌ | Observable Jacobians remain to be ported. |
-| Dynamic binning / migration | ❌ | ❌ | ❌ | Gradient validation rejects models requiring event binning. |
-| Smoothed binning / fractional contributions | ❌ | ❌ | ❌ | Fraction derivatives remain to be ported. |
+| Observable-response dials | ✅ | ❌ | ❌ | CPU differentiates Override, Multiply and Add; moving histogram axes require dynamic binning and smoothing. |
+| Dynamic binning / migration | ⚠️ | ❌ | ❌ | CPU requires smoothed bins; hard migration is rejected for gradients. |
+| Smoothed binning / fractional contributions | ✅ | ❌ | ❌ | CPU differentiates fractions and `(weight * fraction)^2`, with absolute or relative widths and multiple axes. |
 | `BarlowBeestonLiteGaussian` | ✅ | ✅ | ✅ | Includes derivatives with respect to prediction and MC uncertainty. |
 | `PoissonLLH` / `PoissonLogLikelihood` | ❌ | ❌ | ❌ | Value support does not imply gradient support. |
 | `BarlowBeestonLitePoisson` | ❌ | ❌ | ❌ | No backend gradient implementation. |
 | `LeastSquares` and other statistical LLHs | ❌ | ❌ | ❌ | Gradient validation currently requires Gaussian Barlow–Beeston. |
+
+CPU migration gradients combine the dial Jacobians with the observable
+composition and the compact-support binning kernel. Every moving histogram axis
+must have both dynamic binning and smoothing; smoothing an unrelated axis does
+not satisfy this requirement. Hard selections on parameter-independent axes
+remain supported. Observable responses outside the histogram coordinates have
+no statistical derivative. Fixed fractional histograms without observable dials
+still contribute through their event-weight derivatives.
+
+For each bin contribution `w * f`, CPU differentiates both the event weight `w`
+and the fraction `f`, including their effect on the MC squared-weight sum.
+Zero/repeated observable multipliers use products without division. Events
+outside the strict bins can still contribute within the smoothing support; the
+outside remainder is excluded from the statistical LLH. The small roundoff
+correction to the largest fraction is also applied to its Jacobian. A global
+weight cap suppresses only the weight derivative, retaining observable migration.
+The existing Gaussian Barlow–Beeston likelihood restriction still applies.
 
 ### Penalties → fit coordinates → minimizer
 
@@ -383,6 +401,14 @@ original engine and finite differences, including normalized/eigen coordinates
 and backend activation/deactivation. Having these tests in the repository does
 not establish that they have passed on every GPU; the CUDA propagation validation
 reported elsewhere in this document is not itself gradient validation.
+
+CPU migration/fraction regressions are covered by
+[`724BackendsCpuObservableGradient.py`](../../tests/python/fast/724BackendsCpuObservableGradient.py)
+and the CPU native gradient tests. They compare with the original engine and
+finite differences, including absolute/relative smoothing widths, parallel
+execution, normalized/eigen coordinates, zero/repeated multipliers, weight caps,
+ignored bins, multidimensional geometry and outside support, plus rejection of
+unsmoothed moving axes and backend activation/deactivation.
 
 The restrictions above are enforced in
 [`CpuBackendGradient.cpp`](../../src/Backends/Implementations/CPU/src/CpuBackendGradient.cpp)

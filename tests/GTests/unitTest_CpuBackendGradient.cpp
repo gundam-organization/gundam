@@ -499,3 +499,171 @@ TEST(CpuBackendGradient, ResponseSmoothingMatchesSupervisorAtTransitionBoundarie
     }
   }
 }
+
+namespace {
+  EngineView observableGradientModel() {
+    EngineView view;
+    auto& model = view.propagation;
+    model.parameterCount = 3;
+    model.totalBins = 4;
+    model.hasVariableResponses = true;
+    model.dialInputs = {{0}, {1}, {2}};
+    for( std::size_t i = 0; i < 3; ++i ){
+      BackendDialDescriptor dial;
+      dial.firstInput = i; dial.inputCount = 1;
+      model.dials.push_back(dial);
+    }
+    SampleView sample;
+    sample.sampleIndex = 0; sample.binCount = 4;
+    sample.useDynamicBinning = true;
+    sample.variableNames = sample.binning.variableNames = {"x", "y", "selection"};
+    sample.binning.isSmoothed = true;
+    for( int x = 0; x < 2; ++x ) for( int y = 0; y < 2; ++y ){
+      sample.binning.bins.push_back({2*x+y, sample.binning.intervals.size(), 3});
+      sample.binning.intervals.push_back({0, double(x), double(x+1), 1./.3, 1./.3});
+      sample.binning.intervals.push_back({1, double(y), double(y+1), 1./.4, 1./.4});
+      sample.binning.intervals.push_back({2, 0., 1., 0., 0.});
+    }
+    model.samples.push_back(sample);
+    for( int i = 0; i < 10; ++i ){
+      EventView event;
+      event.resultIndex = model.events.size();
+      event.samplePosition = 0; event.sampleIndex = 0;
+      // The initial strict bin is deliberately unavailable, including for
+      // events that later contribute fractions from outside the hard support.
+      event.binIndex = event.globalBinIndex = -1;
+      event.firstVariable = model.variableValues.size(); event.variableCount = 3;
+      model.variableValues.insert(model.variableValues.end(), {.5, .5, i == 5 ? 2. : .5});
+      event.firstVariableResponse = model.variableResponses.size();
+      if( i < 6 ){
+        BackendVariableResponseDescriptor x;
+        x.variableIndex = event.firstVariable;
+        x.overrideDial = 0;
+        x.firstMultiplyDial = model.variableDialIndices.size(); x.multiplyDialCount = 2;
+        model.variableDialIndices.insert(model.variableDialIndices.end(), {1, 1});
+        x.firstAddDial = model.variableDialIndices.size(); x.addDialCount = 1;
+        model.variableDialIndices.push_back(2);
+        model.variableResponses.push_back(x);
+        BackendVariableResponseDescriptor y;
+        y.variableIndex = event.firstVariable+1; y.referenceValue = .5+.1*i;
+        y.firstMultiplyDial = model.variableDialIndices.size(); y.multiplyDialCount = 1;
+        model.variableDialIndices.push_back(1);
+        y.firstAddDial = model.variableDialIndices.size(); y.addDialCount = 1;
+        model.variableDialIndices.push_back(0);
+        model.variableResponses.push_back(y);
+        event.variableResponseCount = 2;
+        model.eventWeights.push_back({.2+.1*i, model.eventDialIndices.size(), 3});
+        model.eventDialIndices.insert(model.eventDialIndices.end(), {0, 1, 0});
+      }
+      else {
+        // Parameter-independent support keeps every populated data bin finite.
+        const int bin = i-6;
+        model.variableValues[event.firstVariable] = (bin/2)+.5;
+        model.variableValues[event.firstVariable+1] = (bin%2)+.5;
+        model.variableValues[event.firstVariable+2] = .5;
+        model.eventWeights.push_back({2., 0, 0});
+      }
+      model.events.push_back(event);
+    }
+    LikelihoodSampleView likelihood;
+    likelihood.portableOptions.kind = LikelihoodKind::BarlowBeestonLiteGaussian;
+    likelihood.dataSums = {3., 4., 3.5, 5.};
+    likelihood.ignoredBins = {false, true, false, false};
+    view.likelihood.samples.push_back(likelihood);
+    return view;
+  }
+}
+
+TEST(CpuBackendGradient, MultidimensionalMigrationFractionsAndOutsideSupport) {
+  for( bool mirror : {false, true} ) for( bool cap : {false, true} ){
+    auto view = observableGradientModel();
+    auto& model = view.propagation;
+    model.dialInputs[0] = {0, mirror, 0., 2.};
+    model.hasReweightCap = cap; model.maxReweight = .1;
+    CpuBackend backend;
+    backend.build(view);
+    for( const auto& point : {std::vector<double>{.8, .9, .2}, {.8, 0., .2},
+                            {.8, .9, -.8}, {.8, .9, 1.5}, {3.2, .9, .2}} ){
+      compareGradient(backend, point, 2e-7);
+    }
+    // Host-only fractional bins remain differentiable for event weights.
+    model.hasVariableResponses = false;
+    model.variableResponses.clear();
+    model.samples[0].useDynamicBinning = false;
+    for( auto& event : model.events ){ event.variableResponseCount = 0; }
+    backend.build(view);
+    compareGradient(backend, {.8, .9, .2});
+  }
+}
+
+TEST(CpuBackendGradient, RejectsMigrationWithoutSmoothingOnEachMovingAxis) {
+  auto view = observableGradientModel();
+  CpuBackend backend;
+  view.propagation.samples[0].useDynamicBinning = false;
+  backend.build(view);
+  EXPECT_THROW(backend.validateLikelihoodGradient(), std::exception);
+  view.propagation.samples[0].useDynamicBinning = true;
+  view.propagation.samples[0].binning.isSmoothed = false;
+  backend.build(view);
+  EXPECT_THROW(backend.validateLikelihoodGradient(), std::exception);
+  view.propagation.samples[0].binning.isSmoothed = true;
+  view.propagation.samples[0].binning.intervals[1].lowerInverseWidth = 0.;
+  view.propagation.samples[0].binning.intervals[1].upperInverseWidth = 0.;
+  backend.build(view);
+  EXPECT_THROW(backend.validateLikelihoodGradient(), std::exception);
+}
+
+TEST(CpuBackendGradient, ObservableFormulaCompositeAndProducerJacobians) {
+  for( auto type : {BackendDialType::Formula, BackendDialType::Composite,
+                   BackendDialType::ExternalWeight, BackendDialType::Tabulated, BackendDialType::Kriged} ){
+    auto view = observableGradientModel();
+    auto& model = view.propagation;
+    auto& dial = model.dials[0];
+    dial.type = type; dial.inputCount = 2;
+    dial.hasMinResponse = dial.hasMaxResponse = true;
+    dial.minResponse = .7; dial.maxResponse = 1.;
+    smoothLimits(dial, .1, .1);
+    const bool producer = type == BackendDialType::ExternalWeight or isTableDial(type);
+    if( producer ){
+      model.externalWeightBlocks = {{0, 2}};
+      model.tableTerms = {{0, .25}, {1, .75}};
+      dial.tableTermCount = 2;
+    }
+    else {
+      model.formulaPrograms = {FormulaCompiler::compile("[p]^2+.2*[q]", {"p", "q"})};
+      model.formulaInputs = {{0}, {1}};
+      if( type == BackendDialType::Composite ){
+        CompositeInstruction node;
+        node.dial.type = BackendDialType::Formula; node.dial.inputCount = 2;
+        model.compositeInputs = {{0}, {1}};
+        model.compositeInstructions = {node};
+        model.compositePrograms = {{0, 1, 2, 2}};
+      }
+    }
+    CpuBackend backend;
+    backend.build(view);
+    PropagationInputs inputs;
+    std::vector<double> table(2);
+    std::uint64_t generation = 0;
+    auto publish = [&](const std::vector<double>& point_){
+      inputs.parameters.values = point_;
+      if( producer ){
+        table.assign(2, point_[0]*point_[0]+.2*point_[1]);
+        inputs.externalWeights = {{table.data(), table.size(), 0, ++generation}};
+        inputs.externalDialGradients.resize(model.dials.size());
+        inputs.externalDialGradients[0] = {2.*point_[0], .2};
+      }
+      return backend.requestPropagation(inputs);
+    };
+    for( const auto& point : {std::vector<double>{.8, .9, .2}, {.75, .8, -.6}, {.9, .8, 1.3}} ){
+      const auto analytic = backend.getLikelihoodGradient(publish(point));
+      for( std::size_t i = 0; i < point.size(); ++i ){
+        auto up = point, down = point;
+        up[i] += 1e-5; down[i] -= 1e-5;
+        const double upper = backend.getLikelihood(publish(up));
+        const double lower = backend.getLikelihood(publish(down));
+        EXPECT_NEAR(analytic[i], (upper-lower)/2e-5, 2e-6);
+      }
+    }
+  }
+}
