@@ -318,7 +318,7 @@ TEST_F(RootMinimizerSimplex, UnsupportedLikelihoodStopsAnalyticGradientInitializ
 
 
 TEST_F(RootMinimizerSimplex, RootFormulaGradientMatchesFullLikelihoodFiniteDifferences) {
-#ifndef R__HAS_CLAD
+#ifndef GUNDAM_TEST_HAS_CLAD
   GTEST_SKIP() << "ROOT was built without Clad";
 #endif
   FitterEngine engine;
@@ -357,7 +357,7 @@ TEST_F(RootMinimizerSimplex, RootFormulaNumericalFallbackStopsAnalyticGradientIn
 
 
 TEST_F(RootMinimizerSimplex, EventFormulaGradientMatchesFullLikelihoodFiniteDifferences) {
-#ifndef R__HAS_CLAD
+#ifndef GUNDAM_TEST_HAS_CLAD
   GTEST_SKIP() << "ROOT was built without Clad";
 #endif
   const int previousThreads = GundamGlobals::getNbCpuThreads();

@@ -34,7 +34,7 @@ namespace {
 }
 
 TEST(CompositeGradient, BranchesRepeatedParametersMirrorsClampsAndNestedGraphs) {
-#ifndef R__HAS_CLAD
+#ifndef GUNDAM_TEST_HAS_CLAD
   GTEST_SKIP() << "ROOT was built without Clad";
 #endif
   const JsonType p{{"parameterName", "p"}}, q{{"parameterName", "q"}};
@@ -126,7 +126,7 @@ TEST(CompositeGradient, BranchesRepeatedParametersMirrorsClampsAndNestedGraphs) 
 }
 
 TEST(CompositeGradient, EventInputsStayConstantAndUnsupportedNodesAreNamed) {
-#ifndef R__HAS_CLAD
+#ifndef GUNDAM_TEST_HAS_CLAD
   GTEST_SKIP() << "ROOT was built without Clad";
 #endif
   RootFormula formula;
