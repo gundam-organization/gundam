@@ -8,12 +8,15 @@
 #include "GradientModel.h"
 #include "Semantics/BackendDeviceGradient.h"
 #include "Semantics/BackendDialGradient.h"
+#include "Bilinear.h"
+#include "Bicubic.h"
 #include "Graph.h"
 #include "CompactSpline.h"
 #include "UniformSpline.h"
 #include "MonotonicSpline.h"
 #include "GeneralSpline.h"
 
+#include <TH2D.h>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -284,3 +287,38 @@ TEST(DeviceGradient, MetalGraphSplinesAndResponseClampsMatchCpu) {
   }
 }
 #endif
+
+TEST(CpuBackendGradient, SurfaceInputsMatchFiniteDifferences) {
+  const double edges[]{-3., -1.9, -.7, .2, 1.8, 3., 5.};
+  TH2D histogram("gradientSurface", "", 6, edges, 6, edges);
+  histogram.SetDirectory(nullptr);
+  for( int x = 1; x <= 6; ++x ) for( int y = 1; y <= 6; ++y ){
+    const double a = histogram.GetXaxis()->GetBinCenter(x), b = histogram.GetYaxis()->GetBinCenter(y);
+    histogram.SetBinContent(x, y, 1. + .1*a + .2*b + .03*a*b + .04*std::sin(a-b));
+  }
+  Bilinear bilinear; bilinear.buildDial(histogram);
+  Bicubic bicubic; bicubic.buildDial(histogram);
+  for( bool cubic : {false, true} ) for( bool mirror : {false, true} )
+  for( bool extrapolate : {false, true} ) for( bool shared : {false, true} )
+  for( bool clamp : {false, true} ){
+    SCOPED_TRACE(::testing::Message() << cubic << mirror << extrapolate << shared << clamp);
+    auto view = gradientModel(1.);
+    auto& model = view.propagation;
+    model.dials.resize(1);
+    auto& dial = model.dials[0];
+    dial.type = cubic ? BackendDialType::Bicubic : BackendDialType::Bilinear;
+    dial.inputCount = 2;
+    dial.allowExtrapolation = extrapolate;
+    model.dialPayloads = cubic ? bicubic.getDialData() : bilinear.getDialData();
+    dial.payloadSize = model.dialPayloads.size();
+    dial.hasMinResponse = dial.hasMaxResponse = clamp;
+    dial.minResponse = .95; dial.maxResponse = 1.2;
+    model.dialInputs = {{0, mirror, -2., 4.}, {shared ? 0u : 1u, mirror, -2., 4.}};
+    for( auto& index : model.eventDialIndices ){ index = 0; }
+    CpuBackend backend;
+    backend.build(view);
+    for( const auto& point : {std::vector<double>{.31, -.27}, {-3.1, .31}, {.31, 5.37}, {6.3, -6.7}} ){
+      compareGradient(backend, point, 2e-7);
+    }
+  }
+}

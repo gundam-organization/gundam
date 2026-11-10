@@ -280,7 +280,7 @@ kernels, but its presence does not constitute CUDA execution support.
 
 ## Analytic gradients
 
-Gradient support as of 2026-11-07. These tables describe the **backend gradient
+Gradient support as of 2026-11-10. These tables describe the **backend gradient
 path**, independently of the value-propagation tables above. Features available
 in the [original engine's analytic gradient](../gradient/AnalyticGradient.md)
 are not automatically available in a backend.
@@ -296,7 +296,7 @@ These statuses describe the code, not a new validation run on each device.
 | `Shift` | ✅ | ✅ | ✅ | |
 | `Graph` | ✅ | ✅ | ✅ | Single parameter input. |
 | `CompactSpline`, `UniformSpline`, `MonotonicSpline`, `GeneralSpline` | ✅ | ✅ | ✅ | Single parameter input. |
-| `Bilinear`, `Bicubic` | ❌ | ❌ | ❌ | Multi-input derivatives remain to be ported. |
+| `Bilinear`, `Bicubic` | ✅ | ❌ | ❌ | CPU differentiates both inputs, including shared parameters, mirroring and clamps. |
 | `RootGraph`, `RootSpline` | ❌ | ❌ | ❌ | Original-engine support does not extend to the backend gradient path. |
 | `Formula` (`RootFormula`, `EventFormula`) | ❌ | ❌ | ❌ | Formula-program derivatives remain to be implemented. |
 | `CompositeDial` | ❌ | ❌ | ❌ | Composite-program derivative propagation remains to be implemented. |
