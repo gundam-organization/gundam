@@ -244,6 +244,9 @@ void Backends::CpuBackend::validateLikelihoodGradient() const {
       case BackendDialType::Bicubic:
         Semantics::validateSurfaceDial(model, dial);
         break;
+      case BackendDialType::Formula:
+        model.formulaPrograms.at(dial.formulaProgramIndex).validate();
+        break;
       case BackendDialType::Composite:
       case BackendDialType::Tabulated:
       case BackendDialType::Kriged:

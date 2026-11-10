@@ -497,13 +497,21 @@ void Backends::BackendManager::validateLikelihoodGradient() const {
   LogThrowIf(not _activeBackendPtr_->getCapabilities().supportsLikelihoodGradient,
              _activeBackendName_ << " does not support analytic likelihood gradients.");
   _activeBackendPtr_->validateLikelihoodGradient();
+  LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for backend gradients.");
+  _likelihoodInterfacePtr_->validateWeightGradient(false);
+  // Only producers need the original dial API to request Jacobian publication.
+  // Formula/composite derivatives are validated by the numerical backend.
+  for( const auto& binding : _backendEngineLayout_->bindings.gradientDials ){
+    if( binding.dial == nullptr ){ continue; }
+    LogThrowIf(not binding.dial->hasAnalyticGradient(),
+               "Backend gradient is unsupported for dial " << binding.dial->getDialTypeName());
+  }
 }
 
 void Backends::BackendManager::evalGradient(ParameterGradient& gradient_) {
   validateLikelihoodGradient();
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for backend gradients.");
   auto& likelihood = *_likelihoodInterfacePtr_;
-  likelihood.validateWeightGradient();
 
   // Refresh the backend snapshot/token even when no value callback preceded us.
   auto propagation = propagate(true);

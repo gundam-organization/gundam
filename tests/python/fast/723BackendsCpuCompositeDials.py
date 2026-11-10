@@ -47,12 +47,14 @@ def compare(path, dial, exact=True, backendType='CPU', backendConfig=None):
 
 def compare_gradient(path, dial):
     config = helpers.make_config(path, dial)
-    config['minimizerConfig'] = {'useNormalizedFitSpace': False}
+    config['minimizerConfig'] = {'useNormalizedFitSpace': False, 'useAnalyticGradient': True}
     config['likelihoodInterfaceConfig']['jointProbabilityConfig'] = {'type': 'BarlowBeestonLiteGaussian'}
     config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': 'CPU'}
     engine = helpers.build(config)
     minimizer = engine.getMinimizer()
+    parameters = list(minimizer.getMinimizerFitParameterList())
     for point in ([.37, .21], [.37, .21], [-.43, .61], [4.13, -.27]):
+        point = point + [p.getParameterValue() for p in parameters[len(point):]]
         analytic = minimizer.evalFitGradientAt(point)
         for i, actual in enumerate(analytic):
             up, down = list(point), list(point)
@@ -138,6 +140,12 @@ def main():
             nested = helpers.composite([source, surface, formula], 'output')
             nested['name'] = 'nested'
             compare_gradient(path, helpers.composite([nested], 'nested'))
+        standalone = helpers.formula('standalone',
+            '1+.1*sin([arg0])+.02*[arg1]^2+.001*[arg2]+.01*floor([arg0])',
+            q, p, event, useMirrorDial=True, mirrorLowEdge=-1., mirrorHighEdge=2.,
+            dialResponseLimits=[.5, 3.])
+        compare_gradient(path, standalone)
+        compare_gradient(path, helpers.formula('binnedFormula', '1+.1*[X]+.02*[arg0]+.03*[arg1]', p, q, binning=binning))
     print('SUCCESS: CPU composite weights and observables match, including event formulas.')
 
 

@@ -49,12 +49,24 @@ def check_threads(threads, backend_name):
     else:
         raise AssertionError('Unsupported backend likelihood gradient was accepted')
 
-    # Formula is supported by the original engine, but remains unsupported by
-    # the resident backend gradient path. Keep this rejection backend-specific.
+    # CPU differentiates compiled formulas without original-engine/Clad validation.
+    # GPU backends still reject these dials for analytic gradients.
     formula = copy.deepcopy(config)
     formula['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'] = [
         checks.helpers.formula('formula', '1+.1*[arg0]', {'parameterName': 'p'})]
-    for configuration, message in ((least_squares, 'BarlowBeestonLiteGaussian'), (formula, 'Unsupported')):
+    rejected = [(least_squares, 'BarlowBeestonLiteGaussian')]
+    if backend_name == 'CPU':
+        for normalized, eigen in ((False, False), (True, False), (False, True), (True, True)):
+            cfg = copy.deepcopy(formula)
+            cfg['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': 'CPU'}
+            engine = build(cfg, normalized, eigen, analytic=True)
+            parameters = list(engine.getMinimizer().getMinimizerFitParameterList())
+            point = [.07*(i+1) if normalized else p.getParameterValue()+.07*p.getStdDevValue()
+                     for i, p in enumerate(parameters)]
+            check(engine, point, preserve_likelihood=False)
+    else:
+        rejected.append((formula, 'Unsupported'))
+    for configuration, message in rejected:
         cfg = copy.deepcopy(configuration)
         cfg['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend_name}
         try:

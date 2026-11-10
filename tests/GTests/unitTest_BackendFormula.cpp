@@ -291,3 +291,26 @@ TEST(BackendFormula, CacheDependenciesDeduplicateRepeatedAndSimultaneouslyChange
     EXPECT_DOUBLE_EQ(backend.getEventWeightsHostView(token)[0], 11.);
   }
 }
+
+namespace {
+  class FormulaWithoutOriginalGradient : public RootFormula {
+  public:
+    std::unique_ptr<DialBase> clone() const override { return std::make_unique<FormulaWithoutOriginalGradient>(*this); }
+    bool hasAnalyticGradient() const override { throw std::runtime_error("Original formula gradient must not be requested"); }
+  };
+}
+
+TEST(BackendFormula, BackendValidationDoesNotRequestOriginalFormulaGradient) {
+  LikelihoodInterface likelihood;
+  likelihood.configure(ConfigReader(JsonType{{"jointProbabilityConfig", {{"type", "BarlowBeestonLiteGaussian"}}}}));
+  FormulaWithoutOriginalGradient formula;
+  formula.setFormulaStr("1+.1*[p]");
+  formula.setInputNames({"p"});
+  DialInterface interface;
+  interface.setDial(DialBaseObject(formula));
+  auto& cache = likelihood.getModelPropagator().getEventDialCache().getCache();
+  cache.push_back({nullptr});
+  cache.back().dialResponseCacheList.emplace_back(interface);
+  EXPECT_THROW(likelihood.validateWeightGradient(), std::runtime_error);
+  EXPECT_NO_THROW(likelihood.validateWeightGradient(false));
+}

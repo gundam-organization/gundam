@@ -432,3 +432,31 @@ TEST(CpuBackendGradient, CompositeFormulaOperationsMatchFiniteDifferences) {
     compareGradient(backend, {.31, .73}, 2e-7);
   }
 }
+
+TEST(CpuBackendGradient, StandaloneFormulaBindingsMirrorsAndResponseLimits) {
+  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ){
+    auto view = gradientModel(1.);
+    auto& model = view.propagation;
+    model.dials.resize(1);
+    auto& dial = model.dials[0];
+    dial.type = BackendDialType::Formula;
+    dial.inputCount = 3;
+    dial.hasMinResponse = dial.hasMaxResponse = clamp;
+    dial.minResponse = 1.05; dial.maxResponse = 1.15;
+    model.dialInputs = {{1, mirror, -2., 4.}, {0}, {1}};
+    model.formulaPrograms = {FormulaCompiler::compile("1+.1*[a]+.02*[b]^2+.03*[repeated]+.001*[event]",
+                                                     {"event", "b", "a", "repeated"})};
+    model.formulaInputs = {{-1, 17.}, {1}, {0}, {2}};
+    for( auto& index : model.eventDialIndices ){ index = 0; }
+    CpuBackend backend; backend.build(view);
+    for( const auto& point : {std::vector<double>{.31, .73}, {-.7, 5.37}, {.2, -5.71}} ){
+      compareGradient(backend, point, 2e-7);
+    }
+    // Event-only formulas and constants have no parameter derivatives.
+    dial.inputCount = 0;
+    model.formulaPrograms = {FormulaCompiler::compile("1+.01*[event]", {"event"})};
+    model.formulaInputs = {{-1, 7.}};
+    backend.build(view);
+    compareGradient(backend, {.31, .73}, 2e-7);
+  }
+}

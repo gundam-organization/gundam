@@ -298,7 +298,7 @@ These statuses describe the code, not a new validation run on each device.
 | `CompactSpline`, `UniformSpline`, `MonotonicSpline`, `GeneralSpline` | ✅ | ✅ | ✅ | Single parameter input. |
 | `Bilinear`, `Bicubic` | ✅ | ❌ | ❌ | CPU differentiates both inputs, including shared parameters, mirroring and clamps. |
 | `RootGraph`, `RootSpline` | ❌ | ❌ | ❌ | Original-engine support does not extend to the backend gradient path. |
-| `Formula` (`RootFormula`, `EventFormula`) | ❌ | ❌ | ❌ | Formula-program derivatives remain to be implemented. |
+| `Formula` (`RootFormula`, `EventFormula`) | ✅ | ❌ | ❌ | CPU differentiates compiled bytecode, including named inputs, bound event constants, mirrors and response limits; no ROOT/Clad gradient generation. |
 | `CompositeDial` | ✅ | ❌ | ❌ | CPU differentiates compiled graphs, including formula nodes, surfaces, branches and nested composites. Response smoothing remains unsupported. |
 | `Polynomial` | ❌ | ❌ | ❌ | No backend gradient implementation. |
 | `Tabulated`, `Kriged` | ✅️ | ❌ | ❌ | CPU consumes producer Jacobians; requires a configured `gradientFunction`. |
@@ -309,6 +309,13 @@ These statuses describe the code, not a new validation run on each device.
 | Extrapolation and hard response limits | ✅ | ✅ | ✅ | Piecewise conventions at knots and limits. |
 | Response smoothing | ❌ | ❌ | ❌ | Rejected even though value propagation supports it. |
 | Global event reweight cap | ✅ | ✅ | ✅ | Weight derivative is zero above the cap. |
+
+CPU Formula gradients apply the chain rule directly to compiled bytecode,
+for standalone dials and composite nodes. All supported formula opcodes have
+derivative rules. `floor`/`ceil` use zero piecewise derivatives, `abs` uses zero
+at zero, and `min`/`max` select the left operand at ties. Host-side formula
+construction/binding can still use ROOT; backend dial validation and numerical
+gradient evaluation do not request ROOT/Clad differentiation.
 
 ### Events → histograms → statistical LLH
 
