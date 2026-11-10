@@ -56,7 +56,9 @@ namespace Backends {
     struct GradientBinding {
       const DialBase* dial{nullptr};
       const DialInputBuffer* inputs{nullptr};
+      std::size_t dialIndex{0};
     };
+    // Only external/table producers, in increasing backend dial-index order.
     std::vector<GradientBinding> gradientDials{};
 
     void clear();

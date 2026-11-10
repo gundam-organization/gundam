@@ -388,6 +388,21 @@ combination automatically.
 | Model requirement | Built backend and current propagation token | Built resident event-propagation model and current token | Built device model and current token |
 | Regression sources | Native backend tests and Python comparisons | Conditional native comparisons and explicit Python backend selection | Conditional device comparisons and explicit Python backend selection |
 
+Manager caches the host structural gradient validation for the prepared model.
+Activation/rebuild, deactivation, data-histogram updates and interface replacement
+invalidate it. Structural changes to an active model require reactivation, as
+for value propagation. External/table producer checks still run on every
+gradient request because they also request the next Jacobian publication.
+
+External/table gradient bindings and publications contain only producer dials,
+with explicit, ordered backend dial indices. CPU copies their Jacobians and raw
+responses into compact reusable snapshots. Models without producers allocate
+no per-dial external Jacobian rows. The input contract still accepts the legacy
+dense per-dial Jacobian format; sparse publications reject invalid, duplicate,
+unsorted or non-producer indices, and missing rows cannot reuse a previous
+publication. The unique-dial derivative loop remains serial and recomputes
+local derivatives for every gradient request.
+
 GPU gradient evaluation reads resident weights and histogram moments; the final
 parameter-gradient vector is returned to the host for penalties and minimizer
 integration. It does not require transferring every event derivative to the host.

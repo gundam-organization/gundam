@@ -440,7 +440,7 @@ namespace {
         propagation.dials.emplace_back(dialRef);
         const bool externalGradient = dialRef.type == Backends::BackendDialType::ExternalWeight
             or Backends::isTableDial(dialRef.type);
-        bindings_.gradientDials.push_back({externalGradient ? dialBase : nullptr, inputBuffer});
+        if( externalGradient ){ bindings_.gradientDials.push_back({dialBase, inputBuffer, dialIndex}); }
         cachedDialIt->second = dialIndex;
         allDialIndices.emplace_back(dialIndex);
 

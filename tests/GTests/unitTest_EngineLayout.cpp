@@ -86,6 +86,7 @@ TEST(EngineLayout, SharesInputSequencesAndPreservesWeightsAfterRebuild) {
     layout.build(likelihood);
     const auto& propagation = layout.view.propagation;
     ASSERT_EQ(propagation.dials.size(), 8);
+    EXPECT_TRUE(layout.bindings.gradientDials.empty());
     ASSERT_EQ(propagation.events.size(), 3);
     ASSERT_EQ(propagation.eventDialIndices.size(), 16);
     ASSERT_EQ(propagation.dialInputs.size(), 6);
@@ -149,6 +150,11 @@ TEST(EngineLayout, TableDialsShareSourcesWithoutRequestingScalarPayloads) {
     const auto& propagation = layout.view.propagation;
     EXPECT_TRUE(propagation.dialPayloads.empty());
     ASSERT_EQ(propagation.dials.size(), 3);
+    ASSERT_EQ(layout.bindings.gradientDials.size(), 3);
+    for( std::size_t i = 0; i < 3; ++i ){
+      EXPECT_EQ(layout.bindings.gradientDials[i].dialIndex, i);
+      EXPECT_NE(layout.bindings.gradientDials[i].dial, nullptr);
+    }
     ASSERT_EQ(propagation.externalWeightBlocks.size(), 2);
     ASSERT_EQ(layout.bindings.externalWeights.size(), 2);
     EXPECT_EQ(layout.bindings.externalWeights[0].table, &first);

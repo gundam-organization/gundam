@@ -99,6 +99,15 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
   initializeWeightExecution();
   _timingTotals_ = BackendTimingTotals();
   const auto& model = _engineView_->propagation;
+  _externalGradientDials_.clear();
+  for( std::size_t i = 0; i < model.dials.size(); ++i ){
+    if( model.dials[i].type == BackendDialType::ExternalWeight or isTableDial(model.dials[i].type) ){
+      _externalGradientDials_.push_back(i);
+    }
+  }
+  _externalDialGradients_.assign(_externalGradientDials_.size(), {});
+  _externalGradientResponses_.assign(_externalGradientDials_.size(), 0.);
+  _externalGradientPublished_.assign(_externalGradientDials_.size(), false);
   _eventState_ = EventState();
   _requiresEventBinning_ = model.requiresEventBinning();
   if( _requiresEventBinning_ ){
@@ -133,15 +142,27 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   const auto& model = _engineView_->propagation;
   const auto& likelihoodModel = _engineView_->likelihood;
   inputs_.validate(model);
-  _externalDialGradients_ = inputs_.externalDialGradients;
-  _externalGradientResponses_.assign(model.dials.size(), 0.);
-  for( std::size_t i = 0; i < model.dials.size(); ++i ){
-    const auto& dial = model.dials[i];
-    if( not _externalDialGradients_.empty() and (dial.type == BackendDialType::ExternalWeight or isTableDial(dial.type)) ){
-      auto unclamped = dial;
-      unclamped.hasMinResponse = unclamped.hasMaxResponse = false;
-      _externalGradientResponses_[i] = Semantics::evalDialResponse(model, unclamped, inputs_);
+  std::size_t sparsePosition = 0;
+  for( std::size_t i = 0; i < _externalGradientDials_.size(); ++i ){
+    const auto dialIndex = _externalGradientDials_[i];
+    std::size_t row = dialIndex;
+    bool published = inputs_.externalDialGradients.size() == model.dials.size();
+    if( not inputs_.externalDialGradientIndices.empty() ){
+      while( sparsePosition < inputs_.externalDialGradientIndices.size()
+             and inputs_.externalDialGradientIndices[sparsePosition] < dialIndex ){ ++sparsePosition; }
+      row = sparsePosition;
+      published = row < inputs_.externalDialGradientIndices.size()
+          and inputs_.externalDialGradientIndices[row] == dialIndex;
     }
+    _externalGradientPublished_[i] = published;
+    if( not published ){
+      _externalDialGradients_[i].clear();
+      continue;
+    }
+    _externalDialGradients_[i] = inputs_.externalDialGradients[row];
+    auto unclamped = model.dials[dialIndex];
+    unclamped.hasMinResponse = unclamped.hasMaxResponse = false;
+    _externalGradientResponses_[i] = Semantics::evalDialResponse(model, unclamped, inputs_);
   }
 
   if( _profiler_ ){

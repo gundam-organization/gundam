@@ -667,3 +667,71 @@ TEST(CpuBackendGradient, ObservableFormulaCompositeAndProducerJacobians) {
     }
   }
 }
+
+TEST(CpuBackendGradient, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows) {
+  auto view = gradientModel(1., 8);
+  auto& model = view.propagation;
+  model.dials.resize(6, model.dials[0]);
+  model.dials[1].type = BackendDialType::ExternalWeight;
+  model.dials[1].firstInput = 0;
+  model.dials[4].type = BackendDialType::Tabulated;
+  model.dials[4].firstInput = 1;
+  model.dials[4].externalWeightIndex = 1;
+  model.externalWeightBlocks = {{0, 3}};
+  model.dials[4].tableTermCount = 2;
+  model.tableTerms = {{1, .25}, {2, .75}};
+  for( auto& index : model.eventDialIndices ){ index = index == 0 ? 1 : 4; }
+  CpuBackend backend;
+  backend.build(view);
+  PropagationInputs inputs;
+  std::vector<double> table(3);
+  const auto publish = [&](const std::vector<double>& point_, bool sparse_){
+    inputs.parameters.values = point_;
+    table = {1.+.2*point_[0]*point_[0], 1.+.1*point_[1], 1.+.3*point_[1]*point_[1]};
+    inputs.externalWeights = {{table.data(), table.size(), 0, 1}};
+    inputs.externalDialGradientIndices = sparse_ ? std::vector<std::size_t>{1, 4} : std::vector<std::size_t>{};
+    inputs.externalDialGradients.assign(sparse_ ? 2 : model.dials.size(), {});
+    inputs.externalDialGradients[sparse_ ? 0 : 1] = {.4*point_[0]};
+    inputs.externalDialGradients[sparse_ ? 1 : 4] = {.025+.45*point_[1]};
+    return backend.requestPropagation(inputs);
+  };
+  for( const auto& point : {std::vector<double>{.31, .27}, {.73, -.4}} ){
+    const auto dense = backend.getLikelihoodGradient(publish(point, false));
+    const auto token = publish(point, true);
+    // Sparse publications must also own their Jacobian/value snapshots.
+    inputs.externalDialGradients[0][0] = 123.;
+    table.assign(3, 456.);
+    const auto sparse = backend.getLikelihoodGradient(token);
+    EXPECT_EQ(sparse, dense);
+    for( std::size_t i = 0; i < point.size(); ++i ){
+      auto up = point, down = point;
+      up[i] += 1e-5; down[i] -= 1e-5;
+      const double upper = backend.getLikelihood(publish(up, true));
+      const double lower = backend.getLikelihood(publish(down, true));
+      EXPECT_NEAR(sparse[i], (upper-lower)/2e-5, 2e-6);
+    }
+  }
+  publish({.31, .27}, true);
+  inputs.externalDialGradientIndices = {1};
+  inputs.externalDialGradients.resize(1);
+  auto token = backend.requestPropagation(inputs);
+  EXPECT_THROW(static_cast<void>(backend.getLikelihoodGradient(token)), std::exception);
+  inputs.externalDialGradientIndices.clear();
+  inputs.externalDialGradients.clear();
+  token = backend.requestPropagation(inputs);
+  EXPECT_THROW(static_cast<void>(backend.getLikelihoodGradient(token)), std::exception);
+
+  for( const auto& indices : {std::vector<std::size_t>{1, 1}, {4, 1}, {1, 6}, {1, 3}} ){
+    inputs.externalDialGradientIndices = indices;
+    inputs.externalDialGradients.assign(2, {1.});
+    EXPECT_THROW(static_cast<void>(backend.requestPropagation(inputs)), std::exception);
+  }
+  inputs.externalDialGradientIndices = {1, 4};
+  inputs.externalDialGradients.resize(1);
+  EXPECT_THROW(static_cast<void>(backend.requestPropagation(inputs)), std::exception);
+  // A rebuild changes the compact snapshot's index map and clears publication.
+  model.dials[1].type = model.dials[4].type = BackendDialType::Norm;
+  model.externalWeightBlocks.clear();
+  backend.build(view);
+  compareGradient(backend, {.7, .9});
+}

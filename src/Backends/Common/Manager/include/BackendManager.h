@@ -35,7 +35,10 @@ namespace Backends {
     BackendManager(const BackendManager&) = delete;
     BackendManager& operator=(const BackendManager&) = delete;
 
-    void setLikelihoodInterfacePtr(LikelihoodInterface* likelihoodInterfacePtr_){ _likelihoodInterfacePtr_ = likelihoodInterfacePtr_; }
+    void setLikelihoodInterfacePtr(LikelihoodInterface* likelihoodInterfacePtr_){
+      _likelihoodInterfacePtr_ = likelihoodInterfacePtr_;
+      _isGradientValidated_ = false;
+    }
 
     [[nodiscard]] const EngineLayout& getEngineLayout() const { return *_backendEngineLayout_; }
     [[nodiscard]] const EngineView& getEngineView() const { return _backendEngineLayout_->view; }
@@ -98,6 +101,7 @@ namespace Backends {
     std::shared_ptr<EngineLayout> _backendEngineLayout_{std::make_shared<EngineLayout>()};
     PropagationToken _lastPropagationToken_{};
     std::uint64_t _backendGeneration_{0};
+    mutable bool _isGradientValidated_{false};
     std::shared_ptr<bool> _hostBinningChanged_{};
     std::vector<std::shared_ptr<std::function<void()>>> _binningUpdateListeners_{};
     std::uint64_t _lastMaterializedStateRevision_{0};

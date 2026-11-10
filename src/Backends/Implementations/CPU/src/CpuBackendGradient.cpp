@@ -371,14 +371,16 @@ std::vector<double> Backends::CpuBackend::getLikelihoodGradient(const Propagatio
   // Evaluate each unique dial derivative once; events retain only dial indices.
   std::vector<double> responses(model.dials.size());
   std::vector<std::vector<double>> derivatives(model.dials.size());
+  std::size_t externalPosition = 0;
   for( std::size_t i = 0; i < model.dials.size(); ++i ){
     const auto& dial = model.dials[i];
     if( dial.type == BackendDialType::ExternalWeight or isTableDial(dial.type) ){
-      responses[i] = _externalGradientResponses_.at(i);
-      LogThrowIf(_externalDialGradients_.size() != model.dials.size()
-                 or _externalDialGradients_[i].size() != dial.inputCount,
+      const auto position = externalPosition++;
+      responses[i] = _externalGradientResponses_.at(position);
+      LogThrowIf(not _externalGradientPublished_.at(position)
+                 or _externalDialGradients_[position].size() != dial.inputCount,
                  "CPU external/table gradient is missing or has invalid dimensions; publish it with propagation.");
-      derivatives[i] = _externalDialGradients_[i];
+      derivatives[i] = _externalDialGradients_[position];
       const double responseSlope = Semantics::dialResponseSlope(dial, responses[i]);
       responses[i] = Semantics::clampDialResponse(dial, responses[i]);
       for( std::size_t j = 0; j < dial.inputCount; ++j ){

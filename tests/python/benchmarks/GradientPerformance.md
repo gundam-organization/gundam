@@ -116,3 +116,28 @@ Keep the whole directory for analysis. Both callbacks are synchronous at return.
 There is no machine-dependent performance pass/fail threshold. An incomplete or
 failed case remains marked as such; failed comparisons must be investigated
 before interpreting speedup as equivalent work.
+
+## ROOT/Clad compatibility for the original engine
+
+With the tested ROOT 6.40.04 installation, Clad rejects the unqualified
+`min([shift], [cap])` in the Eb composite's `cappedShift` node while generating
+its gradient (a `min<double>` custom derivative signature mismatch). Use
+`TMath::Min([shift], [cap])` in those formula definitions. That spelling
+generates an analytic ROOT gradient and is also supported by the CPU formula
+compiler. The benchmark does not rewrite formulas automatically. The CPU
+backend differentiates bytecode independently of Clad and can finish even
+when the original-engine case fails.
+
+## CPU preparation optimizations
+
+The manager caches structural gradient validation for a prepared layout, with
+invalidation on reactivation/rebuild, deactivation, data updates and interface
+replacement. Producer checks remain per-request to arm publication of current
+external/table Jacobians. The manager publishes only those producer rows, and
+CPU retains compact snapshots; no external Jacobian rows are built for ordinary
+dials. These changes remove repeated full-model validation and empty dense-row
+copies. The local dial-derivative loop is still serial and is not cached.
+
+Rebuild before comparing revisions, keep the build type and workload identical,
+and use a new output directory for each measurement. The earlier Debug timings
+are a baseline for that build only; they do not predict the Release speedup.

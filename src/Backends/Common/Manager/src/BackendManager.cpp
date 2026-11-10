@@ -268,6 +268,7 @@ void Backends::BackendManager::initializeImpl() {
 }
 
 void Backends::BackendManager::updateDataHistograms() {
+  _isGradientValidated_ = false;
   if( not hasBackend() ){ return; }
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for data histogram updates.");
   auto& samples = _backendEngineLayout_->view.likelihood.samples;
@@ -304,6 +305,7 @@ void Backends::BackendManager::updateDataHistograms() {
 }
 
 void Backends::BackendManager::buildEngineLayout() {
+  _isGradientValidated_ = false;
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendManager requires a LikelihoodInterface before activation.");
   auto layout = std::make_shared<EngineLayout>();
   layout->build(*_likelihoodInterfacePtr_);
@@ -334,6 +336,7 @@ std::vector<std::string> Backends::BackendManager::getAvailableBackendNames() co
 }
 
 void Backends::BackendManager::deactivateBackend() {
+  _isGradientValidated_ = false;
   if( hasBackend() ){
     if( _lastPropagationToken_.isValid ){
       _activeBackendPtr_->wait(_lastPropagationToken_);
@@ -429,12 +432,13 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
   }
   const auto& model = _backendEngineLayout_->view.propagation;
   if( withGradients_ ){
-    inputs.externalDialGradients.resize(model.dials.size());
-    for( std::size_t i = 0; i < model.dials.size(); ++i ){
-      const auto& binding = _backendEngineLayout_->bindings.gradientDials.at(i);
-      if( binding.dial == nullptr ){ continue; }
+    const auto& bindings = _backendEngineLayout_->bindings.gradientDials;
+    inputs.externalDialGradientIndices.reserve(bindings.size());
+    inputs.externalDialGradients.reserve(bindings.size());
+    for( const auto& binding : bindings ){
       LogThrowIf(binding.inputs == nullptr, "Missing external gradient input buffer.");
-      inputs.externalDialGradients[i] = binding.dial->evalGradients(*binding.inputs);
+      inputs.externalDialGradientIndices.push_back(binding.dialIndex);
+      inputs.externalDialGradients.push_back(binding.dial->evalGradients(*binding.inputs));
     }
   }
   inputs.forceBinningUpdate = *_hostBinningChanged_;
@@ -497,15 +501,19 @@ void Backends::BackendManager::validateLikelihoodGradient() const {
   LogThrowIf(not _activeBackendPtr_->getCapabilities().supportsLikelihoodGradient,
              _activeBackendName_ << " does not support analytic likelihood gradients.");
   _activeBackendPtr_->validateLikelihoodGradient();
+  // The layout owns an immutable model snapshot. Structural validation is
+  // repeated on activation/rebuild, data updates or interface replacement.
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for backend gradients.");
-  _likelihoodInterfacePtr_->validateWeightGradient(false);
-  // Only producers need the original dial API to request Jacobian publication.
+  if( not _isGradientValidated_ ){ _likelihoodInterfacePtr_->validateWeightGradient(false); }
+  // Producer checks also request publication of the next Jacobian. They must
+  // run for every gradient propagation, even when the structure is validated.
   // Formula/composite derivatives are validated by the numerical backend.
   for( const auto& binding : _backendEngineLayout_->bindings.gradientDials ){
     if( binding.dial == nullptr ){ continue; }
     LogThrowIf(not binding.dial->hasAnalyticGradient(),
                "Backend gradient is unsupported for dial " << binding.dial->getDialTypeName());
   }
+  _isGradientValidated_ = true;
 }
 
 void Backends::BackendManager::evalGradient(ParameterGradient& gradient_) {

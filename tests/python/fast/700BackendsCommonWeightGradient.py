@@ -38,6 +38,25 @@ def check_threads(threads, backend_name):
                 for a, b in zip(check(engine, point), reference):
                     close(a, b)
 
+    if backend_name == 'CPU':
+        # Cached structural validation must be invalidated by a data update.
+        engine = build(config, False, False)
+        manager = engine.getBackendsManager()
+        manager.activate('CPU')
+        check(engine, [.4, 1., 1.], preserve_likelihood=False)
+        sample = engine.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList()[0]
+        sample.setUseDynamicBinning(True)
+        manager.updateDataHistograms()
+        try:
+            engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
+        except RuntimeError as error:
+            assert 'smoothing' in str(error).lower(), str(error)
+        else:
+            raise AssertionError('Data update retained stale gradient validation')
+        sample.setUseDynamicBinning(False)
+        manager.updateDataHistograms()
+        check(engine, [.4, 1., 1.], preserve_likelihood=False)
+
     least_squares = copy.deepcopy(config)
     least_squares['likelihoodInterfaceConfig']['jointProbabilityConfig'] = {'type': 'LeastSquares'}
     engine = build(least_squares, False, False)
