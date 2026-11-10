@@ -98,19 +98,25 @@ def main():
         for threads in (1, 4):
             GUNDAM.setNumberOfThreads(threads)
             for binned in (False, True):
-                engine = build(with_backend(config(path, script, binned, 'ok'), backend))
-                minimizer = engine.getMinimizer()
-                for point in ([.55, .3], [.55, .3], [.2, -.1]):
-                    # Initialization has already evaluated weights alone. The first
-                    # gradient call must recompute at this point with derivatives.
-                    analytic = minimizer.evalFitGradientAt(point)
-                    for index, actual in enumerate(analytic):
-                        up, down = list(point), list(point)
-                        up[index] += 1e-5
-                        down[index] -= 1e-5
-                        numeric = (minimizer.evalFit(up) - minimizer.evalFit(down)) / 2e-5
-                        assert math.isclose(actual, numeric, rel_tol=3e-5, abs_tol=3e-6), (actual, numeric)
-                del minimizer, engine
+                for smooth in (False, True):
+                    configuration = config(path, script, binned, 'ok')
+                    if smooth:
+                        dial = configuration['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['dialSetDefinitions'][0]
+                        dial.update(dialResponseLimits=[1.1, 1.5], enableResponseSmoothing=True,
+                                    dialResponseSmoothingWidth=.15)
+                    engine = build(with_backend(configuration, backend))
+                    minimizer = engine.getMinimizer()
+                    for point in ([.55, .3], [.55, .3], [.2, -.1]):
+                        # Initialization has already evaluated weights alone. The first
+                        # gradient call must recompute at this point with derivatives.
+                        analytic = minimizer.evalFitGradientAt(point)
+                        for index, actual in enumerate(analytic):
+                            up, down = list(point), list(point)
+                            up[index] += 1e-5
+                            down[index] -= 1e-5
+                            numeric = (minimizer.evalFit(up) - minimizer.evalFit(down)) / 2e-5
+                            assert math.isclose(actual, numeric, rel_tol=3e-5, abs_tol=3e-6), (actual, numeric)
+                    del minimizer, engine
         for mode in ('unsupported', 'partial', 'nonfinite', 'missingAck', 'staleAck'):
             for binned in (False, True):
                 try:

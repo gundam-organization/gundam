@@ -7,6 +7,7 @@
 #endif
 #include "GradientModel.h"
 #include "FormulaCompiler.h"
+#include "DialResponseSupervisor.h"
 #include "Semantics/BackendDeviceGradient.h"
 #include "Semantics/BackendDialGradient.h"
 #include "Bilinear.h"
@@ -62,6 +63,16 @@ namespace {
     sample.portableOptions.kind = LikelihoodKind::BarlowBeestonLiteGaussian;
     view.likelihood.samples.push_back(sample);
     return view;
+  }
+
+  void smoothLimits(BackendDialDescriptor& dial_, double minWidth_ = .1, double maxWidth_ = .15) {
+    auto& smoothing = dial_.smoothing;
+    smoothing.minResponse = dial_.minResponse; smoothing.maxResponse = dial_.maxResponse;
+    smoothing.minWidth = dial_.hasMinResponse ? minWidth_ : 0.;
+    smoothing.maxWidth = dial_.hasMaxResponse ? maxWidth_ : 0.;
+    smoothing.minInverseWidth = smoothing.minWidth > 0. ? .5/smoothing.minWidth : 0.;
+    smoothing.maxInverseWidth = smoothing.maxWidth > 0. ? .5/smoothing.maxWidth : 0.;
+    dial_.minResponse += smoothing.minWidth; dial_.maxResponse -= smoothing.maxWidth;
   }
 
   void compareGradient(Backend& backend_, const std::vector<double>& point_, double absoluteTolerance_ = 1e-14) {
@@ -132,9 +143,11 @@ TEST(CpuBackendGradient, SimpleDialDerivativesMatchResponsesAndMirrorClamps) {
       for( bool extrapolate : {false, true} ){
         dial.allowExtrapolation = extrapolate;
         for( double x : {-5.7, -2.5, -.27, .31, 1.61, 2.7, 5.3} ){
-          for( bool clamp : {false, true} ){
+          for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
             dial.hasMinResponse = dial.hasMaxResponse = clamp;
             dial.minResponse = .95; dial.maxResponse = 1.2;
+            dial.smoothing = {};
+            if( smooth ){ smoothLimits(dial); }
             auto eval = [&](double raw_){ return Semantics::evalDialResponse(dial, &input, item.second.data(), &raw_); };
             const double numeric = (eval(x+1e-6)-eval(x-1e-6))/2e-6;
             const double analytic = Semantics::evalWeightDialGradient(dial, input, item.second.data(), x);
@@ -152,14 +165,10 @@ TEST(CpuBackendGradient, SimpleDialDerivativesMatchResponsesAndMirrorClamps) {
   }
 }
 
-TEST(CpuBackendGradient, RejectsUnsupportedLikelihoodAndSmoothing) {
+TEST(CpuBackendGradient, RejectsUnsupportedLikelihood) {
   CpuBackend backend;
   auto view = gradientModel(1.);
   view.likelihood.samples[0].portableOptions.kind = LikelihoodKind::Poisson;
-  backend.build(view);
-  EXPECT_THROW(backend.validateLikelihoodGradient(), std::exception);
-  view.likelihood.samples[0].portableOptions.kind = LikelihoodKind::BarlowBeestonLiteGaussian;
-  view.propagation.dials[0].smoothing.minWidth = .1;
   backend.build(view);
   EXPECT_THROW(backend.validateLikelihoodGradient(), std::exception);
 
@@ -301,7 +310,7 @@ TEST(CpuBackendGradient, SurfaceInputsMatchFiniteDifferences) {
   Bicubic bicubic; bicubic.buildDial(histogram);
   for( bool cubic : {false, true} ) for( bool mirror : {false, true} )
   for( bool extrapolate : {false, true} ) for( bool shared : {false, true} )
-  for( bool clamp : {false, true} ){
+  for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
     SCOPED_TRACE(::testing::Message() << cubic << mirror << extrapolate << shared << clamp);
     auto view = gradientModel(1.);
     auto& model = view.propagation;
@@ -314,6 +323,7 @@ TEST(CpuBackendGradient, SurfaceInputsMatchFiniteDifferences) {
     dial.payloadSize = model.dialPayloads.size();
     dial.hasMinResponse = dial.hasMaxResponse = clamp;
     dial.minResponse = .95; dial.maxResponse = 1.2;
+    if( smooth ){ smoothLimits(dial); }
     model.dialInputs = {{0, mirror, -2., 4.}, {shared ? 0u : 1u, mirror, -2., 4.}};
     for( auto& index : model.eventDialIndices ){ index = 0; }
     CpuBackend backend;
@@ -325,13 +335,14 @@ TEST(CpuBackendGradient, SurfaceInputsMatchFiniteDifferences) {
 }
 
 TEST(CpuBackendGradient, CompositeBranchesAndFormulaNodes) {
-  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ){
+  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
     auto view = gradientModel(1.);
     auto& model = view.propagation;
     model.dials.resize(1);
     auto& root = model.dials[0];
     root.type = BackendDialType::Composite; root.inputCount = 2;
     root.hasMaxResponse = clamp; root.maxResponse = 1.4;
+    if( smooth ){ smoothLimits(root); }
     model.dialInputs = {{0, mirror, -2., 4.}, {1}};
     // source = p^2 + q; output = source*p + source. Repeated graph
     // edges and a direct root input must all contribute to the adjoint.
@@ -343,6 +354,7 @@ TEST(CpuBackendGradient, CompositeBranchesAndFormulaNodes) {
     first.dial.type = second.dial.type = BackendDialType::Formula;
     first.dial.inputCount = 2;
     first.dial.hasMinResponse = clamp; first.dial.minResponse = .5;
+    if( smooth ){ smoothLimits(first.dial); }
     second.dial.firstInput = 2; second.dial.inputCount = 3;
     second.dial.firstFormulaInput = 2; second.dial.formulaProgramIndex = 1;
     model.compositeInstructions = {first, second};
@@ -357,13 +369,14 @@ TEST(CpuBackendGradient, CompositeBranchesAndFormulaNodes) {
 
 TEST(CpuBackendGradient, ExternalAndTableSnapshotsMatchFiniteDifferences) {
   for( auto type : {BackendDialType::ExternalWeight, BackendDialType::Tabulated, BackendDialType::Kriged} )
-  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ){
+  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
     auto view = gradientModel(1.);
     auto& model = view.propagation;
     model.dials.resize(1);
     auto& dial = model.dials[0];
     dial.type = type; dial.inputCount = 2;
     dial.hasMinResponse = dial.hasMaxResponse = clamp; dial.minResponse = .95; dial.maxResponse = 1.3;
+    if( smooth ){ smoothLimits(dial); }
     model.dialInputs = {{0, mirror, -2., 4.}, {1}};
     model.externalWeightBlocks = {{0, 2}};
     model.tableTerms = {{0, .25}, {1, .75}}; dial.tableTermCount = 2;
@@ -434,7 +447,7 @@ TEST(CpuBackendGradient, CompositeFormulaOperationsMatchFiniteDifferences) {
 }
 
 TEST(CpuBackendGradient, StandaloneFormulaBindingsMirrorsAndResponseLimits) {
-  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ){
+  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
     auto view = gradientModel(1.);
     auto& model = view.propagation;
     model.dials.resize(1);
@@ -443,6 +456,7 @@ TEST(CpuBackendGradient, StandaloneFormulaBindingsMirrorsAndResponseLimits) {
     dial.inputCount = 3;
     dial.hasMinResponse = dial.hasMaxResponse = clamp;
     dial.minResponse = 1.05; dial.maxResponse = 1.15;
+    if( smooth ){ smoothLimits(dial, .02, .03); }
     model.dialInputs = {{1, mirror, -2., 4.}, {0}, {1}};
     model.formulaPrograms = {FormulaCompiler::compile("1+.1*[a]+.02*[b]^2+.03*[repeated]+.001*[event]",
                                                      {"event", "b", "a", "repeated"})};
@@ -458,5 +472,30 @@ TEST(CpuBackendGradient, StandaloneFormulaBindingsMirrorsAndResponseLimits) {
     model.formulaInputs = {{-1, 7.}};
     backend.build(view);
     compareGradient(backend, {.31, .73}, 2e-7);
+  }
+}
+
+TEST(CpuBackendGradient, ResponseSmoothingMatchesSupervisorAtTransitionBoundaries) {
+  for( double minWidth : {0., .1} ) for( double maxWidth : {0., .2} ){
+    DialResponseSupervisor supervisor;
+    if( minWidth > 0. ){ supervisor.setMinResponse(.5); }
+    if( maxWidth > 0. ){ supervisor.setMaxResponse(1.5); }
+    if( minWidth > 0. or maxWidth > 0. ){ supervisor.setSmoothingWidths(minWidth, maxWidth); }
+    supervisor.setMinResponse(.5); supervisor.setMaxResponse(1.5);
+    BackendDialDescriptor dial;
+    dial.inputCount = 1;
+    dial.hasMinResponse = dial.hasMaxResponse = true;
+    dial.minResponse = .5; dial.maxResponse = 1.5;
+    smoothLimits(dial, minWidth, maxWidth);
+    BackendDialInputDescriptor input{0};
+    for( double x : {.3, .4, .45, .5, .55, .6, .8, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8} ){
+      SCOPED_TRACE(::testing::Message() << minWidth << ", " << maxWidth << ", " << x);
+      const double actual = Semantics::evalWeightDialGradient(dial, input, nullptr, x);
+      EXPECT_NEAR(actual, supervisor.evalDerivative(x), 1e-14);
+      const double h = 1e-6;
+      if( (minWidth == 0. and x == .5) or (maxWidth == 0. and x == 1.5) ){ continue; }
+      const double up = Semantics::clampDialResponse(dial, x+h), down = Semantics::clampDialResponse(dial, x-h);
+      EXPECT_NEAR(actual, (up-down)/(2*h), 1e-8);
+    }
   }
 }

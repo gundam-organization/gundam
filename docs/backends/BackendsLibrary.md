@@ -299,7 +299,7 @@ These statuses describe the code, not a new validation run on each device.
 | `Bilinear`, `Bicubic` | ✅ | ❌ | ❌ | CPU differentiates both inputs, including shared parameters, mirroring and clamps. |
 | `RootGraph`, `RootSpline` | ❌ | ❌ | ❌ | Original-engine support does not extend to the backend gradient path. |
 | `Formula` (`RootFormula`, `EventFormula`) | ✅ | ❌ | ❌ | CPU differentiates compiled bytecode, including named inputs, bound event constants, mirrors and response limits; no ROOT/Clad gradient generation. |
-| `CompositeDial` | ✅ | ❌ | ❌ | CPU differentiates compiled graphs, including formula nodes, surfaces, branches and nested composites. Response smoothing remains unsupported. |
+| `CompositeDial` | ✅ | ❌ | ❌ | CPU differentiates compiled graphs, including formula nodes, surfaces, branches and nested composites. |
 | `Polynomial` | ❌ | ❌ | ❌ | No backend gradient implementation. |
 | `Tabulated`, `Kriged` | ✅️ | ❌ | ❌ | CPU consumes producer Jacobians; requires a configured `gradientFunction`. |
 | `ExternalWeightDispatcher` | ✅️ | ❌ | ❌ | CPU consumes current worker gradients; the worker must support the gradient protocol. |
@@ -307,8 +307,15 @@ These statuses describe the code, not a new validation run on each device.
 | Weight products | ✅ | ✅ | ✅ | Handles zero responses and repeated parameter occurrences without division. |
 | Parameter mirroring | ⚠️ | ⚠️ | ⚠️ | Requires a positive finite mirror range; piecewise derivative conventions. |
 | Extrapolation and hard response limits | ✅ | ✅ | ✅ | Piecewise conventions at knots and limits. |
-| Response smoothing | ❌ | ❌ | ❌ | Rejected even though value propagation supports it. |
+| Response smoothing | ✅ | ❌ | ❌ | CPU applies the response-transition derivative to every supported dial, composite node and composite output. MPS/CUDA still reject it. |
 | Global event reweight cap | ✅ | ✅ | ✅ | Weight derivative is zero above the cap. |
+
+CPU response smoothing uses the same transition thresholds and widths as value
+propagation. Within each transition the local derivative is multiplied by
+`t²(3 − 2t)`; it is zero beyond the outer edge and one on the identity side.
+Hard limits retain their existing piecewise conventions when widths are zero.
+This applies to formula and surface derivatives, producer Jacobians, and every
+level of nested composites. Histogram/bin smoothing remains unsupported.
 
 CPU Formula gradients apply the chain rule directly to compiled bytecode,
 for standalone dials and composite nodes. All supported formula opcodes have

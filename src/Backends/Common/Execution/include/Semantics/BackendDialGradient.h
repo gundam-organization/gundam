@@ -4,8 +4,26 @@
 #include "Semantics/BackendDialSemanticsCore.h"
 
 namespace Backends::Semantics {
-  // Single parameter weight dials only. Callers validate the dial type and
-  // reject response smoothing before invoking this portable derivative.
+  // Derivative of the response supervisor with respect to the raw response.
+  // Thresholds and widths are the same precomputed values used by propagation.
+  GUNDAM_BACKEND_HOST_DEVICE inline double dialResponseSlope(
+      const BackendDialDescriptor& dial_, double response_) {
+    if( response_ != response_ ){ return response_; }
+    const auto& smoothing = dial_.smoothing;
+    double t;
+    if( dial_.hasMinResponse and response_ < dial_.minResponse ){
+      if( smoothing.minWidth == 0. or response_ <= smoothing.minResponse - smoothing.minWidth ){ return 0.; }
+      t = .5 + (response_ - smoothing.minResponse) * smoothing.minInverseWidth;
+    }
+    else if( dial_.hasMaxResponse and response_ > dial_.maxResponse ){
+      if( smoothing.maxWidth == 0. or response_ >= smoothing.maxResponse + smoothing.maxWidth ){ return 0.; }
+      t = .5 + (smoothing.maxResponse - response_) * smoothing.maxInverseWidth;
+    }
+    else{ return 1.; }
+    return t * t * (3. - 2. * t);
+  }
+
+  // Single parameter weight dials only. Callers validate the dial type.
   GUNDAM_BACKEND_HOST_DEVICE inline double evalWeightDialGradient(
       const BackendDialDescriptor& dial_, const BackendDialInputDescriptor& input_,
       const double* payload_, double rawInput_) {
@@ -49,9 +67,8 @@ namespace Backends::Semantics {
     unclamped.hasMinResponse = false;
     unclamped.hasMaxResponse = false;
     const double response = evalDialResponseFromInput(unclamped, x, payload_);
-    if( (dial_.hasMinResponse and response < dial_.minResponse)
-        or (dial_.hasMaxResponse and response > dial_.maxResponse) ){ return 0.; }
-    return derivative * inputGradient;
+    const double slope = dialResponseSlope(dial_, response);
+    return slope == 0. ? 0. : derivative * inputGradient * slope;
   }
 }
 #endif

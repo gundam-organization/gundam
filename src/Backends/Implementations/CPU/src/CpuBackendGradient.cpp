@@ -175,10 +175,8 @@ namespace {
         result.slopes[0] = Semantics::evalWeightDialGradient(local, inputs_[0], payload, parameters_[inputs_[0].parameterIndex]);
       }
     }
-    if( (dial_.hasMinResponse and result.value < dial_.minResponse)
-        or (dial_.hasMaxResponse and result.value > dial_.maxResponse) ){
-      std::fill(result.slopes.begin(), result.slopes.end(), 0.);
-    }
+    const double responseSlope = Semantics::dialResponseSlope(dial_, result.value);
+    for( auto& slope : result.slopes ){ slope = responseSlope == 0. ? 0. : slope * responseSlope; }
     result.value = Semantics::clampDialResponse(dial_, result.value);
     return result;
   }
@@ -199,9 +197,7 @@ namespace {
       values[program.inputCount+i] = nodes.back().value;
     }
     const double raw = values.at(program.outputSlot);
-    if( not ((root_.hasMinResponse and raw < root_.minResponse) or (root_.hasMaxResponse and raw > root_.maxResponse)) ){
-      adjoints[program.outputSlot] = 1.;
-    }
+    adjoints[program.outputSlot] = Semantics::dialResponseSlope(root_, raw);
     for( std::size_t i = program.instructionCount; i-- > 0; ){
       const auto& dial = model_.compositeInstructions[program.firstInstruction+i].dial;
       const double scale = adjoints[program.inputCount+i];
@@ -254,8 +250,6 @@ void Backends::CpuBackend::validateLikelihoodGradient() const {
       case BackendDialType::Shift: break;
       default: LogThrow("Unsupported CPU backend gradient dial: " << static_cast<unsigned>(dial.type));
     }
-    LogThrowIf(dial.smoothing.minWidth != 0. or dial.smoothing.maxWidth != 0.,
-               "CPU backend gradients do not yet support response smoothing.");
     for( std::size_t i = 0; i < dial.inputCount; ++i ){
       const auto& input = model.dialInputs.at(dial.firstInput + i);
       LogThrowIf(input.source != DialInputSource::Parameter or input.parameterIndex >= model.parameterCount,
@@ -266,8 +260,6 @@ void Backends::CpuBackend::validateLikelihoodGradient() const {
   }
   for( const auto& instruction : model.compositeInstructions ){
     const auto& dial = instruction.dial;
-    LogThrowIf(dial.smoothing.minWidth != 0. or dial.smoothing.maxWidth != 0.,
-               "CPU composite gradients do not support response smoothing.");
     for( std::size_t i = 0; i < dial.inputCount; ++i ){
       const auto& input = model.compositeInputs.at(dial.firstInput+i);
       LogThrowIf(input.useMirror and (not std::isfinite(input.mirrorRange) or input.mirrorRange <= 0.),
@@ -308,13 +300,13 @@ std::vector<double> Backends::CpuBackend::getLikelihoodGradient(const Propagatio
                  or _externalDialGradients_[i].size() != dial.inputCount,
                  "CPU external/table gradient is missing or has invalid dimensions; publish it with propagation.");
       derivatives[i] = _externalDialGradients_[i];
-      const bool clamped = (dial.hasMinResponse and responses[i] < dial.minResponse)
-          or (dial.hasMaxResponse and responses[i] > dial.maxResponse);
+      const double responseSlope = Semantics::dialResponseSlope(dial, responses[i]);
       responses[i] = Semantics::clampDialResponse(dial, responses[i]);
       for( std::size_t j = 0; j < dial.inputCount; ++j ){
         LogThrowIf(not std::isfinite(derivatives[i][j]), "Non-finite CPU external/table derivative.");
         const auto& input = model.dialInputs[dial.firstInput+j];
-        derivatives[i][j] *= clamped ? 0. : mirrorSlope(input, _lastParameterValues_[input.parameterIndex]);
+        derivatives[i][j] = responseSlope == 0. ? 0. : derivatives[i][j] * responseSlope
+            * mirrorSlope(input, _lastParameterValues_[input.parameterIndex]);
       }
     }
     else {

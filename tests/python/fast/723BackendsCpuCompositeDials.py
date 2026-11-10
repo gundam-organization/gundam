@@ -140,6 +140,18 @@ def main():
             nested = helpers.composite([source, surface, formula], 'output')
             nested['name'] = 'nested'
             compare_gradient(path, helpers.composite([nested], 'nested'))
+        smooth_source = dict(name='source', dialType='Norm', dialInputList=[p],
+                             dialResponseLimits=[.3, .7], enableResponseSmoothing=True,
+                             dialResponseSmoothingWidth=.1)
+        smooth_output = helpers.formula('output', '[arg0]^2+.01*[arg1]', upstream, q,
+                                        dialResponseLimits=[.1, .5], enableResponseSmoothing=True,
+                                        dialResponseSmoothingWidth=.05)
+        smooth_nested = helpers.composite([smooth_source, smooth_output], 'output',
+                                           dialResponseLimits=[.1, .4], enableResponseSmoothing=True,
+                                           dialResponseSmoothingWidth=.05)
+        smooth_nested['name'] = 'nested'
+        compare_gradient(path, helpers.composite([smooth_nested], 'nested',
+            dialResponseLimits=[.1, .4], enableResponseSmoothing=True, dialResponseSmoothingWidth=.03))
         standalone = helpers.formula('standalone',
             '1+.1*sin([arg0])+.02*[arg1]^2+.001*[arg2]+.01*floor([arg0])',
             q, p, event, useMirrorDial=True, mirrorLowEdge=-1., mirrorHighEdge=2.,
