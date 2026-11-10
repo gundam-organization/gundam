@@ -258,7 +258,7 @@ TEST_F(RootMinimizerSimplex, BackendDataUpdatesPreserveModelAndInvalidateDeferre
     engine.evaluateLikelihood();
     EXPECT_NEAR(likelihood.getLastLikelihood(), reference, 1.e-12);
   }
-  EXPECT_THROW(pending.get(), std::exception);
+  EXPECT_THROW(static_cast<void>(pending.get()), std::exception);
   dataBins.push_back({});
   EXPECT_THROW(manager.updateDataHistograms(), std::exception);
   dataBins.pop_back();
