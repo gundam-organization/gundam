@@ -409,13 +409,13 @@ TEST(CpuBackendGradient, ExternalAndTableSnapshotsMatchFiniteDifferences) {
     publish({.31, .27});
     inputs.externalDialGradients.clear();
     auto token = backend.requestPropagation(inputs);
-    EXPECT_THROW(backend.getLikelihoodGradient(token), std::exception);
+    EXPECT_THROW(static_cast<void>(backend.getLikelihoodGradient(token)), std::exception);
     inputs.externalDialGradients = {{1.}};
     token = backend.requestPropagation(inputs);
-    EXPECT_THROW(backend.getLikelihoodGradient(token), std::exception);
+    EXPECT_THROW(static_cast<void>(backend.getLikelihoodGradient(token)), std::exception);
     inputs.externalDialGradients = {{NAN, 1.}};
     token = backend.requestPropagation(inputs);
-    EXPECT_THROW(backend.getLikelihoodGradient(token), std::exception);
+    EXPECT_THROW(static_cast<void>(backend.getLikelihoodGradient(token)), std::exception);
   }
 }
 

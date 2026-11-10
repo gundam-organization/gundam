@@ -782,3 +782,11 @@ The selected CUDA device must be a V100 unless `--allow-other-gpu` is supplied.
 include the provided `763BackendsCudaV100LikelihoodBenchmark.sbatch` job template.
 These are preliminary CUDA policies inspired by MPS; V100 performance must be
 measured rather than inferred from Metal results.
+
+## Gradient performance with existing configurations
+
+[`GradientPerformance.py`](GradientPerformance.py) accepts `-c/-of/-t/-a`, compares
+the original engine with CPU in isolated processes, checks their gradients and
+records varying/unchanged callback timings. A separate native sampling pass
+identifies expensive C++ functions without instrumenting the timing trials.
+See [usage, upgrade inputs command and output interpretation](GradientPerformance.md).

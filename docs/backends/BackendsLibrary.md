@@ -410,6 +410,13 @@ execution, normalized/eigen coordinates, zero/repeated multipliers, weight caps,
 ignored bins, multidimensional geometry and outside support, plus rejection of
 unsmoothed moving axes and backend activation/deactivation.
 
+For performance measurements on existing configurations,
+[`GradientPerformance.py`](../../tests/python/benchmarks/GradientPerformance.py)
+accepts fitter-style `-c/-of/-t/-a` options and compares original/CPU callbacks.
+It records varying/unchanged workloads, propagation stage clocks, numerical
+comparisons and separate native gradient profiles. See
+[usage and measurement scope](../../tests/python/benchmarks/GradientPerformance.md).
+
 The restrictions above are enforced in
 [`CpuBackendGradient.cpp`](../../src/Backends/Implementations/CPU/src/CpuBackendGradient.cpp)
 and the shared device
