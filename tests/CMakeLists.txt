@@ -118,6 +118,20 @@ if( WITH_GOOGLE_TEST )
   include(GoogleTest)
   cmessage( STATUS "Compiling google tests" )
 
+  # ROOT does not consistently expose an R__HAS_CLAD preprocessor macro.
+  # Query the installed ROOT build rather than silently skipping gradient tests.
+  execute_process(COMMAND ${ROOT_config_CMD} --has-clad
+    RESULT_VARIABLE rootCladResult
+    OUTPUT_VARIABLE rootHasClad
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT rootCladResult EQUAL 0 OR NOT rootHasClad MATCHES "^(yes|no)$")
+    cmessage(FATAL_ERROR "Cannot determine Clad support using root-config --has-clad")
+  endif()
+  add_library(gundamTestFeatures INTERFACE)
+  if(rootHasClad STREQUAL "yes")
+    target_compile_definitions(gundamTestFeatures INTERFACE GUNDAM_TEST_HAS_CLAD=1)
+  endif()
+
   function(gundam_discover_tests target_ category_)
     if(APPLE)
       # DYLD_LIBRARY_PATH overrides even the build RPATHs and can load an older
@@ -192,7 +206,7 @@ if( WITH_GOOGLE_TEST )
     if(unit${unitCategory}Sources)
       set(unitTarget "gundamGTest_${unitCategory}.exe")
       add_executable(${unitTarget} ${unit${unitCategory}Sources})
-      target_link_libraries(${unitTarget} PRIVATE GTest::gtest_main GundamFitter)
+      target_link_libraries(${unitTarget} PRIVATE GTest::gtest_main GundamFitter gundamTestFeatures)
       if(WITH_FAST_TEST)
         gundam_discover_tests(${unitTarget} ${unitCategory}
           TEST_PREFIX "${unitCategory}/"

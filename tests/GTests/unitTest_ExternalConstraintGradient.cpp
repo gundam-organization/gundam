@@ -31,7 +31,7 @@ namespace {
 }
 
 TEST(ExternalConstraintGradient, NonlinearFormulaRepeatedAliasesSubsetsAndParameterFlags){
-#ifndef R__HAS_CLAD
+#ifndef GUNDAM_TEST_HAS_CLAD
   GTEST_SKIP() << "ROOT was built without Clad";
 #endif
   ParametersManager manager;
@@ -69,7 +69,7 @@ TEST(ExternalConstraintGradient, NonlinearFormulaRepeatedAliasesSubsetsAndParame
 }
 
 TEST(ExternalConstraintGradient, MultipleMeasurementsDisabledAndConstantConstraints){
-#ifndef R__HAS_CLAD
+#ifndef GUNDAM_TEST_HAS_CLAD
   GTEST_SKIP() << "ROOT was built without Clad";
 #endif
   ParametersManager manager;
@@ -100,7 +100,7 @@ TEST(ExternalConstraintGradient, MultipleMeasurementsDisabledAndConstantConstrai
 }
 
 TEST(ExternalConstraintGradient, RejectsUnsupportedGenerationAndNonFiniteDerivatives){
-#ifndef R__HAS_CLAD
+#ifndef GUNDAM_TEST_HAS_CLAD
   GTEST_SKIP() << "ROOT was built without Clad";
 #endif
   ParametersManager manager;

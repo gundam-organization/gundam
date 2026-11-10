@@ -78,7 +78,7 @@ TEST(FormulaEvaluator, InvalidBindingsAndReconfiguration){
 
 
 TEST(FormulaEvaluator, AnalyticGradientReorderedInputsAndConstants){
-#ifndef R__HAS_CLAD
+#ifndef GUNDAM_TEST_HAS_CLAD
   GTEST_SKIP() << "ROOT was built without Clad";
 #endif
   FormulaEvaluator evaluator;
@@ -104,7 +104,7 @@ TEST(FormulaEvaluator, AnalyticGradientReorderedInputsAndConstants){
 }
 
 TEST(FormulaEvaluator, AnalyticGradientConcurrentCopiesAndReconfiguration){
-#ifndef R__HAS_CLAD
+#ifndef GUNDAM_TEST_HAS_CLAD
   GTEST_SKIP() << "ROOT was built without Clad";
 #endif
   FormulaEvaluator evaluator;
@@ -138,7 +138,7 @@ TEST(FormulaEvaluator, AnalyticGradientConcurrentCopiesAndReconfiguration){
 }
 
 TEST(FormulaEvaluator, AnalyticGradientConstantAndInvalidInputs){
-#ifndef R__HAS_CLAD
+#ifndef GUNDAM_TEST_HAS_CLAD
   GTEST_SKIP() << "ROOT was built without Clad";
 #endif
   FormulaEvaluator evaluator;
