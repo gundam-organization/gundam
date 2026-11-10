@@ -18,7 +18,10 @@
 #include "TMatrixD.h"
 #include "TMatrixDSym.h"
 
+#include <functional>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 
@@ -141,10 +144,8 @@ private:
       std::string name{};
       std::function<double(const RootMinimizer* this_)> getValueFct{};
 
-      ValueDefinition(const std::string& name_, const std::function<double(const RootMinimizer* this_)>& getValueFct_){
-        name = name_;
-        getValueFct = getValueFct_;
-      }
+      ValueDefinition(std::string name_, std::function<double(const RootMinimizer* this_)> getValueFct_)
+        : name(std::move(name_)), getValueFct(std::move(getValueFct_)) {}
     };
     std::vector<ValueDefinition> valueDefinitionList{};
 
