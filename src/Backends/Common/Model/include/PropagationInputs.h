@@ -19,6 +19,9 @@ namespace Backends {
   // requestPropagation returns. Producers must not write during that call.
   struct PropagationInputs {
     ParameterSnapshot parameters{};
+    // Optional per-dial Jacobians for external/table producers, with respect
+    // to their transformed inputs. Copied by CPU before returning the token.
+    std::vector<std::vector<double>> externalDialGradients{};
     std::vector<ExternalWeightBlockView> externalWeights{};
     // Optional host edits to explicitly dynamic observables, in model order.
     // Empty keeps the state resident in the backend.

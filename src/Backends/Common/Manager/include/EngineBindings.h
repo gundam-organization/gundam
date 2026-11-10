@@ -6,6 +6,7 @@
 #include <memory>
 
 class ExternalWeightBuffer;
+class DialBase;
 class DialInputBuffer;
 class Event;
 class Histogram;
@@ -52,6 +53,11 @@ namespace Backends {
     std::vector<SampleBinding> samples{};
     std::vector<ParameterBinding> parameters{};
     std::vector<ExternalWeightBinding> externalWeights{};
+    struct GradientBinding {
+      const DialBase* dial{nullptr};
+      const DialInputBuffer* inputs{nullptr};
+    };
+    std::vector<GradientBinding> gradientDials{};
 
     void clear();
     void build(LikelihoodInterface& likelihoodInterface_);

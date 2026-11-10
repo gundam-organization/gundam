@@ -169,6 +169,8 @@ ENUM_FIELD( Indexed )
     std::vector<std::vector<std::uint32_t>> _cachedInputGroupsByParameter_{};
     CpuInputEvaluation _inputEvaluation_{CpuInputEvaluation::Shared};
     std::vector<double> _lastParameterValues_{};
+    std::vector<double> _externalGradientResponses_{};
+    std::vector<std::vector<double>> _externalDialGradients_{};
     std::vector<std::uint8_t> _isCachedDial_{};
     std::vector<std::uint8_t> _isCachedDialResponseValid_{};
     bool _isDialResponseCachePrimed_{false};

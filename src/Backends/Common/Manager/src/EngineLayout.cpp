@@ -438,6 +438,9 @@ namespace {
         dialRef.payloadSize = propagation.dialPayloads.size() - dialRef.payloadOffset;
         const auto dialIndex = std::uint32_t(propagation.dials.size());
         propagation.dials.emplace_back(dialRef);
+        const bool externalGradient = dialRef.type == Backends::BackendDialType::ExternalWeight
+            or Backends::isTableDial(dialRef.type);
+        bindings_.gradientDials.push_back({externalGradient ? dialBase : nullptr, inputBuffer});
         cachedDialIt->second = dialIndex;
         allDialIndices.emplace_back(dialIndex);
 

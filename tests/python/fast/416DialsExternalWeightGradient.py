@@ -88,38 +88,45 @@ def main():
         tree = output.mktree('events', {'X': 'float64'})
         tree.extend({'X': np.array([.1, .2, .6, .8])})
     GUNDAM.setLightOutputMode(True)
-    for threads in (1, 4):
-        GUNDAM.setNumberOfThreads(threads)
-        for binned in (False, True):
-            engine = build(config(path, script, binned, 'ok'))
-            minimizer = engine.getMinimizer()
-            for point in ([.55, .3], [.55, .3], [.2, -.1]):
-                # Initialization has already evaluated weights alone. The first
-                # gradient call must recompute at this point with derivatives.
-                analytic = minimizer.evalFitGradientAt(point)
-                for index, actual in enumerate(analytic):
-                    up, down = list(point), list(point)
-                    up[index] += 1e-5
-                    down[index] -= 1e-5
-                    numeric = (minimizer.evalFit(up) - minimizer.evalFit(down)) / 2e-5
-                    assert math.isclose(actual, numeric, rel_tol=3e-5, abs_tol=3e-6), (actual, numeric)
-            del minimizer, engine
-    for mode in ('unsupported', 'partial', 'nonfinite', 'missingAck', 'staleAck'):
-        for binned in (False, True):
-            try:
-                engine = build(config(path, script, binned, mode))
-                engine.getMinimizer().evalFitGradientAt([.55, .3])
-            except RuntimeError as error:
-                expected = {
-                    'unsupported': 'unsupported',
-                    'partial': 'missing/non-finite gradient',
-                    'nonfinite': 'missing/non-finite gradient',
-                    'missingAck': 'gradientGeneration',
-                    'staleAck': 'gradientGeneration',
-                }[mode]
-                assert expected.lower() in str(error).lower(), (mode, str(error))
-            else:
-                raise AssertionError('Invalid external gradient accepted: ' + mode)
+    def with_backend(configuration, backend):
+        if backend:
+            configuration['likelihoodInterfaceConfig']['backendManagerConfig'] = {
+                'isEnabled': True, 'useBackend': backend}
+        return configuration
+
+    for backend in (None, 'CPU'):
+        for threads in (1, 4):
+            GUNDAM.setNumberOfThreads(threads)
+            for binned in (False, True):
+                engine = build(with_backend(config(path, script, binned, 'ok'), backend))
+                minimizer = engine.getMinimizer()
+                for point in ([.55, .3], [.55, .3], [.2, -.1]):
+                    # Initialization has already evaluated weights alone. The first
+                    # gradient call must recompute at this point with derivatives.
+                    analytic = minimizer.evalFitGradientAt(point)
+                    for index, actual in enumerate(analytic):
+                        up, down = list(point), list(point)
+                        up[index] += 1e-5
+                        down[index] -= 1e-5
+                        numeric = (minimizer.evalFit(up) - minimizer.evalFit(down)) / 2e-5
+                        assert math.isclose(actual, numeric, rel_tol=3e-5, abs_tol=3e-6), (actual, numeric)
+                del minimizer, engine
+        for mode in ('unsupported', 'partial', 'nonfinite', 'missingAck', 'staleAck'):
+            for binned in (False, True):
+                try:
+                    engine = build(with_backend(config(path, script, binned, mode), backend))
+                    engine.getMinimizer().evalFitGradientAt([.55, .3])
+                except RuntimeError as error:
+                    expected = {
+                        'unsupported': 'unsupported',
+                        'partial': 'missing/non-finite gradient',
+                        'nonfinite': 'missing/non-finite gradient',
+                        'missingAck': 'gradientGeneration',
+                        'staleAck': 'gradientGeneration',
+                    }[mode]
+                    assert expected.lower() in str(error).lower(), (mode, str(error))
+                else:
+                    raise AssertionError('Invalid external gradient accepted: ' + mode)
     print('SUCCESS: external event/bin gradients match finite differences and invalid workers fail.')
     return 0
 

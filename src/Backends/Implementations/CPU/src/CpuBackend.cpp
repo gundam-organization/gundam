@@ -133,6 +133,16 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   const auto& model = _engineView_->propagation;
   const auto& likelihoodModel = _engineView_->likelihood;
   inputs_.validate(model);
+  _externalDialGradients_ = inputs_.externalDialGradients;
+  _externalGradientResponses_.assign(model.dials.size(), 0.);
+  for( std::size_t i = 0; i < model.dials.size(); ++i ){
+    const auto& dial = model.dials[i];
+    if( not _externalDialGradients_.empty() and (dial.type == BackendDialType::ExternalWeight or isTableDial(dial.type)) ){
+      auto unclamped = dial;
+      unclamped.hasMinResponse = unclamped.hasMaxResponse = false;
+      _externalGradientResponses_[i] = Semantics::evalDialResponse(model, unclamped, inputs_);
+    }
+  }
 
   if( _profiler_ ){
     _profiler_->begin(_timingTotals_.propagationCount + 1, inputs_.parameters.values,

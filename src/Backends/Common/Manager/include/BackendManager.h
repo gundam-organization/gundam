@@ -54,7 +54,7 @@ namespace Backends {
     void setMaterializeOutputList(std::initializer_list<OutputRequest> materializeOutputList_);
     void materialize(OutputRequest outputRequest_);
     void updateDataHistograms();
-    std::future<BackendPropagationResult> propagate();
+    std::future<BackendPropagationResult> propagate(bool withGradients_ = false);
     void validateLikelihoodGradient() const;
     void evalGradient(ParameterGradient& gradient_);
     [[nodiscard]] std::string getActiveBackendName() const;

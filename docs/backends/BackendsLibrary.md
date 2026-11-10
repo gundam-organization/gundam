@@ -299,10 +299,10 @@ These statuses describe the code, not a new validation run on each device.
 | `Bilinear`, `Bicubic` | ✅ | ❌ | ❌ | CPU differentiates both inputs, including shared parameters, mirroring and clamps. |
 | `RootGraph`, `RootSpline` | ❌ | ❌ | ❌ | Original-engine support does not extend to the backend gradient path. |
 | `Formula` (`RootFormula`, `EventFormula`) | ❌ | ❌ | ❌ | Formula-program derivatives remain to be implemented. |
-| `CompositeDial` | ❌ | ❌ | ❌ | Composite-program derivative propagation remains to be implemented. |
+| `CompositeDial` | ✅ | ❌ | ❌ | CPU differentiates compiled graphs, including formula nodes, surfaces, branches and nested composites. Response smoothing remains unsupported. |
 | `Polynomial` | ❌ | ❌ | ❌ | No backend gradient implementation. |
-| `Tabulated`, `Kriged` | ❌ | ❌ | ❌ | Table Jacobians are not consumed by backend gradient evaluation. |
-| `ExternalWeightDispatcher` | ❌ | ❌ | ❌ | Worker gradient buffers are not consumed by backend gradient evaluation. |
+| `Tabulated`, `Kriged` | ✅️ | ❌ | ❌ | CPU consumes producer Jacobians; requires a configured `gradientFunction`. |
+| `ExternalWeightDispatcher` | ✅️ | ❌ | ❌ | CPU consumes current worker gradients; the worker must support the gradient protocol. |
 | `CompiledLibDial` | ❌ | ❌ | ❌ | No backend gradient implementation. |
 | Weight products | ✅ | ✅ | ✅ | Handles zero responses and repeated parameter occurrences without division. |
 | Parameter mirroring | ⚠️ | ⚠️ | ⚠️ | Requires a positive finite mirror range; piecewise derivative conventions. |

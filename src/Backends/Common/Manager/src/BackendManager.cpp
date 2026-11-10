@@ -397,7 +397,7 @@ void Backends::BackendManager::replaceBackend(const std::string& type_, const Co
   activate(type_, backendConfig_);
 }
 
-std::future<Backends::BackendPropagationResult> Backends::BackendManager::propagate() {
+std::future<Backends::BackendPropagationResult> Backends::BackendManager::propagate(bool withGradients_) {
   LogThrowIf(not hasBackend(), "No backend initialized.");
 
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for backend propagation.");
@@ -428,6 +428,15 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
     }
   }
   const auto& model = _backendEngineLayout_->view.propagation;
+  if( withGradients_ ){
+    inputs.externalDialGradients.resize(model.dials.size());
+    for( std::size_t i = 0; i < model.dials.size(); ++i ){
+      const auto& binding = _backendEngineLayout_->bindings.gradientDials.at(i);
+      if( binding.dial == nullptr ){ continue; }
+      LogThrowIf(binding.inputs == nullptr, "Missing external gradient input buffer.");
+      inputs.externalDialGradients[i] = binding.dial->evalGradients(*binding.inputs);
+    }
+  }
   inputs.forceBinningUpdate = *_hostBinningChanged_;
   inputs.variableInputRevisions.reserve(_backendEngineLayout_->bindings.variableInputBuffers.size());
   for( const auto* buffer : _backendEngineLayout_->bindings.variableInputBuffers ){
@@ -497,7 +506,7 @@ void Backends::BackendManager::evalGradient(ParameterGradient& gradient_) {
   likelihood.validateWeightGradient();
 
   // Refresh the backend snapshot/token even when no value callback preceded us.
-  auto propagation = propagate();
+  auto propagation = propagate(true);
   LogThrowIf(not propagation.valid(), "Backend gradient propagation is unavailable.");
   const auto result = propagation.get();
   LogThrowIf(not result.isValid, "Backend gradient propagation failed.");

@@ -6,6 +6,7 @@
 #include "CudaBackend.h"
 #endif
 #include "GradientModel.h"
+#include "FormulaCompiler.h"
 #include "Semantics/BackendDeviceGradient.h"
 #include "Semantics/BackendDialGradient.h"
 #include "Bilinear.h"
@@ -320,5 +321,114 @@ TEST(CpuBackendGradient, SurfaceInputsMatchFiniteDifferences) {
     for( const auto& point : {std::vector<double>{.31, -.27}, {-3.1, .31}, {.31, 5.37}, {6.3, -6.7}} ){
       compareGradient(backend, point, 2e-7);
     }
+  }
+}
+
+TEST(CpuBackendGradient, CompositeBranchesAndFormulaNodes) {
+  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ){
+    auto view = gradientModel(1.);
+    auto& model = view.propagation;
+    model.dials.resize(1);
+    auto& root = model.dials[0];
+    root.type = BackendDialType::Composite; root.inputCount = 2;
+    root.hasMaxResponse = clamp; root.maxResponse = 1.4;
+    model.dialInputs = {{0, mirror, -2., 4.}, {1}};
+    // source = p^2 + q; output = source*p + source. Repeated graph
+    // edges and a direct root input must all contribute to the adjoint.
+    model.formulaPrograms = {FormulaCompiler::compile("[p]^2+[q]", {"p", "q"}),
+                            FormulaCompiler::compile("[a]*[p]+[b]", {"a", "p", "b"})};
+    model.formulaInputs = {{0}, {1}, {0}, {1}, {2}};
+    model.compositeInputs = {{0, mirror, -2., 4.}, {1}, {2}, {0}, {2}};
+    CompositeInstruction first, second;
+    first.dial.type = second.dial.type = BackendDialType::Formula;
+    first.dial.inputCount = 2;
+    first.dial.hasMinResponse = clamp; first.dial.minResponse = .5;
+    second.dial.firstInput = 2; second.dial.inputCount = 3;
+    second.dial.firstFormulaInput = 2; second.dial.formulaProgramIndex = 1;
+    model.compositeInstructions = {first, second};
+    model.compositePrograms = {{0, 2, 2, 3}};
+    for( auto& index : model.eventDialIndices ){ index = 0; }
+    CpuBackend backend; backend.build(view);
+    for( const auto& point : {std::vector<double>{.31, .27}, {-.7, .31}, {5.37, .8}} ){
+      compareGradient(backend, point, 2e-7);
+    }
+  }
+}
+
+TEST(CpuBackendGradient, ExternalAndTableSnapshotsMatchFiniteDifferences) {
+  for( auto type : {BackendDialType::ExternalWeight, BackendDialType::Tabulated, BackendDialType::Kriged} )
+  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ){
+    auto view = gradientModel(1.);
+    auto& model = view.propagation;
+    model.dials.resize(1);
+    auto& dial = model.dials[0];
+    dial.type = type; dial.inputCount = 2;
+    dial.hasMinResponse = dial.hasMaxResponse = clamp; dial.minResponse = .95; dial.maxResponse = 1.3;
+    model.dialInputs = {{0, mirror, -2., 4.}, {1}};
+    model.externalWeightBlocks = {{0, 2}};
+    model.tableTerms = {{0, .25}, {1, .75}}; dial.tableTermCount = 2;
+    for( auto& index : model.eventDialIndices ){ index = 0; }
+    CpuBackend backend; backend.build(view);
+    PropagationInputs inputs;
+    std::vector<double> table(2);
+    auto publish = [&](const std::vector<double>& point_) {
+      inputs.parameters.values = point_;
+      const double p = Semantics::transformDialInput(model.dialInputs[0], point_[0]), q = point_[1];
+      table = {1.+.2*p*p+.1*q, 1.+.1*p+.3*q*q};
+      inputs.externalWeights = {{table.data(), table.size(), 0, 1}};
+      inputs.externalDialGradients = {type == BackendDialType::ExternalWeight ? std::vector<double>{.4*p, .1}
+          : std::vector<double>{.1*p+.075, .025+.45*q}};
+      return backend.requestPropagation(inputs);
+    };
+    for( const auto& point : {std::vector<double>{.31, .27}, {5.37, .8}} ){
+      const auto token = publish(point);
+      // Jacobians and values are owned by the backend after publication.
+      inputs.externalDialGradients[0].assign(2, 123.);
+      table.assign(2, 456.);
+      const auto analytic = backend.getLikelihoodGradient(token);
+      for( std::size_t i = 0; i < point.size(); ++i ){
+        auto up = point, down = point; up[i] += 1e-5; down[i] -= 1e-5;
+        const double upper = backend.getLikelihood(publish(up));
+        const double lower = backend.getLikelihood(publish(down));
+        EXPECT_NEAR(analytic[i], (upper-lower)/2e-5, 2e-6);
+      }
+    }
+    publish({.31, .27});
+    inputs.externalDialGradients.clear();
+    auto token = backend.requestPropagation(inputs);
+    EXPECT_THROW(backend.getLikelihoodGradient(token), std::exception);
+    inputs.externalDialGradients = {{1.}};
+    token = backend.requestPropagation(inputs);
+    EXPECT_THROW(backend.getLikelihoodGradient(token), std::exception);
+    inputs.externalDialGradients = {{NAN, 1.}};
+    token = backend.requestPropagation(inputs);
+    EXPECT_THROW(backend.getLikelihoodGradient(token), std::exception);
+  }
+}
+
+TEST(CpuBackendGradient, CompositeFormulaOperationsMatchFiniteDifferences) {
+  for( const auto* expression : {
+      "exp([p])+log([q])+log10([q])+sqrt([q])+abs([p])",
+      "sin([p])+cos([p])+tan([p])+asin([p])+acos([p])+atan([p])",
+      "sinh([p])+cosh([p])+tanh([p])+erf([p])+erfc([p])",
+      "pow([p],[q])+atan2([p],[q])+[p]/[q]-[p]*[q]",
+      "min([p],[q])+max([p],[q])+floor([p])+ceil([q])",
+      "(-[p])^2+0*[p]+2"} ){
+    SCOPED_TRACE(expression);
+    auto view = gradientModel(1.);
+    auto& model = view.propagation;
+    model.dials.resize(1);
+    model.dials[0].type = BackendDialType::Composite;
+    model.dials[0].inputCount = 2;
+    model.formulaPrograms = {FormulaCompiler::compile(expression, {"p", "q"})};
+    model.formulaInputs = {{0}, {1}};
+    model.compositeInputs = {{0}, {1}};
+    CompositeInstruction instruction;
+    instruction.dial.type = BackendDialType::Formula; instruction.dial.inputCount = 2;
+    model.compositeInstructions = {instruction};
+    model.compositePrograms = {{0, 1, 2, 2}};
+    for( auto& index : model.eventDialIndices ){ index = 0; }
+    CpuBackend backend; backend.build(view);
+    compareGradient(backend, {.31, .73}, 2e-7);
   }
 }

@@ -45,6 +45,22 @@ def compare(path, dial, exact=True, backendType='CPU', backendConfig=None):
                            for a, b in zip(reference, actual)), (p, q, reference, actual)
 
 
+def compare_gradient(path, dial):
+    config = helpers.make_config(path, dial)
+    config['minimizerConfig'] = {'useNormalizedFitSpace': False}
+    config['likelihoodInterfaceConfig']['jointProbabilityConfig'] = {'type': 'BarlowBeestonLiteGaussian'}
+    config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': 'CPU'}
+    engine = helpers.build(config)
+    minimizer = engine.getMinimizer()
+    for point in ([.37, .21], [.37, .21], [-.43, .61], [4.13, -.27]):
+        analytic = minimizer.evalFitGradientAt(point)
+        for i, actual in enumerate(analytic):
+            up, down = list(point), list(point)
+            up[i] += 1e-5; down[i] -= 1e-5
+            numeric = (minimizer.evalFit(up)-minimizer.evalFit(down))/2e-5
+            assert math.isclose(actual, numeric, rel_tol=3e-5, abs_tol=3e-6), (point, actual, numeric)
+
+
 def main():
     import GUNDAM
     if not hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
@@ -111,6 +127,17 @@ def main():
         # Binning constants and formulas with parameter inputs only.
         binned = helpers.formula('binned', '[X]+sin([arg0])', p, binning=binning)
         compare(path, helpers.composite([binned], 'binned'), exact=False)
+        for mode in ('Bilinear', 'Bicubic'):
+            source = dict(name='source', dialType='Norm', dialInputList=[p],
+                          useMirrorDial=True, mirrorLowEdge=-1., mirrorHighEdge=2.)
+            surface = dict(name='surface', dialType='Surface', options=mode, binning=binning,
+                           dialsFilePath=str(path), dialsList='surfaces', dialInputList=[upstream, q])
+            formula = helpers.formula('output', '[arg0]^2+.1*[arg1]+.001*[arg2]',
+                                      {'dialResponse': 'surface'}, upstream, event,
+                                      dialResponseLimits=[0., 8.])
+            nested = helpers.composite([source, surface, formula], 'output')
+            nested['name'] = 'nested'
+            compare_gradient(path, helpers.composite([nested], 'nested'))
     print('SUCCESS: CPU composite weights and observables match, including event formulas.')
 
 

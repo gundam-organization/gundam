@@ -42,6 +42,12 @@ extern "C" int update(const char*, double table[], int bins, const double par[],
   for (int i = 0; i < bins; ++i) table[i] = 1. + par[0] * (i + 1) + par[1] * i * i;
   return 0;
 }
+extern "C" int differentiate(const char*, double jac[], int bins, const double[], int count) {
+  for (int i = 0; i < bins; ++i) {
+    jac[i*count] = i + 1; jac[i*count+1] = i*i;
+  }
+  return 0;
+}
 extern "C" double bin(const char*, int, double values[], int) {
   return 3. * (values[0] + .5);
 }
@@ -63,7 +69,7 @@ extern "C" int weights(const char*, int, int, double values[], int, int index[],
     sets = []
     for dial_type in ('Tabulated', 'Kriged'):
         table_config = dict(name=dial_type, libraryPath=str(library), initFunction='initialize',
-                            initArguments=[], updateFunction='update')
+                            initArguments=[], updateFunction='update', gradientFunction='differentiate')
         if dial_type == 'Tabulated':
             table_config.update(binningFunction='bin', binningVariables=['X'])
         else:
@@ -85,6 +91,8 @@ extern "C" int weights(const char*, int, int, double values[], int, int index[],
 
     def run(backend, mode=None):
         config = json.loads(json.dumps(base_config))
+        config.setdefault('minimizerConfig', {})['useNormalizedFitSpace'] = False
+        config['likelihoodInterfaceConfig']['jointProbabilityConfig'] = {'type': 'BarlowBeestonLiteGaussian'}
         if backend:
             config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend,
                 'options': [{'name': backend, **({'propagationMode': mode} if mode else {})}]}
@@ -122,6 +130,16 @@ extern "C" int weights(const char*, int, int, double values[], int, int index[],
             results.append(actual + [float(item.sumWeights) for item in bins]
                            + [float(item.sqrtSumSqWeights)**2 for item in bins] + [float(li.getLastLikelihood())])
             GUNDAM.flushOutput()
+        if backend in (None, 'CPU'):
+            minimizer = engine.getMinimizer()
+            for point in ((.12, .02, .17, -.01, 1.1), (.12, .02, .17, -.01, 1.1),
+                          (-2., .01, .1, .03, 1.)):
+                analytic = minimizer.evalFitGradientAt(list(point))
+                for index, actual in enumerate(analytic):
+                    up, down = list(point), list(point)
+                    up[index] += 1e-5; down[index] -= 1e-5
+                    numeric = (minimizer.evalFit(up)-minimizer.evalFit(down))/2e-5
+                    assert math.isclose(actual, numeric, rel_tol=3e-5, abs_tol=3e-6), (backend, actual, numeric)
         return results
 
     reference = run(None)

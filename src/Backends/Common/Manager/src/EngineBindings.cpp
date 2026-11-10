@@ -25,6 +25,7 @@ void Backends::EngineBindings::clear() {
   samples.clear();
   parameters.clear();
   externalWeights.clear();
+  gradientDials.clear();
 }
 
 void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) {
