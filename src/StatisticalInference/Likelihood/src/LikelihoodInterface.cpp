@@ -185,7 +185,7 @@ double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const
   _buffer_.updateTotal();
   return _buffer_.totalLikelihood;
 }
-void LikelihoodInterface::validateWeightGradient() const {
+void LikelihoodInterface::validateWeightGradient(bool validateDials_) const {
   LogThrowIf(not _jointProbabilityPtr_->hasAnalyticBinGradient(),
              "Analytic bin gradients are unsupported for likelihood " << _jointProbabilityPtr_->getType());
   _externalConstraints_.validateGradient();
@@ -202,6 +202,7 @@ void LikelihoodInterface::validateWeightGradient() const {
         histogram.validateGradientVariable(name);
       }
     }
+    if( not validateDials_ ){ continue; }
     for( const auto& response : entry.dialResponseCacheList ){
       const auto* dial = response.dialInterface->getDialBaseRef();
       LogThrowIf(not dial->hasAnalyticGradient(), "CPU weight gradient is unsupported for dial " << dial->getDialTypeName());

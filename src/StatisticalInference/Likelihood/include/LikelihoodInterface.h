@@ -98,7 +98,9 @@ public:
   /// Likelihood buffers retain the values from their last explicit evaluation.
   void propagateAndEvalGradient(ParameterGradient& gradient_);
   double evalLikelihood(std::future<bool>& propagation) const;
-  void validateWeightGradient() const;
+  // Backends validate compiled dials themselves; retain likelihood/constraint
+  // validation without generating original-engine formula gradients.
+  void validateWeightGradient(bool validateDials_ = true) const;
   double evalStatLikelihood(std::future<bool>& propagation) const;
   double evalPenaltyLikelihood() const;
   [[nodiscard]] double evalPenaltyLikelihood(const ParameterSet& parSet_) const;
