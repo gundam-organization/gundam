@@ -91,6 +91,8 @@ namespace {
 
   struct GradientBuffers {
     Backends::GradientWork<double> work{};
+    bool resultValid{false};
+    std::vector<double> resultParameters, resultProducerSlopes, result;
     DeviceBuffer<Backends::BackendDialDescriptor> dials;
     DeviceBuffer<Backends::BackendDialInputDescriptor> inputs, edges;
     DeviceBuffer<Backends::CudaGradientDirection> directions;
@@ -850,6 +852,7 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     // update or failed/unprimed cache forces fresh weights and histograms.
     const bool updatePrediction = not reusePrediction_ or not reuse or updateState
         or inputs_.forceBinningUpdate or candidates != 0 or b.externalUpdatePlan.dialCount != 0;
+    if( updatePrediction and b.gradient ){ b.gradient->resultValid = false; }
     bool sparseEvents = false;
     const auto selectionStart = std::chrono::steady_clock::now();
     if( b.eventUpdateIndex.available() and reuse and reusePrediction_ and not updateState
@@ -983,7 +986,7 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
                                   cudaMemcpyDeviceToDevice, stream), "stage event bins");
       }
       std::fill(b.hostEditFlags.begin(), b.hostEditFlags.end(), 0);
-      if( not inputs_.hostVariables.empty() ){
+      if( not inputs_.hostVariables.empty() and (b.stateCache.hostVariablesChanged() or inputs_.forceBinningUpdate) ){
         for( std::size_t i = 0; i < b.hostEditFlags.size(); ++i ){
           b.hostEditFlags[i] = b.stateCache.hostVariableChanged(i, inputs_);
         }
@@ -1230,6 +1233,7 @@ std::size_t Backends::CudaDeviceContext::readEventState(EventState& state_) {
 void Backends::CudaDeviceContext::invalidate() {
   if( _impl_->buffers ){
     _impl_->buffers->cachePrimed = false;
+    if( _impl_->buffers->gradient ){ _impl_->buffers->gradient->resultValid = false; }
     _impl_->buffers->stateCache.invalidate();
   }
 }
@@ -1283,7 +1287,10 @@ Backends::BackendResourceUsage Backends::CudaDeviceContext::getResourceUsage() c
 
 std::vector<double> Backends::CudaDeviceContext::readGradient(const EngineView& view_, const std::vector<double>& producerSlopes_, BackendTimingSummary& timing_) {
   const auto wallStart = std::chrono::steady_clock::now();
-  timing_.gradientModelPreparationSeconds = 0.;
+  timing_.gradientWallSeconds = timing_.gradientModelPreparationSeconds = timing_.gradientDeviceSeconds = 0.;
+  timing_.gradientProducerUploadSeconds = timing_.gradientDialStageSeconds = timing_.gradientBinStageSeconds = 0.;
+  timing_.gradientEventStageSeconds = timing_.gradientReductionStageSeconds = timing_.gradientReadbackSeconds = 0.;
+  timing_.gradientCacheHit = 0;
   DeviceScope scope(_impl_->deviceIndex);
   auto& b = *_impl_->buffers;
   const auto stream = _impl_->stream;
@@ -1318,8 +1325,17 @@ std::vector<double> Backends::CudaDeviceContext::readGradient(const EngineView& 
   auto record = [&](std::size_t index_){
     checkCuda(cudaEventRecord(_impl_->stages[index_], stream), "CUDA gradient event record");
   };
-  record(0);
   auto& g = *b.gradient;
+  // Prediction changes invalidate this result in propagate(). Raw parameters
+  // and current producer Jacobians are checked separately: equal response
+  // values alone do not imply equal derivatives. Data updates reset the model.
+  if( g.resultValid and g.resultParameters == b.previousParameters and g.resultProducerSlopes == producerSlopes_ ){
+    timing_.gradientCacheHit = 1;
+    timing_.gradientWallSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now()-wallStart).count();
+    return g.result;
+  }
+  g.resultValid = false;
+  record(0);
   if( producerSlopes_.size() != g.producerSlopes.size ) throw std::runtime_error("CUDA producer gradient size mismatch.");
   if( !producerSlopes_.empty() ) checkCuda(cudaMemcpyAsync(g.producerSlopes.data,producerSlopes_.data(),
       producerSlopes_.size()*sizeof(double),cudaMemcpyHostToDevice,stream),"producer gradient upload");
@@ -1356,6 +1372,10 @@ std::vector<double> Backends::CudaDeviceContext::readGradient(const EngineView& 
   timing_.gradientReadbackSeconds = elapsed(5,6);
   timing_.gradientDeviceSeconds = elapsed(0,6);
   for( double value : result ) if( !std::isfinite(value) ) throw std::runtime_error("CUDA: non-finite likelihood gradient.");
+  g.resultParameters = b.previousParameters;
+  g.resultProducerSlopes = producerSlopes_;
+  g.result = result;
+  g.resultValid = true;
   timing_.gradientWallSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now()-wallStart).count();
   return result;
 }

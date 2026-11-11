@@ -1,5 +1,5 @@
 #include "CpuBackend.h"
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 #include "MpsBackend.h"
 #endif
 #include "EngineLayout.h"
@@ -141,7 +141,7 @@ TEST_P(CpuCompositeTest, MatchesOriginalBitsThroughNestedGraphAndCacheUpdates) {
       for( auto traversal : {Backends::CpuCacheTraversal::Auto, Backends::CpuCacheTraversal::Indexed} ){
         Backends::CpuBackend backend;
         backend.build(layout.view);
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
         Backends::MpsBackend metal;
         metal.build(layout.view);
 #endif
@@ -157,7 +157,7 @@ TEST_P(CpuCompositeTest, MatchesOriginalBitsThroughNestedGraphAndCacheUpdates) {
           const double expected = events[0].getWeights().base * product;
           const auto token = backend.requestPropagation(inputs);
           for( auto weight : backend.getEventWeightsHostView(token) ){ EXPECT_EQ(bits(weight), bits(expected)); }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
           const auto gpuToken = metal.requestPropagation(inputs);
           metal.materialize(gpuToken, Backends::OutputRequest::EventWeights);
           for( auto weight : metal.getEventWeightsHostView(gpuToken) ){

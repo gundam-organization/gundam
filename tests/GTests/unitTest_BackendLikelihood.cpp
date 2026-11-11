@@ -4,7 +4,7 @@
 #include "Semantics/BackendLikelihood.h"
 #include "JointProbability.h"
 #include "JointProbabilitySnapshot.h"
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 #include "MpsBackend.h"
 #endif
 #ifdef GUNDAM_TEST_CUDA_DEVICE
@@ -269,7 +269,7 @@ TEST(BackendLikelihood, CpuUpdatesDataWithoutRebuildingPropagation) {
   checkDataHistogramUpdates(backend, 1.e-10);
 }
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(BackendLikelihood, MpsUpdatesDataAndGradientBuffers) {
   Backends::MpsBackend backend;
   if( not backend.getCapabilities().supportsLikelihoodGradient ){ GTEST_SKIP() << "Metal is unavailable"; }
@@ -284,7 +284,7 @@ TEST(BackendLikelihood, CudaUpdatesDataAndGradientBuffers) {
 }
 #endif
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(BackendLikelihood, MetalPreservesInfinityEmptyBinsAndHostFallback) {
   MpsBackend gpu;
   auto view = likelihoodView(LikelihoodKind::Poisson);
@@ -587,7 +587,7 @@ TEST(BackendLikelihood, CpuLiteLikelihoodsUseResidentMomentsWithoutCallback) {
   }
 }
 
-#if defined(__APPLE__) || defined(GUNDAM_TEST_CUDA_DEVICE)
+#if defined(GUNDAM_TEST_MPS_AVAILABLE) || defined(GUNDAM_TEST_CUDA_DEVICE)
 namespace {
   void checkLiteEdges(Backend& backend_) {
     for( auto kind : {LikelihoodKind::BarlowBeestonLiteGaussian, LikelihoodKind::BarlowBeestonLitePoisson} ){
@@ -629,7 +629,7 @@ namespace {
     }
   }
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(BackendLikelihood, MetalLiteEmptyAndLowRateBinsStayResident) {
   MpsBackend backend;
   checkLiteEdges(backend);

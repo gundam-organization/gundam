@@ -1,7 +1,7 @@
 #include "CpuBackend.h"
 #include "../../src/Backends/Implementations/CUDA/include/CudaGradientModel.h"
 #include "../../src/Backends/Implementations/CUDA/include/CudaMigrationGradient.h"
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 #include "MpsBackend.h"
 #endif
 #ifdef GUNDAM_TEST_CUDA_DEVICE
@@ -321,7 +321,7 @@ TEST(DeviceGradient, PortableDialDerivativesMatchCpuReference) {
   }
 }
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(DeviceGradient, MetalMatchesCpuWithResidentBinsAndRejectsStaleTokens) {
   for( const char* mode : {"cachedResponses", "recomputeResponses"} ){
     MpsBackend backend;
@@ -368,7 +368,7 @@ TEST(DeviceGradient, CudaMatchesCpuWithResidentBinsAndRejectsStaleTokens) {
 }
 #endif
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(DeviceGradient, MetalGraphSplinesAndResponseClampsMatchCpu) {
   std::vector<DialUtils::DialPoint> points{{-2., .7, .15}, {-1., .9, .15}, {0., 1., .15}, {1., 1.25, .15}, {2., 1.4, .15}};
   CompactSpline compact; compact.buildDial(points);
@@ -446,7 +446,7 @@ TEST(CpuBackendGradient, SurfaceInputsMatchFiniteDifferences) {
   CpuBackend backend;
   checkSurfaceInputsMatchFiniteDifferences(backend);
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsBackendGradient, SurfaceInputsMatchFiniteDifferences) {
   MpsBackend backend;
   if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
@@ -492,7 +492,7 @@ TEST(CpuBackendGradient, CompositeBranchesAndFormulaNodes) {
   CpuBackend backend;
   checkCompositeBranchesAndFormulaNodes(backend);
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsBackendGradient, CompositeBranchesAndFormulaNodes) {
   MpsBackend backend;
   if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
@@ -558,7 +558,7 @@ TEST(CpuBackendGradient, ExternalAndTableSnapshotsMatchFiniteDifferences) {
   CpuBackend backend;
   checkExternalAndTableSnapshotsMatchFiniteDifferences(backend);
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsBackendGradient, ExternalAndTableSnapshotsMatchFiniteDifferences) {
   MpsBackend backend;
   if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
@@ -598,7 +598,7 @@ TEST(CpuBackendGradient, CompositeFormulaOperationsMatchFiniteDifferences) {
   CpuBackend backend;
   checkCompositeFormulaOperationsMatchFiniteDifferences(backend);
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsBackendGradient, CompositeFormulaOperationsMatchFiniteDifferences) {
   MpsBackend backend;
   if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
@@ -640,7 +640,7 @@ TEST(CpuBackendGradient, StandaloneFormulaBindingsMirrorsAndResponseLimits) {
   CpuBackend backend;
   checkStandaloneFormulaBindingsMirrorsAndResponseLimits(backend);
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsBackendGradient, StandaloneFormulaBindingsMirrorsAndResponseLimits) {
   MpsBackend backend;
   if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
@@ -773,7 +773,7 @@ TEST(CpuBackendGradient, MultidimensionalMigrationFractionsAndOutsideSupport) {
   CpuBackend backend;
   checkMultidimensionalMigrationFractionsAndOutsideSupport(backend);
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsBackendGradient, MultidimensionalMigrationFractionsAndOutsideSupport) {
   MpsBackend backend;
   if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
@@ -802,7 +802,7 @@ TEST(CpuBackendGradient, RejectsMigrationWithoutSmoothingOnEachMovingAxis) {
   CpuBackend backend;
   checkRejectsMigrationWithoutSmoothingOnEachMovingAxis(backend);
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsBackendGradient, RejectsMigrationWithoutSmoothingOnEachMovingAxis) {
   MpsBackend backend;
   if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
@@ -869,7 +869,7 @@ TEST(CpuBackendGradient, ObservableFormulaCompositeAndProducerJacobians) {
   CpuBackend backend;
   checkObservableFormulaCompositeAndProducerJacobians(backend);
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsBackendGradient, ObservableFormulaCompositeAndProducerJacobians) {
   MpsBackend backend;
   if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
@@ -950,7 +950,7 @@ TEST(CpuBackendGradient, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows
   CpuBackend backend;
   checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(backend);
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsBackendGradient, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows) {
   MpsBackend backend;
   if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
@@ -1099,3 +1099,60 @@ TEST(ProducerGradientPublications, DenseSparseMissingAndZeroInputRows) {
   // A partial dense vector does not publish even its otherwise correct rows.
   inputs.externalDialGradients = {{.4},{}}; check({false,false},{false,false});
 }
+
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(CudaGradientDevice, CachedGradientTracksPredictionAndProducerJacobians) {
+  auto view = std::make_shared<EngineView>(gradientModel(1.));
+  view->propagation.dials[0].type = BackendDialType::ExternalWeight;
+  view->propagation.externalWeightBlocks = {{0, 1}};
+  CudaBackend backend;
+  backend.configure(ConfigReader(JsonType{{"propagationMode", "cachedResponses"}, {"reusePrediction", true}}));
+  backend.buildShared(view);
+  PropagationInputs inputs;
+  inputs.parameters.values = {.9, 1.2};
+  double externalValue = .9;
+  inputs.externalWeights = {{&externalValue, 1, 0, 1}};
+  inputs.externalDialGradientIndices = {0};
+  inputs.externalDialGradients = {{1.}};
+  auto token = backend.requestPropagation(inputs);
+  const auto first = backend.getLikelihoodGradient(token);
+  EXPECT_EQ(backend.getLastTimingSummary().gradientCacheHit, 0);
+  EXPECT_EQ(backend.getLikelihoodGradient(token), first);
+  EXPECT_EQ(backend.getLastTimingSummary().gradientCacheHit, 1);
+  EXPECT_DOUBLE_EQ(backend.getLastTimingSummary().gradientDeviceSeconds, 0.);
+  token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getLikelihoodGradient(token), first);
+  EXPECT_EQ(backend.getLastTimingSummary().gradientCacheHit, 1);
+  EXPECT_EQ(backend.getLastTimingSummary().eventWeightsRecomputedCount, 0);
+  // Same response generation/value, but a new local derivative.
+  inputs.externalDialGradients[0][0] = 2.;
+  token = backend.requestPropagation(inputs);
+  const auto changedSlope = backend.getLikelihoodGradient(token);
+  EXPECT_EQ(backend.getLastTimingSummary().gradientCacheHit, 0);
+  EXPECT_NEAR(changedSlope[0], 2.*first[0], 1e-10);
+  EXPECT_NEAR(changedSlope[1], first[1], 1e-10);
+  inputs.parameters.values[1] = 1.1;
+  token = backend.requestPropagation(inputs);
+  (void)backend.getLikelihoodGradient(token);
+  EXPECT_EQ(backend.getLastTimingSummary().gradientCacheHit, 0);
+  externalValue = .8;
+  ++inputs.externalWeights[0].generation;
+  token = backend.requestPropagation(inputs);
+  (void)backend.getLikelihoodGradient(token);
+  EXPECT_EQ(backend.getLastTimingSummary().gradientCacheHit, 0);
+  inputs.externalDialGradients.clear(); inputs.externalDialGradientIndices.clear();
+  token = backend.requestPropagation(inputs);
+  EXPECT_THROW((void)backend.getLikelihoodGradient(token), std::runtime_error);
+  inputs.externalDialGradientIndices = {0}; inputs.externalDialGradients = {{2.}};
+  token = backend.requestPropagation(inputs);
+  (void)backend.getLikelihoodGradient(token);
+  EXPECT_EQ(backend.getLastTimingSummary().gradientCacheHit, 0);
+  view->likelihood.samples[0].dataSums[0] *= 1.2;
+  backend.updateDataHistograms(view);
+  token = backend.requestPropagation(inputs);
+  const auto afterData = backend.getLikelihoodGradient(token);
+  EXPECT_EQ(backend.getLastTimingSummary().gradientCacheHit, 0);
+  EXPECT_EQ(backend.getLikelihoodGradient(token), afterData);
+  EXPECT_EQ(backend.getLastTimingSummary().gradientCacheHit, 1);
+}
+#endif

@@ -2,7 +2,7 @@
 #include "FormulaCompiler.h"
 #include "DevicePropagationModel.h"
 #include "DeviceMath/FormulaMath.h"
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 #include "MpsBackend.h"
 #endif
 
@@ -98,7 +98,7 @@ TEST(DeviceFormulaPacking, ValidatesOperandsAndPreservesLoadedConstants) {
   EXPECT_THROW(packed.build(view.propagation), std::runtime_error);
 }
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsFormula, AllOpcodesAndThreeParameterCacheMatchCpu) {
   using namespace Backends;
   const std::vector<std::string> expressions{

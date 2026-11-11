@@ -64,6 +64,11 @@ def snapshot(manager, include_gradient):
     fields = PROPAGATION_FIELDS + COUNT_FIELDS + (GRADIENT_FIELDS if include_gradient else ())
     result = {name: getattr(timing, name) for name in fields}
     result['managerPreparationSeconds'] = manager.getLastPreparationSeconds()
+    result['managerSnapshotSeconds'] = manager.getLastSnapshotSeconds()
+    result['hostVariableReadSeconds'] = manager.getLastHostVariableReadSeconds()
+    result['hostVariableReadCount'] = manager.getLastHostVariableReadCount()
+    if include_gradient:
+        result['gradientCacheHit'] = timing.gradientCacheHit
     return result
 
 
@@ -137,12 +142,16 @@ def write_report(output, summary):
             for callback, values in entry['callbacks'].items():
                 metrics = values['metrics']
                 for name in ('wallSeconds', 'managerPreparationSeconds', 'propagationWallSeconds',
+                             'managerSnapshotSeconds', 'hostVariableReadSeconds',
                              'cachePreparationSeconds', 'eventSelectionSeconds',
                              *values['gpuStageRanking'], 'gradientWallSeconds',
                              'gradientModelPreparationSeconds', 'devicePropagationSeconds', 'gradientDeviceSeconds'):
                     if name in metrics:
                         value = metrics[name]
                         lines.append(f"| {callback} / {name} | {1000*value['median']:.4f} | {1000*value['p95']:.4f} |")
+            gradient = entry['callbacks'].get('gradient', {}).get('metrics', {})
+            if 'gradientCacheHit' in gradient:
+                lines.extend(['', f"Gradient cache hit fraction: {gradient['gradientCacheHit']['mean']:.1%}."])
     lines.extend(['', 'GPU intervals overlap callback wall time; nested host timers also overlap.',
                   'Do not add all rows. Device intervals include stream gaps and are not hardware utilization.',
                   'Observables/search is fused; binning includes scans, sorting and allocation synchronization.',
@@ -158,6 +167,10 @@ def benchmark(args, report):
     # Fail before the expensive dataset load if the installation is stale.
     required = PROPAGATION_FIELDS + COUNT_FIELDS + (GRADIENT_FIELDS if args.backend == 'CUDA' else ())
     missing = [name for name in required if not hasattr(G.BackendTimingSummary, name)]
+    missing.extend(name for name in ('getLastSnapshotSeconds', 'getLastHostVariableReadSeconds',
+                                    'getLastHostVariableReadCount') if not hasattr(G.BackendManager, name))
+    if args.backend == 'CUDA' and not hasattr(G.BackendTimingSummary, 'gradientCacheHit'):
+        missing.append('gradientCacheHit')
     if missing:
         raise RuntimeError('Recompile and reinstall GUNDAM including PythonInterface; missing timers: ' + ', '.join(missing))
     report.update(module=G.__file__, nvidiaSmi=run_command(['nvidia-smi']))

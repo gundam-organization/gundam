@@ -1,6 +1,6 @@
 #include "CpuBackend.h"
 #include "EventStateCache.h"
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 #include "MpsBackend.h"
 #endif
 #include "Kriged.h"
@@ -84,7 +84,7 @@ TEST(BackendTable, CpuReadsUpdatedTablesWithoutParameterChanges) {
   Backends::CpuBackend backend;
   checkUpdatedTableValues(backend);
 }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(BackendTable, MetalReadsUpdatedTablesWithoutParameterChanges) {
   for( const char* mode : {"cachedResponses", "recomputeResponses"} ){
     Backends::MpsBackend backend;
@@ -187,10 +187,67 @@ TEST(BackendTable, RejectsInvalidDescriptors) {
   bad = good;
   bad.propagation.dials[0].tableTermCount = 1;
   EXPECT_THROW(backend.build(bad), std::runtime_error);
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
   MpsBackend mps;
   if( !mps.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
   EXPECT_NO_THROW(mps.build(good));
   EXPECT_THROW(mps.build(bad), std::runtime_error);
 #endif
+}
+
+TEST(BackendTable, ObservableCacheDistinguishesHostSnapshotsFromEdits) {
+  using namespace Backends;
+  PropagationView model;
+  model.parameterCount = 2;
+  model.dialInputs = {{0}};
+  BackendDialDescriptor dial;
+  dial.inputCount = 1;
+  model.dials = {dial};
+  model.variableDialIndices = {0};
+  model.variableInputBufferCount = 1;
+  EventStateCache cache;
+  cache.build(model);
+  PropagationInputs inputs;
+  inputs.parameters.values = {1., 2.};
+  inputs.hostVariables = {.5, 1.5};
+  inputs.variableInputRevisions = {1};
+  cache.prepare(inputs);
+  ASSERT_TRUE(cache.needsUpdate(inputs));
+  cache.commit(inputs, {});
+  cache.prepare(inputs);
+  EXPECT_FALSE(cache.needsUpdate(inputs));
+  EXPECT_FALSE(cache.hostVariablesChanged());
+  inputs.parameters.values[1] = 3.; // Weight-only input, unchanged host snapshot.
+  cache.prepare(inputs);
+  EXPECT_FALSE(cache.needsUpdate(inputs));
+  inputs.parameters.values[0] = 2.;
+  cache.prepare(inputs);
+  EXPECT_TRUE(cache.needsUpdate(inputs));
+  EXPECT_FALSE(cache.hostVariablesChanged());
+  cache.commit(inputs, {});
+  inputs.hostVariables.clear(); // Omission must retain the previous host baseline.
+  ++inputs.variableInputRevisions[0];
+  cache.prepare(inputs);
+  EXPECT_TRUE(cache.needsUpdate(inputs));
+  cache.commit(inputs, {});
+  inputs.hostVariables = {.5, 1.5};
+  cache.prepare(inputs);
+  EXPECT_FALSE(cache.needsUpdate(inputs));
+  inputs.hostVariables[1] = .75;
+  cache.prepare(inputs);
+  EXPECT_TRUE(cache.needsUpdate(inputs));
+  EXPECT_FALSE(cache.hostVariableChanged(0, inputs));
+  EXPECT_TRUE(cache.hostVariableChanged(1, inputs));
+  cache.commit(inputs, {});
+  inputs.forceBinningUpdate = true;
+  cache.prepare(inputs);
+  EXPECT_TRUE(cache.needsUpdate(inputs));
+  EXPECT_TRUE(cache.hostVariableChanged(0, inputs));
+  cache.commit(inputs, {});
+  inputs.forceBinningUpdate = false;
+  cache.prepare(inputs);
+  EXPECT_FALSE(cache.needsUpdate(inputs));
+  cache.invalidate();
+  cache.prepare(inputs);
+  EXPECT_TRUE(cache.needsUpdate(inputs));
 }

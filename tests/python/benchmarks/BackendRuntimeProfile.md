@@ -116,3 +116,29 @@ Results are checked for finite likelihoods/gradients and matching gradient size.
 Checksums are diagnostic; this benchmark does not establish analytic-gradient
 accuracy or compare backends numerically. Those checks remain in the dedicated
 gradient tests and `GradientPerformance.py`.
+
+## Checking the first cache optimization pass
+
+After rebuilding/reinstalling the library and Python interface, a shorter probe
+can reuse the full configuration with `--calls 10 --local-calls 64 --trials 1`.
+This still loads the dataset exactly once, measures all workload types, and
+visits the first 64 eligible coordinates. Compare these coordinates with the
+same prefix of the baseline, rather than comparing against its complete sweep.
+This is a quick performance check; a full production result remains necessary
+before claiming a speedup for the fit as a whole.
+
+Repeated identical host observable snapshots no longer force migration. In a
+primed `constant` CUDA sample, `rebinnedEventCount` and
+`eventWeightsRecomputedCount` should be zero. The CUDA statistical gradient can
+also be reused: `gradientCacheHit = 1` and its GPU stage durations are then zero.
+It is invalidated by prediction changes, and checked against raw parameters and
+current producer Jacobians. Data histogram updates discard gradient buffers;
+missing/invalid producer Jacobians still reject the request. Penalty gradients
+and transformation to fit coordinates remain evaluated by the engine.
+
+The host observables are still read on every explicitly dynamic request to
+preserve detection of external edits. `managerSnapshotSeconds` measures the
+whole snapshot construction, while `hostVariableReadSeconds` and
+`hostVariableReadCount` isolate that read. `managerPreparationSeconds` retains
+its earlier meaning (propagator preparation only). The host-read timer is nested
+inside snapshot time, which is outside `propagationWallSeconds`.

@@ -478,7 +478,7 @@ INSTANTIATE_TEST_SUITE_P(Modes, CudaFitCovariance,
     testing::Values("cachedResponses", "recomputeResponses"),
     [](const testing::TestParamInfo<const char*>& info_){ return info_.param; });
 
-#if defined(__APPLE__) && defined(GUNDAM_USING_BACKENDS)
+#if defined(GUNDAM_TEST_MPS_AVAILABLE) && defined(GUNDAM_USING_BACKENDS)
 TEST(BackendFitCovariance, DeviceStatLikelihoodMatchesOriginalFitAndHesse) {
   FitEnvironment environment;
   FitInput input;
@@ -535,7 +535,7 @@ TEST(BackendFitCovariance, CpuAnalyticGradientMatchesOriginalNumericalFitAndHess
 #endif
 }
 
-#if defined(__APPLE__) && defined(GUNDAM_USING_BACKENDS)
+#if defined(GUNDAM_TEST_MPS_AVAILABLE) && defined(GUNDAM_USING_BACKENDS)
 TEST(BackendFitCovariance, MetalAnalyticGradientMatchesCpuFitAndHesse) {
   FitEnvironment environment;
   FitInput input;

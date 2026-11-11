@@ -1,6 +1,6 @@
 #include "BinningGeometryBuilder.h"
 #include "CpuBackend.h"
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 #include "MpsBackend.h"
 #endif
 #include "DeviceWeightModel.h"
@@ -144,7 +144,7 @@ class BinningBackend : public testing::TestWithParam<std::tuple<bool, bool>> {
 protected:
   std::unique_ptr<Backends::Backend> backend;
   void SetUp() override {
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
     if( std::get<0>(GetParam()) ){
       backend = std::make_unique<Backends::MpsBackend>();
       backend->configure(ConfigReader(JsonType{{"propagationMode", std::get<1>(GetParam()) ? "cachedResponses" : "recomputeResponses"}}));
@@ -155,7 +155,7 @@ protected:
   }
 };
 INSTANTIATE_TEST_SUITE_P(Cpu, BinningBackend, testing::Values(std::make_tuple(false, true)));
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 INSTANTIATE_TEST_SUITE_P(Metal, BinningBackend, testing::Values(std::make_tuple(true, true), std::make_tuple(true, false)));
 #endif
 
@@ -674,7 +674,7 @@ TEST(BinningIndex, PreviousBinCertificationExcludesSmoothingAndEarlierOverlaps) 
   EXPECT_EQ(index.buildReusableBinPositions(layout, 5), std::vector<std::size_t>(5, std::size_t(-1)));
 }
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsBinningIntervals, MatchesHardAndSmoothedGeometry) {
   Backends::MpsBackend backend;
   compareWithHistogram(backend, false, false, true, false);
@@ -684,7 +684,7 @@ TEST(MpsBinningIntervals, MatchesHardAndSmoothedGeometry) {
 }
 #endif
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsResidentPropagation, SparseDialUpdatesPreserveWeightsAndRecoverAfterFailure) {
   using namespace Backends;
   BinningGeometry layout;
@@ -829,7 +829,7 @@ TEST(MpsResidentPropagation, ParallelReductionPreservesSmallTermsAndPartialSimdG
 }
 #endif
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsResidentPropagation, SparseRangesMapSeveralParametersToOriginalResponseSlots) {
   using namespace Backends;
   BinningGeometry layout;
@@ -882,3 +882,53 @@ TEST(MpsResidentPropagation, SparseRangesMapSeveralParametersToOriginalResponseS
   EXPECT_EQ(backend.getHistogramSumsHostView(token)[0], -420.);
 }
 #endif
+
+TEST_P(BinningBackend, UnchangedHostSnapshotPreservesSmoothedContributions) {
+  using namespace Backends;
+  BinningGeometry geometry;
+  geometry.variableNames = {"X"};
+  geometry.isSmoothed = true;
+  geometry.intervals = {{0, 0., 1., 5., 5.}, {0, 1., 2., 5., 5.}};
+  geometry.bins = {{0, 0, 1}, {1, 1, 1}};
+  auto view = makeStrictBinningView(geometry);
+  auto& model = view.propagation;
+  model.parameterCount = 1;
+  model.dialInputs = {{0}};
+  BackendDialDescriptor weight;
+  weight.inputCount = 1;
+  model.dials = {weight};
+  model.eventDialIndices = {0};
+  model.eventWeights[0].dialCount = 1;
+  auto& backend = *this->backend;
+  backend.build(view);
+  PropagationInputs inputs;
+  inputs.parameters.values = {1.};
+  inputs.hostVariables = {.95};
+  auto token = backend.requestPropagation(inputs);
+  const auto original = backend.getHistogramSumsHostView(token);
+  const auto revision = backend.getEventStateHostView(token).revision;
+  EXPECT_GT(backend.getLastTimingSummary().rebinnedEventCount, 0);
+  token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 0);
+  EXPECT_EQ(backend.getEventStateHostView(token).revision, revision);
+  EXPECT_EQ(backend.getHistogramSumsHostView(token), original);
+  inputs.parameters.values[0] = 2.;
+  token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 0);
+  const auto weighted = backend.getHistogramSumsHostView(token);
+  for( std::size_t i = 0; i < original.size(); ++i ) EXPECT_NEAR(weighted[i], 2.*original[i], 1e-12);
+  inputs.hostVariables[0] = 1.05;
+  token = backend.requestPropagation(inputs);
+  EXPECT_GT(backend.getLastTimingSummary().rebinnedEventCount, 0);
+  EXPECT_NE(backend.getHistogramSumsHostView(token), weighted);
+  token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 0);
+  inputs.hostVariables.clear();
+  inputs.forceBinningUpdate = true;
+  token = backend.requestPropagation(inputs);
+  EXPECT_GT(backend.getLastTimingSummary().rebinnedEventCount, 0);
+  inputs.forceBinningUpdate = false;
+  inputs.hostVariables = {1.05};
+  token = backend.requestPropagation(inputs);
+  EXPECT_EQ(backend.getLastTimingSummary().rebinnedEventCount, 0);
+}

@@ -1,5 +1,5 @@
 #include "CpuBackend.h"
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 #include "MpsBackend.h"
 #endif
 #include "Semantics/BackendDialSemantics.h"
@@ -87,7 +87,7 @@ TEST_P(BackendSurface, MatchesNativeAndInvalidatesEveryInput) {
   const auto [gpu, cubic, cache] = GetParam();
   std::unique_ptr<Backend> backend;
   if( gpu ){
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
     backend = std::make_unique<MpsBackend>();
     ASSERT_NE(backend->getCapabilities().deviceName, "Metal unavailable");
     backend->configure(ConfigReader(JsonType{{"propagationMode", cache ? "cachedResponses" : "recomputeResponses"}}));
@@ -132,7 +132,7 @@ TEST_P(BackendSurface, MatchesNativeAndInvalidatesEveryInput) {
           if( observable ){
             EXPECT_NEAR(backend->getEventStateHostView(token).variables[0], response, gpu ? 2e-6 : 1e-12);
           }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
           if( gpu and cache ){
             const auto state = JsonType::parse(static_cast<MpsBackend&>(*backend).getDiagnosticEventPropagationState());
             EXPECT_LE(state.at("evaluatedDials").get<std::size_t>(), view.propagation.dials.size());
@@ -144,8 +144,13 @@ TEST_P(BackendSurface, MatchesNativeAndInvalidatesEveryInput) {
   }
 }
 
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 INSTANTIATE_TEST_SUITE_P(CpuAndMetal, BackendSurface,
     testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()));
+#else
+INSTANTIATE_TEST_SUITE_P(CpuOnly, BackendSurface,
+    testing::Combine(testing::Values(false), testing::Bool(), testing::Bool()));
+#endif
 
 TEST(BackendSurfaceInputs, RejectsUnsupportedEventSourcesAndMalformedSurfaces) {
   auto histogram = makeSurface();
@@ -153,7 +158,7 @@ TEST(BackendSurfaceInputs, RejectsUnsupportedEventSourcesAndMalformedSurfaces) {
   auto good = makeModel(native, false, false, false, false);
   std::vector<std::unique_ptr<Backend>> backends;
   backends.push_back(std::make_unique<CpuBackend>());
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
   backends.push_back(std::make_unique<MpsBackend>());
 #endif
   for( auto& backend : backends ){
@@ -180,7 +185,7 @@ TEST_P(BackendSurface, ReorderedAndRepeatedParametersUseDisjointCacheSlots) {
   const auto [gpu, cubic, cache] = GetParam();
   std::unique_ptr<Backend> backend;
   if( gpu ){
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
     backend = std::make_unique<MpsBackend>();
     ASSERT_NE(backend->getCapabilities().deviceName, "Metal unavailable");
     backend->configure(ConfigReader(JsonType{{"propagationMode", cache ? "cachedResponses" : "recomputeResponses"}}));
@@ -224,7 +229,7 @@ TEST_P(BackendSurface, ReorderedAndRepeatedParametersUseDisjointCacheSlots) {
       const double expected = (1. + .01 * i) * std::max(.2, std::min(2., native.evalResponse(buffer)));
       EXPECT_NEAR(weights[i], expected, gpu ? 2e-6 : 1e-12);
     }
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
     if( gpu ){
       const auto state = JsonType::parse(static_cast<MpsBackend&>(*backend).getDiagnosticEventPropagationState());
       EXPECT_EQ(state.at("evaluatedDials").get<std::size_t>(), cache ? expectedUpdates[pointIndex] : model.dials.size());

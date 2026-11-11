@@ -515,6 +515,23 @@ It measures constant, single-coordinate and global updates, ranks propagation
 and gradient stages, and records migration counts and first-use setup separately.
 See [runtime profiling instructions](../../tests/python/benchmarks/BackendRuntimeProfile.md);
 the CUDA gradient timers require rebuilding the library and Python interface.
+Repeated identical host observable snapshots preserve the cached binning state
+on CPU, MPS and CUDA; a missing snapshot retains the previous host baseline.
+Explicit binning refreshes, input revisions and real observable edits still
+invalidate it. CUDA also reuses the statistical gradient when prediction, raw
+parameters and producer Jacobians are unchanged; data updates and failed requests
+invalidate that result. The runtime profiler reports `gradientCacheHit`, complete
+host snapshot time and observable read time separately. Host observable reads
+are still performed for explicitly dynamic samples to detect external edits.
+
+Native Metal device tests are compiled only when the CMake device probe detects
+a visible Metal GPU; `WITH_METAL_TEST=OFF` can disable them explicitly. Reconfigure
+when device availability changes. Host tests of the shared Metal math remain
+enabled. CUDA device tests stay compiled with the toolkit and check device
+availability at execution: missing GPUs, driver initialization failure or an
+unavailable compatible driver return CTest's skip code 77. Unexpected detection
+errors and failures after a GPU is detected remain test failures. Host-only CUDA
+tests still run without a GPU.
 
 The restrictions above are enforced in
 [`CpuBackendGradient.cpp`](../../src/Backends/Implementations/CPU/src/CpuBackendGradient.cpp)

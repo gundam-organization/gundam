@@ -76,7 +76,8 @@ void Backends::CpuBackend::updateEventVariablesThread(int iThread_) {
         if( index_ - event.firstVariable < sample.binning.variableNames.size() ){ _validBinning_[event.resultIndex] = false; }
       }
     };
-    if( not inputs.hostVariables.empty() and (sample.readHostVariables or inputs.forceBinningUpdate) ){
+    if( not inputs.hostVariables.empty() and (_eventStateCache_.hostVariablesChanged() or inputs.forceBinningUpdate)
+        and (sample.readHostVariables or inputs.forceBinningUpdate) ){
       for( std::size_t i = event.firstVariable; i < event.firstVariable + event.variableCount; ++i ){
         if( _eventStateCache_.hostVariableChanged(i, inputs) ){ assign(i, inputs.hostVariables[i]); }
       }

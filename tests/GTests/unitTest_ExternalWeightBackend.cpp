@@ -1,6 +1,6 @@
 #include "CpuBackend.h"
 #include "DeviceWeightModel.h"
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 #include "MpsBackend.h"
 #endif
 #include "ExternalWeightDialFactory.h"
@@ -73,7 +73,7 @@ namespace {
       const auto timing = backend_.getLastTimingSummary();
       EXPECT_EQ(timing.externalWeightUploadBlocks, blocks_);
       std::size_t scalarBytes = sizeof(float);
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
       if( JsonType::parse(static_cast<MpsBackend&>(backend_).getDiagnostics())["path"] == "eventPropagation" ){
         scalarBytes = 2 * sizeof(float); // Compensated observable scalars.
       }
@@ -154,7 +154,7 @@ TEST(ExternalWeightBackend, Cpu) {
   exerciseBackend(backend, false);
 }
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(ExternalWeightBackend, Mps) {
   Backends::MpsBackend backend;
   if( backend.getCapabilities().deviceName == "Metal unavailable" ){ GTEST_SKIP() << "Metal unavailable"; }

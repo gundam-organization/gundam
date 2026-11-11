@@ -1,3 +1,5 @@
+#include "CudaTestDevice.h"
+
 #include <cuda_runtime.h>
 
 #include <array>
@@ -17,12 +19,8 @@ namespace {
 }
 
 int main() {
-  int deviceCount = 0;
-  if(not checkCuda(cudaGetDeviceCount(&deviceCount), "cudaGetDeviceCount")){ return 1; }
-  if(deviceCount == 0){
-    std::cerr << "No CUDA device visible. Run this test inside a GPU allocation." << std::endl;
-    return 1;
-  }
+  const int status = checkCudaTestDevice();
+  if( status != 0 ){ return status; }
   cudaDeviceProp properties{};
   if(not checkCuda(cudaGetDeviceProperties(&properties, 0), "cudaGetDeviceProperties")){ return 1; }
   std::cout << "Device 0: " << properties.name << " (sm_"

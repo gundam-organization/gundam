@@ -3,7 +3,7 @@
 #include "DialDependencies.h"
 #include "DialDependencyGroups.h"
 #include "HistogramEventIndex.h"
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 #include "MpsBackend.h"
 #endif
 
@@ -215,7 +215,7 @@ TEST(BackendMonitor, LabelsMemoryScopeAndGpuTimeShare) {
   EXPECT_EQ(formatBackendMonitorLine("MPS", usage, timing).find("On-device time:"), std::string::npos);
 }
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(BackendMonitor, MetalResourceQueriesPreservePropagationResultsInBothModes) {
   using namespace Backends;
   for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){

@@ -335,7 +335,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   control.hasReweightCap = model.hasReweightCap;
   control.maxReweight = ObservableScalar(model.maxReweight);
   std::memset(buffer(Buffer::ChangedSamples).contents, 0, std::max(std::size_t(1), model.samples.size()) * sizeof(DeviceIndex));
-  if( not inputs_.hostVariables.empty() ){
+  if( not inputs_.hostVariables.empty() and (_cache_.hostVariablesChanged() or inputs_.forceBinningUpdate) ){
     auto* flags = static_cast<DeviceIndex*>(buffer(Buffer::HostEdits).contents);
     auto* values = static_cast<ObservableScalar*>(buffer(Buffer::HostValues).contents);
     std::fill(flags, flags + model.variableValues.size(), 0);

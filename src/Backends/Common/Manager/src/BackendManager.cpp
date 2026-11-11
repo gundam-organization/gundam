@@ -370,7 +370,8 @@ void Backends::BackendManager::deactivateBackend() {
   }
   ++_backendGeneration_;
   _lastPropagationToken_ = {};
-  _lastPreparationSeconds_ = 0.;
+  _lastPreparationSeconds_ = _lastSnapshotSeconds_ = _lastHostVariableReadSeconds_ = 0.;
+  _lastHostVariableReadCount_ = 0;
   _lastMaterializedStateRevision_ = _lastMaterializedVariableRevision_ = 0;
   _lastMaterializedSampleRevisions_.clear();
   _binningUpdateListeners_.clear();
@@ -421,6 +422,9 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
   propagator.preparePropagation(not handlesEventState);
   _lastPreparationSeconds_ = std::chrono::duration<double>(std::chrono::steady_clock::now() - prepareStart).count();
 
+  const auto snapshotStart = std::chrono::steady_clock::now();
+  _lastSnapshotSeconds_ = _lastHostVariableReadSeconds_ = 0.;
+  _lastHostVariableReadCount_ = 0;
   Backends::PropagationInputs inputs;
   auto& snapshot = inputs.parameters;
   snapshot.values.reserve(_backendEngineLayout_->bindings.parameters.size());
@@ -460,13 +464,17 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
   const auto& variableBindings = _backendEngineLayout_->bindings.variables;
   if( handlesEventState and (inputs.forceBinningUpdate
       or std::any_of(variableBindings.begin(), variableBindings.end(), [](const auto& binding_){ return binding_.readFromHost; })) ){
+    const auto hostReadStart = std::chrono::steady_clock::now();
     inputs.hostVariables = model.variableValues;
     for( const auto& binding : variableBindings ){
       if( binding.readFromHost or inputs.forceBinningUpdate ){
         inputs.hostVariables.at(binding.valueIndex) = binding.event->getVariables().getVarList()[binding.variableIndex].getVarAsDouble();
+        ++_lastHostVariableReadCount_;
       }
     }
+    _lastHostVariableReadSeconds_ = std::chrono::duration<double>(std::chrono::steady_clock::now()-hostReadStart).count();
   }
+  _lastSnapshotSeconds_ = std::chrono::duration<double>(std::chrono::steady_clock::now()-snapshotStart).count();
   auto token = _activeBackendPtr_->requestPropagation(inputs);
   if( token.isValid ){
     *_hostBinningChanged_ = false;

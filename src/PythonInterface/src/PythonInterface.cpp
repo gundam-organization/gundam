@@ -631,6 +631,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def_readonly("histogramReadbackBytes", &Backends::BackendTimingSummary::histogramReadbackBytes)
   .def_readonly("devicePropagationSeconds", &Backends::BackendTimingSummary::devicePropagationSeconds)
   .def_readonly("propagationWallSeconds", &Backends::BackendTimingSummary::propagationWallSeconds)
+  .def_readonly("gradientCacheHit", &Backends::BackendTimingSummary::gradientCacheHit)
   .def_readonly("gradientWallSeconds", &Backends::BackendTimingSummary::gradientWallSeconds)
   .def_readonly("gradientModelPreparationSeconds", &Backends::BackendTimingSummary::gradientModelPreparationSeconds)
   .def_readonly("gradientDeviceSeconds", &Backends::BackendTimingSummary::gradientDeviceSeconds)
@@ -676,6 +677,9 @@ PYBIND11_MODULE(GUNDAM, module) {
        pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getType", &Backends::BackendManager::getType)
   .def("getLastPreparationSeconds", &Backends::BackendManager::getLastPreparationSeconds)
+  .def("getLastSnapshotSeconds", &Backends::BackendManager::getLastSnapshotSeconds)
+  .def("getLastHostVariableReadSeconds", &Backends::BackendManager::getLastHostVariableReadSeconds)
+  .def("getLastHostVariableReadCount", &Backends::BackendManager::getLastHostVariableReadCount)
   .def("setEnableAutoMaterialize", &Backends::BackendManager::setEnableAutoMaterialize)
 #ifdef GUNDAM_USING_CUDA
   .def("getDiagnosticCuda", [](const Backends::BackendManager& manager_){

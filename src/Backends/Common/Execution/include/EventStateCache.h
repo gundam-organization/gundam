@@ -13,6 +13,7 @@ namespace Backends {
     void commit(const PropagationInputs& inputs_, const std::vector<std::uint8_t>& changedSamples_);
     void invalidate();
     [[nodiscard]] bool variableInputsChanged() const { return _variableInputsChanged_; }
+    [[nodiscard]] bool hostVariablesChanged() const { return _hostVariablesChanged_; }
     [[nodiscard]] bool needsUpdate(const PropagationInputs& inputs_) const;
     [[nodiscard]] bool hostVariableChanged(std::size_t index_, const PropagationInputs& inputs_) const;
     void publishRevisions(EventState& state_) const;
@@ -30,6 +31,7 @@ namespace Backends {
     std::uint64_t _variableRevision_{1};
     bool _valid_{false};
     bool _variableInputsChanged_{true};
+    bool _hostVariablesChanged_{false};
   };
 }
 #endif

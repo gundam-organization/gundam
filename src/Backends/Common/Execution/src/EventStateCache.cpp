@@ -27,6 +27,9 @@ void Backends::EventStateCache::build(const PropagationView& model_) {
 }
 
 void Backends::EventStateCache::prepare(const PropagationInputs& inputs_) {
+  // A published host snapshot is not itself an edit. Compare once per request;
+  // needsUpdate is queried repeatedly by some executors.
+  _hostVariablesChanged_ = not inputs_.hostVariables.empty() and _hostVariables_ != inputs_.hostVariables;
   _variableInputsChanged_ = true;
   if( not _valid_ ){ return; }
   if( not inputs_.variableInputRevisions.empty() and _variableInputRevisions_ != inputs_.variableInputRevisions ){ return; }
@@ -40,7 +43,7 @@ void Backends::EventStateCache::prepare(const PropagationInputs& inputs_) {
 }
 
 bool Backends::EventStateCache::needsUpdate(const PropagationInputs& inputs_) const {
-  return _variableInputsChanged_ or not inputs_.hostVariables.empty() or inputs_.forceBinningUpdate;
+  return _variableInputsChanged_ or _hostVariablesChanged_ or inputs_.forceBinningUpdate;
 }
 
 bool Backends::EventStateCache::hostVariableChanged(std::size_t index_, const PropagationInputs& inputs_) const {
@@ -69,7 +72,9 @@ void Backends::EventStateCache::commit(const PropagationInputs& inputs_, const s
     }
     _variableInputRevisions_ = inputs_.variableInputRevisions;
   }
-  _hostVariables_ = inputs_.hostVariables;
+  // An omitted snapshot preserves resident values and the last host baseline.
+  // Republishing it must not overwrite dial-driven resident values.
+  if( _hostVariablesChanged_ ){ _hostVariables_ = inputs_.hostVariables; }
   _valid_ = true;
 }
 

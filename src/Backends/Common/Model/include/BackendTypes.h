@@ -100,6 +100,7 @@ ENUM_FIELD( Unavailable )
     double propagationWallSeconds{0};
     // CUDA gradient only, excluding the preceding propagation. Device intervals
     // overlap wall time; model preparation is lazy and normally paid once.
+    std::size_t gradientCacheHit{0};
     double gradientWallSeconds{0};
     double gradientModelPreparationSeconds{0};
     double gradientDeviceSeconds{0};

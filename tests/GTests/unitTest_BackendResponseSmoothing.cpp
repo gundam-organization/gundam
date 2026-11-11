@@ -1,5 +1,5 @@
 #include "CpuBackend.h"
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 #include "MpsBackend.h"
 #endif
 #include "DeviceWeightModel.h"
@@ -109,7 +109,7 @@ TEST_P(BackendResponseSmoothing, MatchesOriginalSupervisor) {
   const auto [gpu, variables, cache] = GetParam();
   std::unique_ptr<Backend> backend;
   if( gpu ){
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
     backend = std::make_unique<MpsBackend>();
     if( not backend->getCapabilities().supportsGpu ){ GTEST_SKIP() << "Metal unavailable"; }
 #else
@@ -184,7 +184,7 @@ TEST(BackendResponseSmoothingPacking, RejectsCollapsedFloatTransition) {
   EXPECT_NO_THROW(observable.build(view.propagation));
 }
 
-#ifdef __APPLE__
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(MpsPropagationMode, DefaultCachesScalarResponsesAndExplicitModeRecomputes) {
   DialResponseSupervisor supervisor;
   auto view = makeModel(supervisor, false, kDeviceCachedDialReuseThreshold);
@@ -373,5 +373,10 @@ TEST(MpsCachedDialDispatch, MixedCachedAndUncachedDescriptorsMatchCpu) {
 }
 #endif
 
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
 INSTANTIATE_TEST_SUITE_P(CpuAndMetal, BackendResponseSmoothing,
                         testing::Combine(testing::Bool(), testing::Bool(), testing::Bool()));
+#else
+INSTANTIATE_TEST_SUITE_P(CpuOnly, BackendResponseSmoothing,
+    testing::Combine(testing::Values(false), testing::Bool(), testing::Bool()));
+#endif

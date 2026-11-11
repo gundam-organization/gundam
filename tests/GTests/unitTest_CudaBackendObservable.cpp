@@ -210,6 +210,10 @@ TEST(CudaBackendObservable, CompositionMigrationAndCachesMatchCpu) {
       }
       compare(cuda, cpu, inputs);
       compare(cuda, cpu, inputs);
+      EXPECT_EQ(cuda.getLastTimingSummary().rebinnedEventCount, 0);
+      if( std::string(mode) == "cachedResponses" ){
+        EXPECT_EQ(cuda.getLastTimingSummary().eventWeightsRecomputedCount, 0);
+      }
       inputs.forceBinningUpdate = true;
       compare(cuda, cpu, inputs);
       inputs.forceBinningUpdate = false;

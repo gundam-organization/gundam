@@ -9,6 +9,12 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
   enable_testing()
 endif()
 
+add_executable(gundamCudaTestRunner CudaTestRunner.cpp)
+set_target_properties(gundamCudaTestRunner PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(gundamCudaTestRunner PRIVATE CUDA::cudart)
+set_property(TARGET gundamCudaTestRunner APPEND PROPERTY
+    BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
+
 add_executable(gundamCudaSmokeTest CudaSmokeTest.cu)
 set_target_properties(gundamCudaSmokeTest PROPERTIES
     CUDA_STANDARD 17 CUDA_STANDARD_REQUIRED ON CUDA_EXTENSIONS OFF
@@ -20,4 +26,4 @@ target_link_libraries(gundamCudaSmokeTest PRIVATE CUDA::cudart)
 set_property(TARGET gundamCudaSmokeTest APPEND PROPERTY
     BUILD_RPATH "$<TARGET_FILE_DIR:CUDA::cudart>")
 add_test(NAME cuda-smoke COMMAND gundamCudaSmokeTest)
-set_tests_properties(cuda-smoke PROPERTIES LABELS "cuda;device" TIMEOUT 60)
+set_tests_properties(cuda-smoke PROPERTIES LABELS "cuda;device" TIMEOUT 60 SKIP_RETURN_CODE 77)
