@@ -307,6 +307,8 @@ void Backends::BackendManager::updateDataHistograms() {
 void Backends::BackendManager::buildEngineLayout() {
   _isGradientValidated_ = false;
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "BackendManager requires a LikelihoodInterface before activation.");
+  LogInfo << "Preparing backend model on CPU (events, dials, binning and likelihood)..." << std::endl;
+  const auto start = std::chrono::steady_clock::now();
   auto layout = std::make_shared<EngineLayout>();
   layout->build(*_likelihoodInterfacePtr_);
   LogThrowIf(layout->view.likelihood.samples.size() != _ignoredBinsAtPrior_.size(),
@@ -324,6 +326,11 @@ void Backends::BackendManager::buildEngineLayout() {
     _binningUpdateListeners_.push_back(binding.sample->addBinningUpdateListener(
         [changed = _hostBinningChanged_]{ *changed = true; }));
   }
+  const auto& model = layout->view.propagation;
+  LogInfo << "Backend model ready: " << model.events.size() << " events, "
+          << model.dials.size() << " dials, " << model.parameterCount << " parameters, "
+          << model.samples.size() << " samples, " << model.totalBins << " bins ("
+          << std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() << " s)." << std::endl;
   _backendEngineLayout_ = std::move(layout);
 }
 
@@ -383,6 +390,8 @@ void Backends::BackendManager::activateImpl(const std::string& name_, const Conf
   LogThrowIf(found == _availableBackendList_.end(), "Backend is not available in this build: " << name_);
   // Validate overrides before releasing the active backend. Configuration never allocates device buffers.
   const auto config = config_ == nullptr ? found->config : *config_;
+  LogInfo << "Initializing " << name_ << " backend..." << std::endl;
+  const auto start = std::chrono::steady_clock::now();
   auto replacement = makeBackend(name_);
   replacement->configure(config);
   deactivateBackend();
@@ -394,6 +403,8 @@ void Backends::BackendManager::activateImpl(const std::string& name_, const Conf
   _activeBackendPtr_ = found->backend.get();
   _activeBackendName_ = name_;
   _type_ = name_;
+  LogInfo << "Backend " << _activeBackendPtr_->getName() << " ready ("
+          << std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() << " s)." << std::endl;
 }
 
 void Backends::BackendManager::replaceBackend(const std::string& type_, const ConfigReader& backendConfig_) {

@@ -68,6 +68,7 @@ void Backends::MpsEventPropagation::updateDataHistograms(const LikelihoodView& l
 void Backends::MpsEventPropagation::build(const PropagationView& model_, const LikelihoodView& likelihood_) {
   clearBuffers();
   _model_ = &model_;
+  LogInfo << "Packing MPS event model and preparing host caches..." << std::endl;
   _packed_.build(model_);
   _producerDials_.clear();
   for( std::size_t i = 0; i < model_.dials.size(); ++i ){
@@ -94,6 +95,7 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
     _buffers_[std::size_t(slot_)] = makePrivateBuffer(_device_, _queue_, values_);
     LogThrowIf(buffer(slot_) == nil, "Metal event propagation upload failed.");
   };
+  LogInfo << "Allocating MPS buffers and uploading events, dials, binning and likelihood to GPU..." << std::endl;
   upload(Buffer::Events, _packed_.events);
   upload(Buffer::Samples, _packed_.samples);
   upload(Buffer::Dials, _packed_.dials);
@@ -178,6 +180,11 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
   releaseHostStorage(_packed_.programInputs);
   releaseHostStorage(_packed_.compositePrograms);
   releaseHostStorage(_packed_.compositeInstructions);
+  std::size_t bufferBytes{0};
+  for( auto value : _buffers_ ){ if( value != nil ){ bufferBytes += value.length; } }
+  LogInfo << "MPS buffers ready: " << model_.events.size() << " events, "
+          << model_.dials.size() << " dials, " << model_.totalBins << " bins; "
+          << bufferBytes / (1024. * 1024.) << " MiB allocated (private and shared Metal buffers)." << std::endl;
 }
 
 void Backends::MpsEventPropagation::buildDialCache() {

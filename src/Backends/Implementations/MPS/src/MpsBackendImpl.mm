@@ -4,6 +4,7 @@ Backends::MpsBackendImpl::MpsBackendImpl() : model(engineView.propagation), like
   device = MTLCreateSystemDefaultDevice();
   if( device == nil ){ return; }
 
+  LogInfo << "Preparing MPS Metal library and GPU pipelines on " << [device.name UTF8String] << "..." << std::endl;
   NSError* error = nil;
   auto* compileOptions = [[MTLCompileOptions alloc] init];
 #if defined(__MAC_OS_X_VERSION_MAX_ALLOWED) && __MAC_OS_X_VERSION_MAX_ALLOWED >= 150000

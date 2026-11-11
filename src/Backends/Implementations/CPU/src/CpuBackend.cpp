@@ -69,6 +69,7 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
   LogThrowIf(_engineView_->propagation.eventWeights.size() != _engineView_->propagation.events.size(),
              "CpuBackend event weight layout size mismatch.");
   _lastResult_ = Result();
+  LogInfo << "Preparing CPU execution programs and dial-response caches..." << std::endl;
   initializeThreads();
   validateCompositePrograms(_engineView_->propagation);
   _nativePrograms_.build(_engineView_->propagation, _engineView_->propagation.dials);
@@ -117,6 +118,7 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
     _eventState_.contributions.resize(model.events.size());
   }
   _validBinning_.assign(_requiresEventBinning_ ? model.events.size() : 0, false);
+  LogInfo << "Preparing CPU histogram indices and event-state caches..." << std::endl;
   initializeBinning();
   _binningWorkers_.assign(_threadPool_.getNbThreads(), {});
   _workerErrors_.resize(_threadPool_.getNbThreads());
@@ -124,6 +126,8 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
   _cachedContributionCount_ = 0;
   initializeProfiler();
   _isBuilt_ = true;
+  LogInfo << "CPU execution ready: " << model.events.size() << " events, "
+          << model.dials.size() << " dials, " << model.totalBins << " bins in host memory." << std::endl;
 }
 
 void Backends::CpuBackend::updateDataHistograms(std::shared_ptr<const EngineView> engineView_) {

@@ -173,6 +173,7 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   _impl_->diagnostics = {{"available", false}};
   if( not engineView_ ){ throw std::runtime_error("CudaBackend requires a model."); }
   const auto start = Clock::now();
+  LogInfo << "Packing CUDA event model and execution indices on CPU..." << std::endl;
   const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved, _compactDials_, _eventWeightMode_ != CudaEventWeightMode::dense);
   _impl_->buildTiming.buildCompatibilityScanSeconds = elapsed(start);
   // Smaller blocks expose more independent work for short binned likelihoods.
@@ -182,9 +183,14 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
       : (engineView_->propagation.totalBins <= 8192 ? 64u : 256u);
   initializeDevice();
 #ifdef GUNDAM_USING_CUDA
+  LogInfo << "Allocating CUDA buffers and uploading events, dials, binning and likelihood to GPU..." << std::endl;
   const auto uploadStart = Clock::now();
   _impl_->context->build(packed, engineView_->propagation, engineView_->likelihood, likelihoodBlockSize, static_cast<int>(_eventWeightMode_.value), _eventWeightSparseFraction_);
   _impl_->buildTiming.buildBufferUploadSeconds = elapsed(uploadStart);
+  LogInfo << "CUDA buffers ready: " << engineView_->propagation.events.size() << " events, "
+          << engineView_->propagation.dials.size() << " dials, "
+          << engineView_->propagation.totalBins << " bins ("
+          << _impl_->buildTiming.buildBufferUploadSeconds << " s)." << std::endl;
 #endif
   _impl_->engineView = std::move(engineView_);
   _impl_->hasEventState = packed.hasEventState;

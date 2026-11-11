@@ -538,6 +538,15 @@ include transfers and can contain idle gaps; the percentage is not hardware
 utilization, occupancy, or computational efficiency. No extra GPU profiling
 passes or explicit synchronization are introduced for the monitor.
 
+Backend activation logs the preparation of the common model on the CPU, with
+counts of events, dials, parameters, samples and bins. Executor logs then identify
+CPU cache/index preparation or GPU model packing and buffer allocation/upload.
+MPS also announces Metal library/pipeline preparation. Completion messages report
+the prepared model, Metal buffer allocation size for resident event propagation,
+and total activation time. Metal allocation includes private and shared buffers;
+it does not measure physical GPU residency. These messages run only during build,
+outside the propagation loop.
+
 ## Model, inputs and outputs
 
 `EngineLayout` separates a flat numerical model (`EngineView`) from bindings to
