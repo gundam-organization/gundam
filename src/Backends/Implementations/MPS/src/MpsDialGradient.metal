@@ -96,6 +96,8 @@ Dual formula(DeviceFormulaProgram program, uint firstInput,
     device const FormulaInstruction* instructions, device const S* constants,
     device const DeviceProgramInput* inputs, device const S* parameters,
     device const Dual* frame, device Dual* stack, uint parameter) {
+#define GUNDAM_FORMULA_GRADIENT_MATH FormulaMath
+#define GUNDAM_FORMULA_GRADIENT_INV_SQRT_PI FormulaMath::invSqrtPi()
   uint top = 0;
   for( uint i = 0; i < program.instructionCount; ++i ){
     auto instruction = instructions[program.firstInstruction+i];
@@ -110,24 +112,10 @@ Dual formula(DeviceFormulaProgram program, uint firstInput,
     S x = a.value, partial(0), value(0);
     bool unary = true;
     switch( op ){
-      case FormulaOpcode::Negate: partial = S(-1); break;
-      case FormulaOpcode::Exp: partial = FormulaMath::exp(x); break;
-      case FormulaOpcode::Log: partial = S(1)/x; break;
-      case FormulaOpcode::Log10: partial = S(1)/(x*FormulaMath::log(S(10))); break;
-      case FormulaOpcode::Sqrt: partial = S(.5f)/FormulaMath::sqrt(x); break;
-      case FormulaOpcode::Abs: partial = x < S(0) ? S(-1) : (x > S(0) ? S(1) : S(0)); break;
-      case FormulaOpcode::Sin: partial = FormulaMath::cos(x); break;
-      case FormulaOpcode::Cos: partial = -FormulaMath::sin(x); break;
-      case FormulaOpcode::Tan: partial = S(1)/FormulaMath::pow(FormulaMath::cos(x), S(2)); break;
-      case FormulaOpcode::Asin: partial = S(1)/FormulaMath::sqrt(S(1)-x*x); break;
-      case FormulaOpcode::Acos: partial = -S(1)/FormulaMath::sqrt(S(1)-x*x); break;
-      case FormulaOpcode::Atan: partial = S(1)/(S(1)+x*x); break;
-      case FormulaOpcode::Sinh: partial = FormulaMath::cosh(x); break;
-      case FormulaOpcode::Cosh: partial = FormulaMath::sinh(x); break;
-      case FormulaOpcode::Tanh: partial = S(1)/FormulaMath::pow(FormulaMath::cosh(x), S(2)); break;
-      case FormulaOpcode::Erf: partial = S(2)*FormulaMath::invSqrtPi()*FormulaMath::exp(-x*x); break;
-      case FormulaOpcode::Erfc: partial = -S(2)*FormulaMath::invSqrtPi()*FormulaMath::exp(-x*x); break;
-      case FormulaOpcode::Floor: case FormulaOpcode::Ceil: break;
+#define GUNDAM_FORMULA_UNARY_GRADIENT(opcode, operation) \
+      case FormulaOpcode::opcode: partial = operation; break;
+#include "DeviceMath/SharedFormulaGradientOperations.h"
+#undef GUNDAM_FORMULA_UNARY_GRADIENT
       default: unary = false;
     }
     if( unary ){
@@ -144,14 +132,10 @@ Dual formula(DeviceFormulaProgram program, uint firstInput,
     Dual left = stack[top-2];
     S l = left.value, r = a.value, dl(0), dr(0);
     switch( op ){
-      case FormulaOpcode::Add: dl = dr = S(1); break;
-      case FormulaOpcode::Subtract: dl = S(1); dr = S(-1); break;
-      case FormulaOpcode::Multiply: dl = r; dr = l; break;
-      case FormulaOpcode::Divide: dl = S(1)/r; dr = -l/(r*r); break;
-      case FormulaOpcode::Pow: dl = r == S(0) ? S(0) : r*FormulaMath::pow(l, r-S(1)); dr = FormulaMath::pow(l,r)*FormulaMath::log(l); break;
-      case FormulaOpcode::Atan2: dl = r/(l*l+r*r); dr = -l/(l*l+r*r); break;
-      case FormulaOpcode::Min: dl = l <= r ? S(1) : S(0); dr = S(1)-dl; break;
-      case FormulaOpcode::Max: dl = l >= r ? S(1) : S(0); dr = S(1)-dl; break;
+#define GUNDAM_FORMULA_BINARY_GRADIENT(opcode, left, right) \
+      case FormulaOpcode::opcode: dl = left; dr = right; break;
+#include "DeviceMath/SharedFormulaGradientOperations.h"
+#undef GUNDAM_FORMULA_BINARY_GRADIENT
       default: break;
     }
     switch( op ){
@@ -163,6 +147,8 @@ Dual formula(DeviceFormulaProgram program, uint firstInput,
     }
     stack[--top-1] = Dual(value, chain(left.slope,dl)+chain(a.slope,dr));
   }
+#undef GUNDAM_FORMULA_GRADIENT_MATH
+#undef GUNDAM_FORMULA_GRADIENT_INV_SQRT_PI
   return stack[0];
 }
 Dual leaf(DevicePropagationDial dial, Dual first, Dual second, device const S* payloads,

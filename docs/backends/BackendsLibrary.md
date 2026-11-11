@@ -386,6 +386,21 @@ combination automatically.
 | Model requirement | Built backend and current propagation token | Built resident event-propagation model and current token | Built device model and current token |
 | Regression sources | Native backend tests and Python comparisons | Conditional native comparisons and explicit Python backend selection | Conditional device comparisons and explicit Python backend selection |
 
+CPU, MPS and CUDA use
+[`GradientValidation.h`](../../src/Backends/Common/Execution/include/GradientValidation.h)
+for common structural gradient validation: statistical likelihood, dial inputs,
+formula/composite bindings, mirroring and smoothing on every moving histogram
+axis. Lifecycle and producer-publication checks remain in each executor; CUDA
+also retains its uint32 payload-index checks.
+
+Formula derivative rules are defined once in
+[`SharedFormulaGradientOperations.h`](../../src/Backends/Common/Formula/include/DeviceMath/SharedFormulaGradientOperations.h),
+using the same rule table in the CPU, CUDA and Metal interpreters. Each backend
+keeps its input reader, stack and math operations, including compensated Metal
+arithmetic. Zero tangents still suppress singular inactive partials; tie and
+piecewise conventions are unchanged. The Metal source embeds the table at CMake
+configuration time and tracks changes to it.
+
 Manager caches the host structural gradient validation for the prepared model.
 Activation/rebuild, deactivation, data-histogram updates and interface replacement
 invalidate it. Structural changes to an active model require reactivation, as

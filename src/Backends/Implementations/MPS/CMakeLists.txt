@@ -39,6 +39,7 @@ file(READ ${BACKENDS_SOURCE_DIR}/Common/Model/include/LikelihoodTypes.h MPS_LIKE
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Execution/include/Semantics/BackendLikelihood.h MPS_LIKELIHOOD_SEMANTICS)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsLikelihood.metal MPS_LIKELIHOOD_KERNELS)
 foreach(GRADIENT_FILE
+    ${BACKENDS_SOURCE_DIR}/Common/Formula/include/DeviceMath/SharedFormulaGradientOperations.h
     ${BACKENDS_SOURCE_DIR}/Common/Model/include/GradientTypes.h
     ${BACKENDS_SOURCE_DIR}/Common/Execution/include/Semantics/BackendDeviceGradient.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsGradient.metal
@@ -55,6 +56,8 @@ file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsDialPrograms.metal MPS_DIAL_PROGRAM
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Formula/include/DeviceMath/SharedFormulaOperations.h MPS_FORMULA_OPERATIONS)
 string(REPLACE "#include \"DeviceMath/SharedFormulaOperations.h\"" "${MPS_FORMULA_OPERATIONS}" MPS_DIAL_PROGRAMS "${MPS_DIAL_PROGRAMS}")
 string(REPLACE "#include \"DeviceMath/SharedFormulaOperations.h\"" "${MPS_FORMULA_OPERATIONS}" MPS_DIAL_GRADIENT "${MPS_DIAL_GRADIENT}")
+file(READ ${BACKENDS_SOURCE_DIR}/Common/Formula/include/DeviceMath/SharedFormulaGradientOperations.h MPS_FORMULA_GRADIENT_OPERATIONS)
+string(REPLACE "#include \"DeviceMath/SharedFormulaGradientOperations.h\"" "${MPS_FORMULA_GRADIENT_OPERATIONS}" MPS_DIAL_GRADIENT "${MPS_DIAL_GRADIENT}")
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Model/include/DevicePropagationTypes.h MPS_PROPAGATION_TYPES)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsEventPropagationKernels.metal MPS_EVENT_PROPAGATION_KERNELS)
 file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCommon.h MPS_SHARED_SPLINE_COMMON)

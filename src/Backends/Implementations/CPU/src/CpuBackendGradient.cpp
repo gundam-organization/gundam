@@ -1,5 +1,6 @@
 #include "CpuBackend.h"
 #include "CpuFormulaProgram.h"
+#include "GradientValidation.h"
 
 #include "Semantics/BackendDialGradient.h"
 #include "Semantics/BackendDialSemantics.h"
@@ -64,6 +65,9 @@ namespace {
   // evaluating singular partials belonging to constant operands (e.g. x^2).
   double formulaSlope(const Backends::FormulaProgram& program_, const std::vector<double>& values_,
                       std::size_t input_) {
+#define GUNDAM_FORMULA_GRADIENT_MATH NativeFormulaMath
+#define GUNDAM_FORMULA_GRADIENT_INV_SQRT_PI (1./std::sqrt(std::acos(-1.)))
+    using S = double;
     using namespace Backends;
     struct Dual { double value, slope; };
     std::vector<Dual> stack;
@@ -80,24 +84,10 @@ namespace {
       double partial = 0.;
       bool unary = true;
       switch( op ){
-        case FormulaOpcode::Negate: partial = -1.; break;
-        case FormulaOpcode::Exp: partial = std::exp(x); break;
-        case FormulaOpcode::Log: partial = 1./x; break;
-        case FormulaOpcode::Log10: partial = 1./(x*std::log(10.)); break;
-        case FormulaOpcode::Sqrt: partial = .5/std::sqrt(x); break;
-        case FormulaOpcode::Abs: partial = x < 0. ? -1. : (x > 0. ? 1. : 0.); break;
-        case FormulaOpcode::Sin: partial = std::cos(x); break;
-        case FormulaOpcode::Cos: partial = -std::sin(x); break;
-        case FormulaOpcode::Tan: partial = 1./std::pow(std::cos(x), 2); break;
-        case FormulaOpcode::Asin: partial = 1./std::sqrt(1.-x*x); break;
-        case FormulaOpcode::Acos: partial = -1./std::sqrt(1.-x*x); break;
-        case FormulaOpcode::Atan: partial = 1./(1.+x*x); break;
-        case FormulaOpcode::Sinh: partial = std::cosh(x); break;
-        case FormulaOpcode::Cosh: partial = std::sinh(x); break;
-        case FormulaOpcode::Tanh: partial = 1./std::pow(std::cosh(x), 2); break;
-        case FormulaOpcode::Erf: partial = 2./std::sqrt(std::acos(-1.))*std::exp(-x*x); break;
-        case FormulaOpcode::Erfc: partial = -2./std::sqrt(std::acos(-1.))*std::exp(-x*x); break;
-        case FormulaOpcode::Floor: case FormulaOpcode::Ceil: break;
+#define GUNDAM_FORMULA_UNARY_GRADIENT(opcode, operation) \
+        case FormulaOpcode::opcode: partial = operation; break;
+#include "DeviceMath/SharedFormulaGradientOperations.h"
+#undef GUNDAM_FORMULA_UNARY_GRADIENT
         default: unary = false;
       }
       if( unary ){
@@ -117,14 +107,10 @@ namespace {
       const double l = left.value, r = right.value;
       double dl = 0., dr = 0.;
       switch( op ){
-        case FormulaOpcode::Add: dl = dr = 1.; break;
-        case FormulaOpcode::Subtract: dl = 1.; dr = -1.; break;
-        case FormulaOpcode::Multiply: dl = r; dr = l; break;
-        case FormulaOpcode::Divide: dl = 1./r; dr = -l/(r*r); break;
-        case FormulaOpcode::Pow: dl = r == 0. ? 0. : r*std::pow(l, r-1.); dr = std::pow(l,r)*std::log(l); break;
-        case FormulaOpcode::Atan2: dl = r/(l*l+r*r); dr = -l/(l*l+r*r); break;
-        case FormulaOpcode::Min: dl = l <= r ? 1. : 0.; dr = 1.-dl; break;
-        case FormulaOpcode::Max: dl = l >= r ? 1. : 0.; dr = 1.-dl; break;
+#define GUNDAM_FORMULA_BINARY_GRADIENT(opcode, left, right) \
+        case FormulaOpcode::opcode: dl = left; dr = right; break;
+#include "DeviceMath/SharedFormulaGradientOperations.h"
+#undef GUNDAM_FORMULA_BINARY_GRADIENT
         default: throw std::runtime_error("Invalid formula gradient opcode");
       }
       left.slope = (left.slope == 0. ? 0. : left.slope*dl) + (right.slope == 0. ? 0. : right.slope*dr);
@@ -136,6 +122,8 @@ namespace {
         default: throw std::runtime_error("Invalid formula gradient opcode");
       }
     }
+#undef GUNDAM_FORMULA_GRADIENT_MATH
+#undef GUNDAM_FORMULA_GRADIENT_INV_SQRT_PI
     return stack.back().slope;
   }
 
@@ -278,73 +266,7 @@ namespace {
 void Backends::CpuBackend::validateLikelihoodGradient() const {
   LogThrowIf(not _isBuilt_, "CPU gradient requires a built backend.");
   if( _isGradientValidated_ ){ return; }
-  const auto& model = _engineView_->propagation;
-  for( const auto& sample : model.samples ){
-    LogThrowIf(sample.useDynamicBinning and not sample.binning.isSmoothed,
-               "CPU dynamic binning gradients require bin smoothing.");
-  }
-  for( const auto& event : model.events ){
-    for( std::size_t i = 0; i < event.variableResponseCount; ++i ){
-      const auto& target = model.variableResponses.at(event.firstVariableResponse+i);
-      const auto& sample = model.samples.at(event.samplePosition);
-      const auto column = target.variableIndex-event.firstVariable;
-      // Non-histogram observables have no statistical contribution.
-      if( column >= sample.binning.variableNames.size() ){ continue; }
-      LogThrowIf(not sample.useDynamicBinning or not sample.binning.isSmoothed,
-                 "CPU observable gradients require dynamic binning and bin smoothing.");
-      for( const auto& interval : sample.binning.intervals ){
-        LogThrowIf(interval.variableIndex == column and
-                   (interval.lowerInverseWidth <= 0. or interval.upperInverseWidth <= 0.),
-                   "CPU observable gradients require bin smoothing for every moving axis: "
-                   << sample.binning.variableNames[column]);
-      }
-    }
-  }
-  LogThrowIf(_engineView_->likelihood.empty(), "CPU backend gradient requires a statistical likelihood.");
-  for( const auto& sample : _engineView_->likelihood.samples ){
-    LogThrowIf(sample.portableOptions.kind != LikelihoodKind::BarlowBeestonLiteGaussian,
-               "CPU backend gradients currently require BarlowBeestonLiteGaussian.");
-  }
-  for( const auto& dial : model.dials ){
-    switch( dial.type ){
-      case BackendDialType::Norm:
-      case BackendDialType::Graph:
-      case BackendDialType::CompactSpline:
-      case BackendDialType::UniformSpline:
-      case BackendDialType::MonotonicSpline:
-      case BackendDialType::GeneralSpline:
-        LogThrowIf(dial.inputCount != 1, "CPU backend weight gradient requires a single dial input.");
-        break;
-      case BackendDialType::Bilinear:
-      case BackendDialType::Bicubic:
-        Semantics::validateSurfaceDial(model, dial);
-        break;
-      case BackendDialType::Formula:
-        model.formulaPrograms.at(dial.formulaProgramIndex).validate();
-        break;
-      case BackendDialType::Composite:
-      case BackendDialType::Tabulated:
-      case BackendDialType::Kriged:
-      case BackendDialType::ExternalWeight:
-      case BackendDialType::Shift: break;
-      default: LogThrow("Unsupported CPU backend gradient dial: " << static_cast<unsigned>(dial.type));
-    }
-    for( std::size_t i = 0; i < dial.inputCount; ++i ){
-      const auto& input = model.dialInputs.at(dial.firstInput + i);
-      LogThrowIf(input.source != DialInputSource::Parameter or input.parameterIndex >= model.parameterCount,
-                 "CPU backend gradient requires a valid parameter input.");
-      LogThrowIf(input.useMirror and (not std::isfinite(input.mirrorRange) or input.mirrorRange <= 0.),
-                 "CPU backend gradient requires a positive finite mirror range.");
-    }
-  }
-  for( const auto& instruction : model.compositeInstructions ){
-    const auto& dial = instruction.dial;
-    for( std::size_t i = 0; i < dial.inputCount; ++i ){
-      const auto& input = model.compositeInputs.at(dial.firstInput+i);
-      LogThrowIf(input.useMirror and (not std::isfinite(input.mirrorRange) or input.mirrorRange <= 0.),
-                 "CPU composite gradient requires a positive finite mirror range.");
-    }
-  }
+  validateGradientModel(*_engineView_);
   _isGradientValidated_ = true;
 }
 

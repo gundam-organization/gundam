@@ -3,7 +3,7 @@
 #include "MpsGradientTypes.h"
 #include "DevicePropagationModel.h"
 #include "GradientModel.h"
-#include "DialProgramValidation.h"
+#include "GradientValidation.h"
 
 #include <algorithm>
 #include <cmath>
@@ -13,60 +13,7 @@
 
 namespace Backends {
   inline void validateMpsGradient(const EngineView& view_) {
-    const auto& m = view_.propagation;
-    for( const auto& sample : m.samples ){
-      if( sample.useDynamicBinning and not sample.binning.isSmoothed )
-        throw std::runtime_error("MPS dynamic binning gradients require bin smoothing.");
-    }
-    for( const auto& event : m.events ){
-      for( std::size_t i = 0; i < event.variableResponseCount; ++i ){
-        const auto& target = m.variableResponses.at(event.firstVariableResponse+i);
-        const auto& sample = m.samples.at(event.samplePosition);
-        const auto column = target.variableIndex-event.firstVariable;
-        if( column >= sample.binning.variableNames.size() ) continue;
-        if( not sample.useDynamicBinning or not sample.binning.isSmoothed )
-          throw std::runtime_error("MPS observable gradients require dynamic binning and bin smoothing.");
-        for( const auto& interval : sample.binning.intervals ){
-          if( interval.variableIndex == column and
-              (interval.lowerInverseWidth <= 0. or interval.upperInverseWidth <= 0.) )
-            throw std::runtime_error("MPS observable gradients require bin smoothing for every moving axis: "
-                                     + sample.binning.variableNames[column]);
-        }
-      }
-    }
-    if( view_.likelihood.empty() ) throw std::runtime_error("MPS gradient requires a statistical likelihood.");
-    for( const auto& sample : view_.likelihood.samples ){
-      if( sample.portableOptions.kind != LikelihoodKind::BarlowBeestonLiteGaussian )
-        throw std::runtime_error("MPS gradients currently require BarlowBeestonLiteGaussian.");
-    }
-    validateCompositePrograms(m);
-    for( const auto& dial : m.dials ){
-      switch( dial.type ){
-        case BackendDialType::Norm: case BackendDialType::Graph:
-        case BackendDialType::CompactSpline: case BackendDialType::UniformSpline:
-        case BackendDialType::MonotonicSpline: case BackendDialType::GeneralSpline:
-          if( dial.inputCount != 1 ) throw std::runtime_error("MPS scalar gradient requires one input.");
-          break;
-        case BackendDialType::Bilinear: case BackendDialType::Bicubic:
-          Semantics::validateSurfaceDial(m, dial); break;
-        case BackendDialType::Formula: validateFormulaDial(m, dial); break;
-        case BackendDialType::Shift: case BackendDialType::Composite:
-        case BackendDialType::ExternalWeight: break;
-        case BackendDialType::Tabulated: case BackendDialType::Kriged: Semantics::validateTableDial(m, dial); break;
-        default: throw std::runtime_error("Unsupported MPS gradient dial.");
-      }
-      for( std::size_t i = 0; i < dial.inputCount; ++i ){
-        const auto& input = m.dialInputs.at(dial.firstInput+i);
-        if( input.source != DialInputSource::Parameter or input.parameterIndex >= m.parameterCount )
-          throw std::runtime_error("MPS gradient requires valid parameter inputs.");
-      }
-    }
-    const auto validateMirror = [](const auto& input_){
-      if( input_.useMirror and (not std::isfinite(input_.mirrorRange) or input_.mirrorRange <= 0.) )
-        throw std::runtime_error("MPS gradient requires a positive finite mirror range.");
-    };
-    for( const auto& input : m.dialInputs ) validateMirror(input);
-    for( const auto& input : m.compositeInputs ) validateMirror(input);
+    validateGradientModel(view_);
   }
 
   struct MpsGradientModel {

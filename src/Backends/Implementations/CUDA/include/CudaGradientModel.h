@@ -2,69 +2,19 @@
 #define GUNDAM_CUDA_GRADIENT_MODEL_H
 #include "CudaGradientSemantics.h"
 #include "GradientModel.h"
-#include "DialProgramValidation.h"
+#include "GradientValidation.h"
 
 #include <algorithm>
 
 namespace Backends {
   inline void validateCudaGradient(const EngineView& view_) {
+    validateGradientModel(view_);
     const auto& m = view_.propagation;
-    for( const auto& sample : m.samples ){
-      if( sample.useDynamicBinning and not sample.binning.isSmoothed )
-        throw std::runtime_error("CUDA dynamic binning gradients require bin smoothing.");
-    }
-    for( const auto& event : m.events ){
-      for( std::size_t i = 0; i < event.variableResponseCount; ++i ){
-        const auto& target = m.variableResponses.at(event.firstVariableResponse+i);
-        const auto& sample = m.samples.at(event.samplePosition);
-        const auto column = target.variableIndex-event.firstVariable;
-        if( column >= sample.binning.variableNames.size() ) continue;
-        if( not sample.useDynamicBinning or not sample.binning.isSmoothed )
-          throw std::runtime_error("CUDA observable gradients require dynamic binning and bin smoothing.");
-        for( const auto& interval : sample.binning.intervals ){
-          if( interval.variableIndex == column and
-              (interval.lowerInverseWidth <= 0. or interval.upperInverseWidth <= 0.) )
-            throw std::runtime_error("CUDA observable gradients require bin smoothing for every moving axis: "
-                                     + sample.binning.variableNames[column]);
-        }
-      }
-    }
-    if( view_.likelihood.empty() ) throw std::runtime_error("CUDA gradient requires a statistical likelihood.");
-    for( const auto& sample : view_.likelihood.samples )
-      if( sample.portableOptions.kind != LikelihoodKind::BarlowBeestonLiteGaussian )
-        throw std::runtime_error("CUDA gradients currently require BarlowBeestonLiteGaussian.");
-    validateCompositePrograms(m);
-    for( const auto& program : m.formulaPrograms ) program.validate();
-    for( const auto& dial : m.dials ){
-      switch( dial.type ){
-        case BackendDialType::Norm: case BackendDialType::Graph:
-        case BackendDialType::CompactSpline: case BackendDialType::UniformSpline:
-        case BackendDialType::MonotonicSpline: case BackendDialType::GeneralSpline:
-          if( dial.inputCount != 1 ) throw std::runtime_error("CUDA scalar gradient requires one input.");
-          break;
-        case BackendDialType::Bilinear: case BackendDialType::Bicubic: Semantics::validateSurfaceDial(m,dial); break;
-        case BackendDialType::Formula: validateFormulaDial(m,dial); break;
-        case BackendDialType::Tabulated: case BackendDialType::Kriged: Semantics::validateTableDial(m,dial); break;
-        case BackendDialType::Shift: case BackendDialType::Composite: case BackendDialType::ExternalWeight: break;
-        default: throw std::runtime_error("Unsupported CUDA gradient dial.");
-      }
-      for( std::size_t j = 0; j < dial.inputCount; ++j ){
-        const auto& input = m.dialInputs.at(dial.firstInput+j);
-        if( input.source != DialInputSource::Parameter || input.parameterIndex >= m.parameterCount )
-          throw std::runtime_error("CUDA gradient requires valid parameter inputs.");
-      }
-    }
     // Scalar interpolation descriptors use the shared uint32 wire offsets.
     for( const auto& dial : m.dials ){ gradientIndex(dial.payloadOffset); gradientIndex(dial.payloadSize); }
     for( const auto& instruction : m.compositeInstructions ){
       gradientIndex(instruction.dial.payloadOffset); gradientIndex(instruction.dial.payloadSize);
     }
-    const auto mirror = [](const auto& input_){
-      if( input_.useMirror && (!std::isfinite(input_.mirrorRange) || input_.mirrorRange <= 0.) )
-        throw std::runtime_error("CUDA gradient requires positive finite mirror ranges.");
-    };
-    for( const auto& input : m.dialInputs ) mirror(input);
-    for( const auto& input : m.compositeInputs ) mirror(input);
   }
   struct CudaGradientDirection { DeviceIndex dial, input, scratch, stack, external; };
   // Original dial numbering, independent of value-executor remapping, compact
