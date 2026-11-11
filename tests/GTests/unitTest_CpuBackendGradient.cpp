@@ -762,8 +762,9 @@ namespace {
       // Host-only fractional bins remain differentiable for event weights.
       model.hasVariableResponses = false;
       model.variableResponses.clear();
+      model.variableDialIndices.clear();
       model.samples[0].useDynamicBinning = false;
-      for( auto& event : model.events ){ event.variableResponseCount = 0; }
+      for( auto& event : model.events ){ event.firstVariableResponse = event.variableResponseCount = 0; }
       backend_.build(view);
       compareGradient(backend_, {.8, .9, .2});
     }
@@ -785,17 +786,16 @@ namespace {
   void checkRejectsMigrationWithoutSmoothingOnEachMovingAxis(Backend& backend_) {
     auto view = observableGradientModel();
     view.propagation.samples[0].useDynamicBinning = false;
-    backend_.build(view);
-    EXPECT_THROW(backend_.validateLikelihoodGradient(), std::exception);
+    // Executors may reject malformed binning while packing, before the
+    // gradient-specific validation. Either rejection phase is valid.
+    EXPECT_THROW({ backend_.build(view); backend_.validateLikelihoodGradient(); }, std::exception);
     view.propagation.samples[0].useDynamicBinning = true;
     view.propagation.samples[0].binning.isSmoothed = false;
-    backend_.build(view);
-    EXPECT_THROW(backend_.validateLikelihoodGradient(), std::exception);
+    EXPECT_THROW({ backend_.build(view); backend_.validateLikelihoodGradient(); }, std::exception);
     view.propagation.samples[0].binning.isSmoothed = true;
     view.propagation.samples[0].binning.intervals[1].lowerInverseWidth = 0.;
     view.propagation.samples[0].binning.intervals[1].upperInverseWidth = 0.;
-    backend_.build(view);
-    EXPECT_THROW(backend_.validateLikelihoodGradient(), std::exception);
+    EXPECT_THROW({ backend_.build(view); backend_.validateLikelihoodGradient(); }, std::exception);
   }
 }
 TEST(CpuBackendGradient, RejectsMigrationWithoutSmoothingOnEachMovingAxis) {
