@@ -1,5 +1,6 @@
 #include "CpuBackend.h"
 #include "../../src/Backends/Implementations/CUDA/include/CudaGradientModel.h"
+#include "../../src/Backends/Implementations/CUDA/include/CudaMigrationGradient.h"
 #ifdef __APPLE__
 #include "MpsBackend.h"
 #endif
@@ -140,29 +141,61 @@ namespace {
       std::vector<GradientSemantics::DialEvaluation<double>> scales;
       for( std::size_t i = 0; i < layout.bins.size(); ++i )
         scales.push_back(GradientSemantics::binScales<CudaGradient::Math>(layout.bins[i],sums[i],squares[i]));
-      std::vector<double> result(m.parameterCount), contributions(layout.contributionCount);
-      for( const auto& event : layout.events ){
-        double product = 1.;
-        for( std::size_t j = 0; j < event.count; ++j ) product *= local[layout.inputOffsets[layout.indices[event.first+j]]].value;
-        if( event.bin >= scales.size() || (layout.work.useCap && product > layout.work.cap) ) continue;
-        auto scale = event.base*(scales[event.bin].value+weights[event.result]*scales[event.bin].derivative);
-        auto position = layout.eventOffsets[event.result];
-        for( std::size_t j = 0; j < event.count; ++j ){
-          auto dial = layout.indices[event.first+j]; double others = 1.;
-          for( std::size_t k = 0; k < event.count; ++k ) if( k != j ) others *= local[layout.inputOffsets[layout.indices[event.first+k]]].value;
-          for( std::size_t k = 0; k < m.dials[dial].inputCount; ++k ){
-            auto value = scale*others*local[layout.inputOffsets[dial]+k].slope;
-            contributions[position+k] = value;
-            result[m.dialInputs[m.dials[dial].firstInput+k].parameterIndex] += value;
-          }
-          position += std::max(std::size_t(1),m.dials[dial].inputCount);
+      std::vector<double> contributions(layout.contributionCount);
+      std::vector<CudaBinningSample> samples;
+      std::vector<BinningBin> bins;
+      std::vector<BinningInterval> intervals;
+      for( const auto& sample : m.samples ){
+        CudaBinningSample packed;
+        packed.binOffset = sample.binOffset; packed.binCount = sample.binCount;
+        packed.firstBin = bins.size(); packed.variableCount = sample.binning.variableNames.size();
+        packed.isSmoothed = sample.binning.isSmoothed; packed.isDynamic = sample.useDynamicBinning;
+        for( const auto& bin : sample.binning.bins ){
+          auto copy = bin; copy.firstInterval += intervals.size(); bins.push_back(copy);
         }
+        intervals.insert(intervals.end(),sample.binning.intervals.begin(),sample.binning.intervals.end());
+        packed.endBin = bins.size(); samples.push_back(packed);
       }
-      for( std::size_t i = 0; i < result.size(); ++i ) EXPECT_NEAR(result[i],reference[i],1e-10*(1.+std::abs(reference[i])));
+      const double* variables = m.requiresEventBinning() ? getEventStateHostView(token_).variables.data() : nullptr;
+      CudaGradient::EventGradientView eventView{layout.indices.data(),layout.inputOffsets.data(),layout.eventOffsets.data(),
+        m.events.data(),m.variableResponses.data(),m.variableDialIndices.data(),samples.data(),samples.size(),
+        bins.data(),intervals.data(),nullptr,nullptr,variables};
+      std::vector<GradientSemantics::DialEvaluation<double>> responses;
+      for( const auto& value : local ) responses.push_back({value.value,value.slope});
+      for( std::size_t i = 0; i < layout.events.size(); ++i )
+        CudaGradient::eventGradient(i,eventView,layout.events[i],layout.work,responses.data(),scales.data(),weights.data(),contributions.data());
+      // Compare the indexed candidate path with exhaustive traversal using
+      // pruning leaves in original bin order (the CUDA value path's contract).
+      std::vector<CudaBinningNode> nodes;
+      std::vector<CudaBinningBound> bounds;
+      const double infinity = std::numeric_limits<double>::infinity();
+      for( auto& sample : samples ){
+        sample.firstNode = nodes.size();
+        for( auto j = sample.firstBin; j < sample.endBin; ++j ){
+          auto firstBound = bounds.size();
+          bounds.resize(firstBound+sample.variableCount,{-infinity,infinity});
+          const auto& bin = bins[j];
+          for( std::size_t k = 0; k < bin.intervalCount; ++k ){
+            const auto& interval = intervals[bin.firstInterval+k];
+            auto& bound = bounds[firstBound+interval.variableIndex];
+            auto low = interval.lowerBound-(interval.lowerInverseWidth > 0. ? 1./interval.lowerInverseWidth : 0.);
+            auto high = interval.upperBound+(interval.upperInverseWidth > 0. ? 1./interval.upperInverseWidth : 0.);
+            bound.lower = std::max(bound.lower,std::nextafter(low,-infinity));
+            bound.upper = std::min(bound.upper,std::nextafter(high,infinity));
+          }
+          nodes.push_back({j,j+1,firstBound,nodes.size()+1});
+        }
+        sample.endNode = nodes.size();
+      }
+      eventView.nodes = nodes.empty() ? nullptr : nodes.data(); eventView.bounds = bounds.data();
+      std::vector<double> indexed(contributions.size());
+      for( std::size_t i = 0; i < layout.events.size(); ++i )
+        CudaGradient::eventGradient(i,eventView,layout.events[i],layout.work,responses.data(),scales.data(),weights.data(),indexed.data());
+      for( std::size_t i = 0; i < indexed.size(); ++i ) EXPECT_NEAR(indexed[i],contributions[i],1e-12*(1.+std::abs(contributions[i])));
       std::vector<double> reduced(m.parameterCount);
       for( std::size_t i = 0; i < reduced.size(); ++i ){
         for( auto j = layout.parameterOffsets[i]; j < layout.parameterOffsets[i+1]; ++j ) reduced[i] += contributions[layout.parameterOccurrences[j]];
-        EXPECT_NEAR(reduced[i],result[i],1e-12*(1.+std::abs(result[i])));
+        EXPECT_NEAR(reduced[i],reference[i],1e-10*(1.+std::abs(reference[i])));
       }
       return reduced;
     }
@@ -990,11 +1023,37 @@ TEST(CudaGradientDevice, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows
 }
 #endif
 
-TEST(CudaGradientHostMath, RejectsObservableAndFractionalBinning) {
-  auto view = observableGradientModel();
-  EXPECT_THROW(validateCudaGradient(view),std::runtime_error);
-  view.propagation.hasVariableResponses = false;
-  view.propagation.variableResponses.clear();
-  for( auto& event : view.propagation.events ) event.variableResponseCount = 0;
-  EXPECT_THROW(validateCudaGradient(view),std::runtime_error);
+
+
+TEST(CudaGradientHostMath, MultidimensionalMigrationFractionsAndOutsideSupport) { HostCudaGradient backend; checkMultidimensionalMigrationFractionsAndOutsideSupport(backend); }
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(CudaGradientDevice, MultidimensionalMigrationFractionsAndOutsideSupport) {
+  for( const char* mode : {"cachedResponses","recomputeResponses"} ) for( const char* layout : {"eventMajor","warpInterleaved"} ){
+    CudaBackend backend;
+    backend.configure(ConfigReader(JsonType{{"propagationMode",mode},{"weightLayout",layout}}));
+    checkMultidimensionalMigrationFractionsAndOutsideSupport(backend);
+  }
 }
+#endif
+
+TEST(CudaGradientHostMath, RejectsMigrationWithoutSmoothingOnEachMovingAxis) { HostCudaGradient backend; checkRejectsMigrationWithoutSmoothingOnEachMovingAxis(backend); }
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(CudaGradientDevice, RejectsMigrationWithoutSmoothingOnEachMovingAxis) {
+  for( const char* mode : {"cachedResponses","recomputeResponses"} ) for( const char* layout : {"eventMajor","warpInterleaved"} ){
+    CudaBackend backend;
+    backend.configure(ConfigReader(JsonType{{"propagationMode",mode},{"weightLayout",layout}}));
+    checkRejectsMigrationWithoutSmoothingOnEachMovingAxis(backend);
+  }
+}
+#endif
+
+TEST(CudaGradientHostMath, ObservableFormulaCompositeAndProducerJacobians) { HostCudaGradient backend; checkObservableFormulaCompositeAndProducerJacobians(backend); }
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(CudaGradientDevice, ObservableFormulaCompositeAndProducerJacobians) {
+  for( const char* mode : {"cachedResponses","recomputeResponses"} ) for( const char* layout : {"eventMajor","warpInterleaved"} ){
+    CudaBackend backend;
+    backend.configure(ConfigReader(JsonType{{"propagationMode",mode},{"weightLayout",layout}}));
+    checkObservableFormulaCompositeAndProducerJacobians(backend);
+  }
+}
+#endif

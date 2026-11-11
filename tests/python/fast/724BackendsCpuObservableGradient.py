@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CPU/MPS observable/fraction gradients against native execution and finite differences."""
+"""CPU/MPS/CUDA observable/fraction gradients against native execution and finite differences."""
 import argparse
 import copy
 from importlib import import_module
@@ -90,7 +90,7 @@ def check_threads(threads, backend_type="CPU"):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('testDirectory', nargs='?', help=argparse.SUPPRESS)
-    parser.add_argument('--backend', choices=['CPU', 'MPS'], default='CPU')
+    parser.add_argument('--backend', choices=['CPU', 'MPS', 'CUDA'], default='CPU')
     args = parser.parse_args()
     for threads in (1, 4):
         check_threads(threads, args.backend)

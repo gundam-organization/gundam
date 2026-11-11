@@ -331,13 +331,13 @@ gradient evaluation do not request ROOT/Clad differentiation.
 | --- | :---: | :---: | :---: | --- |
 | Fixed, unsmoothed histograms | ✅ | ✅ | ✅ | Derivatives of bin contents and MC uncertainties. |
 | Ignored likelihood bins | ✅ | ✅ | ✅ | Follow the prepared likelihood's ignored-bin mask. |
-| Observable-response dials + dynamic binning / migration + smoothed binning / fractional contributions | ⚠️ | ⚠️ | ❌ | CPU and MPS differentiate Override/Multiply/Add, fractions and `(weight * fraction)^2`. Moving histogram axes require all three features, with smoothing on every moving axis; hard migration is rejected. |
+| Observable-response dials + dynamic binning / migration + smoothed binning / fractional contributions | ⚠️ | ⚠️ | ⚠️ | CPU, MPS and CUDA differentiate Override/Multiply/Add, fractions and `(weight * fraction)^2`. Moving histogram axes require all three features, with smoothing on every moving axis; hard migration is rejected. |
 | `BarlowBeestonLiteGaussian` | ✅ | ✅ | ✅ | Includes derivatives with respect to prediction and MC uncertainty. |
 | `PoissonLLH` / `PoissonLogLikelihood` | ❌ | ❌ | ❌ | Value support does not imply gradient support. |
 | `BarlowBeestonLitePoisson` | ❌ | ❌ | ❌ | No backend gradient implementation. |
 | `LeastSquares` and other statistical LLHs | ❌ | ❌ | ❌ | Gradient validation currently requires Gaussian Barlow–Beeston. |
 
-CPU and MPS migration gradients combine the dial Jacobians with the observable
+CPU, MPS and CUDA migration gradients combine the dial Jacobians with the observable
 composition and the compact-support binning kernel. Every moving histogram axis
 must have both dynamic binning and smoothing; smoothing an unrelated axis does
 not satisfy this requirement. Hard selections on parameter-independent axes
@@ -345,7 +345,7 @@ remain supported. Observable responses outside the histogram coordinates have
 no statistical derivative. Fixed fractional histograms without observable dials
 still contribute through their event-weight derivatives.
 
-For each bin contribution `w * f`, CPU and MPS differentiate both the event weight `w`
+For each bin contribution `w * f`, CPU, MPS and CUDA differentiate both the event weight `w`
 and the fraction `f`, including their effect on the MC squared-weight sum.
 Zero/repeated observable multipliers use products without division. Events
 outside the strict bins can still contribute within the smoothing support; the
@@ -425,12 +425,19 @@ coupling to value-path reordering, compact descriptors or template deduplication
 Producer Jacobians are copied per propagation and checked before gradient use;
 missing, malformed or non-finite rows cannot reuse an older publication.
 Constant/zero-input responses remain in event products but have no parameter
-occurrences. CUDA still rejects observable-response, dynamic and smoothed
-binning gradients.
+occurrences. Observable occurrences follow weight occurrences in the sparse
+layout. CUDA differentiates the shared observable composition and the same
+compact-support fractions and first-largest roundoff correction used by value
+propagation, reading resident observables and histogram moments. The geometry
+traversal uses the resident CUDA candidate tree; it stores no dense event/bin or
+event/parameter Jacobian. Weight caps retain the observable migration derivative.
+Hard migration and smoothing missing from any moving axis are rejected.
 
 The CUDA derivative semantics and occurrence layout have been tested on the
-host against CPU gradients and finite differences, without a CUDA toolkit.
-**NVCC compilation and GPU execution of these new dial gradients remain
+host against CPU gradients and finite differences, without a CUDA toolkit. Migration rules are also compared with CPU gradients and
+finite differences for multiple axes, zero/repeated multipliers, outside support,
+ignored bins, producer Jacobians and capped weights.
+**NVCC compilation and GPU execution of these new dial and migration gradients remain
 unvalidated.** Conditional `CudaGradientDevice.*` tests exercise both propagation
 modes and weight layouts in `gundamGTest_cudaBackend.exe`. Integration scripts
 `416DialsExternalWeightGradient.py`, `723BackendsCpuCompositeDials.py` and
@@ -458,9 +465,9 @@ and backend activation/deactivation. Having these tests in the repository does
 not establish that they have passed on every GPU; the CUDA propagation validation
 reported elsewhere in this document is not itself gradient validation.
 
-CPU/MPS migration/fraction regressions are covered by
+CPU/MPS/CUDA migration/fraction regressions are covered by
 [`724BackendsCpuObservableGradient.py`](../../tests/python/fast/724BackendsCpuObservableGradient.py)
-(`--backend CPU|MPS`, default `CPU`) and the native CPU/MPS gradient tests.
+(`--backend CPU|MPS|CUDA`, default `CPU`) and native CPU/MPS plus host/device CUDA gradient tests.
 They compare with the original engine and
 finite differences, including absolute/relative smoothing widths, parallel
 execution, normalized/eigen coordinates, zero/repeated multipliers, weight caps,
