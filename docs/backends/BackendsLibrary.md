@@ -331,15 +331,13 @@ gradient evaluation do not request ROOT/Clad differentiation.
 | --- | :---: | :---: | :---: | --- |
 | Fixed, unsmoothed histograms | ✅ | ✅ | ✅ | Derivatives of bin contents and MC uncertainties. |
 | Ignored likelihood bins | ✅ | ✅ | ✅ | Follow the prepared likelihood's ignored-bin mask. |
-| Observable-response dials | ✅ | ❌ | ❌ | CPU differentiates Override, Multiply and Add; moving histogram axes require dynamic binning and smoothing. |
-| Dynamic binning / migration | ⚠️ | ❌ | ❌ | CPU requires smoothed bins; hard migration is rejected for gradients. |
-| Smoothed binning / fractional contributions | ✅ | ❌ | ❌ | CPU differentiates fractions and `(weight * fraction)^2`, with absolute or relative widths and multiple axes. |
+| Observable-response dials + dynamic binning / migration + smoothed binning / fractional contributions | ⚠️ | ⚠️ | ❌ | CPU and MPS differentiate Override/Multiply/Add, fractions and `(weight * fraction)^2`. Moving histogram axes require all three features, with smoothing on every moving axis; hard migration is rejected. |
 | `BarlowBeestonLiteGaussian` | ✅ | ✅ | ✅ | Includes derivatives with respect to prediction and MC uncertainty. |
 | `PoissonLLH` / `PoissonLogLikelihood` | ❌ | ❌ | ❌ | Value support does not imply gradient support. |
 | `BarlowBeestonLitePoisson` | ❌ | ❌ | ❌ | No backend gradient implementation. |
 | `LeastSquares` and other statistical LLHs | ❌ | ❌ | ❌ | Gradient validation currently requires Gaussian Barlow–Beeston. |
 
-CPU migration gradients combine the dial Jacobians with the observable
+CPU and MPS migration gradients combine the dial Jacobians with the observable
 composition and the compact-support binning kernel. Every moving histogram axis
 must have both dynamic binning and smoothing; smoothing an unrelated axis does
 not satisfy this requirement. Hard selections on parameter-independent axes
@@ -347,7 +345,7 @@ remain supported. Observable responses outside the histogram coordinates have
 no statistical derivative. Fixed fractional histograms without observable dials
 still contribute through their event-weight derivatives.
 
-For each bin contribution `w * f`, CPU differentiates both the event weight `w`
+For each bin contribution `w * f`, CPU and MPS differentiate both the event weight `w`
 and the fraction `f`, including their effect on the MC squared-weight sum.
 Zero/repeated observable multipliers use products without division. Events
 outside the strict bins can still contribute within the smoothing support; the
@@ -413,7 +411,12 @@ External/table Jacobians are copied before propagation returns, including at
 unchanged parameters, and uploaded for the current gradient. Missing, malformed
 or non-finite publications are rejected; an older Jacobian is never reused.
 Table values and response supervision also run on the device; producers remain
-on the host. MPS observable-response and bin-migration gradients remain unsupported.
+on the host. Observable adjoints and fraction derivatives also run on the GPU,
+using resident observables, sparse contributions and the same bin-search tree
+and compact-support geometry as propagation. The event accumulation includes
+both weight and observable dial occurrences; no dense event/bin or
+event/parameter Jacobian is stored. Fixed bins use resident bin contributions,
+so dynamic state never depends on a stale initial event bin.
 
 GPU gradient evaluation reads resident weights and histogram moments; the final
 parameter-gradient vector is returned to the host for penalties and minimizer
@@ -436,9 +439,10 @@ and backend activation/deactivation. Having these tests in the repository does
 not establish that they have passed on every GPU; the CUDA propagation validation
 reported elsewhere in this document is not itself gradient validation.
 
-CPU migration/fraction regressions are covered by
+CPU/MPS migration/fraction regressions are covered by
 [`724BackendsCpuObservableGradient.py`](../../tests/python/fast/724BackendsCpuObservableGradient.py)
-and the CPU native gradient tests. They compare with the original engine and
+(`--backend CPU|MPS`, default `CPU`) and the native CPU/MPS gradient tests.
+They compare with the original engine and
 finite differences, including absolute/relative smoothing widths, parallel
 execution, normalized/eigen coordinates, zero/repeated multipliers, weight caps,
 ignored bins, multidimensional geometry and outside support, plus rejection of
@@ -454,7 +458,8 @@ comparisons and separate native gradient profiles. See
 The restrictions above are enforced in
 [`CpuBackendGradient.cpp`](../../src/Backends/Implementations/CPU/src/CpuBackendGradient.cpp)
 and the shared device
-[`GradientModel.h`](../../src/Backends/Common/Execution/include/GradientModel.h).
+[`GradientModel.h`](../../src/Backends/Common/Execution/include/GradientModel.h) and
+[`MpsGradientModel.h`](../../src/Backends/Implementations/MPS/include/MpsGradientModel.h).
 Unsupported dial, likelihood and binning combinations fail explicitly; there is
 no automatic fallback to the original engine's gradient. The external-constraint
 integration gap described above is an exception to this rejection behavior.

@@ -640,99 +640,135 @@ namespace {
   }
 }
 
+namespace {
+  void checkMultidimensionalMigrationFractionsAndOutsideSupport(Backend& backend_) {
+    for( bool mirror : {false, true} ) for( bool cap : {false, true} ){
+      auto view = observableGradientModel();
+      auto& model = view.propagation;
+      model.dialInputs[0] = {0, mirror, 0., 2.};
+      model.hasReweightCap = cap; model.maxReweight = .1;
+      backend_.build(view);
+      for( const auto& point : {std::vector<double>{.8, .9, .2}, {.8, 0., .2},
+                              {.8, .9, -.8}, {.8, .9, 1.5}, {3.2, .9, .2}} ){
+        compareGradient(backend_, point, 2e-7);
+      }
+      // Host-only fractional bins remain differentiable for event weights.
+      model.hasVariableResponses = false;
+      model.variableResponses.clear();
+      model.samples[0].useDynamicBinning = false;
+      for( auto& event : model.events ){ event.variableResponseCount = 0; }
+      backend_.build(view);
+      compareGradient(backend_, {.8, .9, .2});
+    }
+  }
+}
 TEST(CpuBackendGradient, MultidimensionalMigrationFractionsAndOutsideSupport) {
-  for( bool mirror : {false, true} ) for( bool cap : {false, true} ){
-    auto view = observableGradientModel();
-    auto& model = view.propagation;
-    model.dialInputs[0] = {0, mirror, 0., 2.};
-    model.hasReweightCap = cap; model.maxReweight = .1;
-    CpuBackend backend;
-    backend.build(view);
-    for( const auto& point : {std::vector<double>{.8, .9, .2}, {.8, 0., .2},
-                            {.8, .9, -.8}, {.8, .9, 1.5}, {3.2, .9, .2}} ){
-      compareGradient(backend, point, 2e-7);
-    }
-    // Host-only fractional bins remain differentiable for event weights.
-    model.hasVariableResponses = false;
-    model.variableResponses.clear();
-    model.samples[0].useDynamicBinning = false;
-    for( auto& event : model.events ){ event.variableResponseCount = 0; }
-    backend.build(view);
-    compareGradient(backend, {.8, .9, .2});
-  }
-}
-
-TEST(CpuBackendGradient, RejectsMigrationWithoutSmoothingOnEachMovingAxis) {
-  auto view = observableGradientModel();
   CpuBackend backend;
-  view.propagation.samples[0].useDynamicBinning = false;
-  backend.build(view);
-  EXPECT_THROW(backend.validateLikelihoodGradient(), std::exception);
-  view.propagation.samples[0].useDynamicBinning = true;
-  view.propagation.samples[0].binning.isSmoothed = false;
-  backend.build(view);
-  EXPECT_THROW(backend.validateLikelihoodGradient(), std::exception);
-  view.propagation.samples[0].binning.isSmoothed = true;
-  view.propagation.samples[0].binning.intervals[1].lowerInverseWidth = 0.;
-  view.propagation.samples[0].binning.intervals[1].upperInverseWidth = 0.;
-  backend.build(view);
-  EXPECT_THROW(backend.validateLikelihoodGradient(), std::exception);
+  checkMultidimensionalMigrationFractionsAndOutsideSupport(backend);
 }
+#ifdef __APPLE__
+TEST(MpsBackendGradient, MultidimensionalMigrationFractionsAndOutsideSupport) {
+  MpsBackend backend;
+  if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  checkMultidimensionalMigrationFractionsAndOutsideSupport(backend);
+}
+#endif
 
-TEST(CpuBackendGradient, ObservableFormulaCompositeAndProducerJacobians) {
-  for( auto type : {BackendDialType::Formula, BackendDialType::Composite,
-                   BackendDialType::ExternalWeight, BackendDialType::Tabulated, BackendDialType::Kriged} ){
+namespace {
+  void checkRejectsMigrationWithoutSmoothingOnEachMovingAxis(Backend& backend_) {
     auto view = observableGradientModel();
-    auto& model = view.propagation;
-    auto& dial = model.dials[0];
-    dial.type = type; dial.inputCount = 2;
-    dial.hasMinResponse = dial.hasMaxResponse = true;
-    dial.minResponse = .7; dial.maxResponse = 1.;
-    smoothLimits(dial, .1, .1);
-    const bool producer = type == BackendDialType::ExternalWeight or isTableDial(type);
-    if( producer ){
-      model.externalWeightBlocks = {{0, 2}};
-      model.tableTerms = {{0, .25}, {1, .75}};
-      dial.tableTermCount = 2;
-    }
-    else {
-      model.formulaPrograms = {FormulaCompiler::compile("[p]^2+.2*[q]", {"p", "q"})};
-      model.formulaInputs = {{0}, {1}};
-      if( type == BackendDialType::Composite ){
-        CompositeInstruction node;
-        node.dial.type = BackendDialType::Formula; node.dial.inputCount = 2;
-        model.compositeInputs = {{0}, {1}};
-        model.compositeInstructions = {node};
-        model.compositePrograms = {{0, 1, 2, 2}};
-      }
-    }
-    CpuBackend backend;
-    backend.build(view);
-    PropagationInputs inputs;
-    std::vector<double> table(2);
-    std::uint64_t generation = 0;
-    auto publish = [&](const std::vector<double>& point_){
-      inputs.parameters.values = point_;
+    view.propagation.samples[0].useDynamicBinning = false;
+    backend_.build(view);
+    EXPECT_THROW(backend_.validateLikelihoodGradient(), std::exception);
+    view.propagation.samples[0].useDynamicBinning = true;
+    view.propagation.samples[0].binning.isSmoothed = false;
+    backend_.build(view);
+    EXPECT_THROW(backend_.validateLikelihoodGradient(), std::exception);
+    view.propagation.samples[0].binning.isSmoothed = true;
+    view.propagation.samples[0].binning.intervals[1].lowerInverseWidth = 0.;
+    view.propagation.samples[0].binning.intervals[1].upperInverseWidth = 0.;
+    backend_.build(view);
+    EXPECT_THROW(backend_.validateLikelihoodGradient(), std::exception);
+  }
+}
+TEST(CpuBackendGradient, RejectsMigrationWithoutSmoothingOnEachMovingAxis) {
+  CpuBackend backend;
+  checkRejectsMigrationWithoutSmoothingOnEachMovingAxis(backend);
+}
+#ifdef __APPLE__
+TEST(MpsBackendGradient, RejectsMigrationWithoutSmoothingOnEachMovingAxis) {
+  MpsBackend backend;
+  if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  checkRejectsMigrationWithoutSmoothingOnEachMovingAxis(backend);
+}
+#endif
+
+namespace {
+  void checkObservableFormulaCompositeAndProducerJacobians(Backend& backend_) {
+    for( auto type : {BackendDialType::Formula, BackendDialType::Composite,
+                     BackendDialType::ExternalWeight, BackendDialType::Tabulated, BackendDialType::Kriged} ){
+      auto view = observableGradientModel();
+      auto& model = view.propagation;
+      auto& dial = model.dials[0];
+      dial.type = type; dial.inputCount = 2;
+      dial.hasMinResponse = dial.hasMaxResponse = true;
+      dial.minResponse = .7; dial.maxResponse = 1.;
+      smoothLimits(dial, .1, .1);
+      const bool producer = type == BackendDialType::ExternalWeight or isTableDial(type);
       if( producer ){
-        table.assign(2, point_[0]*point_[0]+.2*point_[1]);
-        inputs.externalWeights = {{table.data(), table.size(), 0, ++generation}};
-        inputs.externalDialGradients.resize(model.dials.size());
-        inputs.externalDialGradients[0] = {2.*point_[0], .2};
+        model.externalWeightBlocks = {{0, 2}};
+        model.tableTerms = {{0, .25}, {1, .75}};
+        dial.tableTermCount = 2;
       }
-      return backend.requestPropagation(inputs);
-    };
-    for( const auto& point : {std::vector<double>{.8, .9, .2}, {.75, .8, -.6}, {.9, .8, 1.3}} ){
-      const auto analytic = backend.getLikelihoodGradient(publish(point));
-      for( std::size_t i = 0; i < point.size(); ++i ){
-        auto up = point, down = point;
-        up[i] += 1e-5; down[i] -= 1e-5;
-        const double upper = backend.getLikelihood(publish(up));
-        const double lower = backend.getLikelihood(publish(down));
-        EXPECT_NEAR(analytic[i], (upper-lower)/2e-5, 2e-6);
+      else {
+        model.formulaPrograms = {FormulaCompiler::compile("[p]^2+.2*[q]", {"p", "q"})};
+        model.formulaInputs = {{0}, {1}};
+        if( type == BackendDialType::Composite ){
+          CompositeInstruction node;
+          node.dial.type = BackendDialType::Formula; node.dial.inputCount = 2;
+          model.compositeInputs = {{0}, {1}};
+          model.compositeInstructions = {node};
+          model.compositePrograms = {{0, 1, 2, 2}};
+        }
+      }
+      backend_.build(view);
+      PropagationInputs inputs;
+      std::vector<double> table(2);
+      std::uint64_t generation = 0;
+      auto publish = [&](const std::vector<double>& point_){
+        inputs.parameters.values = point_;
+        if( producer ){
+          table.assign(2, point_[0]*point_[0]+.2*point_[1]);
+          inputs.externalWeights = {{table.data(), table.size(), 0, ++generation}};
+          inputs.externalDialGradients.resize(model.dials.size());
+          inputs.externalDialGradients[0] = {2.*point_[0], .2};
+        }
+        return backend_.requestPropagation(inputs);
+      };
+      for( const auto& point : {std::vector<double>{.8, .9, .2}, {.75, .8, -.6}, {.9, .8, 1.3}} ){
+        const auto analytic = backend_.getLikelihoodGradient(publish(point));
+        for( std::size_t i = 0; i < point.size(); ++i ){
+          auto up = point, down = point;
+          up[i] += 1e-5; down[i] -= 1e-5;
+          const double upper = backend_.getLikelihood(publish(up));
+          const double lower = backend_.getLikelihood(publish(down));
+          EXPECT_NEAR(analytic[i], (upper-lower)/2e-5, 2e-6);
+        }
       }
     }
   }
 }
+TEST(CpuBackendGradient, ObservableFormulaCompositeAndProducerJacobians) {
+  CpuBackend backend;
+  checkObservableFormulaCompositeAndProducerJacobians(backend);
+}
+#ifdef __APPLE__
+TEST(MpsBackendGradient, ObservableFormulaCompositeAndProducerJacobians) {
+  MpsBackend backend;
+  if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  checkObservableFormulaCompositeAndProducerJacobians(backend);
+}
+#endif
 
 namespace {
   void checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(Backend& backend_) {

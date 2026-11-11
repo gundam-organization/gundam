@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""CPU observable/fraction gradients against native execution and finite differences."""
+"""CPU/MPS observable/fraction gradients against native execution and finite differences."""
+import argparse
 import copy
 from importlib import import_module
 from pathlib import Path
@@ -11,7 +12,7 @@ fixture = import_module('590NumericsWeightGradient')
 observables = import_module('595NumericsObservableGradient')
 
 
-def check_threads(threads):
+def check_threads(threads, backend_type="CPU"):
     config, build, check, close = fixture.make_fixture(threads)
     li = config['likelihoodInterfaceConfig']
     observables.add_reference_events(li['dataSetList'][0]['model']['filePathList'][0])
@@ -38,7 +39,7 @@ def check_threads(threads):
         for normalized, eigen in ((False, False), (True, False), (False, True), (True, True)):
             native = build(config, normalized, eigen, analytic=True)
             cpu_config = copy.deepcopy(config)
-            cpu_config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': 'CPU'}
+            cpu_config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend_type}
             cpu = build(cpu_config, normalized, eigen, analytic=True)
             cpu.getBackendsManager().setEnableAutoMaterialize(False)
             points = fixture.nearby_fit_points(cpu, normalized) if normalized or eigen else (
@@ -52,12 +53,12 @@ def check_threads(threads):
             cpu.getBackendsManager().deactivateBackend()
             for a, b in zip(check(cpu, points[0]), check(native, points[0])):
                 close(a, b)
-            cpu.getBackendsManager().activate('CPU')
+            cpu.getBackendsManager().activate(backend_type)
             check(cpu, points[0], preserve_likelihood=False)
 
     for cap in (False, True):
         cfg = copy.deepcopy(config)
-        cfg['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': 'CPU'}
+        cfg['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend_type}
         if cap:
             cfg['likelihoodInterfaceConfig']['propagatorConfig']['globalEventReweightCap'] = .1
         cpu = build(cfg, False, False, analytic=True)
@@ -68,7 +69,7 @@ def check_threads(threads):
     for missing in ('smoothing', 'moving-axis'):
         bad = copy.deepcopy(config)
         bad_li = bad['likelihoodInterfaceConfig']
-        bad_li['backendManagerConfig'] = {'isEnabled': True, 'useBackend': 'CPU'}
+        bad_li['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend_type}
         bad_prop = bad_li['propagatorConfig']
         bad_sample = bad_prop['sampleSetConfig']['sampleList'][0]
         if missing == 'smoothing':
@@ -83,9 +84,13 @@ def check_threads(threads):
             assert 'smoothing' in str(error).lower(), str(error)
         else:
             raise AssertionError(f'Accepted observable gradient without {missing}')
-    print(f'SUCCESS: CPU observable and fractional gradients ({threads} threads)')
+    print(f'SUCCESS: {backend_type} observable and fractional gradients ({threads} threads)')
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('testDirectory', nargs='?', help=argparse.SUPPRESS)
+    parser.add_argument('--backend', choices=['CPU', 'MPS'], default='CPU')
+    args = parser.parse_args()
     for threads in (1, 4):
-        check_threads(threads)
+        check_threads(threads, args.backend)

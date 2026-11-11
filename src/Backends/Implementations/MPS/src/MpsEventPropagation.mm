@@ -633,7 +633,9 @@ std::vector<double> Backends::MpsEventPropagation::getLikelihoodGradient(const E
       {Buffer::GradientBins, Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::GradientScales, Buffer::GradientWork});
   dispatch(encoder, Kernel::GradientEvents, _gradientWork_.events,
       {Buffer::GradientEvents, Buffer::GradientIndices, Buffer::GradientInputOffsets, Buffer::Responses,
-       Buffer::GradientResponses, Buffer::GradientScales, Buffer::EventWeights, Buffer::GradientContributions, Buffer::GradientWork});
+       Buffer::GradientResponses, Buffer::GradientScales, Buffer::EventWeights, Buffer::GradientContributions, Buffer::GradientWork,
+       Buffer::Events, Buffer::Samples, Buffer::Targets, Buffer::VariableDialIndices, Buffer::Variables,
+       Buffer::EventCounts, Buffer::Contributions, Buffer::Nodes, Buffer::Bounds, Buffer::NodeBins, Buffer::Bins, Buffer::Intervals});
   dispatch(encoder, Kernel::GradientReduce, std::size_t(_gradientWork_.parameters)*128,
       {Buffer::GradientOffsets, Buffer::GradientOccurrences, Buffer::GradientContributions, Buffer::GradientTotal});
   [encoder endEncoding];

@@ -14,7 +14,26 @@
 namespace Backends {
   inline void validateMpsGradient(const EngineView& view_) {
     const auto& m = view_.propagation;
-    if( m.requiresEventBinning() ) throw std::runtime_error("MPS gradients require fixed, unsmoothed bins without observable-response dials.");
+    for( const auto& sample : m.samples ){
+      if( sample.useDynamicBinning and not sample.binning.isSmoothed )
+        throw std::runtime_error("MPS dynamic binning gradients require bin smoothing.");
+    }
+    for( const auto& event : m.events ){
+      for( std::size_t i = 0; i < event.variableResponseCount; ++i ){
+        const auto& target = m.variableResponses.at(event.firstVariableResponse+i);
+        const auto& sample = m.samples.at(event.samplePosition);
+        const auto column = target.variableIndex-event.firstVariable;
+        if( column >= sample.binning.variableNames.size() ) continue;
+        if( not sample.useDynamicBinning or not sample.binning.isSmoothed )
+          throw std::runtime_error("MPS observable gradients require dynamic binning and bin smoothing.");
+        for( const auto& interval : sample.binning.intervals ){
+          if( interval.variableIndex == column and
+              (interval.lowerInverseWidth <= 0. or interval.upperInverseWidth <= 0.) )
+            throw std::runtime_error("MPS observable gradients require bin smoothing for every moving axis: "
+                                     + sample.binning.variableNames[column]);
+        }
+      }
+    }
     if( view_.likelihood.empty() ) throw std::runtime_error("MPS gradient requires a statistical likelihood.");
     for( const auto& sample : view_.likelihood.samples ){
       if( sample.portableOptions.kind != LikelihoodKind::BarlowBeestonLiteGaussian )
@@ -103,15 +122,23 @@ namespace Backends {
       for( const auto& event : m.events ){
         const auto& weight = m.eventWeights.at(event.resultIndex);
         events.push_back({gradientIndex(indices.size()), gradientIndex(weight.dialCount),
-          event.globalBinIndex < 0 ? std::numeric_limits<DeviceIndex>::max() : gradientIndex(event.globalBinIndex),
           gradientIndex(event.resultIndex), gradientIndex(contributionCount), ObservableScalar(weight.baseWeight)});
-        for( std::size_t j = 0; j < weight.dialCount; ++j ){
-          const auto index = m.eventDialIndices.at(weight.firstDial+j);
-          indices.push_back(gradientIndex(index));
-          const auto& dial = m.dials.at(index);
+        const auto addDial = [&](std::size_t index_){
+          indices.push_back(gradientIndex(index_));
+          const auto& dial = m.dials.at(index_);
           for( std::size_t k = 0; k < dial.inputCount; ++k ){
             byParameter.at(m.dialInputs.at(dial.firstInput+k).parameterIndex).push_back(gradientIndex(contributionCount++));
           }
+        };
+        for( std::size_t j = 0; j < weight.dialCount; ++j ) addDial(m.eventDialIndices.at(weight.firstDial+j));
+        // Observable occurrences follow weight occurrences. The device walks
+        // these targets in the same override/multiply/add order, even for a
+        // non-histogram observable (whose statistical adjoint is zero).
+        for( std::size_t j = 0; j < event.variableResponseCount; ++j ){
+          const auto& target = m.variableResponses.at(event.firstVariableResponse+j);
+          if( target.overrideDial != std::size_t(-1) ) addDial(target.overrideDial);
+          for( std::size_t k = 0; k < target.multiplyDialCount; ++k ) addDial(m.variableDialIndices.at(target.firstMultiplyDial+k));
+          for( std::size_t k = 0; k < target.addDialCount; ++k ) addDial(m.variableDialIndices.at(target.firstAddDial+k));
         }
       }
       gradientIndex(contributionCount);

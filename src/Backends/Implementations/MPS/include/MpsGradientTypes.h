@@ -8,12 +8,12 @@ namespace Backends {
   // reduced together. Each direction owns its composite/formula scratch frame.
   struct MpsGradientInput { DeviceIndex dial, input, scratch, external; };
   struct MpsGradientEvent {
-    DeviceIndex first, count, bin, result, firstContribution;
+    DeviceIndex first, count, result, firstContribution;
     ObservableScalar base;
   };
 #ifndef __METAL_VERSION__
   static_assert(sizeof(MpsGradientInput) == 16);
-  static_assert(sizeof(MpsGradientEvent) == 28);
+  static_assert(sizeof(MpsGradientEvent) == 24);
 #endif
 }
 #endif
