@@ -136,8 +136,11 @@ current producer Jacobians. Data histogram updates discard gradient buffers;
 missing/invalid producer Jacobians still reject the request. Penalty gradients
 and transformation to fit coordinates remain evaluated by the engine.
 
-The host observables are still read on every explicitly dynamic request to
-preserve detection of external edits. `managerSnapshotSeconds` measures the
+Loaded observables stay resident on the backend. Normal evaluations should report
+`hostVariableReadCount = 0` and `hostVariableReadSeconds = 0`, including explicitly
+dynamic samples. Host edits require `Sample.updateEventBinning()` or
+`Propagator.updateEventSampleBinning()`; the next propagation reads and publishes
+the edited values once. `managerSnapshotSeconds` measures the
 whole snapshot construction, while `hostVariableReadSeconds` and
 `hostVariableReadCount` isolate that read. `managerPreparationSeconds` retains
 its earlier meaning (propagator preparation only). The host-read timer is nested

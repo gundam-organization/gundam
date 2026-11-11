@@ -71,10 +71,16 @@ def exercise_manual_binning(path, backend_name="CPU", backend_mode=None):
         for event in sample.getEventList():
             event.getVariables().fetchVariable('X').setValue(1.5)
         engine.evaluateLikelihood()
+        if engine.getBackendsManager().hasBackend():
+            assert engine.getBackendsManager().getLastHostVariableReadCount() == 0
         # Without variable dials, rebinning remains explicit.
         assert_same(sums(engine), initial)
         sample.updateEventBinning()
         engine.evaluateLikelihood()
+        if engine.getBackendsManager().hasBackend():
+            assert engine.getBackendsManager().getLastHostVariableReadCount() > 0
+            engine.evaluateLikelihood()
+            assert engine.getBackendsManager().getLastHostVariableReadCount() == 0
     assert_same(sums(engines[1]), sums(engines[0]))
     assert_same(sums(engines[1]), [0., 10., 0.])
     for engine in engines:
@@ -109,14 +115,19 @@ def main(backend_name="CPU"):
                 for name, value in zip(('multiply', 'add', 'override', 'weight'), point):
                     parameters[name].setParameterValue(value)
                 engine.evaluateLikelihood()
+            assert backend.getBackendsManager().getLastHostVariableReadCount() == 0
             assert_same(capture(backend), capture(reference))
-        # Host edits in explicitly dynamic samples remain observable even when
-        # all dial inputs are unchanged.
+        # Publish host edits explicitly, including when dial inputs are unchanged.
         for value in (2., .5):
             for engine in (reference, backend):
                 sample = engine.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList()[2]
                 sample.getEventList()[0].getVariables().fetchVariable('Y').setValue(value)
+                sample.updateEventBinning()
                 engine.evaluateLikelihood()
+            assert backend.getBackendsManager().getLastHostVariableReadCount() > 0
+            assert_same(capture(backend), capture(reference))
+            backend.evaluateLikelihood()
+            assert backend.getBackendsManager().getLastHostVariableReadCount() == 0
             assert_same(capture(backend), capture(reference))
         # Fit mode keeps intermediates resident; explicit materialization must
         # recover the same variables, pointer lists and fractional histograms.

@@ -24,7 +24,6 @@ namespace Backends {
     Event* event{nullptr};
     int variableIndex{-1};
     std::size_t valueIndex{0};
-    bool readFromHost{false};
     bool isDialTarget{false};
   };
 

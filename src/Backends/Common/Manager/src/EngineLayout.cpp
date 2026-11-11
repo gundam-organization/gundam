@@ -476,7 +476,7 @@ namespace {
         int index = variables.findVarIndex(name);
         bool isTarget = std::any_of(cacheEntry.variableResponseCacheList.begin(), cacheEntry.variableResponseCacheList.end(),
                                     [&](const auto& target_){ return target_.variableIndex == index; });
-        bindings_.variables.push_back({cacheEntry.event, index, propagation.variableValues.size(), sample.readHostVariables, isTarget});
+        bindings_.variables.push_back({cacheEntry.event, index, propagation.variableValues.size(), isTarget});
         propagation.variableValues.emplace_back(variables.getVarList()[index].getVarAsDouble());
       }
       eventRef.firstVariableResponse = propagation.variableResponses.size();

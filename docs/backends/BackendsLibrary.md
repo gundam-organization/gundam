@@ -521,8 +521,11 @@ Explicit binning refreshes, input revisions and real observable edits still
 invalidate it. CUDA also reuses the statistical gradient when prediction, raw
 parameters and producer Jacobians are unchanged; data updates and failed requests
 invalidate that result. The runtime profiler reports `gradientCacheHit`, complete
-host snapshot time and observable read time separately. Host observable reads
-are still performed for explicitly dynamic samples to detect external edits.
+host snapshot time and observable read time separately. Loaded observables remain
+resident on the backend during normal evaluation, including explicitly dynamic
+samples. After editing host observables, call `Sample::updateEventBinning()` or
+`Propagator::updateEventSampleBinning()` to publish them on the next propagation;
+subsequent evaluations reuse the resident state without reading host observables.
 
 Native Metal device tests are compiled only when the CMake device probe detects
 a visible Metal GPU; `WITH_METAL_TEST=OFF` can disable them explicitly. Reconfigure

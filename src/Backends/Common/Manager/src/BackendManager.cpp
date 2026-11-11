@@ -462,15 +462,14 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
     inputs.variableInputRevisions.emplace_back(buffer->getRevision());
   }
   const auto& variableBindings = _backendEngineLayout_->bindings.variables;
-  if( handlesEventState and (inputs.forceBinningUpdate
-      or std::any_of(variableBindings.begin(), variableBindings.end(), [](const auto& binding_){ return binding_.readFromHost; })) ){
+  // The layout owns the loaded observable baseline; executors keep their current
+  // state resident. Only an explicit host binning update publishes edited values.
+  if( handlesEventState and inputs.forceBinningUpdate ){
     const auto hostReadStart = std::chrono::steady_clock::now();
     inputs.hostVariables = model.variableValues;
     for( const auto& binding : variableBindings ){
-      if( binding.readFromHost or inputs.forceBinningUpdate ){
-        inputs.hostVariables.at(binding.valueIndex) = binding.event->getVariables().getVarList()[binding.variableIndex].getVarAsDouble();
-        ++_lastHostVariableReadCount_;
-      }
+      inputs.hostVariables.at(binding.valueIndex) = binding.event->getVariables().getVarList()[binding.variableIndex].getVarAsDouble();
+      ++_lastHostVariableReadCount_;
     }
     _lastHostVariableReadSeconds_ = std::chrono::duration<double>(std::chrono::steady_clock::now()-hostReadStart).count();
   }
