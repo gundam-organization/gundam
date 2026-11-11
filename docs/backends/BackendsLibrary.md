@@ -401,6 +401,19 @@ arithmetic. Zero tangents still suppress singular inactive partials; tie and
 piecewise conventions are unchanged. The Metal source embeds the table at CMake
 configuration time and tracks changes to it.
 
+Small derivative primitives are shared across CPU, CUDA and Metal: the mirror
+slope in `BackendInputMirroring.h`, response supervision in
+`BackendResponseSmoothing.h`, and the cumulative binning-kernel slope in
+`SharedBinningMath.h`. Each caller retains its native remainder calculation and
+scalar precision; the piecewise boundary conventions are unchanged.
+
+[`ProducerGradientPublications.h`](../../src/Backends/Common/Execution/include/ProducerGradientPublications.h)
+provides the common host traversal of dense/sparse producer Jacobians, checking
+publication, dimensions and finite entries. A published empty row is valid for
+a zero-input producer; a missing row is not. Callers retain their compact row or
+flat snapshots, overwrite publication state on every request, and defer errors
+to gradient use so value-only propagation still needs no Jacobian.
+
 Manager caches the host structural gradient validation for the prepared model.
 Activation/rebuild, deactivation, data-histogram updates and interface replacement
 invalidate it. Structural changes to an active model require reactivation, as

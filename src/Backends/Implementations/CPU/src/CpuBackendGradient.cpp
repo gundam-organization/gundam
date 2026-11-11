@@ -28,8 +28,7 @@ namespace {
       coordinates[axis] = Backends::Semantics::transformDialInput(input, raw);
       if( input.useMirror ){
         const double folded = std::fmod(raw - input.mirrorMin, 2. * input.mirrorRange);
-        factors[axis] = folded < 0. ? -1. : 1.;
-        if( std::abs(folded) > input.mirrorRange ){ factors[axis] = -factors[axis]; }
+        factors[axis] = Backends::Semantics::mirrorSlopeFromFolded(folded,input.mirrorRange);
       }
       if( not dial_.allowExtrapolation ){
         const double low = axes[axis][0], high = axes[axis][sizes[axis] - 1];
@@ -52,8 +51,7 @@ namespace {
   double mirrorSlope(const Backends::BackendDialInputDescriptor& input_, double raw_) {
     if( not input_.useMirror ){ return 1.; }
     const double folded = std::fmod(raw_ - input_.mirrorMin, 2. * input_.mirrorRange);
-    double slope = folded < 0. ? -1. : 1.;
-    return std::abs(folded) > input_.mirrorRange ? -slope : slope;
+    return Backends::Semantics::mirrorSlopeFromFolded(folded,input_.mirrorRange);
   }
 
   struct DialGradient {
@@ -215,11 +213,6 @@ namespace {
     index_.findCandidates(values_, candidates_);
     std::vector<FractionGradient> rows;
     std::vector<double> factors, slopes, prefix;
-    const auto kernelSlope = [](double x_){
-      if( x_ <= -1. or x_ >= 1. ){ return 0.; }
-      const double t = .5*(x_+1.);
-      return 15.*t*t*(1.-t)*(1.-t);
-    };
     double total = 0.;
     std::size_t largest = 0;
     for( auto position : candidates_ ){
@@ -232,8 +225,8 @@ namespace {
         factors[j] = GundamBinningMath::intervalFraction(interval.lowerBound, interval.upperBound,
             interval.lowerInverseWidth, interval.upperInverseWidth, value);
         if( factors[j] > 0. and interval.lowerInverseWidth > 0. ){
-          slopes[j] = kernelSlope((interval.lowerBound-value)*interval.lowerInverseWidth)*interval.lowerInverseWidth
-              - kernelSlope((interval.upperBound-value)*interval.upperInverseWidth)*interval.upperInverseWidth;
+          slopes[j] = GundamBinningMath::cumulativeKernelSlope((interval.lowerBound-value)*interval.lowerInverseWidth)*interval.lowerInverseWidth
+              - GundamBinningMath::cumulativeKernelSlope((interval.upperBound-value)*interval.upperInverseWidth)*interval.upperInverseWidth;
         }
         prefix[j+1] = prefix[j]*factors[j];
       }
@@ -299,14 +292,12 @@ std::vector<double> Backends::CpuBackend::getLikelihoodGradient(const Propagatio
     if( dial.type == BackendDialType::ExternalWeight or isTableDial(dial.type) ){
       const auto position = externalPosition++;
       responses[i] = _externalGradientResponses_.at(position);
-      LogThrowIf(not _externalGradientPublished_.at(position)
-                 or _externalDialGradients_[position].size() != dial.inputCount,
-                 "CPU external/table gradient is missing or has invalid dimensions; publish it with propagation.");
+      LogThrowIf(not _externalGradientPublished_.at(position),
+                 "CPU external/table gradient is missing, non-finite or has invalid dimensions; publish it with propagation.");
       derivatives[i] = _externalDialGradients_[position];
       const double responseSlope = Semantics::dialResponseSlope(dial, responses[i]);
       responses[i] = Semantics::clampDialResponse(dial, responses[i]);
       for( std::size_t j = 0; j < dial.inputCount; ++j ){
-        LogThrowIf(not std::isfinite(derivatives[i][j]), "Non-finite CPU external/table derivative.");
         const auto& input = model.dialInputs[dial.firstInput+j];
         derivatives[i][j] = responseSlope == 0. ? 0. : derivatives[i][j] * responseSlope
             * mirrorSlope(input, _lastParameterValues_[input.parameterIndex]);

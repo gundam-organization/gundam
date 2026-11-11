@@ -2,25 +2,15 @@
 #define GUNDAM_BACKEND_DIAL_GRADIENT_H
 
 #include "Semantics/BackendDialSemanticsCore.h"
+#include "Semantics/BackendInputMirroring.h"
 
 namespace Backends::Semantics {
   // Derivative of the response supervisor with respect to the raw response.
   // Thresholds and widths are the same precomputed values used by propagation.
   GUNDAM_BACKEND_HOST_DEVICE inline double dialResponseSlope(
       const BackendDialDescriptor& dial_, double response_) {
-    if( response_ != response_ ){ return response_; }
-    const auto& smoothing = dial_.smoothing;
-    double t;
-    if( dial_.hasMinResponse and response_ < dial_.minResponse ){
-      if( smoothing.minWidth == 0. or response_ <= smoothing.minResponse - smoothing.minWidth ){ return 0.; }
-      t = .5 + (response_ - smoothing.minResponse) * smoothing.minInverseWidth;
-    }
-    else if( dial_.hasMaxResponse and response_ > dial_.maxResponse ){
-      if( smoothing.maxWidth == 0. or response_ >= smoothing.maxResponse + smoothing.maxWidth ){ return 0.; }
-      t = .5 + (smoothing.maxResponse - response_) * smoothing.maxInverseWidth;
-    }
-    else{ return 1.; }
-    return t * t * (3. - 2. * t);
+    return responseSlope(response_,dial_.minResponse,dial_.maxResponse,dial_.smoothing,
+                         dial_.hasMinResponse,dial_.hasMaxResponse);
   }
 
   // Single parameter weight dials only. Callers validate the dial type.
@@ -31,8 +21,7 @@ namespace Backends::Semantics {
     if( input_.useMirror ){
       if( input_.mirrorRange <= 0. ){ return 0.; }
       const double folded = ::fmod(rawInput_ - input_.mirrorMin, 2. * input_.mirrorRange);
-      inputGradient = folded < 0. ? -1. : 1.;
-      if( ::fabs(folded) > input_.mirrorRange ){ inputGradient = -inputGradient; }
+      inputGradient = mirrorSlopeFromFolded(folded,input_.mirrorRange);
     }
     const double x = transformDialInput(input_, rawInput_);
     double low = 0., high = 0., derivative = 0.;

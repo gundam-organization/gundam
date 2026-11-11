@@ -20,7 +20,7 @@ namespace Backends {
   struct PropagationInputs {
     ParameterSnapshot parameters{};
     // Optional per-dial Jacobians for external/table producers, with respect
-    // to their transformed inputs. CPU and MPS copy them before returning the token.
+    // to their transformed inputs. Each backend copies them before returning the token.
     std::vector<std::vector<double>> externalDialGradients{};
     // Optional sparse row indices, strictly increasing. When omitted, the
     // legacy representation indexes externalDialGradients by backend dial.

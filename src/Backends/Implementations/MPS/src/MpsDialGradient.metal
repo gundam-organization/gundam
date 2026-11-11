@@ -15,27 +15,11 @@ S chain(S tangent, S partial) { return tangent == S(0) ? S(0) : tangent*partial;
 Dual mirror(Dual x, uint enabled, S minimum, S range) {
   if( !enabled ) return x;
   S folded = GundamDeviceMath::remainder(x.value-minimum, S(2)*range);
-  S slope = folded < S(0) ? S(-1) : S(1);
-  if( FormulaMath::abs(folded) > range ) slope = -slope;
+  S slope = Semantics::mirrorSlopeFromFolded(folded,range);
   return {mirror_program_input(x.value, enabled, minimum, range), chain(x.slope, slope)};
 }
 Dual supervise(Dual x, DevicePropagationDial dial) {
-  S slope(1);
-  auto smoothing = dial.smoothing;
-  if( x.value < dial.minResponse ){
-    if( smoothing.minWidth == S(0) || x.value <= smoothing.minResponse-smoothing.minWidth ) slope = S(0);
-    else{
-      S t = S(.5f)+(x.value-smoothing.minResponse)*smoothing.minInverseWidth;
-      slope = t*t*(S(3)-S(2)*t);
-    }
-  }
-  else if( x.value > dial.maxResponse ){
-    if( smoothing.maxWidth == S(0) || x.value >= smoothing.maxResponse+smoothing.maxWidth ) slope = S(0);
-    else{
-      S t = S(.5f)+(smoothing.maxResponse-x.value)*smoothing.maxInverseWidth;
-      slope = t*t*(S(3)-S(2)*t);
-    }
-  }
+  S slope = Semantics::responseSlope(x.value,dial.minResponse,dial.maxResponse,dial.smoothing);
   return {Semantics::processResponse(x.value, dial), chain(x.slope, slope)};
 }
 Dual cubic(Dual x, S x0, Dual p0, S x1, Dual p1, S x2, Dual p2, S x3, Dual p3) {

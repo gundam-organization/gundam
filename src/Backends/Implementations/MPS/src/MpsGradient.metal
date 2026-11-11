@@ -91,11 +91,7 @@ kernel void gradient_bins(
   if( i < work.bins ) out[i] = Backends::GradientSemantics::binScales<Backends::LikelihoodSemantics::MetalMath>(bins[i], sums[i], squares[i]);
 }
 namespace MpsGradient {
-S kernelSlope(S x) {
-  if( x <= S(-1) || x >= S(1) ) return S(0);
-  S t = S(.5f)*(x+S(1));
-  return S(15)*t*t*(S(1)-t)*(S(1)-t);
-}
+
 // Differentiate the same BVH candidates and compact-support products as value
 // propagation. Strict selection intervals are constant. No event/parameter or
 // event/bin dense Jacobian is allocated.
@@ -127,8 +123,8 @@ S observableScale(DevicePropagationEvent event, DeviceBinningSample sample, uint
             interval.lowerInverseWidth, interval.upperInverseWidth, value);
         S df(0);
         if( f > S(0) && interval.variableIndex == column && interval.lowerInverseWidth > S(0) ){
-          df = kernelSlope((interval.lowerBound-value)*interval.lowerInverseWidth)*interval.lowerInverseWidth
-             - kernelSlope((interval.upperBound-value)*interval.upperInverseWidth)*interval.upperInverseWidth;
+          df = GundamBinningMath::cumulativeKernelSlope((interval.lowerBound-value)*interval.lowerInverseWidth)*interval.lowerInverseWidth
+             - GundamBinningMath::cumulativeKernelSlope((interval.upperBound-value)*interval.upperInverseWidth)*interval.upperInverseWidth;
         }
         fraction = fraction*Dual(f,df);
         if( fraction.value == S(0) ) break;

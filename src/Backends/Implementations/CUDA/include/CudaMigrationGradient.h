@@ -20,11 +20,7 @@ namespace Backends::CudaGradient {
     const CudaBinningBound* bounds;
     const double* variables;
   };
-  GUNDAM_BACKEND_HOST_DEVICE inline double kernelSlope(double x_) {
-    if( x_ <= -1. || x_ >= 1. ) return 0.;
-    const double t = .5*(x_+1.);
-    return 15.*t*t*(1.-t)*(1.-t);
-  }
+
   // value = LLH adjoint of the event weight; slope = LLH adjoint of
   // one histogram coordinate. Reuse the value path's candidate traversal,
   // compact-support fractions and first-largest roundoff correction.
@@ -46,8 +42,8 @@ namespace Backends::CudaGradient {
             interval.lowerInverseWidth,interval.upperInverseWidth,value);
         double df = 0.;
         if( f > 0. && interval.variableIndex == column_ && interval.lowerInverseWidth > 0. )
-          df = kernelSlope((interval.lowerBound-value)*interval.lowerInverseWidth)*interval.lowerInverseWidth
-             - kernelSlope((interval.upperBound-value)*interval.upperInverseWidth)*interval.upperInverseWidth;
+          df = GundamBinningMath::cumulativeKernelSlope((interval.lowerBound-value)*interval.lowerInverseWidth)*interval.lowerInverseWidth
+             - GundamBinningMath::cumulativeKernelSlope((interval.upperBound-value)*interval.upperInverseWidth)*interval.upperInverseWidth;
         fraction = fraction*Dual(f,df);
         if( fraction.value == 0. ) break;
       }

@@ -17,6 +17,25 @@ namespace Backends {
 }
 
 namespace Backends::Semantics {
+  // Derivative of supervision with respect to its raw response. Enabled flags
+  // let native descriptors omit limits; packed Metal bounds already use +/-inf.
+  template<typename Scalar>
+  GUNDAM_RESPONSE_INLINE Scalar responseSlope(Scalar value_, Scalar lower_, Scalar upper_,
+      ResponseSmoothing<Scalar> smoothing_, bool hasLower_ = true, bool hasUpper_ = true) {
+    if( value_ != value_ ) return value_;
+    Scalar t;
+    if( hasLower_ and value_ < lower_ ){
+      if( smoothing_.minWidth == Scalar(0) or value_ <= smoothing_.minResponse-smoothing_.minWidth ) return Scalar(0);
+      t = Scalar(.5f)+(value_-smoothing_.minResponse)*smoothing_.minInverseWidth;
+    }
+    else if( hasUpper_ and value_ > upper_ ){
+      if( smoothing_.maxWidth == Scalar(0) or value_ >= smoothing_.maxResponse+smoothing_.maxWidth ) return Scalar(0);
+      t = Scalar(.5f)+(smoothing_.maxResponse-value_)*smoothing_.maxInverseWidth;
+    }
+    else return Scalar(1);
+    return t*t*(Scalar(3)-Scalar(2)*t);
+  }
+
   // Called only outside the precomputed transition thresholds. With smoothing
   // disabled, the ordinary in-range path still consists of two comparisons.
   template<typename Scalar>

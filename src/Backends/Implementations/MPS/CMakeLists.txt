@@ -7,6 +7,7 @@ set_property(
     ${BACKENDS_SOURCE_DIR}/Common/Model/include/DeviceMath/DoubleFloat.h
     ${BACKENDS_SOURCE_DIR}/Common/Binning/include/Semantics/BackendBinningSemantics.h
     ${BACKENDS_SOURCE_DIR}/Common/Execution/include/Semantics/BackendVariableResponse.h
+    ${BACKENDS_SOURCE_DIR}/Common/Model/include/Semantics/BackendInputMirroring.h
     ${BACKENDS_SOURCE_DIR}/Common/Model/include/Semantics/BackendResponseSmoothing.h
     ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedBinningMath.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/MpsWeightTypes.h
@@ -26,6 +27,7 @@ file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedBinningMath.h M
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Binning/include/Semantics/BackendBinningSemantics.h MPS_BINNING_SEMANTICS)
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Execution/include/Semantics/BackendVariableResponse.h MPS_SHARED_VARIABLE_RESPONSE)
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Model/include/Semantics/BackendResponseSmoothing.h MPS_RESPONSE_SMOOTHING)
+file(READ ${BACKENDS_SOURCE_DIR}/Common/Model/include/Semantics/BackendInputMirroring.h MPS_INPUT_MIRRORING)
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Formula/include/FormulaTypes.h MPS_FORMULA_TYPES)
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Formula/include/DeviceMath/FormulaMath.h MPS_FORMULA_MATH)
 foreach(LLH_FILE

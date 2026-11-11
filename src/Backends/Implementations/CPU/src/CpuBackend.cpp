@@ -3,6 +3,7 @@
 #include "CpuCompositeProgram.h"
 #include "CpuFormulaProgram.h"
 #include "DialDependencies.h"
+#include "ProducerGradientPublications.h"
 
 #include "Semantics/BackendHostPropagation.h"
 #include "GundamGlobals.h"
@@ -146,28 +147,15 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   const auto& model = _engineView_->propagation;
   const auto& likelihoodModel = _engineView_->likelihood;
   inputs_.validate(model);
-  std::size_t sparsePosition = 0;
-  for( std::size_t i = 0; i < _externalGradientDials_.size(); ++i ){
-    const auto dialIndex = _externalGradientDials_[i];
-    std::size_t row = dialIndex;
-    bool published = inputs_.externalDialGradients.size() == model.dials.size();
-    if( not inputs_.externalDialGradientIndices.empty() ){
-      while( sparsePosition < inputs_.externalDialGradientIndices.size()
-             and inputs_.externalDialGradientIndices[sparsePosition] < dialIndex ){ ++sparsePosition; }
-      row = sparsePosition;
-      published = row < inputs_.externalDialGradientIndices.size()
-          and inputs_.externalDialGradientIndices[row] == dialIndex;
-    }
-    _externalGradientPublished_[i] = published;
-    if( not published ){
-      _externalDialGradients_[i].clear();
-      continue;
-    }
-    _externalDialGradients_[i] = inputs_.externalDialGradients[row];
-    auto unclamped = model.dials[dialIndex];
+  visitProducerGradientPublications(model,inputs_,_externalGradientDials_,
+      [&](std::size_t i_, std::size_t dialIndex_, const std::vector<double>* row_, bool valid_){
+    _externalGradientPublished_[i_] = valid_;
+    if( row_ == nullptr ){ _externalDialGradients_[i_].clear(); return; }
+    _externalDialGradients_[i_] = *row_;
+    auto unclamped = model.dials[dialIndex_];
     unclamped.hasMinResponse = unclamped.hasMaxResponse = false;
-    _externalGradientResponses_[i] = Semantics::evalDialResponse(model, unclamped, inputs_);
-  }
+    _externalGradientResponses_[i_] = Semantics::evalDialResponse(model, unclamped, inputs_);
+  });
 
   if( _profiler_ ){
     _profiler_->begin(_timingTotals_.propagationCount + 1, inputs_.parameters.values,

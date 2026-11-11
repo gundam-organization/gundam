@@ -2,6 +2,7 @@
 #define GUNDAM_BACKEND_DEVICE_GRADIENT_H
 #ifndef __METAL_VERSION__
 #include "GradientTypes.h"
+#include "Semantics/BackendInputMirroring.h"
 #include "Semantics/BackendLikelihood.h"
 #define GUNDAM_GRADIENT_DEVICE
 #ifdef __CUDACC__
@@ -31,9 +32,9 @@ namespace Backends::GradientSemantics {
     S x = raw_, inputSlope(1);
     if( d_.mirror ){
       x = Math::remainder(x - d_.mirrorMin, S(2) * d_.mirrorRange);
-      inputSlope = x < S(0) ? S(-1) : S(1);
+      inputSlope = Semantics::mirrorSlopeFromFolded(x,d_.mirrorRange);
       x = absolute(x);
-      if( x > d_.mirrorRange ){ x = S(2) * d_.mirrorRange - x; inputSlope = -inputSlope; }
+      if( x > d_.mirrorRange ){ x = S(2) * d_.mirrorRange - x; }
       x += d_.mirrorMin;
     }
     DialEvaluation<S> out{x, S(1)};

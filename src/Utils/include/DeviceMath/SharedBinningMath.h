@@ -14,6 +14,11 @@ namespace GundamBinningMath {
     Scalar t = (position_ + Scalar(1)) / Scalar(2);
     return t * t * t * (Scalar(10) + t * (Scalar(-15) + Scalar(6) * t));
   }
+  template<typename Scalar> GUNDAM_BINNING_CALLABLE inline Scalar cumulativeKernelSlope(Scalar position_) {
+    if( position_ <= Scalar(-1) or position_ >= Scalar(1) ) return Scalar(0);
+    const Scalar t = Scalar(.5f)*(position_+Scalar(1));
+    return Scalar(15)*t*t*(Scalar(1)-t)*(Scalar(1)-t);
+  }
   template<typename Scalar> GUNDAM_BINNING_CALLABLE inline bool contains(Scalar lower_, Scalar upper_, Scalar value_) {
     return lower_ == upper_ ? value_ == lower_ : !(value_ < lower_ || value_ >= upper_);
   }

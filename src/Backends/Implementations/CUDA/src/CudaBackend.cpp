@@ -3,6 +3,7 @@
 #include "PropagationResult.h"
 #include "LikelihoodModel.h"
 #include "CudaGradientModel.h"
+#include "ProducerGradientPublications.h"
 #include "Semantics/BackendHostPropagation.h"
 
 #ifdef GUNDAM_USING_CUDA
@@ -322,18 +323,11 @@ Backends::PropagationToken Backends::CudaBackend::requestPropagation(const Propa
     const auto& view = getEngineView();
     inputs_.validate(view.propagation);
     _impl_->producerSlopes.clear(); _impl_->producerSlopesValid = true;
-    std::size_t position = 0;
-    const bool sparse = !inputs_.externalDialGradientIndices.empty();
-    for( auto index : _impl_->producerDials ){
-      while( sparse && position < inputs_.externalDialGradientIndices.size() && inputs_.externalDialGradientIndices[position] < index ) ++position;
-      const bool published = sparse ? (position < inputs_.externalDialGradientIndices.size() && inputs_.externalDialGradientIndices[position] == index)
-          : inputs_.externalDialGradients.size() == view.propagation.dials.size();
-      if( !published ){ _impl_->producerSlopesValid = false; continue; }
-      const auto& row = inputs_.externalDialGradients[sparse ? position : index];
-      if( row.size() != view.propagation.dials[index].inputCount ) _impl_->producerSlopesValid = false;
-      for( auto value : row ) if( !std::isfinite(value) ) _impl_->producerSlopesValid = false;
-      _impl_->producerSlopes.insert(_impl_->producerSlopes.end(),row.begin(),row.end());
-    }
+    visitProducerGradientPublications(view.propagation,inputs_,_impl_->producerDials,
+        [&](std::size_t, std::size_t, const std::vector<double>* row_, bool valid_){
+      _impl_->producerSlopesValid = _impl_->producerSlopesValid and valid_;
+      if( row_ ) _impl_->producerSlopes.insert(_impl_->producerSlopes.end(),row_->begin(),row_->end());
+    });
     for( double value : inputs_.hostVariables ){
       if( not std::isfinite(value) ){ throw std::runtime_error("CudaBackend: host observables must be finite."); }
     }

@@ -3,6 +3,7 @@
 #include "MpsGradientModel.h"
 #include "DialDependencyGroups.h"
 #include "LikelihoodModel.h"
+#include "ProducerGradientPublications.h"
 
 #include <algorithm>
 #include <stdexcept>
@@ -307,21 +308,12 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   // change, and reject missing rows on the next gradient rather than reusing
   // an older token's Jacobian. Value-only propagation needs no Jacobian.
   _producerGradientsValid_ = true;
-  std::size_t sparsePosition = 0;
-  const bool sparse = not inputs_.externalDialGradientIndices.empty();
-  for( std::size_t i = 0; i < _producerDials_.size(); ++i ){
-    const auto index = _producerDials_[i];
-    while( sparse and sparsePosition < inputs_.externalDialGradientIndices.size()
-           and inputs_.externalDialGradientIndices[sparsePosition] < index ) ++sparsePosition;
-    const bool published = sparse ? (sparsePosition < inputs_.externalDialGradientIndices.size()
-        and inputs_.externalDialGradientIndices[sparsePosition] == index)
-        : inputs_.externalDialGradients.size() == model.dials.size();
-    auto& row = _producerGradients_[i];
-    if( not published ){ row.clear(); _producerGradientsValid_ = false; continue; }
-    row = inputs_.externalDialGradients[sparse ? sparsePosition : index];
-    if( row.size() != model.dials[index].inputCount ) _producerGradientsValid_ = false;
-    for( auto slope : row ) if( not std::isfinite(slope) ) _producerGradientsValid_ = false;
-  }
+  visitProducerGradientPublications(model,inputs_,_producerDials_,
+      [&](std::size_t i_, std::size_t, const std::vector<double>* row_, bool valid_){
+    _producerGradientsValid_ = _producerGradientsValid_ and valid_;
+    if( row_ ) _producerGradients_[i_] = *row_;
+    else _producerGradients_[i_].clear();
+  });
   _cache_.prepare(inputs_);
   uploadParameters<ObservableScalar>(buffer(Buffer::Parameters), inputs_.parameters, timing_);
   uploadExternalWeights<ObservableScalar>(buffer(Buffer::ExternalWeights), _externalGenerations_, inputs_, timing_);

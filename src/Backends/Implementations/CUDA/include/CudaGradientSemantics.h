@@ -42,27 +42,11 @@ GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE S chain(S tangent, S part
 GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE Dual mirror(Dual x, unsigned enabled, S minimum, S range) {
   if( !enabled ) return x;
   S folded = ::fmod(x.value-minimum, S(2)*range);
-  S slope = folded < S(0) ? S(-1) : S(1);
-  if( NativeFormulaMath::abs(folded) > range ) slope = -slope;
+  S slope = Semantics::mirrorSlopeFromFolded(folded,range);
   return {(NativeFormulaMath::abs(folded) > range ? S(2)*range-NativeFormulaMath::abs(folded) : NativeFormulaMath::abs(folded))+minimum, chain(x.slope, slope)};
 }
 GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE Dual supervise(Dual x, BackendDialDescriptor dial) {
-  S slope(1);
-  auto smoothing = dial.smoothing;
-  if( dial.hasMinResponse && x.value < dial.minResponse ){
-    if( smoothing.minWidth == S(0) || x.value <= smoothing.minResponse-smoothing.minWidth ) slope = S(0);
-    else{
-      S t = S(.5f)+(x.value-smoothing.minResponse)*smoothing.minInverseWidth;
-      slope = t*t*(S(3)-S(2)*t);
-    }
-  }
-  else if( dial.hasMaxResponse && x.value > dial.maxResponse ){
-    if( smoothing.maxWidth == S(0) || x.value >= smoothing.maxResponse+smoothing.maxWidth ) slope = S(0);
-    else{
-      S t = S(.5f)+(smoothing.maxResponse-x.value)*smoothing.maxInverseWidth;
-      slope = t*t*(S(3)-S(2)*t);
-    }
-  }
+  S slope = Semantics::responseSlope(x.value,dial.minResponse,dial.maxResponse,dial.smoothing,dial.hasMinResponse,dial.hasMaxResponse);
   return {Semantics::clampDialResponse(dial, x.value), chain(x.slope, slope)};
 }
 GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE Dual cubic(Dual x, S x0, Dual p0, S x1, Dual p1, S x2, Dual p2, S x3, Dual p3) {

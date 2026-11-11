@@ -8,6 +8,7 @@
 #include "CudaBackend.h"
 #endif
 #include "GradientModel.h"
+#include "ProducerGradientPublications.h"
 #include "FormulaCompiler.h"
 #include "DialResponseSupervisor.h"
 #include "Semantics/BackendDeviceGradient.h"
@@ -1057,3 +1058,44 @@ TEST(CudaGradientDevice, ObservableFormulaCompositeAndProducerJacobians) {
   }
 }
 #endif
+
+TEST(ProducerGradientPublications, DenseSparseMissingAndZeroInputRows) {
+  auto view = gradientModel(1.);
+  auto& model = view.propagation;
+  model.dials.resize(3,model.dials[0]);
+  model.dials[0].type = model.dials[2].type = BackendDialType::ExternalWeight;
+  model.dials[2].inputCount = 0;
+  const std::vector<std::size_t> producers{0,2};
+  PropagationInputs inputs;
+  inputs.parameters.values = {.3,.7};
+  auto check = [&](std::vector<bool> present_, std::vector<bool> valid_){
+    inputs.validate(model);
+    std::size_t calls = 0;
+    visitProducerGradientPublications(model,inputs,producers,
+        [&](std::size_t position_, std::size_t index_, const std::vector<double>* row_, bool validRow_){
+      EXPECT_EQ(position_,calls++); EXPECT_EQ(index_,producers[position_]);
+      EXPECT_EQ(row_ != nullptr,present_[position_]); EXPECT_EQ(validRow_,valid_[position_]);
+      if( row_ ){
+        auto rowIndex = inputs.externalDialGradientIndices.empty() ? index_ : position_;
+        EXPECT_EQ(row_,&inputs.externalDialGradients[rowIndex]);
+      }
+    });
+    EXPECT_EQ(calls,producers.size());
+  };
+  inputs.externalDialGradients = {{.4},{},{}};
+  check({true,true},{true,true});
+  inputs.externalDialGradientIndices = {0,2};
+  inputs.externalDialGradients = {{.4},{}};
+  check({true,true},{true,true});
+  inputs.externalDialGradientIndices = {0}; inputs.externalDialGradients = {{.4}};
+  check({true,false},{true,false});
+  inputs.externalDialGradientIndices = {0,2}; inputs.externalDialGradients = {{},{}};
+  check({true,true},{false,true});
+  for( double invalid : {NAN,INFINITY,-INFINITY} ){
+    inputs.externalDialGradients[0] = {invalid}; check({true,true},{false,true});
+  }
+  inputs.externalDialGradientIndices.clear(); inputs.externalDialGradients.clear();
+  check({false,false},{false,false});
+  // A partial dense vector does not publish even its otherwise correct rows.
+  inputs.externalDialGradients = {{.4},{}}; check({false,false},{false,false});
+}
