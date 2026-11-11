@@ -156,6 +156,17 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
       }
       programScratchSize = index(programScratchSize + scratchSize);
     }
+    else if( isTableDial(dial.type) ){
+      Semantics::validateTableDial(model_, dial);
+      packed.externalIndex = index(model_.externalWeightBlocks.at(dial.externalBlockIndex).offset);
+      packed.payloadOffset = index(payloads.size());
+      packed.payloadSize = index(2*dial.tableTermCount);
+      for( std::size_t j = 0; j < dial.tableTermCount; ++j ){
+        const auto& term = model_.tableTerms.at(dial.firstTableTerm+j);
+        payloads.push_back(scalar(double(index(term.index))));
+        payloads.push_back(scalar(term.coefficient));
+      }
+    }
     else if( dial.type == BackendDialType::ExternalWeight ){
       const auto& block = model_.externalWeightBlocks.at(dial.externalBlockIndex);
       if( dial.externalWeightIndex >= block.count ){ throw std::runtime_error("Invalid external observable dial index."); }

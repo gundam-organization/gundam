@@ -1,7 +1,7 @@
 #include "MpsBackend.h"
 
 #include "MpsBackendInternal.h"
-#include "GradientModel.h"
+#include "MpsGradientModel.h"
 #include "LikelihoodModel.h"
 #include "Semantics/BackendHostPropagation.h"
 
@@ -56,7 +56,7 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
       or engineView_.propagation.requiresEventBinning() or engineView_.propagation.hasReweightCap;
   for( const auto& dial : engineView_.propagation.dials ){
     if( dial.type == BackendDialType::Formula or dial.type == BackendDialType::Composite ){ _impl_->useEventPropagation = true; }
-    LogThrowIf(isTableDial(dial.type), "Tabulated and Kriged dials are not supported by the MPS backend.");
+    if( isTableDial(dial.type) ){ _impl_->useEventPropagation = true; Semantics::validateTableDial(engineView_.propagation, dial); }
     Semantics::validateSurfaceDial(engineView_.propagation, dial);
     if( dial.type == BackendDialType::ExternalWeight ){ continue; }
     if( dial.inputCount > 1 ){ _impl_->useEventPropagation = true; }
@@ -422,7 +422,7 @@ Backends::BackendResourceUsage Backends::MpsBackend::getResourceUsage() const {
 void Backends::MpsBackend::validateLikelihoodGradient() const {
   LogThrowIf(not _impl_->isBuilt or not _impl_->useEventPropagation, "MPS gradient requires a built resident likelihood model.");
   if( not _impl_->gradientValidated ){
-    validateDeviceGradient(_impl_->engineView);
+    validateMpsGradient(_impl_->engineView);
     _impl_->gradientValidated = true;
   }
 }

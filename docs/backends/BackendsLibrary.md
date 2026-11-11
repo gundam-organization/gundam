@@ -155,8 +155,7 @@ Unavailable backends or devices produce skips by default, while
 
 Compatibility depends on the concrete dial produced by the loader. All three backends
 use the same `EngineLayout` conversion, which rejects unsupported dial classes
-with `Unsupported dial type for EngineView`. MPS additionally rejects
-`Tabulated` and `Kriged` during backend construction. There is no automatic fallback to
+with `Unsupported dial type for EngineView`. There is no automatic fallback to
 the original engine for these classes. CUDA's scalar evaluator reuses common
 numerical semantics; its scalar dial types passed the V100 comparison tests in
 both propagation modes. 🚧 marks missing CUDA implementations, rejected at build time even when
@@ -175,8 +174,8 @@ the common layout can represent the dial. ❌ marks unsupported dial classes.
 | `Surface` / `Bicubic` | ✅ | ✅ | ✅ |
 | `ExternalWeight` (`ExternalWeightDispatcher`) | ✅ | ✅ | ✅ |
 | ROOT objects (`RootFormula`, `RootSpline`, `RootGraph`) | ❌ Heavy C++ objects, unsuitable for the flat backend model | ❌ Strictly incompatible with Metal device execution as C++ ROOT objects | ❌ Rejected by `EngineLayout` |
-| `Tabulated` | ⚠️ Table updated on host at each propagation | ❌ | ⚠️ Host table, GPU response; weights validated at CC |
-| `Kriged` | ⚠️ Table updated on host at each propagation | ❌ | ⚠️ Host table, GPU response; weights validated at CC |
+| `Tabulated` | ⚠️ Table updated on host at each propagation | ⚠️ Host table, GPU response | ⚠️ Host table, GPU response; weights validated at CC |
+| `Kriged` | ⚠️ Table updated on host at each propagation | ⚠️ Host table, GPU response | ⚠️ Host table, GPU response; weights validated at CC |
 | `CompiledLibDial` | ❌ | ❌ | ❌ Rejected by `EngineLayout` |
 | `Polynomial` | ❌ | ❌ | ❌ Rejected by `EngineLayout` |
 
@@ -192,8 +191,9 @@ Responses are evaluated on each propagation, including when parameter values
 are unchanged. Each table publication advances its generation so observable
 and binning caches also see the update.
 
-CUDA now uses the same external block layout for dispatchers and tables.
-Only changed generations are uploaded (native doubles); disjoint per-block
+MPS and CUDA use the same external block layout for dispatchers and tables.
+MPS retains compensated float pairs for table values, terms and responses.
+Only changed generations are uploaded (native doubles on CUDA); disjoint per-block
 response groups are evaluated independently of parameter changes. Immutable
 indices and coefficients retain native term order, including negative, repeated
 and unsorted Kriged terms. `cachedResponses` reuses published responses;
@@ -280,7 +280,7 @@ kernels, but its presence does not constitute CUDA execution support.
 
 ## Analytic gradients
 
-Gradient support as of 2026-11-10. These tables describe the **backend gradient
+Gradient support as of 2026-11-11. These tables describe the **backend gradient
 path**, independently of the value-propagation tables above. Features available
 in the [original engine's analytic gradient](../gradient/AnalyticGradient.md)
 are not automatically available in a backend.
@@ -296,21 +296,21 @@ These statuses describe the code, not a new validation run on each device.
 | `Shift` | ✅ | ✅ | ✅ | |
 | `Graph` | ✅ | ✅ | ✅ | Single parameter input. |
 | `CompactSpline`, `UniformSpline`, `MonotonicSpline`, `GeneralSpline` | ✅ | ✅ | ✅ | Single parameter input. |
-| `Bilinear`, `Bicubic` | ✅ | ❌ | ❌ | CPU differentiates both inputs, including shared parameters, mirroring and clamps. |
+| `Bilinear`, `Bicubic` | ✅ | ✅ | ❌ | CPU and MPS differentiate both inputs, including shared parameters, mirroring and clamps. |
 | `RootGraph`, `RootSpline` | ❌ | ❌ | ❌ | Original-engine support does not extend to the backend gradient path. |
-| `Formula` (`RootFormula`, `EventFormula`) | ✅ | ❌ | ❌ | CPU differentiates compiled bytecode, including named inputs, bound event constants, mirrors and response limits; no ROOT/Clad gradient generation. |
-| `CompositeDial` | ✅ | ❌ | ❌ | CPU differentiates compiled graphs, including formula nodes, surfaces, branches and nested composites. |
+| `Formula` (`RootFormula`, `EventFormula`) | ✅ | ✅ | ❌ | CPU and MPS differentiate compiled bytecode, including named inputs, bound event constants, mirrors and response limits; no ROOT/Clad gradient generation. |
+| `CompositeDial` | ✅ | ✅ | ❌ | CPU and MPS differentiate compiled graphs, including formula nodes, surfaces, branches and nested composites. |
 | `Polynomial` | ❌ | ❌ | ❌ | No backend gradient implementation. |
-| `Tabulated`, `Kriged` | ✅️ | ❌ | ❌ | CPU consumes producer Jacobians; requires a configured `gradientFunction`. |
-| `ExternalWeightDispatcher` | ✅️ | ❌ | ❌ | CPU consumes current worker gradients; the worker must support the gradient protocol. |
+| `Tabulated`, `Kriged` | ✅️ | ✅ | ❌ | CPU and MPS consume producer Jacobians; requires a configured `gradientFunction`. |
+| `ExternalWeightDispatcher` | ✅️ | ✅ | ❌ | CPU and MPS consume current worker gradients; the worker must support the gradient protocol. |
 | `CompiledLibDial` | ❌ | ❌ | ❌ | No backend gradient implementation. |
 | Weight products | ✅ | ✅ | ✅ | Handles zero responses and repeated parameter occurrences without division. |
 | Parameter mirroring | ⚠️ | ⚠️ | ⚠️ | Requires a positive finite mirror range; piecewise derivative conventions. |
 | Extrapolation and hard response limits | ✅ | ✅ | ✅ | Piecewise conventions at knots and limits. |
-| Response smoothing | ✅ | ❌ | ❌ | CPU applies the response-transition derivative to every supported dial, composite node and composite output. MPS/CUDA still reject it. |
+| Response smoothing | ✅ | ✅ | ❌ | CPU and MPS apply the transition derivative to every supported dial, composite node and composite output. CUDA still rejects it. |
 | Global event reweight cap | ✅ | ✅ | ✅ | Weight derivative is zero above the cap. |
 
-CPU response smoothing uses the same transition thresholds and widths as value
+CPU and MPS response smoothing use the same transition thresholds and widths as value
 propagation. Within each transition the local derivative is multiplied by
 `t²(3 − 2t)`; it is zero beyond the outer edge and one on the identity side.
 Hard limits retain their existing piecewise conventions when widths are zero.
@@ -318,7 +318,7 @@ This applies to formula and surface derivatives, producer Jacobians, and every
 level of nested composites. Histogram/bin smoothing is differentiated separately
 as described below.
 
-CPU Formula gradients apply the chain rule directly to compiled bytecode,
+CPU and MPS Formula gradients apply the chain rule directly to compiled bytecode,
 for standalone dials and composite nodes. All supported formula opcodes have
 derivative rules. `floor`/`ceil` use zero piecewise derivatives, `abs` uses zero
 at zero, and `min`/`max` select the left operand at ties. Host-side formula
@@ -403,9 +403,28 @@ unsorted or non-producer indices, and missing rows cannot reuse a previous
 publication. The unique-dial derivative loop remains serial and recomputes
 local derivatives for every gradient request.
 
+MPS evaluates local derivatives on the GPU in compensated float pairs. Its
+immutable sparse layout has one direction per dial input and one contribution
+per event/dial/input occurrence. Repeated parameter bindings reduce into the
+same parameter, without division by responses or a dense event/parameter
+Jacobian. Composite directions own separate scratch frames; formulas, surfaces,
+edge mirrors and response smoothing are differentiated within these frames.
+External/table Jacobians are copied before propagation returns, including at
+unchanged parameters, and uploaded for the current gradient. Missing, malformed
+or non-finite publications are rejected; an older Jacobian is never reused.
+Table values and response supervision also run on the device; producers remain
+on the host. MPS observable-response and bin-migration gradients remain unsupported.
+
 GPU gradient evaluation reads resident weights and histogram moments; the final
 parameter-gradient vector is returned to the host for penalties and minimizer
 integration. It does not require transferring every event derivative to the host.
+
+MPS regression coverage also includes opt-in integration runs of
+[`416DialsExternalWeightGradient.py`](../../tests/python/fast/416DialsExternalWeightGradient.py),
+[`723BackendsCpuCompositeDials.py`](../../tests/python/fast/723BackendsCpuCompositeDials.py)
+and [`762BackendsCudaTableDials.py`](../../tests/python/fast/762BackendsCudaTableDials.py)
+with `GUNDAM_TEST_MPS=1`. These exercise producer publication, nested composites,
+response smoothing and table values/gradients in the full fitter.
 
 Regression sources are
 [`unitTest_CpuBackendGradient.cpp`](../../tests/GTests/unitTest_CpuBackendGradient.cpp)

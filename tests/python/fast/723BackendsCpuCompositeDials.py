@@ -3,6 +3,7 @@
 import copy
 import json
 import math
+import os
 import struct
 import sys
 from importlib import import_module
@@ -45,11 +46,16 @@ def compare(path, dial, exact=True, backendType='CPU', backendConfig=None):
                            for a, b in zip(reference, actual)), (p, q, reference, actual)
 
 
-def compare_gradient(path, dial):
+def compare_gradient(path, dial, backend_type=None):
+    if backend_type is None:
+        compare_gradient(path, dial, "CPU")
+        if os.environ.get("GUNDAM_TEST_MPS") == "1":
+            compare_gradient(path, dial, "MPS")
+        return
     config = helpers.make_config(path, dial)
     config['minimizerConfig'] = {'useNormalizedFitSpace': False, 'useAnalyticGradient': True}
     config['likelihoodInterfaceConfig']['jointProbabilityConfig'] = {'type': 'BarlowBeestonLiteGaussian'}
-    config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': 'CPU'}
+    config['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend_type}
     engine = helpers.build(config)
     minimizer = engine.getMinimizer()
     parameters = list(minimizer.getMinimizerFitParameterList())

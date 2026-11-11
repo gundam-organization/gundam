@@ -49,6 +49,11 @@ kernel void evaluate_propagation_dials(
                 programInputs, dialInputs, parameters, payloads, programScratch);
   }
   else if( kind == BackendDialType::ExternalWeight ){ value = externalWeights[dial.externalIndex]; }
+  else if( kind == BackendDialType::Tabulated || kind == BackendDialType::Kriged ){
+    for( uint j = 0; j < dial.payloadSize; j += 2 ){
+      value += payloads[dial.payloadOffset+j+1]*externalWeights[dial.externalIndex+table_term_index(payloads[dial.payloadOffset+j])];
+    }
+  }
   else{
     if( kind == BackendDialType::Bilinear || kind == BackendDialType::Bicubic ){
       auto range = inputRanges[dialIndex];

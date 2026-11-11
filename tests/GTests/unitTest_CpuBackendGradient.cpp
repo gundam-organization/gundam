@@ -275,7 +275,7 @@ TEST(DeviceGradient, MetalGraphSplinesAndResponseClampsMatchCpu) {
       {BackendDialType::Graph, graph.getDialData()}, {BackendDialType::Shift, {.83}}};
   MpsBackend gpu;
   if( !gpu.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
-  for( const auto& item : cases ) for( bool extrapolate : {false, true} ) for( bool clamp : {false, true} ) for( bool mirror : {false, true} ){
+  for( const auto& item : cases ) for( bool extrapolate : {false, true} ) for( bool clamp : {false, true} ) for( bool mirror : {false, true} ) for( bool smooth : {false, true} ){
     auto view = gradientModel(1.);
     auto& model = view.propagation;
     model.dials.resize(1); model.dialPayloads = item.second;
@@ -283,6 +283,7 @@ TEST(DeviceGradient, MetalGraphSplinesAndResponseClampsMatchCpu) {
     auto& dial = model.dials[0];
     dial.type = item.first; dial.payloadSize = item.second.size(); dial.allowExtrapolation = extrapolate;
     dial.hasMinResponse = dial.hasMaxResponse = clamp; dial.minResponse = .95; dial.maxResponse = 1.2;
+    if( smooth ) smoothLimits(dial);
     for( auto& index : model.eventDialIndices ) index = 0;
     gpu.build(view);
     CpuBackend cpu; cpu.build(view);
@@ -298,182 +299,247 @@ TEST(DeviceGradient, MetalGraphSplinesAndResponseClampsMatchCpu) {
 }
 #endif
 
-TEST(CpuBackendGradient, SurfaceInputsMatchFiniteDifferences) {
-  const double edges[]{-3., -1.9, -.7, .2, 1.8, 3., 5.};
-  TH2D histogram("gradientSurface", "", 6, edges, 6, edges);
-  histogram.SetDirectory(nullptr);
-  for( int x = 1; x <= 6; ++x ) for( int y = 1; y <= 6; ++y ){
-    const double a = histogram.GetXaxis()->GetBinCenter(x), b = histogram.GetYaxis()->GetBinCenter(y);
-    histogram.SetBinContent(x, y, 1. + .1*a + .2*b + .03*a*b + .04*std::sin(a-b));
-  }
-  Bilinear bilinear; bilinear.buildDial(histogram);
-  Bicubic bicubic; bicubic.buildDial(histogram);
-  for( bool cubic : {false, true} ) for( bool mirror : {false, true} )
-  for( bool extrapolate : {false, true} ) for( bool shared : {false, true} )
-  for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
-    SCOPED_TRACE(::testing::Message() << cubic << mirror << extrapolate << shared << clamp);
-    auto view = gradientModel(1.);
-    auto& model = view.propagation;
-    model.dials.resize(1);
-    auto& dial = model.dials[0];
-    dial.type = cubic ? BackendDialType::Bicubic : BackendDialType::Bilinear;
-    dial.inputCount = 2;
-    dial.allowExtrapolation = extrapolate;
-    model.dialPayloads = cubic ? bicubic.getDialData() : bilinear.getDialData();
-    dial.payloadSize = model.dialPayloads.size();
-    dial.hasMinResponse = dial.hasMaxResponse = clamp;
-    dial.minResponse = .95; dial.maxResponse = 1.2;
-    if( smooth ){ smoothLimits(dial); }
-    model.dialInputs = {{0, mirror, -2., 4.}, {shared ? 0u : 1u, mirror, -2., 4.}};
-    for( auto& index : model.eventDialIndices ){ index = 0; }
-    CpuBackend backend;
-    backend.build(view);
-    for( const auto& point : {std::vector<double>{.31, -.27}, {-3.1, .31}, {.31, 5.37}, {6.3, -6.7}} ){
-      compareGradient(backend, point, 2e-7);
+namespace {
+  void checkSurfaceInputsMatchFiniteDifferences(Backend& backend_) {
+    const double edges[]{-3., -1.9, -.7, .2, 1.8, 3., 5.};
+    TH2D histogram("gradientSurface", "", 6, edges, 6, edges);
+    histogram.SetDirectory(nullptr);
+    for( int x = 1; x <= 6; ++x ) for( int y = 1; y <= 6; ++y ){
+      const double a = histogram.GetXaxis()->GetBinCenter(x), b = histogram.GetYaxis()->GetBinCenter(y);
+      histogram.SetBinContent(x, y, 1. + .1*a + .2*b + .03*a*b + .04*std::sin(a-b));
     }
-  }
-}
-
-TEST(CpuBackendGradient, CompositeBranchesAndFormulaNodes) {
-  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
-    auto view = gradientModel(1.);
-    auto& model = view.propagation;
-    model.dials.resize(1);
-    auto& root = model.dials[0];
-    root.type = BackendDialType::Composite; root.inputCount = 2;
-    root.hasMaxResponse = clamp; root.maxResponse = 1.4;
-    if( smooth ){ smoothLimits(root); }
-    model.dialInputs = {{0, mirror, -2., 4.}, {1}};
-    // source = p^2 + q; output = source*p + source. Repeated graph
-    // edges and a direct root input must all contribute to the adjoint.
-    model.formulaPrograms = {FormulaCompiler::compile("[p]^2+[q]", {"p", "q"}),
-                            FormulaCompiler::compile("[a]*[p]+[b]", {"a", "p", "b"})};
-    model.formulaInputs = {{0}, {1}, {0}, {1}, {2}};
-    model.compositeInputs = {{0, mirror, -2., 4.}, {1}, {2}, {0}, {2}};
-    CompositeInstruction first, second;
-    first.dial.type = second.dial.type = BackendDialType::Formula;
-    first.dial.inputCount = 2;
-    first.dial.hasMinResponse = clamp; first.dial.minResponse = .5;
-    if( smooth ){ smoothLimits(first.dial); }
-    second.dial.firstInput = 2; second.dial.inputCount = 3;
-    second.dial.firstFormulaInput = 2; second.dial.formulaProgramIndex = 1;
-    model.compositeInstructions = {first, second};
-    model.compositePrograms = {{0, 2, 2, 3}};
-    for( auto& index : model.eventDialIndices ){ index = 0; }
-    CpuBackend backend; backend.build(view);
-    for( const auto& point : {std::vector<double>{.31, .27}, {-.7, .31}, {5.37, .8}} ){
-      compareGradient(backend, point, 2e-7);
-    }
-  }
-}
-
-TEST(CpuBackendGradient, ExternalAndTableSnapshotsMatchFiniteDifferences) {
-  for( auto type : {BackendDialType::ExternalWeight, BackendDialType::Tabulated, BackendDialType::Kriged} )
-  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
-    auto view = gradientModel(1.);
-    auto& model = view.propagation;
-    model.dials.resize(1);
-    auto& dial = model.dials[0];
-    dial.type = type; dial.inputCount = 2;
-    dial.hasMinResponse = dial.hasMaxResponse = clamp; dial.minResponse = .95; dial.maxResponse = 1.3;
-    if( smooth ){ smoothLimits(dial); }
-    model.dialInputs = {{0, mirror, -2., 4.}, {1}};
-    model.externalWeightBlocks = {{0, 2}};
-    model.tableTerms = {{0, .25}, {1, .75}}; dial.tableTermCount = 2;
-    for( auto& index : model.eventDialIndices ){ index = 0; }
-    CpuBackend backend; backend.build(view);
-    PropagationInputs inputs;
-    std::vector<double> table(2);
-    auto publish = [&](const std::vector<double>& point_) {
-      inputs.parameters.values = point_;
-      const double p = Semantics::transformDialInput(model.dialInputs[0], point_[0]), q = point_[1];
-      table = {1.+.2*p*p+.1*q, 1.+.1*p+.3*q*q};
-      inputs.externalWeights = {{table.data(), table.size(), 0, 1}};
-      inputs.externalDialGradients = {type == BackendDialType::ExternalWeight ? std::vector<double>{.4*p, .1}
-          : std::vector<double>{.1*p+.075, .025+.45*q}};
-      return backend.requestPropagation(inputs);
-    };
-    for( const auto& point : {std::vector<double>{.31, .27}, {5.37, .8}} ){
-      const auto token = publish(point);
-      // Jacobians and values are owned by the backend after publication.
-      inputs.externalDialGradients[0].assign(2, 123.);
-      table.assign(2, 456.);
-      const auto analytic = backend.getLikelihoodGradient(token);
-      for( std::size_t i = 0; i < point.size(); ++i ){
-        auto up = point, down = point; up[i] += 1e-5; down[i] -= 1e-5;
-        const double upper = backend.getLikelihood(publish(up));
-        const double lower = backend.getLikelihood(publish(down));
-        EXPECT_NEAR(analytic[i], (upper-lower)/2e-5, 2e-6);
+    Bilinear bilinear; bilinear.buildDial(histogram);
+    Bicubic bicubic; bicubic.buildDial(histogram);
+    for( bool cubic : {false, true} ) for( bool mirror : {false, true} )
+    for( bool extrapolate : {false, true} ) for( bool shared : {false, true} )
+    for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
+      SCOPED_TRACE(::testing::Message() << cubic << mirror << extrapolate << shared << clamp);
+      auto view = gradientModel(1.);
+      auto& model = view.propagation;
+      model.dials.resize(1);
+      auto& dial = model.dials[0];
+      dial.type = cubic ? BackendDialType::Bicubic : BackendDialType::Bilinear;
+      dial.inputCount = 2;
+      dial.allowExtrapolation = extrapolate;
+      model.dialPayloads = cubic ? bicubic.getDialData() : bilinear.getDialData();
+      dial.payloadSize = model.dialPayloads.size();
+      dial.hasMinResponse = dial.hasMaxResponse = clamp;
+      dial.minResponse = .95; dial.maxResponse = 1.2;
+      if( smooth ){ smoothLimits(dial); }
+      model.dialInputs = {{0, mirror, -2., 4.}, {shared ? 0u : 1u, mirror, -2., 4.}};
+      for( auto& index : model.eventDialIndices ){ index = 0; }
+      backend_.build(view);
+      for( const auto& point : {std::vector<double>{.31, -.27}, {-3.1, .31}, {.31, 5.37}, {6.3, -6.7}} ){
+        compareGradient(backend_, point, 2e-7);
       }
     }
-    publish({.31, .27});
-    inputs.externalDialGradients.clear();
-    auto token = backend.requestPropagation(inputs);
-    EXPECT_THROW(static_cast<void>(backend.getLikelihoodGradient(token)), std::exception);
-    inputs.externalDialGradients = {{1.}};
-    token = backend.requestPropagation(inputs);
-    EXPECT_THROW(static_cast<void>(backend.getLikelihoodGradient(token)), std::exception);
-    inputs.externalDialGradients = {{NAN, 1.}};
-    token = backend.requestPropagation(inputs);
-    EXPECT_THROW(static_cast<void>(backend.getLikelihoodGradient(token)), std::exception);
   }
 }
-
-TEST(CpuBackendGradient, CompositeFormulaOperationsMatchFiniteDifferences) {
-  for( const auto* expression : {
-      "exp([p])+log([q])+log10([q])+sqrt([q])+abs([p])",
-      "sin([p])+cos([p])+tan([p])+asin([p])+acos([p])+atan([p])",
-      "sinh([p])+cosh([p])+tanh([p])+erf([p])+erfc([p])",
-      "pow([p],[q])+atan2([p],[q])+[p]/[q]-[p]*[q]",
-      "min([p],[q])+max([p],[q])+floor([p])+ceil([q])",
-      "(-[p])^2+0*[p]+2"} ){
-    SCOPED_TRACE(expression);
-    auto view = gradientModel(1.);
-    auto& model = view.propagation;
-    model.dials.resize(1);
-    model.dials[0].type = BackendDialType::Composite;
-    model.dials[0].inputCount = 2;
-    model.formulaPrograms = {FormulaCompiler::compile(expression, {"p", "q"})};
-    model.formulaInputs = {{0}, {1}};
-    model.compositeInputs = {{0}, {1}};
-    CompositeInstruction instruction;
-    instruction.dial.type = BackendDialType::Formula; instruction.dial.inputCount = 2;
-    model.compositeInstructions = {instruction};
-    model.compositePrograms = {{0, 1, 2, 2}};
-    for( auto& index : model.eventDialIndices ){ index = 0; }
-    CpuBackend backend; backend.build(view);
-    compareGradient(backend, {.31, .73}, 2e-7);
-  }
+TEST(CpuBackendGradient, SurfaceInputsMatchFiniteDifferences) {
+  CpuBackend backend;
+  checkSurfaceInputsMatchFiniteDifferences(backend);
 }
+#ifdef __APPLE__
+TEST(MpsBackendGradient, SurfaceInputsMatchFiniteDifferences) {
+  MpsBackend backend;
+  if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  checkSurfaceInputsMatchFiniteDifferences(backend);
+}
+#endif
 
-TEST(CpuBackendGradient, StandaloneFormulaBindingsMirrorsAndResponseLimits) {
-  for( bool mirror : {false, true} ) for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
-    auto view = gradientModel(1.);
-    auto& model = view.propagation;
-    model.dials.resize(1);
-    auto& dial = model.dials[0];
-    dial.type = BackendDialType::Formula;
-    dial.inputCount = 3;
-    dial.hasMinResponse = dial.hasMaxResponse = clamp;
-    dial.minResponse = 1.05; dial.maxResponse = 1.15;
-    if( smooth ){ smoothLimits(dial, .02, .03); }
-    model.dialInputs = {{1, mirror, -2., 4.}, {0}, {1}};
-    model.formulaPrograms = {FormulaCompiler::compile("1+.1*[a]+.02*[b]^2+.03*[repeated]+.001*[event]",
-                                                     {"event", "b", "a", "repeated"})};
-    model.formulaInputs = {{-1, 17.}, {1}, {0}, {2}};
-    for( auto& index : model.eventDialIndices ){ index = 0; }
-    CpuBackend backend; backend.build(view);
-    for( const auto& point : {std::vector<double>{.31, .73}, {-.7, 5.37}, {.2, -5.71}} ){
-      compareGradient(backend, point, 2e-7);
+namespace {
+  void checkCompositeBranchesAndFormulaNodes(Backend& backend_) {
+    for( bool mirror : {false, true} ) for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
+      auto view = gradientModel(1.);
+      auto& model = view.propagation;
+      model.dials.resize(1);
+      auto& root = model.dials[0];
+      root.type = BackendDialType::Composite; root.inputCount = 2;
+      root.hasMaxResponse = clamp; root.maxResponse = 1.4;
+      if( smooth ){ smoothLimits(root); }
+      model.dialInputs = {{0, mirror, -2., 4.}, {1}};
+      // source = p^2 + q; output = source*p + source. Repeated graph
+      // edges and a direct root input must all contribute to the adjoint.
+      model.formulaPrograms = {FormulaCompiler::compile("[p]^2+[q]", {"p", "q"}),
+                              FormulaCompiler::compile("[a]*[p]+[b]", {"a", "p", "b"})};
+      model.formulaInputs = {{0}, {1}, {0}, {1}, {2}};
+      model.compositeInputs = {{0, mirror, -2., 4.}, {1}, {2}, {0}, {2}};
+      CompositeInstruction first, second;
+      first.dial.type = second.dial.type = BackendDialType::Formula;
+      first.dial.inputCount = 2;
+      first.dial.hasMinResponse = clamp; first.dial.minResponse = .5;
+      if( smooth ){ smoothLimits(first.dial); }
+      second.dial.firstInput = 2; second.dial.inputCount = 3;
+      second.dial.firstFormulaInput = 2; second.dial.formulaProgramIndex = 1;
+      model.compositeInstructions = {first, second};
+      model.compositePrograms = {{0, 2, 2, 3}};
+      for( auto& index : model.eventDialIndices ){ index = 0; }
+      backend_.build(view);
+      for( const auto& point : {std::vector<double>{.31, .27}, {-.7, .31}, {5.37, .8}} ){
+        compareGradient(backend_, point, 2e-7);
+      }
     }
-    // Event-only formulas and constants have no parameter derivatives.
-    dial.inputCount = 0;
-    model.formulaPrograms = {FormulaCompiler::compile("1+.01*[event]", {"event"})};
-    model.formulaInputs = {{-1, 7.}};
-    backend.build(view);
-    compareGradient(backend, {.31, .73}, 2e-7);
   }
 }
+TEST(CpuBackendGradient, CompositeBranchesAndFormulaNodes) {
+  CpuBackend backend;
+  checkCompositeBranchesAndFormulaNodes(backend);
+}
+#ifdef __APPLE__
+TEST(MpsBackendGradient, CompositeBranchesAndFormulaNodes) {
+  MpsBackend backend;
+  if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  checkCompositeBranchesAndFormulaNodes(backend);
+}
+#endif
+
+namespace {
+  void checkExternalAndTableSnapshotsMatchFiniteDifferences(Backend& backend_) {
+    for( auto type : {BackendDialType::ExternalWeight, BackendDialType::Tabulated, BackendDialType::Kriged} )
+    for( bool mirror : {false, true} ) for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
+      auto view = gradientModel(1.);
+      auto& model = view.propagation;
+      model.dials.resize(1);
+      auto& dial = model.dials[0];
+      dial.type = type; dial.inputCount = 2;
+      dial.hasMinResponse = dial.hasMaxResponse = clamp; dial.minResponse = .95; dial.maxResponse = 1.3;
+      if( smooth ){ smoothLimits(dial); }
+      model.dialInputs = {{0, mirror, -2., 4.}, {1}};
+      model.externalWeightBlocks = {{0, 2}};
+      model.tableTerms = {{0, .25}, {1, .75}}; dial.tableTermCount = 2;
+      for( auto& index : model.eventDialIndices ){ index = 0; }
+      backend_.build(view);
+      PropagationInputs inputs;
+      std::uint64_t generation = 0;
+    std::vector<double> table(2);
+      auto publish = [&](const std::vector<double>& point_) {
+        inputs.parameters.values = point_;
+        const double p = Semantics::transformDialInput(model.dialInputs[0], point_[0]), q = point_[1];
+        table = {1.+.2*p*p+.1*q, 1.+.1*p+.3*q*q};
+        inputs.externalWeights = {{table.data(), table.size(), 0, ++generation}};
+        inputs.externalDialGradients = {type == BackendDialType::ExternalWeight ? std::vector<double>{.4*p, .1}
+            : std::vector<double>{.1*p+.075, .025+.45*q}};
+        return backend_.requestPropagation(inputs);
+      };
+      for( const auto& point : {std::vector<double>{.31, .27}, {5.37, .8}} ){
+        const auto token = publish(point);
+        // Jacobians and values are owned by the backend_ after publication.
+        inputs.externalDialGradients[0].assign(2, 123.);
+        table.assign(2, 456.);
+        const auto analytic = backend_.getLikelihoodGradient(token);
+        for( std::size_t i = 0; i < point.size(); ++i ){
+          auto up = point, down = point; up[i] += 1e-5; down[i] -= 1e-5;
+          const double upper = backend_.getLikelihood(publish(up));
+          const double lower = backend_.getLikelihood(publish(down));
+          EXPECT_NEAR(analytic[i], (upper-lower)/2e-5, 2e-6);
+        }
+      }
+      publish({.31, .27});
+      inputs.externalDialGradients.clear();
+      auto token = backend_.requestPropagation(inputs);
+      EXPECT_THROW(static_cast<void>(backend_.getLikelihoodGradient(token)), std::exception);
+      inputs.externalDialGradients = {{1.}};
+      token = backend_.requestPropagation(inputs);
+      EXPECT_THROW(static_cast<void>(backend_.getLikelihoodGradient(token)), std::exception);
+      inputs.externalDialGradients = {{NAN, 1.}};
+      token = backend_.requestPropagation(inputs);
+      EXPECT_THROW(static_cast<void>(backend_.getLikelihoodGradient(token)), std::exception);
+    }
+  }
+}
+TEST(CpuBackendGradient, ExternalAndTableSnapshotsMatchFiniteDifferences) {
+  CpuBackend backend;
+  checkExternalAndTableSnapshotsMatchFiniteDifferences(backend);
+}
+#ifdef __APPLE__
+TEST(MpsBackendGradient, ExternalAndTableSnapshotsMatchFiniteDifferences) {
+  MpsBackend backend;
+  if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  checkExternalAndTableSnapshotsMatchFiniteDifferences(backend);
+}
+#endif
+
+namespace {
+  void checkCompositeFormulaOperationsMatchFiniteDifferences(Backend& backend_) {
+    for( const auto* expression : {
+        "exp([p])+log([q])+log10([q])+sqrt([q])+abs([p])",
+        "sin([p])+cos([p])+tan([p])+asin([p])+acos([p])+atan([p])",
+        "sinh([p])+cosh([p])+tanh([p])+erf([p])+erfc([p])",
+        "pow([p],[q])+atan2([p],[q])+[p]/[q]-[p]*[q]",
+        "min([p],[q])+max([p],[q])+floor([p])+ceil([q])",
+        "(-[p])^2+0*[p]+2"} ){
+      SCOPED_TRACE(expression);
+      auto view = gradientModel(1.);
+      auto& model = view.propagation;
+      model.dials.resize(1);
+      model.dials[0].type = BackendDialType::Composite;
+      model.dials[0].inputCount = 2;
+      model.formulaPrograms = {FormulaCompiler::compile(expression, {"p", "q"})};
+      model.formulaInputs = {{0}, {1}};
+      model.compositeInputs = {{0}, {1}};
+      CompositeInstruction instruction;
+      instruction.dial.type = BackendDialType::Formula; instruction.dial.inputCount = 2;
+      model.compositeInstructions = {instruction};
+      model.compositePrograms = {{0, 1, 2, 2}};
+      for( auto& index : model.eventDialIndices ){ index = 0; }
+      backend_.build(view);
+      compareGradient(backend_, {.31, .73}, 2e-7);
+    }
+  }
+}
+TEST(CpuBackendGradient, CompositeFormulaOperationsMatchFiniteDifferences) {
+  CpuBackend backend;
+  checkCompositeFormulaOperationsMatchFiniteDifferences(backend);
+}
+#ifdef __APPLE__
+TEST(MpsBackendGradient, CompositeFormulaOperationsMatchFiniteDifferences) {
+  MpsBackend backend;
+  if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  checkCompositeFormulaOperationsMatchFiniteDifferences(backend);
+}
+#endif
+
+namespace {
+  void checkStandaloneFormulaBindingsMirrorsAndResponseLimits(Backend& backend_) {
+    for( bool mirror : {false, true} ) for( bool clamp : {false, true} ) for( bool smooth : {false, true} ){
+      auto view = gradientModel(1.);
+      auto& model = view.propagation;
+      model.dials.resize(1);
+      auto& dial = model.dials[0];
+      dial.type = BackendDialType::Formula;
+      dial.inputCount = 3;
+      dial.hasMinResponse = dial.hasMaxResponse = clamp;
+      dial.minResponse = 1.05; dial.maxResponse = 1.15;
+      if( smooth ){ smoothLimits(dial, .02, .03); }
+      model.dialInputs = {{1, mirror, -2., 4.}, {0}, {1}};
+      model.formulaPrograms = {FormulaCompiler::compile("1+.1*[a]+.02*[b]^2+.03*[repeated]+.001*[event]",
+                                                       {"event", "b", "a", "repeated"})};
+      model.formulaInputs = {{-1, 17.}, {1}, {0}, {2}};
+      for( auto& index : model.eventDialIndices ){ index = 0; }
+      backend_.build(view);
+      for( const auto& point : {std::vector<double>{.31, .73}, {-.7, 5.37}, {.2, -5.71}} ){
+        compareGradient(backend_, point, 2e-7);
+      }
+      // Event-only formulas and constants have no parameter derivatives.
+      dial.inputCount = 0;
+      model.formulaPrograms = {FormulaCompiler::compile("1+.01*[event]", {"event"})};
+      model.formulaInputs = {{-1, 7.}};
+      backend_.build(view);
+      compareGradient(backend_, {.31, .73}, 2e-7);
+    }
+  }
+}
+TEST(CpuBackendGradient, StandaloneFormulaBindingsMirrorsAndResponseLimits) {
+  CpuBackend backend;
+  checkStandaloneFormulaBindingsMirrorsAndResponseLimits(backend);
+}
+#ifdef __APPLE__
+TEST(MpsBackendGradient, StandaloneFormulaBindingsMirrorsAndResponseLimits) {
+  MpsBackend backend;
+  if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  checkStandaloneFormulaBindingsMirrorsAndResponseLimits(backend);
+}
+#endif
 
 TEST(CpuBackendGradient, ResponseSmoothingMatchesSupervisorAtTransitionBoundaries) {
   for( double minWidth : {0., .1} ) for( double maxWidth : {0., .2} ){
@@ -668,70 +734,83 @@ TEST(CpuBackendGradient, ObservableFormulaCompositeAndProducerJacobians) {
   }
 }
 
-TEST(CpuBackendGradient, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows) {
-  auto view = gradientModel(1., 8);
-  auto& model = view.propagation;
-  model.dials.resize(6, model.dials[0]);
-  model.dials[1].type = BackendDialType::ExternalWeight;
-  model.dials[1].firstInput = 0;
-  model.dials[4].type = BackendDialType::Tabulated;
-  model.dials[4].firstInput = 1;
-  model.dials[4].externalWeightIndex = 1;
-  model.externalWeightBlocks = {{0, 3}};
-  model.dials[4].tableTermCount = 2;
-  model.tableTerms = {{1, .25}, {2, .75}};
-  for( auto& index : model.eventDialIndices ){ index = index == 0 ? 1 : 4; }
-  CpuBackend backend;
-  backend.build(view);
-  PropagationInputs inputs;
-  std::vector<double> table(3);
-  const auto publish = [&](const std::vector<double>& point_, bool sparse_){
-    inputs.parameters.values = point_;
-    table = {1.+.2*point_[0]*point_[0], 1.+.1*point_[1], 1.+.3*point_[1]*point_[1]};
-    inputs.externalWeights = {{table.data(), table.size(), 0, 1}};
-    inputs.externalDialGradientIndices = sparse_ ? std::vector<std::size_t>{1, 4} : std::vector<std::size_t>{};
-    inputs.externalDialGradients.assign(sparse_ ? 2 : model.dials.size(), {});
-    inputs.externalDialGradients[sparse_ ? 0 : 1] = {.4*point_[0]};
-    inputs.externalDialGradients[sparse_ ? 1 : 4] = {.025+.45*point_[1]};
-    return backend.requestPropagation(inputs);
-  };
-  for( const auto& point : {std::vector<double>{.31, .27}, {.73, -.4}} ){
-    const auto dense = backend.getLikelihoodGradient(publish(point, false));
-    const auto token = publish(point, true);
-    // Sparse publications must also own their Jacobian/value snapshots.
-    inputs.externalDialGradients[0][0] = 123.;
-    table.assign(3, 456.);
-    const auto sparse = backend.getLikelihoodGradient(token);
-    EXPECT_EQ(sparse, dense);
-    for( std::size_t i = 0; i < point.size(); ++i ){
-      auto up = point, down = point;
-      up[i] += 1e-5; down[i] -= 1e-5;
-      const double upper = backend.getLikelihood(publish(up, true));
-      const double lower = backend.getLikelihood(publish(down, true));
-      EXPECT_NEAR(sparse[i], (upper-lower)/2e-5, 2e-6);
+namespace {
+  void checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(Backend& backend_) {
+    auto view = gradientModel(1., 8);
+    auto& model = view.propagation;
+    model.dials.resize(6, model.dials[0]);
+    model.dials[1].type = BackendDialType::ExternalWeight;
+    model.dials[1].firstInput = 0;
+    model.dials[4].type = BackendDialType::Tabulated;
+    model.dials[4].firstInput = 1;
+    model.dials[4].externalWeightIndex = 1;
+    model.externalWeightBlocks = {{0, 3}};
+    model.dials[4].tableTermCount = 2;
+    model.tableTerms = {{1, .25}, {2, .75}};
+    for( auto& index : model.eventDialIndices ){ index = index == 0 ? 1 : 4; }
+    backend_.build(view);
+    PropagationInputs inputs;
+    std::uint64_t generation = 0;
+    std::vector<double> table(3);
+    const auto publish = [&](const std::vector<double>& point_, bool sparse_){
+      inputs.parameters.values = point_;
+      table = {1.+.2*point_[0]*point_[0], 1.+.1*point_[1], 1.+.3*point_[1]*point_[1]};
+      inputs.externalWeights = {{table.data(), table.size(), 0, ++generation}};
+      inputs.externalDialGradientIndices = sparse_ ? std::vector<std::size_t>{1, 4} : std::vector<std::size_t>{};
+      inputs.externalDialGradients.assign(sparse_ ? 2 : model.dials.size(), {});
+      inputs.externalDialGradients[sparse_ ? 0 : 1] = {.4*point_[0]};
+      inputs.externalDialGradients[sparse_ ? 1 : 4] = {.025+.45*point_[1]};
+      return backend_.requestPropagation(inputs);
+    };
+    for( const auto& point : {std::vector<double>{.31, .27}, {.73, -.4}} ){
+      const auto dense = backend_.getLikelihoodGradient(publish(point, false));
+      const auto token = publish(point, true);
+      // Sparse publications must also own their Jacobian/value snapshots.
+      inputs.externalDialGradients[0][0] = 123.;
+      table.assign(3, 456.);
+      const auto sparse = backend_.getLikelihoodGradient(token);
+      EXPECT_EQ(sparse, dense);
+      for( std::size_t i = 0; i < point.size(); ++i ){
+        auto up = point, down = point;
+        up[i] += 1e-5; down[i] -= 1e-5;
+        const double upper = backend_.getLikelihood(publish(up, true));
+        const double lower = backend_.getLikelihood(publish(down, true));
+        EXPECT_NEAR(sparse[i], (upper-lower)/2e-5, 2e-6);
+      }
     }
-  }
-  publish({.31, .27}, true);
-  inputs.externalDialGradientIndices = {1};
-  inputs.externalDialGradients.resize(1);
-  auto token = backend.requestPropagation(inputs);
-  EXPECT_THROW(static_cast<void>(backend.getLikelihoodGradient(token)), std::exception);
-  inputs.externalDialGradientIndices.clear();
-  inputs.externalDialGradients.clear();
-  token = backend.requestPropagation(inputs);
-  EXPECT_THROW(static_cast<void>(backend.getLikelihoodGradient(token)), std::exception);
+    publish({.31, .27}, true);
+    inputs.externalDialGradientIndices = {1};
+    inputs.externalDialGradients.resize(1);
+    auto token = backend_.requestPropagation(inputs);
+    EXPECT_THROW(static_cast<void>(backend_.getLikelihoodGradient(token)), std::exception);
+    inputs.externalDialGradientIndices.clear();
+    inputs.externalDialGradients.clear();
+    token = backend_.requestPropagation(inputs);
+    EXPECT_THROW(static_cast<void>(backend_.getLikelihoodGradient(token)), std::exception);
 
-  for( const auto& indices : {std::vector<std::size_t>{1, 1}, {4, 1}, {1, 6}, {1, 3}} ){
-    inputs.externalDialGradientIndices = indices;
-    inputs.externalDialGradients.assign(2, {1.});
-    EXPECT_THROW(static_cast<void>(backend.requestPropagation(inputs)), std::exception);
+    for( const auto& indices : {std::vector<std::size_t>{1, 1}, {4, 1}, {1, 6}, {1, 3}} ){
+      inputs.externalDialGradientIndices = indices;
+      inputs.externalDialGradients.assign(2, {1.});
+      EXPECT_THROW(static_cast<void>(backend_.requestPropagation(inputs)), std::exception);
+    }
+    inputs.externalDialGradientIndices = {1, 4};
+    inputs.externalDialGradients.resize(1);
+    EXPECT_THROW(static_cast<void>(backend_.requestPropagation(inputs)), std::exception);
+    // A rebuild changes the compact snapshot's index map and clears publication.
+    model.dials[1].type = model.dials[4].type = BackendDialType::Norm;
+    model.externalWeightBlocks.clear();
+    backend_.build(view);
+    compareGradient(backend_, {.7, .9});
   }
-  inputs.externalDialGradientIndices = {1, 4};
-  inputs.externalDialGradients.resize(1);
-  EXPECT_THROW(static_cast<void>(backend.requestPropagation(inputs)), std::exception);
-  // A rebuild changes the compact snapshot's index map and clears publication.
-  model.dials[1].type = model.dials[4].type = BackendDialType::Norm;
-  model.externalWeightBlocks.clear();
-  backend.build(view);
-  compareGradient(backend, {.7, .9});
 }
+TEST(CpuBackendGradient, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows) {
+  CpuBackend backend;
+  checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(backend);
+}
+#ifdef __APPLE__
+TEST(MpsBackendGradient, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows) {
+  MpsBackend backend;
+  if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(backend);
+}
+#endif

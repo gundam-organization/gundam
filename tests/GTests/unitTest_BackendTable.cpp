@@ -42,43 +42,58 @@ namespace {
   }
 }
 
-TEST(BackendTable, CpuReadsUpdatedTablesWithoutParameterChanges) {
-  using namespace Backends;
-  GundamGlobals::setNumberOfThreads(2);
-  CpuBackend backend;
-  auto model = makeTableModel();
-  backend.build(model);
-  std::vector<double> first{10., 2., 4.}, second{3., 5.};
-  Tabulated tabulated(&first, 1, .25);
-  Kriged kriged(&second, 3, {1, 0, 1}, {-.25, .5, .75});
-  DialInputBuffer buffer;
-  PropagationInputs inputs;
-  inputs.externalWeights = {{first.data(), first.size(), 0, 1}, {second.data(), second.size(), 3, 1}};
-  auto check = [&]{
-    const auto token = backend.requestPropagation(inputs);
-    ASSERT_TRUE(token.isValid);
-    backend.materialize(token, OutputRequest::EventWeights);
-    const auto& weights = backend.getEventWeightsHostView(token);
-    const double a = tabulated.evalResponse(buffer), b = kriged.evalResponse(buffer);
-    ASSERT_EQ(weights.size(), 2);
-    EXPECT_DOUBLE_EQ(weights[0], 2. * a * b);
-    EXPECT_DOUBLE_EQ(weights[1], 3. * a);
-    EXPECT_DOUBLE_EQ(backend.getHistogramSumsHostView(token)[0], weights[0] + weights[1]);
-    EXPECT_DOUBLE_EQ(backend.getHistogramSumSquaresHostView(token)[0], weights[0]*weights[0] + weights[1]*weights[1]);
-  };
-  check();
-  check();
-  first[2] = 8.;
-  ++inputs.externalWeights[0].generation;
-  check();
-  second[0] = -2.;
-  ++inputs.externalWeights[1].generation;
-  check();
-  backend.build(model);
-  check();
-  inputs.externalWeights[0].count = 1;
-  EXPECT_THROW(backend.requestPropagation(inputs), std::runtime_error);
+namespace {
+  void checkUpdatedTableValues(Backends::Backend& backend_) {
+    using namespace Backends;
+    GundamGlobals::setNumberOfThreads(2);
+    auto model = makeTableModel();
+    backend_.build(model);
+    std::vector<double> first{10., 2., 4.}, second{3., 5.};
+    Tabulated tabulated(&first, 1, .25);
+    Kriged kriged(&second, 3, {1, 0, 1}, {-.25, .5, .75});
+    DialInputBuffer buffer;
+    PropagationInputs inputs;
+    inputs.externalWeights = {{first.data(), first.size(), 0, 1}, {second.data(), second.size(), 3, 1}};
+    auto check = [&]{
+      const auto token = backend_.requestPropagation(inputs);
+      ASSERT_TRUE(token.isValid);
+      backend_.materialize(token, OutputRequest::EventWeights);
+      const auto& weights = backend_.getEventWeightsHostView(token);
+      const double a = tabulated.evalResponse(buffer), b = kriged.evalResponse(buffer);
+      ASSERT_EQ(weights.size(), 2);
+      EXPECT_DOUBLE_EQ(weights[0], 2. * a * b);
+      EXPECT_DOUBLE_EQ(weights[1], 3. * a);
+      EXPECT_DOUBLE_EQ(backend_.getHistogramSumsHostView(token)[0], weights[0] + weights[1]);
+      EXPECT_DOUBLE_EQ(backend_.getHistogramSumSquaresHostView(token)[0], weights[0]*weights[0] + weights[1]*weights[1]);
+    };
+    check();
+    check();
+    first[2] = 8.;
+    ++inputs.externalWeights[0].generation;
+    check();
+    second[0] = -2.;
+    ++inputs.externalWeights[1].generation;
+    check();
+    backend_.build(model);
+    check();
+    inputs.externalWeights[0].count = 1;
+    EXPECT_THROW(backend_.requestPropagation(inputs), std::runtime_error);
+  }
 }
+TEST(BackendTable, CpuReadsUpdatedTablesWithoutParameterChanges) {
+  Backends::CpuBackend backend;
+  checkUpdatedTableValues(backend);
+}
+#ifdef __APPLE__
+TEST(BackendTable, MetalReadsUpdatedTablesWithoutParameterChanges) {
+  for( const char* mode : {"cachedResponses", "recomputeResponses"} ){
+    Backends::MpsBackend backend;
+    if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+    backend.configure(ConfigReader(JsonType{{"propagationMode", mode}}));
+    checkUpdatedTableValues(backend);
+  }
+}
+#endif
 
 TEST(BackendTable, ObservableCacheTracksTableGenerations) {
   using namespace Backends;
@@ -174,6 +189,8 @@ TEST(BackendTable, RejectsInvalidDescriptors) {
   EXPECT_THROW(backend.build(bad), std::runtime_error);
 #ifdef __APPLE__
   MpsBackend mps;
-  EXPECT_THROW(mps.build(good), std::runtime_error);
+  if( !mps.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
+  EXPECT_NO_THROW(mps.build(good));
+  EXPECT_THROW(mps.build(bad), std::runtime_error);
 #endif
 }

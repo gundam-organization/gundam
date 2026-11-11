@@ -1,6 +1,6 @@
 #include "MpsEventPropagation.h"
 #include "MpsBackendInternal.h"
-#include "GradientModel.h"
+#include "MpsGradientModel.h"
 #include "DialDependencyGroups.h"
 #include "LikelihoodModel.h"
 
@@ -42,6 +42,7 @@ void Backends::MpsEventPropagation::clear() {
   _state_ = EventState();
   _cache_ = EventStateCache();
   _valid_ = false;
+  _producerDials_.clear(); _producerGradients_.clear(); _producerGradientsValid_ = false;
 }
 
 void Backends::MpsEventPropagation::updateDataHistograms(const LikelihoodView& likelihood_) {
@@ -68,6 +69,12 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
   clearBuffers();
   _model_ = &model_;
   _packed_.build(model_);
+  _producerDials_.clear();
+  for( std::size_t i = 0; i < model_.dials.size(); ++i ){
+    if( model_.dials[i].type == BackendDialType::ExternalWeight or isTableDial(model_.dials[i].type) ) _producerDials_.push_back(i);
+  }
+  _producerGradients_.assign(_producerDials_.size(), {});
+  _producerGradientsValid_ = false;
   _cache_.build(model_);
   _state_ = EventState();
   _materializedRevision_ = 0;
@@ -289,6 +296,25 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   _diagnosticStageGpuSeconds_.clear();
   const auto& model = *_model_;
   inputs_.validate(model);
+  // Publications are borrowed. Snapshot even when values/generations did not
+  // change, and reject missing rows on the next gradient rather than reusing
+  // an older token's Jacobian. Value-only propagation needs no Jacobian.
+  _producerGradientsValid_ = true;
+  std::size_t sparsePosition = 0;
+  const bool sparse = not inputs_.externalDialGradientIndices.empty();
+  for( std::size_t i = 0; i < _producerDials_.size(); ++i ){
+    const auto index = _producerDials_[i];
+    while( sparse and sparsePosition < inputs_.externalDialGradientIndices.size()
+           and inputs_.externalDialGradientIndices[sparsePosition] < index ) ++sparsePosition;
+    const bool published = sparse ? (sparsePosition < inputs_.externalDialGradientIndices.size()
+        and inputs_.externalDialGradientIndices[sparsePosition] == index)
+        : inputs_.externalDialGradients.size() == model.dials.size();
+    auto& row = _producerGradients_[i];
+    if( not published ){ row.clear(); _producerGradientsValid_ = false; continue; }
+    row = inputs_.externalDialGradients[sparse ? sparsePosition : index];
+    if( row.size() != model.dials[index].inputCount ) _producerGradientsValid_ = false;
+    for( auto slope : row ) if( not std::isfinite(slope) ) _producerGradientsValid_ = false;
+  }
   _cache_.prepare(inputs_);
   uploadParameters<ObservableScalar>(buffer(Buffer::Parameters), inputs_.parameters, timing_);
   uploadExternalWeights<ObservableScalar>(buffer(Buffer::ExternalWeights), _externalGenerations_, inputs_, timing_);
@@ -532,7 +558,7 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   out["contributionCapacity"] = _packed_.contributionCapacity;
   out["histogramChunkCapacity"] = _packed_.histogramChunkCapacity;
   out["buffers"] = JsonType::array();
-  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights", "FormulaPrograms", "FormulaInstructions", "FormulaConstants", "ProgramInputs", "CompositePrograms", "CompositeInstructions", "ProgramScratch", "LikelihoodBins", "LikelihoodCount", "LikelihoodPartials", "LikelihoodTotal", "LikelihoodReadback", "GradientDials", "GradientEvents", "GradientBins", "GradientPayloads", "GradientIndices", "GradientOffsets", "GradientOccurrences", "GradientResponses", "GradientScales", "GradientContributions", "GradientTotal", "GradientReadback", "GradientWork"};
+  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights", "FormulaPrograms", "FormulaInstructions", "FormulaConstants", "ProgramInputs", "CompositePrograms", "CompositeInstructions", "ProgramScratch", "LikelihoodBins", "LikelihoodCount", "LikelihoodPartials", "LikelihoodTotal", "LikelihoodReadback", "GradientDials", "GradientEvents", "GradientBins", "GradientIndices", "GradientOffsets", "GradientOccurrences", "GradientResponses", "GradientScales", "GradientContributions", "GradientTotal", "GradientReadback", "GradientBindings", "GradientRanges", "GradientInputOffsets", "GradientScratch", "GradientExternal", "GradientWork"};
   static_assert(sizeof(names) / sizeof(*names) == std::size_t(Buffer::Count));
   for( std::size_t i = 0; i < _buffers_.size(); ++i ){
     auto value = _buffers_[i];
@@ -553,28 +579,36 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
 
 std::vector<double> Backends::MpsEventPropagation::getLikelihoodGradient(const EngineView& view_) {
   LogThrowIf(not _valid_, "MPS gradient has no valid propagation.");
+  LogThrowIf(not _producerGradientsValid_, "MPS gradient requires current, finite external/table Jacobians with matching input dimensions.");
   if( buffer(Buffer::GradientWork) == nil ){
-    GradientModel<ObservableScalar> model;
-    model.build(view_);
+    MpsGradientModel model;
+    model.build(view_, _packed_);
     _gradientWork_ = model.work;
     auto upload = [&](Buffer slot_, const auto& data_){
+      LogThrowIf(data_.size() > _device_.maxBufferLength / sizeof(typename std::decay_t<decltype(data_)>::value_type),
+                 "MPS gradient upload exceeds Metal maxBufferLength.");
       _buffers_[std::size_t(slot_)] = data_.empty() ? makePrivateEmptyBuffer(_device_, 8)
           : makePrivateBuffer(_device_, _queue_, data_);
       LogThrowIf(buffer(slot_) == nil, "MPS gradient upload failed.");
     };
     auto allocate = [&](Buffer slot_, std::size_t bytes_, bool shared_ = false){
       bytes_ = std::max(std::size_t(8), bytes_);
+      LogThrowIf(bytes_ > _device_.maxBufferLength, "MPS gradient allocation exceeds Metal maxBufferLength.");
       _buffers_[std::size_t(slot_)] = shared_ ? makeSharedEmptyBuffer(_device_, bytes_) : makePrivateEmptyBuffer(_device_, bytes_);
       LogThrowIf(buffer(slot_) == nil, "MPS gradient allocation failed.");
     };
     try{
-      upload(Buffer::GradientDials, model.dials); upload(Buffer::GradientEvents, model.events);
-      upload(Buffer::GradientBins, model.bins); upload(Buffer::GradientPayloads, model.payloads);
+      upload(Buffer::GradientDials, model.inputs); upload(Buffer::GradientEvents, model.events);
+      upload(Buffer::GradientBins, model.bins);
       upload(Buffer::GradientIndices, model.indices); upload(Buffer::GradientOffsets, model.parameterOffsets);
       upload(Buffer::GradientOccurrences, model.parameterOccurrences);
-      allocate(Buffer::GradientResponses, model.dials.size()*2*sizeof(ObservableScalar));
+      upload(Buffer::GradientBindings, model.bindings); upload(Buffer::GradientRanges, model.ranges);
+      upload(Buffer::GradientInputOffsets, model.inputOffsets);
+      allocate(Buffer::GradientScratch, model.scratchSize*2*sizeof(ObservableScalar));
+      allocate(Buffer::GradientExternal, model.externalCount*sizeof(ObservableScalar), true);
+      allocate(Buffer::GradientResponses, model.inputs.size()*sizeof(ObservableScalar));
       allocate(Buffer::GradientScales, model.bins.size()*2*sizeof(ObservableScalar));
-      allocate(Buffer::GradientContributions, model.indices.size()*sizeof(ObservableScalar));
+      allocate(Buffer::GradientContributions, model.contributionCount*sizeof(ObservableScalar));
       allocate(Buffer::GradientTotal, model.work.parameters*sizeof(ObservableScalar));
       allocate(Buffer::GradientReadback, model.work.parameters*sizeof(ObservableScalar), true);
       // Publish the completed layout only after all other allocations succeeded.
@@ -585,15 +619,21 @@ std::vector<double> Backends::MpsEventPropagation::getLikelihoodGradient(const E
       throw;
     }
   }
+  auto* external = static_cast<ObservableScalar*>(buffer(Buffer::GradientExternal).contents);
+  std::size_t externalPosition = 0;
+  for( const auto& row : _producerGradients_ ) for( auto slope : row ) external[externalPosition++] = ObservableScalar(slope);
   auto command = [_queue_ commandBuffer];
   auto encoder = [command computeCommandEncoder];
   dispatch(encoder, Kernel::GradientDials, _gradientWork_.dials,
-      {Buffer::GradientDials, Buffer::GradientPayloads, Buffer::Parameters, Buffer::GradientResponses, Buffer::GradientWork});
+      {Buffer::GradientDials, Buffer::Dials, Buffer::GradientBindings, Buffer::GradientRanges,
+       Buffer::Parameters, Buffer::Payloads, Buffer::ExternalWeights, Buffer::GradientExternal,
+       Buffer::FormulaPrograms, Buffer::FormulaInstructions, Buffer::FormulaConstants, Buffer::ProgramInputs,
+       Buffer::CompositePrograms, Buffer::CompositeInstructions, Buffer::GradientScratch, Buffer::GradientResponses, Buffer::GradientWork});
   dispatch(encoder, Kernel::GradientBins, _gradientWork_.bins,
       {Buffer::GradientBins, Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::GradientScales, Buffer::GradientWork});
   dispatch(encoder, Kernel::GradientEvents, _gradientWork_.events,
-      {Buffer::GradientEvents, Buffer::GradientIndices, Buffer::GradientResponses, Buffer::GradientScales,
-       Buffer::EventWeights, Buffer::GradientContributions, Buffer::GradientWork});
+      {Buffer::GradientEvents, Buffer::GradientIndices, Buffer::GradientInputOffsets, Buffer::Responses,
+       Buffer::GradientResponses, Buffer::GradientScales, Buffer::EventWeights, Buffer::GradientContributions, Buffer::GradientWork});
   dispatch(encoder, Kernel::GradientReduce, std::size_t(_gradientWork_.parameters)*128,
       {Buffer::GradientOffsets, Buffer::GradientOccurrences, Buffer::GradientContributions, Buffer::GradientTotal});
   [encoder endEncoding];

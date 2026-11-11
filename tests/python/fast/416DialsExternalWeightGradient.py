@@ -2,6 +2,7 @@
 """External workers supply dense event/bin gradients and acknowledge their generation."""
 import json
 import math
+import os
 from pathlib import Path
 import sys
 
@@ -94,7 +95,10 @@ def main():
                 'isEnabled': True, 'useBackend': backend}
         return configuration
 
-    for backend in (None, 'CPU'):
+    backends = [None, 'CPU']
+    if os.environ.get('GUNDAM_TEST_MPS') == '1':
+        backends.append('MPS')
+    for backend in backends:
         for threads in (1, 4):
             GUNDAM.setNumberOfThreads(threads)
             for binned in (False, True):

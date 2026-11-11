@@ -41,15 +41,20 @@ file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsLikelihood.metal MPS_LIKELIHOOD_KER
 foreach(GRADIENT_FILE
     ${BACKENDS_SOURCE_DIR}/Common/Model/include/GradientTypes.h
     ${BACKENDS_SOURCE_DIR}/Common/Execution/include/Semantics/BackendDeviceGradient.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsGradient.metal)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsGradient.metal
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsDialGradient.metal
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/MpsGradientTypes.h)
   set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${GRADIENT_FILE})
 endforeach()
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Model/include/GradientTypes.h MPS_GRADIENT_TYPES)
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Execution/include/Semantics/BackendDeviceGradient.h MPS_GRADIENT_SEMANTICS)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsGradient.metal MPS_GRADIENT_KERNELS)
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/include/MpsGradientTypes.h MPS_GRADIENT_INPUT_TYPES)
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsDialGradient.metal MPS_DIAL_GRADIENT)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsDialPrograms.metal MPS_DIAL_PROGRAMS)
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Formula/include/DeviceMath/SharedFormulaOperations.h MPS_FORMULA_OPERATIONS)
 string(REPLACE "#include \"DeviceMath/SharedFormulaOperations.h\"" "${MPS_FORMULA_OPERATIONS}" MPS_DIAL_PROGRAMS "${MPS_DIAL_PROGRAMS}")
+string(REPLACE "#include \"DeviceMath/SharedFormulaOperations.h\"" "${MPS_FORMULA_OPERATIONS}" MPS_DIAL_GRADIENT "${MPS_DIAL_GRADIENT}")
 file(READ ${BACKENDS_SOURCE_DIR}/Common/Model/include/DevicePropagationTypes.h MPS_PROPAGATION_TYPES)
 file(READ ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsEventPropagationKernels.metal MPS_EVENT_PROPAGATION_KERNELS)
 file(READ ${CMAKE_SOURCE_DIR}/src/Utils/include/DeviceMath/SharedSplineCommon.h MPS_SHARED_SPLINE_COMMON)

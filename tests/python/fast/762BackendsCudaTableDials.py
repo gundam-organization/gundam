@@ -130,7 +130,7 @@ extern "C" int weights(const char*, int, int, double values[], int, int index[],
             results.append(actual + [float(item.sumWeights) for item in bins]
                            + [float(item.sqrtSumSqWeights)**2 for item in bins] + [float(li.getLastLikelihood())])
             GUNDAM.flushOutput()
-        if backend in (None, 'CPU'):
+        if backend in (None, 'CPU', 'MPS'):
             minimizer = engine.getMinimizer()
             for point in ((.12, .02, .17, -.01, 1.1), (.12, .02, .17, -.01, 1.1),
                           (-2., .01, .1, .03, 1.)):
@@ -144,6 +144,8 @@ extern "C" int weights(const char*, int, int, double values[], int, int index[],
 
     reference = run(None)
     backends = [('CPU', None)]
+    if os.environ.get('GUNDAM_TEST_MPS') == '1':
+        backends.extend(('MPS', mode) for mode in ('cachedResponses', 'recomputeResponses'))
     # Explicit GPU validation; the default fast test needs no CUDA toolkit/device.
     if os.environ.get('GUNDAM_TEST_CUDA') == '1':
         backends.extend(('CUDA', mode) for mode in ('cachedResponses', 'recomputeResponses'))

@@ -1,5 +1,13 @@
 using namespace Backends;
 
+// Decode the full uint32 range without rounding a compensated integer to a
+// float or overflowing a signed conversion near 2^31 and 2^32.
+uint table_term_index(ObservableScalar value) {
+  auto upper = FormulaMath::floor(value / ObservableScalar(65536));
+  auto lower = value - upper * ObservableScalar(65536);
+  return uint(int(upper)) * 65536u + uint(int(lower));
+}
+
 ObservableScalar mirror_program_input(ObservableScalar value, uint useMirror,
                                       ObservableScalar minimum, ObservableScalar range) {
   if( !useMirror ){ return value; }

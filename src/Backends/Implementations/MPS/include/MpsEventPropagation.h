@@ -45,7 +45,7 @@ namespace Backends {
       EventWeights, BinCounts, BinPositions, BinContributions, ChunkOffsets, Chunks,
       PartialSums, PartialSquares, HistogramSums, HistogramSquares, ReadbackSums, ReadbackSquares,
       ReadbackVariables, ReadbackBins, ReadbackCounts, ReadbackContributions, ReadbackWeights, FormulaPrograms, FormulaInstructions, FormulaConstants,
-      ProgramInputs, CompositePrograms, CompositeInstructions, ProgramScratch, LikelihoodBins, LikelihoodCount, LikelihoodPartials, LikelihoodTotal, LikelihoodReadback, GradientDials, GradientEvents, GradientBins, GradientPayloads, GradientIndices, GradientOffsets, GradientOccurrences, GradientResponses, GradientScales, GradientContributions, GradientTotal, GradientReadback, GradientWork, Count
+      ProgramInputs, CompositePrograms, CompositeInstructions, ProgramScratch, LikelihoodBins, LikelihoodCount, LikelihoodPartials, LikelihoodTotal, LikelihoodReadback, GradientDials, GradientEvents, GradientBins, GradientIndices, GradientOffsets, GradientOccurrences, GradientResponses, GradientScales, GradientContributions, GradientTotal, GradientReadback, GradientBindings, GradientRanges, GradientInputOffsets, GradientScratch, GradientExternal, GradientWork, Count
     };
     enum class Kernel { Dials, Events, Binning, ClearCounts, CountContributions, IndexChunks, Scatter, Reduce, Finish, ReduceParallel, LikelihoodPartials, LikelihoodFinish, GradientDials, GradientBins, GradientEvents, GradientReduce, Count };
     id<MTLBuffer> buffer(Buffer buffer_) const { return _buffers_[std::size_t(buffer_)]; }
@@ -71,6 +71,9 @@ namespace Backends {
     bool _deviceLikelihood_{false};
     LikelihoodWorkLayout _likelihoodWork_{};
     GradientWork<ObservableScalar> _gradientWork_{};
+    std::vector<std::size_t> _producerDials_{};
+    std::vector<std::vector<double>> _producerGradients_{};
+    bool _producerGradientsValid_{false};
     bool _lastUpdatedPrediction_{true};
     bool _enableDiagnosticStageProfiling_{false};
     bool _enableDialCache_{true};
