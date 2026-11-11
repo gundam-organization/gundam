@@ -112,7 +112,7 @@ def plot_scans(path):
     import numpy as np
 
     GUNDAM.setNumberOfThreads(1)
-    figure, axes = plt.subplots(3, 3, figsize=(15, 10), layout="constrained")
+    figure, axes = plt.subplots(3, 3, figsize=(15, 10), constrained_layout=True)
     cases = [("symmetric", "Normalization", 0.25, (0.25, 0.25), "Shared width: 0.25"),
              ("asymmetric", "Normalization", [0.4, 0.1], (0.4, 0.1), "Separate widths: [0.4, 0.1]"),
              ("v-shape", "Graph", [0.4, 0.1], (0.4, 0.1), "V-shaped dial: w = |parameter|")]
