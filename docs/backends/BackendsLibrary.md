@@ -296,21 +296,21 @@ These statuses describe the code, not a new validation run on each device.
 | `Shift` | ✅ | ✅ | ✅ | |
 | `Graph` | ✅ | ✅ | ✅ | Single parameter input. |
 | `CompactSpline`, `UniformSpline`, `MonotonicSpline`, `GeneralSpline` | ✅ | ✅ | ✅ | Single parameter input. |
-| `Bilinear`, `Bicubic` | ✅ | ✅ | ❌ | CPU and MPS differentiate both inputs, including shared parameters, mirroring and clamps. |
+| `Bilinear`, `Bicubic` | ✅ | ✅ | ✅ | CPU, MPS and CUDA differentiate both inputs, including shared parameters, mirroring and clamps. |
 | `RootGraph`, `RootSpline` | ❌ | ❌ | ❌ | Original-engine support does not extend to the backend gradient path. |
-| `Formula` (`RootFormula`, `EventFormula`) | ✅ | ✅ | ❌ | CPU and MPS differentiate compiled bytecode, including named inputs, bound event constants, mirrors and response limits; no ROOT/Clad gradient generation. |
-| `CompositeDial` | ✅ | ✅ | ❌ | CPU and MPS differentiate compiled graphs, including formula nodes, surfaces, branches and nested composites. |
+| `Formula` (`RootFormula`, `EventFormula`) | ✅ | ✅ | ✅ | CPU, MPS and CUDA differentiate compiled bytecode, including named inputs, bound event constants, mirrors and response limits; no ROOT/Clad gradient generation. |
+| `CompositeDial` | ✅ | ✅ | ✅ | CPU, MPS and CUDA differentiate compiled graphs, including formula nodes, surfaces, branches and nested composites. |
 | `Polynomial` | ❌ | ❌ | ❌ | No backend gradient implementation. |
-| `Tabulated`, `Kriged` | ✅️ | ✅ | ❌ | CPU and MPS consume producer Jacobians; requires a configured `gradientFunction`. |
-| `ExternalWeightDispatcher` | ✅️ | ✅ | ❌ | CPU and MPS consume current worker gradients; the worker must support the gradient protocol. |
+| `Tabulated`, `Kriged` | ✅️ | ✅ | ✅ | CPU, MPS and CUDA consume producer Jacobians; requires a configured `gradientFunction`. |
+| `ExternalWeightDispatcher` | ✅️ | ✅ | ✅ | CPU, MPS and CUDA consume current worker gradients; the worker must support the gradient protocol. |
 | `CompiledLibDial` | ❌ | ❌ | ❌ | No backend gradient implementation. |
 | Weight products | ✅ | ✅ | ✅ | Handles zero responses and repeated parameter occurrences without division. |
 | Parameter mirroring | ⚠️ | ⚠️ | ⚠️ | Requires a positive finite mirror range; piecewise derivative conventions. |
 | Extrapolation and hard response limits | ✅ | ✅ | ✅ | Piecewise conventions at knots and limits. |
-| Response smoothing | ✅ | ✅ | ❌ | CPU and MPS apply the transition derivative to every supported dial, composite node and composite output. CUDA still rejects it. |
+| Response smoothing | ✅ | ✅ | ✅ | CPU, MPS and CUDA apply the transition derivative to every supported dial, composite node and composite output. |
 | Global event reweight cap | ✅ | ✅ | ✅ | Weight derivative is zero above the cap. |
 
-CPU and MPS response smoothing use the same transition thresholds and widths as value
+CPU, MPS and CUDA response smoothing use the same transition thresholds and widths as value
 propagation. Within each transition the local derivative is multiplied by
 `t²(3 − 2t)`; it is zero beyond the outer edge and one on the identity side.
 Hard limits retain their existing piecewise conventions when widths are zero.
@@ -318,7 +318,7 @@ This applies to formula and surface derivatives, producer Jacobians, and every
 level of nested composites. Histogram/bin smoothing is differentiated separately
 as described below.
 
-CPU and MPS Formula gradients apply the chain rule directly to compiled bytecode,
+CPU, MPS and CUDA Formula gradients apply the chain rule directly to compiled bytecode,
 for standalone dials and composite nodes. All supported formula opcodes have
 derivative rules. `floor`/`ceil` use zero piecewise derivatives, `abs` uses zero
 at zero, and `min`/`max` select the left operand at ties. Host-side formula
@@ -417,6 +417,25 @@ and compact-support geometry as propagation. The event accumulation includes
 both weight and observable dial occurrences; no dense event/bin or
 event/parameter Jacobian is stored. Fixed bins use resident bin contributions,
 so dynamic state never depends on a stale initial event bin.
+
+CUDA dial gradients are implemented in native doubles with one analytic
+forward direction per root input. An independent gradient layout retains
+original dial numbering, formula bindings and full composite graphs, avoiding
+coupling to value-path reordering, compact descriptors or template deduplication.
+Producer Jacobians are copied per propagation and checked before gradient use;
+missing, malformed or non-finite rows cannot reuse an older publication.
+Constant/zero-input responses remain in event products but have no parameter
+occurrences. CUDA still rejects observable-response, dynamic and smoothed
+binning gradients.
+
+The CUDA derivative semantics and occurrence layout have been tested on the
+host against CPU gradients and finite differences, without a CUDA toolkit.
+**NVCC compilation and GPU execution of these new dial gradients remain
+unvalidated.** Conditional `CudaGradientDevice.*` tests exercise both propagation
+modes and weight layouts in `gundamGTest_cudaBackend.exe`. Integration scripts
+`416DialsExternalWeightGradient.py`, `723BackendsCpuCompositeDials.py` and
+`762BackendsCudaTableDials.py` enable CUDA gradient checks with
+`GUNDAM_TEST_CUDA=1`; `700BackendsCommonWeightGradient.py` accepts `--backend CUDA`.
 
 GPU gradient evaluation reads resident weights and histogram moments; the final
 parameter-gradient vector is returned to the host for penalties and minimizer

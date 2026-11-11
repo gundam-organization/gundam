@@ -3,7 +3,7 @@
 #include "CudaDialPrograms.h"
 #include "CudaBinning.h"
 #include "LikelihoodModel.h"
-#include "GradientModel.h"
+#include "CudaGradientModel.h"
 #include "Semantics/BackendDeviceGradient.h"
 #include "Semantics/BackendLikelihood.h"
 #include "BackendTypes.h"
@@ -22,6 +22,7 @@
 #include <array>
 #include <cmath>
 #include <chrono>
+#include <climits>
 #include <limits>
 #include <stdexcept>
 #include <type_traits>
@@ -89,7 +90,23 @@ namespace {
 
   struct GradientBuffers {
     Backends::GradientWork<double> work{};
-    DeviceBuffer<Backends::GradientDial<double>> dials;
+    DeviceBuffer<Backends::BackendDialDescriptor> dials;
+    DeviceBuffer<Backends::BackendDialInputDescriptor> inputs, edges;
+    DeviceBuffer<Backends::CudaGradientDirection> directions;
+    DeviceBuffer<Backends::CudaFormulaProgram> formulas;
+    DeviceBuffer<Backends::FormulaInstruction> instructions;
+    DeviceBuffer<Backends::FormulaInput> formulaInputs;
+    DeviceBuffer<Backends::CompositeProgram> composites;
+    DeviceBuffer<Backends::CompositeInstruction> nodes;
+    DeviceBuffer<Backends::BackendTableTerm> terms;
+    DeviceBuffer<Backends::ExternalWeightBlockDescriptor> blocks;
+    DeviceBuffer<Backends::CudaGradient::Dual> scratch;
+    DeviceBuffer<double> constants, producerSlopes;
+    DeviceBuffer<Backends::DeviceIndex> inputOffsets, eventOffsets;
+    Backends::CudaGradient::View view() const {
+      return {dials.data,inputs.data,payloads.data,formulas.data,instructions.data,constants.data,
+        formulaInputs.data,composites.data,nodes.data,edges.data,terms.data,blocks.data};
+    }
     DeviceBuffer<Backends::GradientEvent<double>> events;
     DeviceBuffer<Backends::LikelihoodBin<double>> bins;
     DeviceBuffer<double> payloads, contributions, total;
@@ -599,13 +616,15 @@ namespace {
     __host__ __device__ static double remainder(double a_, double b_) { return ::fmod(a_, b_); }
     __host__ __device__ static int integer(double x_) { return int(x_); }
   };
-  __global__ void gradientDials(const Backends::GradientDial<double>* dials_, const double* payloads_,
-      const double* parameters_, Backends::GradientSemantics::DialEvaluation<double>* out_, unsigned count_) {
+  __global__ void gradientDials(Backends::CudaGradient::View view_, const Backends::CudaGradientDirection* directions_,
+      const double* parameters_, const double* external_, const double* producerSlopes_,
+      Backends::CudaGradient::Dual* scratch_, Backends::GradientSemantics::DialEvaluation<double>* out_, unsigned count_) {
     auto i = blockIdx.x*blockDim.x + threadIdx.x;
     if( i >= count_ ) return;
-    const auto dial = dials_[i];
-    out_[i] = Backends::GradientSemantics::evaluateDial<GradientMath>(dial, payloads_,
-        dial.type == unsigned(Backends::BackendDialType::Shift) ? 0. : parameters_[dial.parameter]);
+    auto d = directions_[i];
+    auto value = Backends::CudaGradient::evaluate(view_,d.dial,d.input,parameters_,external_,
+        d.external == UINT_MAX ? 0. : producerSlopes_[d.external],scratch_+d.scratch,scratch_+d.stack);
+    out_[i] = {value.value,value.slope};
   }
   __global__ void gradientBins(const Backends::LikelihoodBin<double>* bins_, const double* sums_, const double* squares_,
       Backends::GradientSemantics::DialEvaluation<double>* out_, unsigned count_) {
@@ -613,10 +632,31 @@ namespace {
     if( i < count_ ) out_[i] = Backends::GradientSemantics::binScales<GradientMath>(bins_[i], sums_[i], squares_[i]);
   }
   __global__ void gradientEvents(const Backends::GradientEvent<double>* events_, Backends::GradientWork<double> work_,
-      const Backends::DeviceIndex* indices_, const Backends::GradientSemantics::DialEvaluation<double>* responses_,
+      const Backends::DeviceIndex* indices_, const Backends::DeviceIndex* inputOffsets_, const Backends::DeviceIndex* eventOffsets_,
+      const Backends::GradientSemantics::DialEvaluation<double>* responses_,
       const Backends::GradientSemantics::DialEvaluation<double>* scales_, const double* weights_, double* out_) {
     auto i = blockIdx.x*blockDim.x + threadIdx.x;
-    if( i < work_.events ) Backends::GradientSemantics::eventContributions(events_[i], work_, indices_, responses_, scales_, weights_, out_);
+    if( i >= work_.events ) return;
+    auto event = events_[i];
+    unsigned offset = eventOffsets_[i];
+    double prefix = 1.;
+    for( unsigned j = 0; j < event.count; ++j ){
+      auto dial = indices_[event.first+j];
+      for( unsigned k = inputOffsets_[dial]; k < inputOffsets_[dial+1]; ++k ) out_[offset++] = prefix;
+      prefix *= responses_[inputOffsets_[dial]].value;
+    }
+    double scale = 0.;
+    if( event.bin < work_.bins && !(work_.useCap && prefix > work_.cap) ){
+      auto bin = scales_[event.bin]; scale = event.base*(bin.value+weights_[event.result]*bin.derivative);
+    }
+    double suffix = 1.;
+    for( unsigned j = event.count; j-- > 0; ){
+      auto dial = indices_[event.first+j];
+      for( unsigned k = inputOffsets_[dial+1]; k-- > inputOffsets_[dial]; ){
+        --offset; out_[offset] = scale == 0. ? 0. : scale*out_[offset]*suffix*responses_[k].derivative;
+      }
+      suffix *= responses_[inputOffsets_[dial]].value;
+    }
   }
   __global__ void gradientReduce(const Backends::DeviceIndex* offsets_, const Backends::DeviceIndex* occurrences_,
       const double* contributions_, double* out_) {
@@ -1244,7 +1284,9 @@ Backends::BackendResourceUsage Backends::CudaDeviceContext::getResourceUsage() c
   if( b.gradient ){
     const auto& g = *b.gradient;
     usage.allocatedBytes += allocatedBufferBytes(g.dials, g.events, g.bins, g.payloads, g.contributions, g.total,
-                                               g.responses, g.scales, g.indices, g.offsets, g.occurrences);
+                                               g.responses, g.scales, g.indices, g.offsets, g.occurrences, g.inputs, g.edges, g.directions,
+                                               g.formulas, g.instructions, g.formulaInputs, g.composites, g.nodes, g.terms, g.blocks,
+                                               g.scratch, g.constants, g.producerSlopes, g.inputOffsets, g.eventOffsets);
   }
   // Monitoring is best effort: a telemetry query must not abort a fit.
   try{
@@ -1255,31 +1297,43 @@ Backends::BackendResourceUsage Backends::CudaDeviceContext::getResourceUsage() c
   return usage;
 }
 
-std::vector<double> Backends::CudaDeviceContext::readGradient(const EngineView& view_) {
+std::vector<double> Backends::CudaDeviceContext::readGradient(const EngineView& view_, const std::vector<double>& producerSlopes_) {
   DeviceScope scope(_impl_->deviceIndex);
   auto& b = *_impl_->buffers;
   const auto stream = _impl_->stream;
   if( !b.gradient ){
-    GradientModel<double> model;
+    CudaGradientModel model;
     model.build(view_);
     auto pending = std::make_unique<GradientBuffers>();
     auto& g = *pending;
     g.work = model.work;
-    g.dials.upload(model.dials, stream); g.events.upload(model.events, stream); g.bins.upload(model.bins, stream);
-    g.payloads.upload(model.payloads, stream); g.indices.upload(model.indices, stream);
+    const auto& original = view_.propagation;
+    g.dials.upload(original.dials, stream);
+    g.inputs.upload(original.dialInputs,stream); g.edges.upload(original.compositeInputs,stream);
+    g.directions.upload(model.directions,stream); g.formulas.upload(model.formulas,stream);
+    g.instructions.upload(model.instructions,stream); g.constants.upload(model.constants,stream);
+    g.formulaInputs.upload(original.formulaInputs,stream); g.composites.upload(original.compositePrograms,stream);
+    g.nodes.upload(original.compositeInstructions,stream); g.terms.upload(original.tableTerms,stream);
+    g.blocks.upload(original.externalWeightBlocks,stream); g.scratch.allocate(std::max(std::size_t(1),model.scratchSize));
+    g.inputOffsets.upload(model.inputOffsets,stream); g.eventOffsets.upload(model.eventOffsets,stream);
+    g.producerSlopes.allocate(model.externalCount); g.events.upload(model.events, stream); g.bins.upload(model.bins, stream);
+    g.payloads.upload(original.dialPayloads, stream); g.indices.upload(model.indices, stream);
     g.offsets.upload(model.parameterOffsets, stream); g.occurrences.upload(model.parameterOccurrences, stream);
-    g.responses.allocate(model.dials.size()); g.scales.allocate(model.bins.size());
-    g.contributions.allocate(model.indices.size()); g.total.allocate(model.work.parameters);
+    g.responses.allocate(model.directions.size()); g.scales.allocate(model.bins.size());
+    g.contributions.allocate(model.contributionCount); g.total.allocate(model.work.parameters);
     checkCuda(cudaStreamSynchronize(stream), "gradient model upload");
     b.gradient = std::move(pending);
   }
   auto& g = *b.gradient;
+  if( producerSlopes_.size() != g.producerSlopes.size ) throw std::runtime_error("CUDA producer gradient size mismatch.");
+  if( !producerSlopes_.empty() ) checkCuda(cudaMemcpyAsync(g.producerSlopes.data,producerSlopes_.data(),
+      producerSlopes_.size()*sizeof(double),cudaMemcpyHostToDevice,stream),"producer gradient upload");
   if( g.work.dials ) gradientDials<<<(g.work.dials+255)/256, 256, 0, stream>>>(
-      g.dials.data, g.payloads.data, b.parameters.data, g.responses.data, g.work.dials);
+      g.view(), g.directions.data, b.parameters.data, b.externalWeights.data, g.producerSlopes.data, g.scratch.data, g.responses.data, g.work.dials);
   if( g.work.bins ) gradientBins<<<(g.work.bins+255)/256, 256, 0, stream>>>(
       g.bins.data, b.sums.data, b.sumSquares.data, g.scales.data, g.work.bins);
   if( g.work.events ) gradientEvents<<<(g.work.events+255)/256, 256, 0, stream>>>(
-      g.events.data, g.work, g.indices.data, g.responses.data, g.scales.data, b.weights.data, g.contributions.data);
+      g.events.data, g.work, g.indices.data, g.inputOffsets.data, g.eventOffsets.data, g.responses.data, g.scales.data, b.weights.data, g.contributions.data);
   if( g.work.parameters ) gradientReduce<<<g.work.parameters, 128, 0, stream>>>(
       g.offsets.data, g.occurrences.data, g.contributions.data, g.total.data);
   checkCuda(cudaGetLastError(), "gradient kernel launch");

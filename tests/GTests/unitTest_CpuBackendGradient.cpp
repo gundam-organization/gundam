@@ -1,4 +1,5 @@
 #include "CpuBackend.h"
+#include "../../src/Backends/Implementations/CUDA/include/CudaGradientModel.h"
 #ifdef __APPLE__
 #include "MpsBackend.h"
 #endif
@@ -94,6 +95,78 @@ namespace {
     }
     EXPECT_THROW(static_cast<void>(backend_.getLikelihoodGradient(token)), std::exception);
   }
+}
+
+namespace {
+  // Execute the exact host/device CUDA math on the host, using CPU only for
+  // values/histograms. This runs even without a CUDA compiler or device.
+  class HostCudaGradient : public CpuBackend {
+    PropagationInputs snapshot;
+    std::vector<std::vector<double>> blocks;
+  public:
+    PropagationToken requestPropagation(const PropagationInputs& inputs_) override {
+      const auto token = CpuBackend::requestPropagation(inputs_);
+      snapshot = inputs_; blocks.clear();
+      for( const auto& block : inputs_.externalWeights ) blocks.emplace_back(block.values,block.values+block.count);
+      for( std::size_t i = 0; i < blocks.size(); ++i ) snapshot.externalWeights[i].values = blocks[i].data();
+      return token;
+    }
+    std::vector<double> getLikelihoodGradient(const PropagationToken& token_) override {
+      const auto reference = CpuBackend::getLikelihoodGradient(token_);
+      const auto& view = getEngineView(); const auto& m = view.propagation;
+      CudaGradientModel layout; layout.build(view);
+      CudaGradient::View program{m.dials.data(),m.dialInputs.data(),m.dialPayloads.data(),layout.formulas.data(),
+        layout.instructions.data(),layout.constants.data(),m.formulaInputs.data(),m.compositePrograms.data(),
+        m.compositeInstructions.data(),m.compositeInputs.data(),m.tableTerms.data(),m.externalWeightBlocks.data()};
+      std::vector<double> external;
+      for( const auto& block : snapshot.externalWeights ){
+        external.resize(std::max(external.size(),block.destinationOffset+block.count));
+        std::copy(block.values,block.values+block.count,external.begin()+block.destinationOffset);
+      }
+      std::vector<CudaGradient::Dual> scratch(std::max(std::size_t(1),layout.scratchSize)), local;
+      for( const auto& d : layout.directions ){
+        double producer = 0.;
+        if( d.external != std::numeric_limits<DeviceIndex>::max() ){
+          auto row = d.dial;
+          if( !snapshot.externalDialGradientIndices.empty() ) row = std::lower_bound(snapshot.externalDialGradientIndices.begin(),snapshot.externalDialGradientIndices.end(),d.dial)-snapshot.externalDialGradientIndices.begin();
+          producer = snapshot.externalDialGradients[row][d.input];
+        }
+        local.push_back(CudaGradient::evaluate(program,d.dial,d.input,snapshot.parameters.values.data(),external.data(),
+                          producer,scratch.data()+d.scratch,scratch.data()+d.stack));
+      }
+      const auto& sums = getHistogramSumsHostView(token_);
+      const auto& squares = getHistogramSumSquaresHostView(token_);
+      const auto& weights = getEventWeightsHostView(token_);
+      std::vector<GradientSemantics::DialEvaluation<double>> scales;
+      for( std::size_t i = 0; i < layout.bins.size(); ++i )
+        scales.push_back(GradientSemantics::binScales<CudaGradient::Math>(layout.bins[i],sums[i],squares[i]));
+      std::vector<double> result(m.parameterCount), contributions(layout.contributionCount);
+      for( const auto& event : layout.events ){
+        double product = 1.;
+        for( std::size_t j = 0; j < event.count; ++j ) product *= local[layout.inputOffsets[layout.indices[event.first+j]]].value;
+        if( event.bin >= scales.size() || (layout.work.useCap && product > layout.work.cap) ) continue;
+        auto scale = event.base*(scales[event.bin].value+weights[event.result]*scales[event.bin].derivative);
+        auto position = layout.eventOffsets[event.result];
+        for( std::size_t j = 0; j < event.count; ++j ){
+          auto dial = layout.indices[event.first+j]; double others = 1.;
+          for( std::size_t k = 0; k < event.count; ++k ) if( k != j ) others *= local[layout.inputOffsets[layout.indices[event.first+k]]].value;
+          for( std::size_t k = 0; k < m.dials[dial].inputCount; ++k ){
+            auto value = scale*others*local[layout.inputOffsets[dial]+k].slope;
+            contributions[position+k] = value;
+            result[m.dialInputs[m.dials[dial].firstInput+k].parameterIndex] += value;
+          }
+          position += std::max(std::size_t(1),m.dials[dial].inputCount);
+        }
+      }
+      for( std::size_t i = 0; i < result.size(); ++i ) EXPECT_NEAR(result[i],reference[i],1e-10*(1.+std::abs(reference[i])));
+      std::vector<double> reduced(m.parameterCount);
+      for( std::size_t i = 0; i < reduced.size(); ++i ){
+        for( auto j = layout.parameterOffsets[i]; j < layout.parameterOffsets[i+1]; ++j ) reduced[i] += contributions[layout.parameterOccurrences[j]];
+        EXPECT_NEAR(reduced[i],result[i],1e-12*(1.+std::abs(result[i])));
+      }
+      return reduced;
+    }
+  };
 }
 
 TEST(CpuBackendGradient, FiniteDifferencesForLowRatesZeroResponsesRepeatedInputsAndCap) {
@@ -850,3 +923,78 @@ TEST(MpsBackendGradient, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows
   checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(backend);
 }
 #endif
+
+TEST(CudaGradientHostMath, SurfaceInputsMatchFiniteDifferences) { HostCudaGradient backend; checkSurfaceInputsMatchFiniteDifferences(backend); }
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(CudaGradientDevice, SurfaceInputsMatchFiniteDifferences) {
+  for( const char* mode : {"cachedResponses","recomputeResponses"} ) for( const char* layout : {"eventMajor","warpInterleaved"} ){
+    CudaBackend backend;
+    backend.configure(ConfigReader(JsonType{{"propagationMode",mode},{"weightLayout",layout}}));
+    checkSurfaceInputsMatchFiniteDifferences(backend);
+  }
+}
+#endif
+
+TEST(CudaGradientHostMath, CompositeBranchesAndFormulaNodes) { HostCudaGradient backend; checkCompositeBranchesAndFormulaNodes(backend); }
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(CudaGradientDevice, CompositeBranchesAndFormulaNodes) {
+  for( const char* mode : {"cachedResponses","recomputeResponses"} ) for( const char* layout : {"eventMajor","warpInterleaved"} ){
+    CudaBackend backend;
+    backend.configure(ConfigReader(JsonType{{"propagationMode",mode},{"weightLayout",layout}}));
+    checkCompositeBranchesAndFormulaNodes(backend);
+  }
+}
+#endif
+
+TEST(CudaGradientHostMath, ExternalAndTableSnapshotsMatchFiniteDifferences) { HostCudaGradient backend; checkExternalAndTableSnapshotsMatchFiniteDifferences(backend); }
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(CudaGradientDevice, ExternalAndTableSnapshotsMatchFiniteDifferences) {
+  for( const char* mode : {"cachedResponses","recomputeResponses"} ) for( const char* layout : {"eventMajor","warpInterleaved"} ){
+    CudaBackend backend;
+    backend.configure(ConfigReader(JsonType{{"propagationMode",mode},{"weightLayout",layout}}));
+    checkExternalAndTableSnapshotsMatchFiniteDifferences(backend);
+  }
+}
+#endif
+
+TEST(CudaGradientHostMath, CompositeFormulaOperationsMatchFiniteDifferences) { HostCudaGradient backend; checkCompositeFormulaOperationsMatchFiniteDifferences(backend); }
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(CudaGradientDevice, CompositeFormulaOperationsMatchFiniteDifferences) {
+  for( const char* mode : {"cachedResponses","recomputeResponses"} ) for( const char* layout : {"eventMajor","warpInterleaved"} ){
+    CudaBackend backend;
+    backend.configure(ConfigReader(JsonType{{"propagationMode",mode},{"weightLayout",layout}}));
+    checkCompositeFormulaOperationsMatchFiniteDifferences(backend);
+  }
+}
+#endif
+
+TEST(CudaGradientHostMath, StandaloneFormulaBindingsMirrorsAndResponseLimits) { HostCudaGradient backend; checkStandaloneFormulaBindingsMirrorsAndResponseLimits(backend); }
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(CudaGradientDevice, StandaloneFormulaBindingsMirrorsAndResponseLimits) {
+  for( const char* mode : {"cachedResponses","recomputeResponses"} ) for( const char* layout : {"eventMajor","warpInterleaved"} ){
+    CudaBackend backend;
+    backend.configure(ConfigReader(JsonType{{"propagationMode",mode},{"weightLayout",layout}}));
+    checkStandaloneFormulaBindingsMirrorsAndResponseLimits(backend);
+  }
+}
+#endif
+
+TEST(CudaGradientHostMath, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows) { HostCudaGradient backend; checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(backend); }
+#ifdef GUNDAM_TEST_CUDA_DEVICE
+TEST(CudaGradientDevice, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows) {
+  for( const char* mode : {"cachedResponses","recomputeResponses"} ) for( const char* layout : {"eventMajor","warpInterleaved"} ){
+    CudaBackend backend;
+    backend.configure(ConfigReader(JsonType{{"propagationMode",mode},{"weightLayout",layout}}));
+    checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(backend);
+  }
+}
+#endif
+
+TEST(CudaGradientHostMath, RejectsObservableAndFractionalBinning) {
+  auto view = observableGradientModel();
+  EXPECT_THROW(validateCudaGradient(view),std::runtime_error);
+  view.propagation.hasVariableResponses = false;
+  view.propagation.variableResponses.clear();
+  for( auto& event : view.propagation.events ) event.variableResponseCount = 0;
+  EXPECT_THROW(validateCudaGradient(view),std::runtime_error);
+}

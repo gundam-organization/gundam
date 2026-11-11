@@ -130,7 +130,7 @@ extern "C" int weights(const char*, int, int, double values[], int, int index[],
             results.append(actual + [float(item.sumWeights) for item in bins]
                            + [float(item.sqrtSumSqWeights)**2 for item in bins] + [float(li.getLastLikelihood())])
             GUNDAM.flushOutput()
-        if backend in (None, 'CPU', 'MPS'):
+        if backend in (None, 'CPU', 'MPS', 'CUDA'):
             minimizer = engine.getMinimizer()
             for point in ((.12, .02, .17, -.01, 1.1), (.12, .02, .17, -.01, 1.1),
                           (-2., .01, .1, .03, 1.)):

@@ -1,6 +1,7 @@
 # Gradient performance on existing inputs
 
-`GradientPerformance.py` compares the original engine and the CPU backend using
+`GradientPerformance.py` compares the original engine and the selected backend
+(`--backend CPU|MPS|CUDA`, default `CPU`) using
 `evalFitGradientAt`, the callback used by the minimizer. It accepts the fitter's
 `-c`, `-of` (ordered overrides), `-t` and `-a` options. Without `-a`, it selects
 `RealData`, just like `gundamFitter`. No fit or HESSE is run.
@@ -39,8 +40,8 @@ defaults to the invocation directory.
 
 Each engine runs in a separate subprocess, sequentially, with the same random
 seed and resolved physics configuration. The script overrides backend selection
-in both cases, even if an override file enables CPU. It enables analytic
-gradients, disables plots and LLH history, and disables CPU automatic host
+in both cases, even if an override file enables another backend. It enables analytic
+gradients, disables plots and LLH history, and disables backend automatic host
 materialization. Input fit coordinates, likelihood, bin smoothing, parameter
 selection and covariance are retained. Unsupported analytic configurations fail
 explicitly and leave logs/reports.
@@ -61,7 +62,7 @@ order, with three repetitions (`--repeats`) per trial. The workloads are:
 
 Each trial records wall time and process CPU time per callback. Process CPU time
 includes all worker threads; it can exceed wall time. Median wall times determine
-the reported CPU speedup. Timings include Python argument/result conversion and
+the reported backend speedup. Timings include Python argument/result conversion and
 the complete callback: propagation, derivative computation and fit-coordinate /
 penalty integration. Backend callbacks currently evaluate a scalar likelihood
 inside the gradient path; the original gradient path does not. This is the
@@ -141,3 +142,13 @@ copies. The local dial-derivative loop is still serial and is not cached.
 Rebuild before comparing revisions, keep the build type and workload identical,
 and use a new output directory for each measurement. The earlier Debug timings
 are a baseline for that build only; they do not predict the Release speedup.
+
+## MPS on existing inputs
+
+Add `--backend MPS` to the command above and select the rebuilt Release module
+(e.g. `cmake-build-release/src/PythonInterface`). The script forces MPS selection
+even with `override/backendCpuTest.yaml`; keep that override for shared settings.
+Use a new output directory. Reports are in `original/`, `mps/` and `summary.json`.
+Wall times include completion of Metal work and gradient readback. Native
+sampling profiles host submission/waits; it does not attribute GPU kernel time.
+Propagation stage clocks likewise do not split the gradient Metal kernels.

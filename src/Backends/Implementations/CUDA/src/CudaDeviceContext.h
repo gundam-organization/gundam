@@ -30,7 +30,7 @@ namespace Backends {
     void propagate(const PropagationInputs& inputs_, bool recomputeResponses_, bool reusePrediction_, BackendTimingSummary& timing_);
     double readLikelihood();
     void updateDataHistograms(const LikelihoodView& likelihood_);
-    std::vector<double> readGradient(const EngineView& view_);
+    std::vector<double> readGradient(const EngineView& view_, const std::vector<double>& producerSlopes_);
     void readWeights(std::vector<double>& weights_);
     void readHistograms(std::vector<double>& sums_, std::vector<double>& sumSquares_,
                         std::vector<double>& outsideSums_, std::vector<double>& outsideSquares_);

@@ -98,6 +98,8 @@ def main():
     backends = [None, 'CPU']
     if os.environ.get('GUNDAM_TEST_MPS') == '1':
         backends.append('MPS')
+    if os.environ.get('GUNDAM_TEST_CUDA') == '1':
+        backends.append('CUDA')
     for backend in backends:
         for threads in (1, 4):
             GUNDAM.setNumberOfThreads(threads)

@@ -68,12 +68,12 @@ def check_threads(threads, backend_name):
     else:
         raise AssertionError('Unsupported backend likelihood gradient was accepted')
 
-    # CPU and MPS differentiate compiled formulas without ROOT/Clad.
+    # Backends differentiate compiled formulas without ROOT/Clad.
     formula = copy.deepcopy(config)
     formula['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'] = [
         checks.helpers.formula('formula', '1+.1*[arg0]', {'parameterName': 'p'})]
     rejected = [(least_squares, 'BarlowBeestonLiteGaussian')]
-    if backend_name in ('CPU', 'MPS'):
+    if backend_name in ('CPU', 'MPS', 'CUDA'):
         for normalized, eigen in ((False, False), (True, False), (False, True), (True, True)):
             cfg = copy.deepcopy(formula)
             cfg['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend_name}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare original-engine and CPU gradient callbacks on existing GUNDAM inputs.
+"""Compare original-engine and selected backend gradient callbacks on existing GUNDAM inputs.
 
 Accepts gundamFitter's -c/-of/-t/-a. See GradientPerformance.md for measurement
 scope, native stack profiling and the output format. No minimization is run.
@@ -120,7 +120,7 @@ def worker(args):
             'minimizerConfig': {'useAnalyticGradient': True, 'writeLlhHistory': False,
                                 'enablePostFitErrorFit': False},
             'likelihoodInterfaceConfig': {'backendManagerConfig': {
-                'isEnabled': args.worker == 'CPU', 'useBackend': 'CPU'}}}})))
+                'isEnabled': args.worker != 'Original', 'useBackend': args.backend}}}})))
         resolved = json.loads(builder.toString())
         (directory / 'config.json').write_text(builder.toString())
         config = resolved['fitterEngineConfig']
@@ -139,9 +139,9 @@ def worker(args):
         engine.initialize()
         report['initializationSeconds'] = time.perf_counter() - started
         manager = engine.getBackendsManager()
-        if args.worker == 'CPU':
-            if manager.getActiveBackendName() != 'CPU':
-                raise RuntimeError('Requested CPU backend is not active')
+        if args.worker != 'Original':
+            if manager.getActiveBackendName() != args.worker:
+                raise RuntimeError(f'Requested {args.worker} backend is not active')
             manager.setEnableAutoMaterialize(False)
         elif manager.hasBackend():
             raise RuntimeError('Original-engine case unexpectedly has an active backend')
@@ -210,7 +210,7 @@ def worker(args):
                     run[kind+'WallSecondsPerCall'] = wall/run['calls']
                     run[kind+'CpuSecondsPerCall'] = cpu/run['calls']
                     run[kind+'LastChecksum'] = float(result) if kind == 'value' else sum(result)
-                    if args.worker == 'CPU':
+                    if args.worker != 'Original':
                         # Untimed pass: stage clocks are propagation measurements.
                         stages = {field: [] for field in timing_fields}
                         for point in sequence:
@@ -240,7 +240,8 @@ def worker(args):
 def compare(reports, rtol, atol):
     if any(not r.get('complete') for r in reports.values()) or len(reports) != 2:
         return {'passed': None, 'reason': 'Not run: both complete reports are required'}
-    native, cpu = reports['Original'], reports['CPU']
+    native = reports['Original']
+    cpu = next(report for name, report in reports.items() if name != 'Original')
     if any(native[k] != cpu[k] for k in ('parameterNames', 'points', 'dataHistograms', 'events', 'normalizedFitSpace')):
         return {'passed': False, 'reason': 'The two workloads differ'}
     checks = []
@@ -275,7 +276,9 @@ def main():
     parser.add_argument('--profile-seconds', type=int, default=10)
     parser.add_argument('--rtol', type=float, default=3e-5)
     parser.add_argument('--atol', type=float, default=3e-6)
-    parser.add_argument('--worker', choices=['Original', 'CPU'], help=argparse.SUPPRESS)
+    parser.add_argument('--backend', choices=['CPU', 'MPS', 'CUDA'], default='CPU',
+                        help='Backend compared with the original engine (default: CPU)')
+    parser.add_argument('--worker', choices=['Original', 'CPU', 'MPS', 'CUDA'], help=argparse.SUPPRESS)
     args = parser.parse_args()
     if min(args.threads, args.points, args.trials, args.repeats, args.profile_seconds) < 1 or args.warmup < 0:
         parser.error('Counts must be positive, warmup nonnegative')
@@ -291,7 +294,7 @@ def main():
         'describe', '--always', '--dirty'], text=True, capture_output=True)
     summary = {'complete': False, 'sourceRevision': revision.stdout.strip(), 'cases': {}}
     reports = {}
-    for backend in ('Original', 'CPU'):
+    for backend in ('Original', args.backend):
         print(f'{backend}: loading inputs, measuring, then profiling; log in {args.output}', flush=True)
         command = [sys.executable, str(Path(__file__).resolve()), *sys.argv[1:], '--worker', backend]
         with (args.output / (backend.lower()+'.log')).open('w') as log:
@@ -313,11 +316,13 @@ def main():
             print(f'{backend}: native profile unavailable/incomplete; see profile.json and profile.log', flush=True)
     summary['comparison'] = compare(reports, args.rtol, args.atol)
     if all(r.get('timings') for r in reports.values()):
-        summary['cpuSpeedup'] = {w: reports['Original']['timings'][w]['gradient']['median'] /
-            reports['CPU']['timings'][w]['gradient']['median'] for w in ('varying', 'unchanged')}
-        for w, speedup in summary['cpuSpeedup'].items():
+        summary['backendSpeedup'] = {w: reports['Original']['timings'][w]['gradient']['median'] /
+            reports[args.backend]['timings'][w]['gradient']['median'] for w in ('varying', 'unchanged')}
+        if args.backend == 'CPU':
+            summary['cpuSpeedup'] = summary['backendSpeedup']  # Legacy report key.
+        for w, speedup in summary['backendSpeedup'].items():
             print(f'{w}: Original {1e3*reports["Original"]["timings"][w]["gradient"]["median"]:.3f} ms, '
-                  f'CPU {1e3*reports["CPU"]["timings"][w]["gradient"]["median"]:.3f} ms, '
+                  f'{args.backend} {1e3*reports[args.backend]["timings"][w]["gradient"]["median"]:.3f} ms, '
                   f'speedup {speedup:.3f}x', flush=True)
     summary['complete'] = all(r.get('complete') for r in reports.values())
     write_json(args.output / 'summary.json', summary)

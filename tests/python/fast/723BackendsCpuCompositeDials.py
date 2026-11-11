@@ -51,6 +51,8 @@ def compare_gradient(path, dial, backend_type=None):
         compare_gradient(path, dial, "CPU")
         if os.environ.get("GUNDAM_TEST_MPS") == "1":
             compare_gradient(path, dial, "MPS")
+        if os.environ.get("GUNDAM_TEST_CUDA") == "1":
+            compare_gradient(path, dial, "CUDA")
         return
     config = helpers.make_config(path, dial)
     config['minimizerConfig'] = {'useNormalizedFitSpace': False, 'useAnalyticGradient': True}

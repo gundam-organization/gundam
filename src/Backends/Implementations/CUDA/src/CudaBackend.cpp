@@ -2,7 +2,7 @@
 #include "CudaWeightModel.h"
 #include "PropagationResult.h"
 #include "LikelihoodModel.h"
-#include "GradientModel.h"
+#include "CudaGradientModel.h"
 #include "Semantics/BackendHostPropagation.h"
 
 #ifdef GUNDAM_USING_CUDA
@@ -29,6 +29,9 @@ struct Backends::CudaBackendImpl {
   EventState eventState{};
   bool hasEventState{false};
   mutable bool gradientValidated{false};
+  std::vector<std::size_t> producerDials{};
+  std::vector<double> producerSlopes{};
+  bool producerSlopesValid{false};
   bool hasSmoothedBinning{false};
   BackendTimingSummary timing{};
   BackendTimingSummary buildTiming{};
@@ -154,6 +157,11 @@ void Backends::CudaBackend::build(const EngineView& engineView_) { buildShared(s
 
 void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engineView_) {
   _impl_->gradientValidated = false;
+  _impl_->producerDials.clear(); _impl_->producerSlopes.clear(); _impl_->producerSlopesValid = false;
+  if( engineView_ ) for( std::size_t i = 0; i < engineView_->propagation.dials.size(); ++i ){
+    auto type = engineView_->propagation.dials[i].type;
+    if( type == BackendDialType::ExternalWeight || isTableDial(type) ) _impl_->producerDials.push_back(i);
+  }
   invalidateResult();
   _impl_->engineView.reset();
   _impl_->hasEventState = false;
@@ -307,6 +315,19 @@ Backends::PropagationToken Backends::CudaBackend::requestPropagation(const Propa
   try{
     const auto& view = getEngineView();
     inputs_.validate(view.propagation);
+    _impl_->producerSlopes.clear(); _impl_->producerSlopesValid = true;
+    std::size_t position = 0;
+    const bool sparse = !inputs_.externalDialGradientIndices.empty();
+    for( auto index : _impl_->producerDials ){
+      while( sparse && position < inputs_.externalDialGradientIndices.size() && inputs_.externalDialGradientIndices[position] < index ) ++position;
+      const bool published = sparse ? (position < inputs_.externalDialGradientIndices.size() && inputs_.externalDialGradientIndices[position] == index)
+          : inputs_.externalDialGradients.size() == view.propagation.dials.size();
+      if( !published ){ _impl_->producerSlopesValid = false; continue; }
+      const auto& row = inputs_.externalDialGradients[sparse ? position : index];
+      if( row.size() != view.propagation.dials[index].inputCount ) _impl_->producerSlopesValid = false;
+      for( auto value : row ) if( !std::isfinite(value) ) _impl_->producerSlopesValid = false;
+      _impl_->producerSlopes.insert(_impl_->producerSlopes.end(),row.begin(),row.end());
+    }
     for( double value : inputs_.hostVariables ){
       if( not std::isfinite(value) ){ throw std::runtime_error("CudaBackend: host observables must be finite."); }
     }
@@ -478,7 +499,7 @@ Backends::BackendResourceUsage Backends::CudaBackend::getResourceUsage() const {
 
 void Backends::CudaBackend::validateLikelihoodGradient() const {
   if( !_impl_->gradientValidated ){
-    validateDeviceGradient(getEngineView());
+    validateCudaGradient(getEngineView());
     _impl_->gradientValidated = true;
   }
 }
@@ -487,7 +508,10 @@ std::vector<double> Backends::CudaBackend::getLikelihoodGradient(const Propagati
   validateLikelihoodGradient();
   if( !std::isfinite(getLikelihood(token_)) ) throw std::runtime_error("Cannot differentiate a non-finite CUDA likelihood.");
 #ifdef GUNDAM_USING_CUDA
-  try{ return _impl_->context->readGradient(getEngineView()); }
+  try{
+    if( !_impl_->producerSlopesValid ) throw std::runtime_error("CUDA gradient requires current finite producer Jacobians with matching input dimensions.");
+    return _impl_->context->readGradient(getEngineView(),_impl_->producerSlopes);
+  }
   catch(...){ invalidateResult(); throw; }
 #else
   throw std::runtime_error("CUDA support not compiled.");
