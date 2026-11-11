@@ -510,7 +510,7 @@ std::vector<double> Backends::CudaBackend::getLikelihoodGradient(const Propagati
 #ifdef GUNDAM_USING_CUDA
   try{
     if( !_impl_->producerSlopesValid ) throw std::runtime_error("CUDA gradient requires current finite producer Jacobians with matching input dimensions.");
-    return _impl_->context->readGradient(getEngineView(),_impl_->producerSlopes);
+    return _impl_->context->readGradient(getEngineView(),_impl_->producerSlopes,_impl_->timing);
   }
   catch(...){ invalidateResult(); throw; }
 #else

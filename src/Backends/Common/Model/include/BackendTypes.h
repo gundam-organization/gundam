@@ -98,6 +98,17 @@ ENUM_FIELD( Unavailable )
     double devicePropagationSeconds{0};
     // Wall time of the last successful request, including host likelihood.
     double propagationWallSeconds{0};
+    // CUDA gradient only, excluding the preceding propagation. Device intervals
+    // overlap wall time; model preparation is lazy and normally paid once.
+    double gradientWallSeconds{0};
+    double gradientModelPreparationSeconds{0};
+    double gradientDeviceSeconds{0};
+    double gradientProducerUploadSeconds{0};
+    double gradientDialStageSeconds{0};
+    double gradientBinStageSeconds{0};
+    double gradientEventStageSeconds{0};
+    double gradientReductionStageSeconds{0};
+    double gradientReadbackSeconds{0};
     double eventStateReadbackSeconds{0};
     std::size_t eventStateReadbackBytes{0};
     std::size_t contributionBufferBytes{0};

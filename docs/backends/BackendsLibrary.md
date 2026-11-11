@@ -509,6 +509,13 @@ It records varying/unchanged workloads, propagation stage clocks, numerical
 comparisons and separate native gradient profiles. See
 [usage and measurement scope](../../tests/python/benchmarks/GradientPerformance.md).
 
+For a single-load breakdown of production CUDA propagation and gradients, use
+[`BackendRuntimeProfile.py`](../../tests/python/benchmarks/BackendRuntimeProfile.py).
+It measures constant, single-coordinate and global updates, ranks propagation
+and gradient stages, and records migration counts and first-use setup separately.
+See [runtime profiling instructions](../../tests/python/benchmarks/BackendRuntimeProfile.md);
+the CUDA gradient timers require rebuilding the library and Python interface.
+
 The restrictions above are enforced in
 [`CpuBackendGradient.cpp`](../../src/Backends/Implementations/CPU/src/CpuBackendGradient.cpp)
 and the shared device

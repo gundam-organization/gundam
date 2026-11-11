@@ -1281,7 +1281,9 @@ Backends::BackendResourceUsage Backends::CudaDeviceContext::getResourceUsage() c
   return usage;
 }
 
-std::vector<double> Backends::CudaDeviceContext::readGradient(const EngineView& view_, const std::vector<double>& producerSlopes_) {
+std::vector<double> Backends::CudaDeviceContext::readGradient(const EngineView& view_, const std::vector<double>& producerSlopes_, BackendTimingSummary& timing_) {
+  const auto wallStart = std::chrono::steady_clock::now();
+  timing_.gradientModelPreparationSeconds = 0.;
   DeviceScope scope(_impl_->deviceIndex);
   auto& b = *_impl_->buffers;
   const auto stream = _impl_->stream;
@@ -1309,25 +1311,51 @@ std::vector<double> Backends::CudaDeviceContext::readGradient(const EngineView& 
     g.contributions.allocate(model.contributionCount); g.total.allocate(model.work.parameters);
     checkCuda(cudaStreamSynchronize(stream), "gradient model upload");
     b.gradient = std::move(pending);
+    timing_.gradientModelPreparationSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now()-wallStart).count();
   }
+  // Propagation has completed before this call; reuse its events without adding
+  // synchronization between kernels. The existing readback fence completes them.
+  auto record = [&](std::size_t index_){
+    checkCuda(cudaEventRecord(_impl_->stages[index_], stream), "CUDA gradient event record");
+  };
+  record(0);
   auto& g = *b.gradient;
   if( producerSlopes_.size() != g.producerSlopes.size ) throw std::runtime_error("CUDA producer gradient size mismatch.");
   if( !producerSlopes_.empty() ) checkCuda(cudaMemcpyAsync(g.producerSlopes.data,producerSlopes_.data(),
       producerSlopes_.size()*sizeof(double),cudaMemcpyHostToDevice,stream),"producer gradient upload");
+  record(1);
   if( g.work.dials ) gradientDials<<<(g.work.dials+255)/256, 256, 0, stream>>>(
       g.view(), g.directions.data, b.parameters.data, b.externalWeights.data, g.producerSlopes.data, g.scratch.data, g.responses.data, g.work.dials);
+  record(2);
   if( g.work.bins ) gradientBins<<<(g.work.bins+255)/256, 256, 0, stream>>>(
       g.bins.data, b.sums.data, b.sumSquares.data, g.scales.data, g.work.bins);
+  record(3);
   if( g.work.events ) gradientEvents<<<(g.work.events+255)/256, 256, 0, stream>>>(
       g.events.data, g.work, {g.indices.data,g.inputOffsets.data,g.eventOffsets.data,
         g.originalEvents.data,g.targets.data,g.variableDials.data,b.samples.data,b.samples.size,
         b.bins.data,b.intervals.data,b.binningNodes.data,b.binningBounds.data,b.variables.data}, g.responses.data, g.scales.data, b.weights.data, g.contributions.data);
+  record(4);
   if( g.work.parameters ) gradientReduce<<<g.work.parameters, 128, 0, stream>>>(
       g.offsets.data, g.occurrences.data, g.contributions.data, g.total.data);
+  record(5);
   checkCuda(cudaGetLastError(), "gradient kernel launch");
   std::vector<double> result;
   g.total.read(result, stream);
+  record(6);
   checkCuda(cudaStreamSynchronize(stream), "gradient readback completion");
+  auto elapsed = [&](std::size_t first_, std::size_t last_){
+    float milliseconds = 0.;
+    checkCuda(cudaEventElapsedTime(&milliseconds, _impl_->stages[first_], _impl_->stages[last_]), "CUDA gradient stage timing");
+    return double(milliseconds)*1.e-3;
+  };
+  timing_.gradientProducerUploadSeconds = elapsed(0,1);
+  timing_.gradientDialStageSeconds = elapsed(1,2);
+  timing_.gradientBinStageSeconds = elapsed(2,3);
+  timing_.gradientEventStageSeconds = elapsed(3,4);
+  timing_.gradientReductionStageSeconds = elapsed(4,5);
+  timing_.gradientReadbackSeconds = elapsed(5,6);
+  timing_.gradientDeviceSeconds = elapsed(0,6);
   for( double value : result ) if( !std::isfinite(value) ) throw std::runtime_error("CUDA: non-finite likelihood gradient.");
+  timing_.gradientWallSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now()-wallStart).count();
   return result;
 }
