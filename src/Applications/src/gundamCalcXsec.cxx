@@ -61,6 +61,7 @@ int main(int argc, char** argv){
   LogThrowIf(not clParser.isOptionTriggered("configFile"), "Xsec calculator config file not provided.");
   LogThrowIf(not clParser.isOptionTriggered("fitterFile"), "Did not provide the output fitter file.");
   LogThrowIf(not clParser.isOptionTriggered("nToys"), "Did not provide number of toys.");
+  LogThrowIf(clParser.getOptionVal<int>("nToys") <= 0, "Number of toys must be positive.");
 
 
   // Global parameters
@@ -86,7 +87,7 @@ int main(int argc, char** argv){
   if( GenericToolbox::hasExtension(fitterFile, "root") ){
     LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
     fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
-    LogThrowIf( fitterRootFile == nullptr, "Could not open fitter output file." );
+    LogThrowIf( fitterRootFile == nullptr or fitterRootFile->IsZombie(), "Could not open fitter output file." );
 
     RootUtils::ObjectReader::throwIfNotFound = true;
 
@@ -354,7 +355,7 @@ int main(int argc, char** argv){
       LogThrowIf(dialCollectionPtr->getSupervisedParameter() != nullptr, "Need a dial collection that handle a whole parSet.");
 
       file = std::make_shared<TFile>( filePath.c_str() );
-      LogThrowIf(file == nullptr, "Could not open file");
+      LogThrowIf(file == nullptr or file->IsZombie(), "Could not open normalization file");
 
       histogram = file->Get<TH1D>( histogramPath.c_str() );
       LogThrowIf(histogram == nullptr, "Could not find histogram.");
@@ -465,6 +466,8 @@ int main(int argc, char** argv){
       if     ( config_.hasField( "meanValue" ) ){
         normParameter.min  = config_.fetchValue<double>("meanValue");
         normParameter.max = config_.fetchValue("stdDev", double(0.));
+        LogThrowIf(not std::isfinite(normParameter.min) or normParameter.min <= 0, "Normalizer mean must be positive and finite.");
+        LogThrowIf(not std::isfinite(normParameter.max) or normParameter.max < 0, "Normalizer stdDev must be non-negative and finite.");
         LogInfo << "mean ± sigma = " << normParameter.min << " ± " << normParameter.max;
       }
       else if( config_.hasField("disabledBinDim" ) ){
@@ -629,6 +632,7 @@ int main(int argc, char** argv){
               if( normThrow == normThrowList.end() ){ normThrow = normThrowList.emplace(normData.name, gRandom->Gaus()).first; }
               norm += normData.normParameter.max * normThrow->second;
             }
+            LogThrowIf(not std::isfinite(norm) or norm <= 0, "Invalid normalization throw for " << normData.name);
             binData /= norm;
           }
           else if( not normData.parSetNormaliserName.empty() ){
