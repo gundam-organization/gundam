@@ -39,7 +39,10 @@ def main():
     sample = config['fitterEngineConfig']['likelihoodInterfaceConfig']['propagatorConfig']['sampleSetConfig']['sampleList'][0]
     del sample['binning']
     sample['parSetBinning'] = 'unknown'
-    calculate('unknownParameterSet', fitter_path, config, error='Could not find unknown among fit dial collections')
+    # LogThrowIf's exception contains the literal C++ stream expression. The
+    # expanded parameter name is only in stdout, which may be lost on abort
+    # when redirected in Linux CI. Match the diagnostic shared by both forms.
+    calculate('unknownParameterSet', fitter_path, config, error='among fit dial collections')
     print('PASS CalcXsec invalid inputs and diagnostics')
 
 
