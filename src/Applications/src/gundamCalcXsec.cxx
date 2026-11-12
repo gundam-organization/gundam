@@ -504,6 +504,8 @@ int main(int argc, char** argv){
 
     TH1D histogram{};
     std::vector<BinNormaliser> normList{};
+    std::vector<double> bestFitEventWeights{};
+    std::vector<double> summedEventWeights{};
   };
   std::vector<CrossSectionData> crossSectionDataList{};
 
@@ -518,6 +520,8 @@ int main(int argc, char** argv){
     LogScopeIndent;
     LogInfo << "Defining xsec entry: " << sample.getName() << std::endl;
     xsecEntry.samplePtr = &sample;
+    xsecEntry.bestFitEventWeights.resize(sample.getEventList().size(), 0.);
+    xsecEntry.summedEventWeights.resize(sample.getEventList().size(), 0.);
 
     for( auto& dataSample : dataPropagator.getSampleSet().getSampleList()) {
       if( sample.getIndex() == dataSample.getIndex() ) { xsecEntry.sampleDataPtr = &dataSample; break; }
@@ -592,18 +596,6 @@ int main(int argc, char** argv){
 
   int nToys{ clParser.getOptionVal<int>("nToys") };
 
-  // no bin volume of events -> use the current weight container
-  for( auto& xsec : crossSectionDataList ){
-    {
-      auto& mcEvList{xsec.samplePtr->getEventList()};
-      std::for_each(mcEvList.begin(), mcEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
-    }
-//    {
-//      auto& dataEvList{xsec.samplePtr->getDataContainer().getEventList()};
-//      std::for_each(dataEvList.begin(), dataEvList.end(), []( Event& ev_){ ev_.getWeights().current = 0; });
-//    }
-  }
-
   bool enableEventMcThrow{true};
   bool enableStatThrowInToys{true};
   auto xsecCalcConfig   = xsecConfig.fetchValue( "xsecCalcConfig", ConfigReader() );
@@ -616,6 +608,18 @@ int main(int argc, char** argv){
   enableStatThrowInToys = xsecCalcConfig.fetchValue("enableStatThrowInToys", enableStatThrowInToys);
   enableEventMcThrow    = xsecCalcConfig.fetchValue("enableEventMcThrow", enableEventMcThrow);
 
+  auto getBinVolume = [](const CrossSectionData& xsec_, int iBin_){
+    double volume{1};
+    const auto& bin = xsec_.samplePtr->getHistogram().getBinContextList()[iBin_].bin;
+    for( const auto& edges : bin.getEdgesList() ){
+      if( edges.isConditionVar ){ continue; }
+      if( GenericToolbox::doesElementIsInVector(edges.varName, xsec_.normList,
+          [](const BinNormaliser& norm_){ return norm_.disabledBinDim; }) ){ continue; }
+      volume *= edges.max - edges.min;
+    }
+    return volume;
+  };
+
   auto writeBinDataFct = [&](bool throwNormPar_) {
     // one throw per normaliser per toy, shared by all bins
     std::map<std::string, double> normThrowList{};
@@ -623,6 +627,7 @@ int main(int argc, char** argv){
     for( auto& xsec : crossSectionDataList ){
 
       xsec.branchBinsData.resetCursor();
+      std::vector<double> binNormalizations(xsec.samplePtr->getHistogram().getNbBins(), 1.);
       for( int iBin = 0 ; iBin < xsec.samplePtr->getHistogram().getNbBins() ; iBin++ ){
         double binData{ xsec.samplePtr->getHistogram().getBinContentList()[iBin].sumWeights };
 
@@ -637,6 +642,7 @@ int main(int argc, char** argv){
             }
             LogThrowIf(not std::isfinite(norm) or norm <= 0, "Invalid normalization throw for " << normData.name);
             binData /= norm;
+            binNormalizations[iBin] /= norm;
           }
           else if( not normData.parSetNormaliserName.empty() ){
             ParSetNormaliser* parSetNormPtr{nullptr};
@@ -648,45 +654,27 @@ int main(int argc, char** argv){
             }
             LogThrowIf(parSetNormPtr == nullptr, "Could not find parSetNorm obj with name: " << normData.parSetNormaliserName);
 
-            binData /= parSetNormPtr->getNormFactor();
+            double norm = parSetNormPtr->getNormFactor();
+            LogThrowIf(not std::isfinite(norm) or norm <= 0, "Invalid flux normalization for " << normData.name);
+            binData /= norm;
+            binNormalizations[iBin] /= norm;
           }
         }
 
-        // no bin volume of events
-        {
-          auto& mcEvList{xsec.samplePtr->getEventList()};
-          std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event& ev_){
-            if( iBin != ev_.getIndices().bin ){ return; }
-            ev_.getWeights().current += binData;
-          });
-        }
-
-        // set event weight
-        {
-          auto& dataEvList{xsec.sampleDataPtr->getEventList()};
-          std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event& ev_){
-            if( iBin != ev_.getIndices().bin ){ return; }
-            ev_.getWeights().current = binData;
-          });
-        }
-
-        // bin volume
-        auto& bin = xsec.samplePtr->getHistogram().getBinContextList()[iBin].bin;
-        double binVolume{1};
-
-        for( auto& edges : bin.getEdgesList() ){
-          if( edges.isConditionVar ){ continue; } // no volume, just a condition variable
-
-          // is this bin excluded from the normalisation ?
-          if( GenericToolbox::doesElementIsInVector(edges.varName, xsec.normList, [](const BinNormaliser& n){ return n.disabledBinDim; }) ){
-            continue;
-          }
-
-          binVolume *= (edges.max - edges.min);
-        }
-
+        double binVolume = getBinVolume(xsec, iBin);
         binData /= binVolume;
         xsec.branchBinsData.writeRawData( binData );
+      }
+
+      // Preserve each event's contribution, including reaction-dependent dials
+      // and statistical throws. A bin total redistributed uniformly would
+      // destroy weighted breakdowns and distributions of other observables.
+      const auto& events = xsec.samplePtr->getEventList();
+      for( size_t iEvent = 0 ; iEvent < events.size() ; ++iEvent ){
+        int iBin = events[iEvent].getIndices().bin;
+        double weight = iBin < 0 ? 0. : events[iEvent].getEventWeight() * binNormalizations[iBin];
+        if( throwNormPar_ ){ xsec.summedEventWeights[iEvent] += weight; }
+        else{ xsec.bestFitEventWeights[iEvent] = weight; }
       }
     }
   };
@@ -863,55 +851,35 @@ int main(int argc, char** argv){
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[0], "binsCorrelationMatrix");
   GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(calcXsecDir, "matrices"), chopped[1], "parsCorrelationMatrix");
 
-  // now propagate to the engine for the plot generator
+  // Propagation overwrites event weights on every toy. Restore the separately
+  // accumulated contributions, without flattening their reaction breakdown.
   LogInfo << "Re-normalizing the samples for the plot generator..." << std::endl;
   for( auto& xsec : crossSectionDataList ){
-    // this gives the average as the event weights were summed together
-    {
-      auto &mcEvList{xsec.samplePtr->getEventList()};
-      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
-      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
-        nEventInBin[iBin] = std::count_if(mcEvList.begin(), mcEvList.end(), [iBin]( Event &ev_) {
-          return ev_.getIndices().bin == iBin;
-        });
+    for( auto* sample : {xsec.samplePtr, xsec.sampleDataPtr} ){
+      auto& events = sample->getEventList();
+      // Forced Asimov data is an ordered copy of the model event list.
+      LogThrowIf(events.size() != xsec.summedEventWeights.size(), "Mismatching Asimov event lists.");
+      for( size_t iEvent = 0 ; iEvent < events.size() ; ++iEvent ){
+        events[iEvent].getWeights().current = useBestFitAsCentralValue ?
+            xsec.bestFitEventWeights[iEvent] : xsec.summedEventWeights[iEvent] / nToys;
       }
-
-      std::for_each(mcEvList.begin(), mcEvList.end(), [&]( Event &ev_) {
-        ev_.getWeights().current /= nToys;
-        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
-      });
-    }
-    {
-      auto &dataEvList{xsec.sampleDataPtr->getEventList()};
-      std::vector<size_t> nEventInBin(xsec.histogram.GetNbinsX(), 0);
-      for( size_t iBin = 0 ; iBin < nEventInBin.size() ; iBin++ ){
-        nEventInBin[iBin] = std::count_if(dataEvList.begin(), dataEvList.end(), [iBin]( Event &ev_) {
-          return ev_.getIndices().bin== iBin;
-        });
-      }
-
-      std::for_each(dataEvList.begin(), dataEvList.end(), [&]( Event &ev_) {
-        ev_.getWeights().current /= nToys;
-        ev_.getWeights().current /= double(nEventInBin[ev_.getIndices().bin]);
-      });
     }
   }
 
   LogInfo << "Generating xsec sample plots..." << std::endl;
-  fitter.getLikelihoodInterface().getPlotGenerator().generateSampleHistograms( GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms") );
+  fitter.getLikelihoodInterface().getPlotGenerator().generateSampleHistograms(nullptr);
 
   // manual trigger to tweak the error bars
   for( auto& histHolder : fitter.getLikelihoodInterface().getPlotGenerator().getHistHolderList(0) ){
-    if( not histHolder.isData ){ continue; } // only data will print errors
+    if( not histHolder.isData ){
+      GenericToolbox::writeInTFileWithObjTypeExt(
+          GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms/" + histHolder.folderPath),
+          histHolder.histPtr.get(), histHolder.histName, false);
+      continue;
+    } // only data will print errors
 
     const CrossSectionData* xsecDataPtr{nullptr};
     for( auto& xsecData : crossSectionDataList ){
-      /*
-      if( xsecData.samplePtr  == histHolder.samplePtr){
-        xsecDataPtr = &xsecData;
-        break;
-      }
-      */
       if( (xsecData.samplePtr)->getName()  == (histHolder.samplePtr)->getName()){
         xsecDataPtr = &xsecData;
         break;
@@ -921,15 +889,17 @@ int main(int argc, char** argv){
 
     // alright, now rescale error bars
     for( int iBin = 0 ; iBin < histHolder.histPtr->GetNbinsX() ; iBin++ ){
-      // relative error should be set
-      // histHolder.histPtr->SetBinContent( 1+iBin, histHolder.histPtr->GetBinContent(1+iBin) / nToys );
       histHolder.histPtr->SetBinError(
           1+iBin,
+          xsecDataPtr->histogram.GetBinContent(1+iBin) == 0 ? 0. :
           histHolder.histPtr->GetBinContent(1+iBin)
           * xsecDataPtr->histogram.GetBinError(1+iBin)
           / xsecDataPtr->histogram.GetBinContent(1+iBin)
       );
     }
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile(calcXsecDir, "plots/histograms/" + histHolder.folderPath),
+        histHolder.histPtr.get(), histHolder.histName, false);
   }
 
   fitter.getLikelihoodInterface().getPlotGenerator().generateCanvas(
