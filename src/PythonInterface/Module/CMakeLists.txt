@@ -27,3 +27,6 @@ cmessage(STATUS "Building ${pythonTarget} with ${Python3_EXECUTABLE}")
 # Keep the last successfully configured interpreter for the CTest Python suites.
 set(gundamTestPython "${Python3_EXECUTABLE}" PARENT_SCOPE)
 set(gundamTestPythonTarget "${pythonTarget}" PARENT_SCOPE)
+
+list(APPEND gundamTestPythonCandidates "${Python3_EXECUTABLE}")
+set(gundamTestPythonCandidates "${gundamTestPythonCandidates}" PARENT_SCOPE)

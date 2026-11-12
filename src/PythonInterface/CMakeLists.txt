@@ -86,6 +86,7 @@ endif()
 
 add_custom_target(GUNDAM)
 set(pythonBuiltVersions)
+set(gundamTestPythonCandidates)
 set(pythonAttemptedVersions)
 foreach(pythonVersion IN LISTS pythonAvailableVersions)
   string(REPLACE "." "_" pythonVersionTag "${pythonVersion}")
@@ -114,3 +115,6 @@ cmessage(STATUS "GUNDAM Python interfaces: ${pythonBuiltVersions}")
 
 set(gundamTestPython "${gundamTestPython}" PARENT_SCOPE)
 set(gundamTestPythonTarget "${gundamTestPythonTarget}" PARENT_SCOPE)
+
+set(gundamTestPythonCandidates "${gundamTestPythonCandidates}" PARENT_SCOPE)
+set(gundamTestPythonVersions "${pythonBuiltVersions}" PARENT_SCOPE)
