@@ -220,3 +220,46 @@ Their matching `*Full.py` tests in `regular/` retain the full validation.
 
 Fast tests `711`, `726` and `743` keep representative backend scenarios; their
 matching `*Full.py` tests in `regular/` retain the complete validation.
+
+### Cross-section calculator
+
+The CalcXsec tests launch the real `gundamCalcXsec` executable and read its ROOT
+outputs with uproot. Configurations are explicit Python dictionaries in the test
+scripts and are written as formatted JSON beside every output and command log.
+Input trees, flux histograms and covariance matrices are generated locally; no
+external analysis files are needed. ROOT must be available on PATH to create the
+native `TMatrixDSym` input.
+
+| Suite / script | Coverage |
+|---|---|
+| fast / `150ConfigCalcXsec.py` | Required CLI arguments, invalid toy counts/ROOT files/normalizers and unknown parameter sets |
+| fast / `585NumericsCalcXsec.py` | Weighted yields, multidimensional volumes, empty bins, excluded dimensions, successive/disabled normalizers, seed and threads, central-value modes, overrides and dry-run |
+| fast / `586NumericsCalcXsecNormalizers.py` | Shared/independent Gaussian normalizers, weighted flux integrals, selections, unmatched bins, exact cancellation, explicit/inherited/inline binning |
+| fast / `587NumericsCalcXsecPostfit.py` | Real fit with nontrivial posterior, analytic best-fit/Hesse reference, prefit ROOT/config equivalence and exact covariance injection |
+| fast / `588NumericsCalcXsecOutputs.py` | Weighted reaction breakdowns with different parameter responses, per-event toy averages, saved error bars, canvases and empty-bin finiteness |
+| regular / `585NumericsCalcXsecConvergence.py` | 20000 throws per case: linear and squared Gaussian responses, cross-sample and parameter covariance, shared/independent normalization distributions |
+| regular / `586NumericsCalcXsecStatistics.py` | 20000 throws per case: all four statistical switches, per-sample MC suppression, Poisson and compound-Poisson moments |
+
+The output test checks each event and each reaction contribution, not only bin
+totals: plots must preserve unequal event weights and reaction-dependent dial
+responses when averaging normalized throws or selecting the best-fit value.
+
+Fast tests use 32 throws and exact relations; regular tests compare moments with
+independent formulas using six Monte Carlo standard errors. For covariance, the
+uncertainty comes from centered products, including non-Gaussian cases. Exported
+matrices are also checked against the actual TTree using population covariance
+(`ddof=0`); analytic comparisons remove that estimator's finite-sample bias.
+
+CTest selects executables from its own build. For manual runs with several
+installations, set absolute `GUNDAM_CALC_XSEC` and `GUNDAM_FITTER` paths. Otherwise,
+the helper first looks beside the imported GUNDAM interface, then on PATH.
+
+```bash
+python tests/python/run.py --test 585NumericsCalcXsec.py
+python tests/python/run.py --suite regular --test 585NumericsCalcXsecConvergence.py
+ctest --test-dir cmake-build-debug -R 'python-.*CalcXsec' --output-on-failure
+```
+
+Regular scripts are registered with CTest when `WITH_REGULAR_TEST=ON`. Each test
+runs independently in its own working directory. Failed command logs and all
+inputs remain in the output directory reported by the runner.

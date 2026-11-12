@@ -34,7 +34,7 @@ public:
 protected:
   // called through JsonBaseClass::configure() and JsonBaseClass::initialize()
   void configureImpl() override;
-  void initializeImpl() override{ _config_.printUnusedKeys(); }
+  void initializeImpl() override;
 
 public:
   // setters

@@ -54,12 +54,18 @@ void Sample::configureImpl(){
   }
 
   LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _binningConfig_ << std::endl;
+  // CalcXsec resolves parameter-set binning after the dial collections exist.
+  if( _binningConfig_.empty() and _config_.hasField("parSetBinning") ){ return; }
   _histogram_.build(_binningConfig_);
   if( _config_.hasField("binningResponse") ){
     _histogram_.configureBinningResponse(_config_.fetchValue<ConfigReader>("binningResponse"));
   }
 
   LogDebugIf(GundamGlobals::isDebug()) << "Histogram has " << _histogram_.getNbBins() << " bins." << std::endl;
+}
+void Sample::initializeImpl(){
+  LogThrowIf(_isEnabled_ and _binningConfig_.empty(), "Sample " << _name_ << ": binning has not been resolved.");
+  _config_.printUnusedKeys();
 }
 
 void Sample::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const{
