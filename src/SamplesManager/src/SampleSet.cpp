@@ -12,6 +12,12 @@
 #include <memory>
 
 
+void SampleSet::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
+  for( auto& sample : _sampleList_ ){
+    if( sample.isUseDynamicBinning() ){ sample.updateEventBinning(threadPool_); }
+  }
+}
+
 void SampleSet::configureImpl(){
 
   _config_.defineFields({
