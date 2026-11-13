@@ -9,6 +9,7 @@
 
 #include <vector>
 #include <utility>
+#include <cstdint>
 
 
 class DialInputBuffer {
@@ -49,6 +50,8 @@ public:
 
   // const getters
   [[nodiscard]] auto isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
+  [[nodiscard]] auto getRevision() const{ return _revision_; }
+  [[nodiscard]] const std::uint64_t* getRevisionPtr() const{ return &_revision_; }
   [[nodiscard]] auto isDialUpdateRequestedPtr() const{ return &_isDialUpdateRequested_; }
   [[nodiscard]] auto getBufferSize() const{ return _inputArraySize_; }
   [[nodiscard]] auto getInputSize() const{ return _inputParameterReferenceList_.size(); }
@@ -92,6 +95,8 @@ private:
   /// Flag for if the dials need to be recalculated.  Dials don't need to
   /// be recalculated if the parameter values have not changed.
   bool _isDialUpdateRequested_{true};
+  // Monotonic invalidation token, independent of how often update() is called.
+  std::uint64_t _revision_{0};
 
   /// How many inputs are handled
   int _inputArraySize_{0};

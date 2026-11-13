@@ -43,6 +43,14 @@ public:
 #include "GenericToolbox.MakeEnum.h"
   MAKE_ENUM_JSON_INTERFACE(DialType);
 
+#define ENUM_NAME VariableResponseMode
+#define ENUM_FIELDS \
+  ENUM_FIELD( Multiply ) \
+  ENUM_FIELD( Add ) \
+  ENUM_FIELD( Override )
+#include "GenericToolbox.MakeEnum.h"
+  MAKE_ENUM_JSON_INTERFACE(VariableResponseMode);
+
   static void prepareConfig(ConfigReader &config_);
 
 public:
@@ -109,6 +117,9 @@ public:
 
   [[nodiscard]] auto& getDialType() const{ return _dialType_; }
   [[nodiscard]] auto& getDialOptions() const{ return _dialOptions_; }
+
+  [[nodiscard]] const std::string& getApplyToVariable() const{ return _applyToVariable_; }
+  [[nodiscard]] VariableResponseMode getVariableResponseMode() const{ return _variableResponseMode_; }
 
   // mutable getters
   BinSet &getDialBinSet(){ return _dialBinSet_; }
@@ -207,6 +218,7 @@ protected:
   bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
   bool initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition);
 
+  void readVariableResponseConfig(const ConfigReader& config_);
   void readParametersFromConfig(const ConfigReader &config_);
   ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;
 
@@ -238,6 +250,9 @@ private:
   std::string _dialLeafName_{};
   std::string _dialParameterValuesBranch_{};
   std::string _dialResponsesBranch_{};
+
+  std::string _applyToVariable_{};
+  VariableResponseMode _variableResponseMode_{VariableResponseMode::Multiply};
 
   DialType _dialType_{DialType::Norm}; // Graph, Spline...
   std::string _dialOptions_{}; // monotonic, catmull-rom...
