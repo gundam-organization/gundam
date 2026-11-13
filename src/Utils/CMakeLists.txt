@@ -56,12 +56,16 @@ target_include_directories( GundamUtils BEFORE PUBLIC
   ${CMAKE_BINARY_DIR}/generated
 )
 
-# Keep ROOT's bundled headers behind the selected dependency headers (notably
-# nlohmann_json), including installations using the root-config fallback.
-# Scope this to GUNDAM: toolbox targets must not inherit ROOT include paths.
+# Installed JSON packages expose system includes through their imported target.
+# ROOT also bundles nlohmann/json.hpp: explicitly order the selected JSON first
+# even when both dependencies use system includes. Propagate this order to all
+# GUNDAM consumers, including installations using the root-config fallback.
+target_include_directories( GundamUtils SYSTEM BEFORE PUBLIC
+  "$<TARGET_PROPERTY:nlohmann_json::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>"
+)
 target_include_directories( GundamUtils SYSTEM PUBLIC ${ROOT_INCLUDE_DIRS} )
 
-target_link_libraries( GundamUtils PUBLIC GenericToolbox::GenericToolbox SimpleCppLogger ${ROOT_LIBRARIES} yaml-cpp::yaml-cpp GundamCmdLineParser)
+target_link_libraries( GundamUtils PUBLIC nlohmann_json::nlohmann_json GenericToolbox::GenericToolbox SimpleCppLogger ${ROOT_LIBRARIES} yaml-cpp::yaml-cpp GundamCmdLineParser)
 install( TARGETS GundamUtils DESTINATION lib )
 
 #Can uncomment this to install the headers... but is it really neccessary?
