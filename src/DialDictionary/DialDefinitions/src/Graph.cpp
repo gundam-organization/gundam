@@ -60,3 +60,12 @@ double Graph::evalGradient(const DialInputBuffer& input_, int iInput_) const {
   if( not _allowExtrapolation_ and (x <= _data_[1] or x >= _data_.back()) ){ return 0.; }
   return CalculateGraphGradient(x, -1E20, 1E20, _data_.data(), _data_.size());
 }
+
+std::vector<double> Graph::getSourceKnotPositions() const {
+  std::vector<double> positions;
+  positions.reserve(_data_.size() / 2);
+  for( size_t i = 1; i < _data_.size(); i += 2 ){
+    positions.emplace_back(_data_[i]);
+  }
+  return positions;
+}

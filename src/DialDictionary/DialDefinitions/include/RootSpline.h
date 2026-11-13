@@ -21,6 +21,7 @@ public:
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<RootSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"RootSpline"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] std::vector<double> getSourceKnotPositions() const override;
 
   [[nodiscard]] bool hasAnalyticGradient() const override { return true; }
   [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override;

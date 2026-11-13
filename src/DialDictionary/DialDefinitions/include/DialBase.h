@@ -49,6 +49,10 @@ public:
   virtual void setAllowExtrapolation(bool allow_){}
   [[nodiscard]] virtual bool getAllowExtrapolation() const {return false;}
 
+  /// Return the retained knot positions in dial-input coordinates.
+  /// Dials without knots return an empty vector.
+  [[nodiscard]] virtual std::vector<double> getSourceKnotPositions() const { return {}; }
+
   /// Dial summary describing its content
   [[nodiscard]] virtual std::string getSummary() const { return {}; };
 

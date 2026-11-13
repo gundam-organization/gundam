@@ -25,6 +25,7 @@ public:
   [[nodiscard]] std::string getDialTypeName() const override { return {"Graph"}; }
   [[nodiscard]] bool hasAnalyticGradient() const override { return true; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] std::vector<double> getSourceKnotPositions() const override;
 
   [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override;
 

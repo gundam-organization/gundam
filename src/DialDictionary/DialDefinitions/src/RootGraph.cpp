@@ -62,3 +62,11 @@ double RootGraph::evalGradient(const DialInputBuffer& input_, int iInput_) const
   if( lower < 0 or upper < 0 ){ return 0.; }
   return (values[upper] - values[lower]) / (points[upper] - points[lower]);
 }
+
+std::vector<double> RootGraph::getSourceKnotPositions() const {
+  std::vector<double> positions(_graph_.GetN());
+  for( size_t i = 0; i < positions.size(); ++i ){
+    positions[i] = _graph_.GetX()[i];
+  }
+  return positions;
+}

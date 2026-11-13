@@ -524,3 +524,52 @@ TEST(DialDefinitions, RootFormulaAnalyticGradient){
   EXPECT_EQ(0., dial.evalGradient(input, 2));
   EXPECT_NEAR(1.2 * std::exp(.3) + 1.44, dial.evalResponse(input), 1e-12);
 }
+
+TEST(DialDefinitions, SourceKnotPositions) {
+    const std::vector<double> uniformPositions{-2.0, -0.5, 1.0, 2.5};
+    const std::vector<double> irregularPositions{-2.0, -0.25, 0.5, 2.5};
+    for( const auto& positions : {uniformPositions, irregularPositions} ){
+        TGraph graph;
+        for( size_t i = 0; i < positions.size(); ++i ){
+            graph.SetPoint(int(i), positions[i], 1.0 + i*i);
+        }
+        const auto points = DialUtils::getPointList(&graph);
+        auto check = [&](const DialBase& dial_){
+            EXPECT_EQ(dial_.getSourceKnotPositions(), positions);
+            EXPECT_EQ(dial_.clone()->getSourceKnotPositions(), positions);
+            DialInterface interface;
+            EXPECT_TRUE(interface.getSourceKnotPositions().empty());
+            interface.setDial(DialBaseObject(dial_));
+            EXPECT_EQ(interface.getSourceKnotPositions(), positions);
+        };
+        Graph graphDial;
+        EXPECT_TRUE(graphDial.getSourceKnotPositions().empty());
+        graphDial.buildDial(points);
+        check(graphDial);
+        GeneralSpline generalSpline;
+        EXPECT_TRUE(generalSpline.getSourceKnotPositions().empty());
+        generalSpline.buildDial(points);
+        check(generalSpline);
+        RootGraph rootGraph;
+        rootGraph.setGraph(graph);
+        check(rootGraph);
+        RootSpline rootSpline;
+        rootSpline.buildDial(points);
+        check(rootSpline);
+        if( positions == uniformPositions ){
+            UniformSpline uniformSpline;
+            CompactSpline compactSpline;
+            MonotonicSpline monotonicSpline;
+            EXPECT_TRUE(uniformSpline.getSourceKnotPositions().empty());
+            EXPECT_TRUE(compactSpline.getSourceKnotPositions().empty());
+            EXPECT_TRUE(monotonicSpline.getSourceKnotPositions().empty());
+            uniformSpline.buildDial(points);
+            compactSpline.buildDial(points);
+            monotonicSpline.buildDial(points);
+            check(uniformSpline);
+            check(compactSpline);
+            check(monotonicSpline);
+        }
+    }
+    EXPECT_TRUE(Norm().getSourceKnotPositions().empty());
+}
