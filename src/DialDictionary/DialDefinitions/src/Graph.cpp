@@ -52,3 +52,12 @@ double Graph::evalResponse(const DialInputBuffer& input_) const {
 
   return CalculateGraph(dialInput, -1E20, 1E20, _data_.data(), _data_.size());
 }
+
+std::vector<double> Graph::getSourceKnotPositions() const {
+  std::vector<double> positions;
+  positions.reserve(_data_.size() / 2);
+  for( size_t i = 1; i < _data_.size(); i += 2 ){
+    positions.emplace_back(_data_[i]);
+  }
+  return positions;
+}
