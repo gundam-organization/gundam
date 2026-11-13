@@ -540,7 +540,8 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
                  "TArray dialBranchData requires dialType Spline or Graph");
     }
   }
-  _minDialResponse_ = _applyToVariable_.empty() or _variableResponseMode_ == VariableResponseMode::Multiply
+  // Variable responses, including multipliers, may be negative.
+  _minDialResponse_ = _applyToVariable_.empty()
       ? 0. : std::nan("unset");
   config_.fillValue(_minDialResponse_, "minDialResponse");
   config_.fillValue(_maxDialResponse_, "maxDialResponse");
