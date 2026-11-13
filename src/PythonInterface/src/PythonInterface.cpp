@@ -264,6 +264,7 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<DialInterface>(module, "DialInterface")
   .def("evalResponse", &DialInterface::evalResponse)
+  .def("getSourceKnotPositions", &DialInterface::getSourceKnotPositions)
   .def("getInputBuffer", &DialInterface::getInputBuffer, pybind11::return_value_policy::reference_internal)
   .def("getSummary", &DialInterface::getSummary, pybind11::arg("shallow") = true);
 

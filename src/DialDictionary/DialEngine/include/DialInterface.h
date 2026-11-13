@@ -82,6 +82,11 @@ public:
   /// Get the data bin definition for the dial.
   [[nodiscard]] const Bin* getDialBinRef() const {return _dialBinRef_;}
 
+  [[nodiscard]] std::vector<double> getSourceKnotPositions() const {
+    if( not _dial_.get() ){ return {}; }
+    return _dial_->getSourceKnotPositions();
+  }
+
   [[nodiscard]] double evalResponse() const { return _responseSupervisorPtr_->process(_dial_->evalResponse(*_inputBufferPtr_)); }
   [[nodiscard]] std::string getSummary(bool shallow_=true) const;
 
