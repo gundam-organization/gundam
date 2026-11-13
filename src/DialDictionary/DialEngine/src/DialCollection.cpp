@@ -637,7 +637,9 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
                  "TArray dialBranchData requires dialType Spline or Graph");
     }
   }
-  _minDialResponse_ = not _isCompositeNode_ and (_applyToVariable_.empty() or _variableResponseMode_ == VariableResponseMode::Multiply)
+// Only final event weights are nonnegative by default. Variable responses
+  // (including multipliers) and intermediate composite responses may be negative.
+  _minDialResponse_ = not _isCompositeNode_ and _applyToVariable_.empty()
       ? 0. : std::nan("unset");
   config_.fillValue(_minDialResponse_, "minDialResponse");
   config_.fillValue(_maxDialResponse_, "maxDialResponse");
