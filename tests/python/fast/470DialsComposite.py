@@ -186,6 +186,17 @@ def main():
         nested['name'] = 'nested'
         exercise(path, composite([nested], 'nested'), lambda p, q, i: 2 + p*p + q)
 
+        # Only the outer weight output gets the default zero floor, even when
+        # the output of a nested composite is negative.
+        signed = composite([formula('source', '[arg0]', first)], 'source')
+        signed['name'] = 'nested'
+        exercise(path, composite([signed, formula('output', '1+[arg0]',
+                                                 {'dialResponse': 'nested'})], 'output'),
+                 lambda p, q, i: max(0., 1 + p),
+                 points=[(.5, .25), (-.5, .25), (-2., .25)])
+        exercise(path, composite([formula('source', '[arg0]', first)], 'source'),
+                 lambda p, q, i: max(0., p))
+
         # Use ordinary branch dials, including the constant-one shortcut.
         for dial_type in ('Spline', 'Graph'):
             node = dict(name='curve', dialType=dial_type, dialBranchData='graph', dialInputList=[upstream])

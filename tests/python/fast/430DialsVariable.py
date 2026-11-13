@@ -156,7 +156,8 @@ def exercise(path, threads, reverse=False, disjoint=False):
     check(propagator, prior, .5, 2.)
     # The initial Asimov must include the variable responses, not the loaded bins.
     check(likelihood.getDataPropagator(), prior, .5, 2.)
-    for mult, add, override, weight in [(2., -.25, -.5, 1.5), (1., .75, 1., 3.), (1., .5, 1.25, 2.)]:
+    for mult, add, override, weight in [(2., -.25, -.5, 1.5), (-1., .5, 1.25, 2.),
+                                       (1., .75, 1., 3.), (1., .5, 1.25, 2.)]:
         for name, value in [("multiply", mult), ("add", add), ("override", override), ("weight", weight)]:
             parameters[name].setParameterValue(value)
         for _ in range(2):

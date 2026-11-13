@@ -603,8 +603,9 @@ void DialCollection::readResponseSupervisorConfig(const ConfigReader& config_){
                << "Existing configurations remain supported." << std::endl;
   }
   GenericToolbox::Range limits;
-  // Intermediate responses and additive/override variable shifts may be negative.
-  limits.min = not _isCompositeNode_ and (_applyToVariable_.empty() or _variableResponseMode_ == VariableResponseMode::Multiply)
+  // Only final event weights are nonnegative by default. Variable responses
+  // (including multipliers) and intermediate composite responses may be negative.
+  limits.min = not _isCompositeNode_ and _applyToVariable_.empty()
       ? 0. : std::nan("unset");
   if( config_.hasField("dialResponseLimits") ){
     limits = config_.fetchValue<GenericToolbox::Range>("dialResponseLimits");
