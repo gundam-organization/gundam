@@ -28,6 +28,17 @@ and is reused until the requirements or selected interpreter change. The first
 `make test` needs network access if packages are not already available locally.
 No packages are installed into the system Python.
 
+When the MPS backend is compiled and the fast suite is enabled, preparation uses
+`requirements-mps.txt`, which includes the common requirements and Torch. Other
+builds keep `requirements.txt` without Torch. With automatic venv preparation
+disabled, install the matching requirements yourself.
+
+`745BackendsMpsPythonWorkerBuffers.py` is registered only when the MPS backend
+target exists. It uses the YAML and PythonWorker in `fast/inputs/PythonWorkerBuffers`
+to check host/device detection, in-place weights and histogram results at several
+parameter points. The test requires a usable Metal device and Torch MPS; these
+are checked at runtime, and an unavailable device fails the test explicitly.
+
 The same selection fixture runs with automatic venv preparation disabled; it
 selects an existing interpreter without installing packages. All tests in an
 invocation use the selection saved by that fixture. If no compatible interpreter

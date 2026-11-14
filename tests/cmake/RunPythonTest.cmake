@@ -47,7 +47,7 @@ if(TEST_MODE STREQUAL "PREPARE")
   endif()
   message(STATUS "Python tests use ${selectedPython}; modules: ${testPythonModuleDirectory}")
   if(testPythonUseVenv)
-    execute_process(COMMAND "${selectedPython}" "${testPythonPrepareScript}" "${testPythonVenv}"
+    execute_process(COMMAND "${selectedPython}" "${testPythonPrepareScript}" "${testPythonVenv}" "${testPythonRequirements}"
       RESULT_VARIABLE prepareResult)
     if(NOT "${prepareResult}" STREQUAL "0")
       message(FATAL_ERROR "Python test environment preparation failed (${prepareResult}) using ${selectedPython}")
