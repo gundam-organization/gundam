@@ -142,14 +142,14 @@ def run(command):
 '''
 
 
-def run(deviceBackend, propagationMode=None):
+def run(deviceBackend, propagationMode=None, full=False):
     started = time.perf_counter()
 
     def progress(stage):
         elapsed = time.perf_counter() - started
         print(f'[{deviceBackend}/{propagationMode or "default"} +{elapsed:.1f}s] {stage}', flush=True)
 
-    progress('Starting buffer contract')
+    progress('Starting full buffer contract' if full else 'Starting fast buffer check')
     import GUNDAM
     if not hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
         print('SKIP: GUNDAM was built without backends')
@@ -176,9 +176,11 @@ def run(deviceBackend, propagationMode=None):
     GUNDAM.setNumberOfThreads(1)
 
     referenceGradients = []
-    for backend, location, expectedDevice in [
-            ('CPU', 'onDevice', 'cpu'), (deviceBackend, 'onHost', 'cpu'),
-            (deviceBackend, 'onDevice', deviceBackend.lower())]:
+    cases = [('CPU', 'onDevice', 'cpu')]
+    if full:
+        cases.append((deviceBackend, 'onHost', 'cpu'))
+    cases.append((deviceBackend, 'onDevice', deviceBackend.lower()))
+    for backend, location, expectedDevice in cases:
         auditPath = work / f'{backend}-{location}.jsonl'
         auditPath.write_text('')
         builder = GUNDAM.ConfigUtils.ConfigBuilder()
@@ -203,8 +205,10 @@ def run(deviceBackend, propagationMode=None):
         interface = engine.getLikelihoodInterface()
         propagator = interface.getModelPropagator()
         parameters = propagator.getParametersManager().getParameterSetsList()[0].getParameterList()
-        # Check initial activation, updates, a repeated point and a return to prior.
-        points = [(2., .25), (.5, 1.), (.5, 1.), (2., .25)]
+        # Fast coverage checks the prior and one changed parameter point.
+        points = [(2., .25), (.5, 1.)]
+        if full:
+            points += [(.5, 1.), (2., .25)]
         for index, (scale, offset) in enumerate(points):
             progress(f'{backend}/{location}: weights and gradient at point {index + 1}/{len(points)}')
             parameters[0].setParameterValue(scale)
@@ -239,7 +243,11 @@ def run(deviceBackend, propagationMode=None):
                 np.testing.assert_allclose(gradient, referenceGradients[index], rtol=gradientRtol, atol=gradientAtol)
             GUNDAM.flushOutput()
         progress(f'PASS {backend}/{location}: {expectedDevice} buffers, histogram moments and gradients')
-        del minimizer, engine
+        # Release Python views as well as the engine before starting a new worker.
+        del bins, minimizer, parameters, propagator, interface, manager, engine
+    if not full:
+        progress('PASS fast buffer check')
+        return 0
     # A transport restart must also remap the lazily allocated gradient table.
     progress('Initializing backend-switch checks')
     engine = GUNDAM.FitterEngine()
@@ -251,7 +259,7 @@ def run(deviceBackend, propagationMode=None):
         manager.activate(backend)
         gradient = engine.getMinimizer().evalFitGradientAt([.5, 1.])
         np.testing.assert_allclose(gradient, referenceGradients[1], rtol=gradientRtol, atol=gradientAtol)
-    del engine
+    del manager, engine
     for mode, expected in [('partial', 'missing/non-finite gradient'),
                            ('nonfinite', 'missing/non-finite gradient'),
                            ('missingAck', 'gradientGeneration'), ('staleAck', 'gradientGeneration')]:

@@ -41,7 +41,7 @@ and is reused until the requirements or selected interpreter change. The first
 `make test` needs network access if packages are not already available locally.
 No packages are installed into the system Python.
 
-When the MPS or CUDA backend is compiled and the fast suite is enabled, preparation
+When the MPS or CUDA backend is compiled and a Python test suite is enabled, preparation
 uses `requirements-device.txt`, which includes the common requirements and Torch. Other
 builds keep `requirements.txt` without Torch. With automatic venv preparation
 disabled, install the matching requirements yourself.
@@ -49,17 +49,21 @@ disabled, install the matching requirements yourself.
 `745BackendsMpsPythonWorkerBuffers.py` is registered only when the MPS backend
 target exists. The shared `fast/shared/PythonWorkerBuffers.py` module embeds the YAML
 configuration and PythonWorker script
-to check host/device detection, in-place weights and gradients, histogram results,
-backend switches and invalid gradient responses at several parameter points. The test requires a usable Metal device and Torch MPS; these
+to check host/device detection, in-place weights and gradients, and histogram
+results at the prior and one changed parameter point. The test requires a usable Metal device and Torch MPS; these
 are checked at runtime. An unavailable Metal device marks the test as `Skipped`;
 a missing or incompatible Torch installation is a failure.
 
 `766BackendsCudaPythonWorkerBuffers.py` runs the same contract through CUDA IPC,
-with both propagation modes, float64 tensors and device-to-device weight copies.
+with float64 tensors and device-to-device weight copies in the default mode.
 It is registered only with the CUDA backend and is `Skipped` without a usable GPU.
-Its CTest timeout is 600 seconds to allow repeated Torch/CUDA worker startups on
-cluster nodes. Timestamped stages are streamed to CTest and saved in `test.log`,
-including when CTest terminates a test on timeout.
+Each fast test creates only two engines: a CPU reference and an onDevice GPU
+engine, with a 120-second timeout. The corresponding `regular/*PythonWorkerBuffersFull.py`
+tests cover onHost GPU execution, repeated points, backend switching and invalid
+worker responses; the CUDA regular test also exercises both propagation modes.
+These full tests allow 600 seconds for repeated worker startups on cluster nodes.
+Timestamped stages are streamed to CTest and saved in `test.log`, including when
+CTest terminates a test on timeout.
 For a V100 allocation, use a Torch CUDA build that includes support for that GPU:
 
 ```bash

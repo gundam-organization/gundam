@@ -76,7 +76,7 @@ if(WITH_PYTHON_INTERFACE)
   set(pythonTestConfig "${CMAKE_CURRENT_BINARY_DIR}/python-test-config.cmake")
   set(pythonTestLauncher "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunPythonTest.cmake")
   set(pythonTestRequirements "${CMAKE_CURRENT_SOURCE_DIR}/python/requirements.txt")
-  if(WITH_FAST_TEST AND (TARGET GundamBackendsMPS OR TARGET GundamBackendsCUDA))
+  if((WITH_FAST_TEST OR WITH_REGULAR_TEST) AND (TARGET GundamBackendsMPS OR TARGET GundamBackendsCUDA))
     set(pythonTestRequirements "${CMAKE_CURRENT_SOURCE_DIR}/python/requirements-device.txt")
   endif()
   set(pythonCudaRunner "")
@@ -146,14 +146,12 @@ set(testPythonSelection [==[${CMAKE_CURRENT_BINARY_DIR}/python-test-selected.cma
         set_tests_properties("${pythonTestName}" PROPERTIES
           FIXTURES_REQUIRED gundamPythonEnvironment
           SKIP_REGULAR_EXPRESSION "GUNDAM_PYTHON_TEST_SKIPPED:")
-        if(pythonScriptName STREQUAL "745BackendsMpsPythonWorkerBuffers.py"
-            OR pythonScriptName STREQUAL "766BackendsCudaPythonWorkerBuffers.py")
+        if(pythonScriptName MATCHES "^(745BackendsMpsPythonWorkerBuffers|766BackendsCudaPythonWorkerBuffers)(Full)?[.]py$")
           string(TOLOWER "${pythonTestBackend}" pythonBackendLabel)
           set_tests_properties("${pythonTestName}" PROPERTIES
-            LABELS "python;python-fast;${pythonBackendLabel}" TIMEOUT 120)
-          if(pythonTestBackend STREQUAL "CUDA")
-            # Both propagation modes restart independent Torch/CUDA workers.
-            # Cluster startup/I/O can dominate this small numerical fixture.
+            LABELS "python;python-${pythonSuite};${pythonBackendLabel}" TIMEOUT 120)
+          if(pythonSuite STREQUAL "regular")
+            # Full coverage deliberately exercises worker restarts and errors.
             set_tests_properties("${pythonTestName}" PROPERTIES TIMEOUT 600)
           endif()
         endif()

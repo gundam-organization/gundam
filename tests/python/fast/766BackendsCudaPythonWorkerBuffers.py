@@ -6,7 +6,4 @@ from shared.PythonWorkerBuffers import run
 
 
 if __name__ == '__main__':
-    for mode in ('cachedResponses', 'recomputeResponses'):
-        status = run('CUDA', propagationMode=mode)
-        if status:
-            sys.exit(status)
+    sys.exit(run('CUDA'))
