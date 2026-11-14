@@ -3,6 +3,8 @@
 #include "LikelihoodModel.h"
 #include "GradientTypes.h"
 
+#include "Semantics/BackendLikelihood.h"
+
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -15,8 +17,8 @@ namespace Backends {
     if( model.requiresEventBinning() ) throw std::runtime_error("Backend gradients require fixed, unsmoothed bins without observable-response dials.");
     if( view_.likelihood.empty() ) throw std::runtime_error("Backend gradient requires a statistical likelihood.");
     for( const auto& sample : view_.likelihood.samples ){
-      if( sample.portableOptions.kind != LikelihoodKind::BarlowBeestonLiteGaussian )
-        throw std::runtime_error("Backend gradients currently require BarlowBeestonLiteGaussian.");
+      if( not LikelihoodSemantics::hasAnalyticGradient(sample.portableOptions.kind) )
+        throw std::runtime_error("Backend analytic gradient is unsupported for this likelihood.");
     }
     for( const auto& dial : model.dials ){
       switch( dial.type ){

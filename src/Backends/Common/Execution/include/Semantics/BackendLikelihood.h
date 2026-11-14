@@ -174,6 +174,29 @@ namespace Backends::LikelihoodSemantics {
             S(-4 * Math::exp(logPenalty - logSigma))};
   }
 
+  GUNDAM_LLH_INLINE bool hasAnalyticGradient(LikelihoodKind kind_) {
+    return kind_ == LikelihoodKind::Poisson || kind_ == LikelihoodKind::LeastSquares
+        || kind_ == LikelihoodKind::BarlowBeestonLiteGaussian || kind_ == LikelihoodKind::BarlowBeestonLitePoisson;
+  }
+
+  // Shared analytic partials with respect to prediction and standard deviation.
+  template<typename Math> GUNDAM_LLH_INLINE LiteEvaluation<typename Math::Scalar> evaluateGradient(
+      typename Math::Scalar data_, typename Math::Scalar pred_, typename Math::Scalar err_,
+      LikelihoodOptions<typename Math::Scalar> options_) {
+    using S = typename Math::Scalar;
+    if( options_.kind == LikelihoodKind::BarlowBeestonLiteGaussian )
+      return evaluateLiteGaussian<Math>(data_, pred_, err_);
+    if( options_.kind == LikelihoodKind::BarlowBeestonLitePoisson )
+      return evaluateLitePoisson<Math>(data_, pred_, err_);
+    if( options_.kind == LikelihoodKind::Poisson )
+      return {0, pred_ <= S(0) ? S(0) : (data_ <= S(0) ? S(2) : S(2)*(S(1)-data_/pred_)), 0};
+    if( options_.kind == LikelihoodKind::LeastSquares ) {
+      const S scale = options_.lsqPoissonianApproximation && data_ > S(1) ? S(0.5)*data_ : S(1);
+      return {S((pred_-data_)*(pred_-data_)/scale), S(2)*(pred_-data_)/scale, 0};
+    }
+    return {Math::invalid(), Math::invalid(), Math::invalid()};
+  }
+
   // Dispatches the two lite models before the legacy evaluators.
   // The legacy Barlow path mirrors the validated 2022 implementation, including its compatibility
   // options and its stabilized expansion near the Asimov minimum. The caller
@@ -187,6 +210,9 @@ namespace Backends::LikelihoodSemantics {
     }
     if( options_.kind == LikelihoodKind::BarlowBeestonLitePoisson ){
       return evaluateLitePoisson<Math>(data_, pred_, Math::sqrt(variance_)).value;
+    }
+    if( options_.kind == LikelihoodKind::LeastSquares ){
+      return evaluateGradient<Math>(data_, pred_, S(0), options_).value;
     }
     if( options_.kind == LikelihoodKind::Poisson ){
       if( pred_ <= S(0) ){ return Math::infinity(); }

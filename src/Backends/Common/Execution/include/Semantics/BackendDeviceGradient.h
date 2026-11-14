@@ -120,7 +120,7 @@ namespace Backends::GradientSemantics {
     using S = typename Math::Scalar;
     if( bin_.ignored ) return {S(0), S(0)};
     const S sigma = Math::sqrt(square_);
-    const auto profile = LikelihoodSemantics::evaluateLiteGaussian<Math>(bin_.data, sum_, sigma);
+    const auto profile = LikelihoodSemantics::evaluateGradient<Math>(bin_.data, sum_, sigma, bin_.options);
     return {profile.predictionGradient, sigma > S(0) ? profile.uncertaintyGradient/sigma : S(0)};
   }
   template<typename S> GUNDAM_GRADIENT_INLINE void eventContributions(

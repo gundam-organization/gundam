@@ -275,8 +275,8 @@ std::vector<double> Backends::CpuBackend::getLikelihoodGradient(const Propagatio
       if( i < sample.ignoredBins.size() and sample.ignoredBins[i] ){ continue; }
       const auto bin = sample.binOffset + i;
       const double sigma = std::sqrt(_lastResult_.histSumSquares.at(bin));
-      const auto profile = LikelihoodSemantics::evaluateLiteGaussian<LikelihoodSemantics::DoubleMath>(
-          sample.dataSums[i], _lastResult_.histSums.at(bin), sigma);
+      const auto profile = LikelihoodSemantics::evaluateGradient<LikelihoodSemantics::DoubleMath>(
+          sample.dataSums[i], _lastResult_.histSums.at(bin), sigma, sample.portableOptions);
       LogThrowIf(not std::isfinite(profile.predictionGradient) or not std::isfinite(profile.uncertaintyGradient),
                  "Non-finite CPU backend bin gradient.");
       predictionScales.at(bin) = profile.predictionGradient;

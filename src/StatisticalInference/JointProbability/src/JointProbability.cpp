@@ -110,6 +110,10 @@ namespace JointProbability{
     if( typeid(probability_) == typeid(PoissonLogLikelihood) ){
       out.kind = JointProbabilitySnapshot::Kind::Poisson;
     }
+    else if( typeid(probability_) == typeid(LeastSquares) ){
+      out.kind = JointProbabilitySnapshot::Kind::LeastSquares;
+      out.lsqPoissonianApproximation = static_cast<const LeastSquares&>(probability_).lsqPoissonianApproximation;
+    }
     else if( typeid(probability_) == typeid(BarlowBeestonLiteGaussian) ){
       out.kind = JointProbabilitySnapshot::Kind::BarlowBeestonLiteGaussian;
       out.throwIfInfLlh = false;

@@ -57,22 +57,30 @@ def check_threads(threads, backend_name):
         manager.updateDataHistograms()
         check(engine, [.4, 1., 1.], preserve_likelihood=False)
 
-    least_squares = copy.deepcopy(config)
-    least_squares['likelihoodInterfaceConfig']['jointProbabilityConfig'] = {'type': 'LeastSquares'}
-    engine = build(least_squares, False, False)
-    engine.getBackendsManager().activate(backend_name)
-    try:
-        engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
-    except RuntimeError as error:
-        assert 'BarlowBeestonLiteGaussian' in str(error), str(error)
-    else:
-        raise AssertionError('Unsupported backend likelihood gradient was accepted')
+    # All portable analytic likelihoods must match native gradients and finite differences.
+    for probability in ({'type': 'PoissonLLH'}, {'type': 'LeastSquares'},
+                        {'type': 'LeastSquares', 'lsqPoissonianApproximation': True},
+                        {'type': 'BarlowBeestonLitePoisson'}):
+        cfg = copy.deepcopy(config)
+        cfg['likelihoodInterfaceConfig']['jointProbabilityConfig'] = dict(probability, ignoreBinsWithZeroPredictionAtPrior=True)
+        for normalized, eigen in ((False, False), (True, True)):
+            engine = build(cfg, normalized, eigen)
+            parameters = list(engine.getMinimizer().getMinimizerFitParameterList())
+            point = [.07*(i+1) if normalized else p.getParameterValue()+.07*p.getStdDevValue()
+                     for i, p in enumerate(parameters)]
+            reference = check(engine, point)
+            engine.getBackendsManager().activate(backend_name)
+            for actual, expected in zip(check(engine, point, preserve_likelihood=False), reference):
+                close(actual, expected)
+            active = copy.deepcopy(cfg)
+            active['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'useBackend': backend_name}
+            check(build(active, normalized, eigen, analytic=True), point, preserve_likelihood=False)
 
     # Backends differentiate compiled formulas without ROOT/Clad.
     formula = copy.deepcopy(config)
     formula['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'] = [
         checks.helpers.formula('formula', '1+.1*[arg0]', {'parameterName': 'p'})]
-    rejected = [(least_squares, 'BarlowBeestonLiteGaussian')]
+    rejected = []
     if backend_name in ('CPU', 'MPS', 'CUDA'):
         for normalized, eigen in ((False, False), (True, False), (False, True), (True, True)):
             cfg = copy.deepcopy(formula)

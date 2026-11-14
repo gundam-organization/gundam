@@ -5,8 +5,9 @@
 namespace JointProbability {
   // Read-only export for executors. The validated classes remain unchanged.
   struct JointProbabilitySnapshot {
-    enum class Kind { Unsupported, Poisson, BarlowBeeston2022, BarlowBeestonLiteGaussian, BarlowBeestonLitePoisson };
+    enum class Kind { Unsupported, Poisson, BarlowBeeston2022, BarlowBeestonLiteGaussian, BarlowBeestonLitePoisson, LeastSquares };
     Kind kind{Kind::Unsupported};
+    bool lsqPoissonianApproximation{false};
     bool usePoissonLikelihood{false};
     bool useNominalVariance{false};
     bool throwIfInfLlh{true};

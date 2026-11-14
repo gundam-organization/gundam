@@ -20,7 +20,7 @@ namespace Backends {
 #else
   using LikelihoodIndex = std::uint32_t;
 #endif
-  enum class LikelihoodKind : LikelihoodIndex { Host, Poisson, BarlowBeeston2022, BarlowBeestonLiteGaussian, BarlowBeestonLitePoisson };
+  enum class LikelihoodKind : LikelihoodIndex { Host, Poisson, BarlowBeeston2022, BarlowBeestonLiteGaussian, BarlowBeestonLitePoisson, LeastSquares };
 
   // Shared host/device work description. The final reduction uses one fixed
   // threadgroup, independently of the number of partial contributions.
@@ -37,6 +37,7 @@ namespace Backends {
     LikelihoodIndex throwIfInfLlh{1};
     Scalar fractionalErrorLimit{};
     Scalar expectedValueMinimum{};
+    LikelihoodIndex lsqPoissonianApproximation{0};
   };
   template<typename Scalar> struct LikelihoodBin {
     LikelihoodIndex globalBin{0};

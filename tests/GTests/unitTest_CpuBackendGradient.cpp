@@ -275,7 +275,7 @@ TEST(CpuBackendGradient, SimpleDialDerivativesMatchResponsesAndMirrorClamps) {
 TEST(CpuBackendGradient, RejectsUnsupportedLikelihood) {
   CpuBackend backend;
   auto view = gradientModel(1.);
-  view.likelihood.samples[0].portableOptions.kind = LikelihoodKind::Poisson;
+  view.likelihood.samples[0].portableOptions.kind = LikelihoodKind::Host;
   backend.build(view);
   EXPECT_THROW(backend.validateLikelihoodGradient(), std::exception);
 

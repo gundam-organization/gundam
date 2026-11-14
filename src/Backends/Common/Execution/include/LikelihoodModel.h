@@ -44,7 +44,7 @@ namespace Backends {
         bin.data = likelihoodScalar<Scalar>(sample.dataSums[i]);
         bin.nominalVariance = o.useNominalVariance ? likelihoodScalar<Scalar>(sample.nominalVariances[i]) : Scalar(0);
         bin.options = {o.kind, o.usePoissonLikelihood, o.useNominalVariance, o.throwIfInfLlh,
-                       likelihoodScalar<Scalar>(o.fractionalErrorLimit, true), likelihoodScalar<Scalar>(o.expectedValueMinimum)};
+                       likelihoodScalar<Scalar>(o.fractionalErrorLimit, true), likelihoodScalar<Scalar>(o.expectedValueMinimum), o.lsqPoissonianApproximation};
         bins.push_back(bin);
       }
     }

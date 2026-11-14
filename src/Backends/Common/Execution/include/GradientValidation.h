@@ -2,6 +2,8 @@
 #define GUNDAM_GRADIENT_VALIDATION_H
 #include "DialProgramValidation.h"
 
+#include "Semantics/BackendLikelihood.h"
+
 #include <cmath>
 #include <stdexcept>
 
@@ -32,8 +34,8 @@ namespace Backends {
     }
     if( view_.likelihood.empty() ) throw std::runtime_error("Backend gradient requires a statistical likelihood.");
     for( const auto& sample : view_.likelihood.samples )
-      if( sample.portableOptions.kind != LikelihoodKind::BarlowBeestonLiteGaussian )
-        throw std::runtime_error("Backend gradients currently require BarlowBeestonLiteGaussian.");
+      if( not LikelihoodSemantics::hasAnalyticGradient(sample.portableOptions.kind) )
+        throw std::runtime_error("Backend analytic gradient is unsupported for this likelihood.");
     validateCompositePrograms(m);
     for( const auto& program : m.formulaPrograms ) program.validate();
     for( const auto& dial : m.dials ){

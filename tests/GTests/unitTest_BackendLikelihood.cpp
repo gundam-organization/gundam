@@ -31,11 +31,13 @@ namespace {
     using Kind = JointProbability::JointProbabilitySnapshot::Kind;
     switch( snapshot.kind ){
       case Kind::Poisson: out.kind = LikelihoodKind::Poisson; break;
+      case Kind::LeastSquares: out.kind = LikelihoodKind::LeastSquares; break;
       case Kind::BarlowBeeston2022: out.kind = LikelihoodKind::BarlowBeeston2022; break;
       case Kind::BarlowBeestonLiteGaussian: out.kind = LikelihoodKind::BarlowBeestonLiteGaussian; break;
       case Kind::BarlowBeestonLitePoisson: out.kind = LikelihoodKind::BarlowBeestonLitePoisson; break;
       default: out.kind = LikelihoodKind::Host;
     }
+    out.lsqPoissonianApproximation = snapshot.lsqPoissonianApproximation;
     out.usePoissonLikelihood = snapshot.usePoissonLikelihood;
     out.throwIfInfLlh = snapshot.throwIfInfLlh;
     out.fractionalErrorLimit = snapshot.fractionalErrorLimit;
@@ -546,9 +548,7 @@ TEST(BackendLikelihood, LiteSnapshotsAndPortableValuesAndGradientsMatchReference
       for( double mu : {0., .1, 1., 20., 1e8, n*(1+1e-10)} ){
         for( double sigma : {0., .01, 1., 100.} ){
           SCOPED_TRACE(::testing::Message() << type << ": " << n << ", " << mu << ", " << sigma);
-          auto actual = config.kind == LikelihoodKind::BarlowBeestonLiteGaussian
-              ? LikelihoodSemantics::evaluateLiteGaussian<Math>(n, mu, sigma)
-              : LikelihoodSemantics::evaluateLitePoisson<Math>(n, mu, sigma);
+          auto actual = LikelihoodSemantics::evaluateGradient<Math>(n, mu, sigma, config);
           same(actual.value, ref->eval(n, mu, sigma, 0));
           same(actual.predictionGradient, ref->evalPredictionGradient(n, mu, sigma, 0));
           same(actual.uncertaintyGradient, ref->evalSqrtSumSqWeightsGradient(n, mu, sigma, 0));
@@ -658,4 +658,35 @@ TEST(BackendLikelihood, HostCallbackRejectsNanAndRetainsInfinityBarriers) {
   EXPECT_EQ(Backends::Semantics::calculateLikelihood(likelihood, sums, squares), std::numeric_limits<double>::infinity());
   (*values)[1] = -std::numeric_limits<double>::infinity();
   EXPECT_THROW(Backends::Semantics::calculateLikelihood(likelihood, sums, squares), std::runtime_error);
+}
+
+TEST(BackendLikelihood, PoissonAndLeastSquaresAnalyticPartialsMatchReference) {
+  for( const char* type : {"PoissonLLH", "LeastSquares"} ){
+    for( bool approximation : {false, true} ){
+      auto ref = reference(type, std::string(type) == "LeastSquares"
+          ? JsonType{{"lsqPoissonianApproximation", approximation}} : JsonType::object());
+      const auto config = options(*ref);
+      ASSERT_TRUE(LikelihoodSemantics::hasAnalyticGradient(config.kind));
+      for( double data : {-1., 0., .5, 1., 1.01, 20.} ){
+        for( double pred : {-1., 0., .1, 1., 20.} ){
+          for( double error : {0., .1, 10.} ){
+            SCOPED_TRACE(::testing::Message() << type << ": " << approximation << ", " << data << ", " << pred);
+            const auto actual = LikelihoodSemantics::evaluateGradient<Math>(data, pred, error, config);
+            same(actual.predictionGradient, ref->evalPredictionGradient(data, pred, error, 0));
+            same(actual.uncertaintyGradient, ref->evalSqrtSumSqWeightsGradient(data, pred, error, 0));
+            const double value = LikelihoodSemantics::evaluate<Math>(data, pred, error*error, config);
+            same(value, ref->eval(data, pred, error, 0));
+            if( pred > 0 ){
+              const double step = 1e-5*pred;
+              const double numeric = (LikelihoodSemantics::evaluate<Math>(data, pred+step, error*error, config)
+                  - LikelihoodSemantics::evaluate<Math>(data, pred-step, error*error, config))/(2*step);
+              EXPECT_NEAR(actual.predictionGradient, numeric, 1e-7*std::max(1., std::abs(numeric)));
+            }
+          }
+        }
+      }
+    }
+  }
+  EXPECT_FALSE(LikelihoodSemantics::hasAnalyticGradient(LikelihoodKind::Host));
+  EXPECT_FALSE(LikelihoodSemantics::hasAnalyticGradient(LikelihoodKind::BarlowBeeston2022));
 }

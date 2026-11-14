@@ -529,6 +529,8 @@ namespace {
       else if( snapshot.kind == Kind::BarlowBeeston2022 ){ options.kind = Backends::LikelihoodKind::BarlowBeeston2022; }
       else if( snapshot.kind == Kind::BarlowBeestonLiteGaussian ){ options.kind = Backends::LikelihoodKind::BarlowBeestonLiteGaussian; }
       else if( snapshot.kind == Kind::BarlowBeestonLitePoisson ){ options.kind = Backends::LikelihoodKind::BarlowBeestonLitePoisson; }
+      else if( snapshot.kind == Kind::LeastSquares ){ options.kind = Backends::LikelihoodKind::LeastSquares; }
+      options.lsqPoissonianApproximation = snapshot.lsqPoissonianApproximation;
       options.usePoissonLikelihood = snapshot.usePoissonLikelihood;
       options.useNominalVariance = snapshot.useNominalVariance;
       options.throwIfInfLlh = snapshot.throwIfInfLlh;
