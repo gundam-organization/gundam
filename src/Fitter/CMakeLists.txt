@@ -22,6 +22,12 @@ target_include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/include
 )
 
+if( WITH_BACKENDS )
+  set(BACKENDS_LIBRARIES "GundamBackends")
+else()
+  set(BACKENDS_LIBRARIES "")
+endif()
+
 if( WITH_ROOT_DICT_BUILD )
   set(CMAKE_CXX_FLAGS_DICT "-Wno-nonportable-include-path")
   ROOT_GENERATE_DICTIONARY(
@@ -41,6 +47,7 @@ if( WITH_ROOT_DICT_BUILD )
       ${LIB_NAME}
       PUBLIC
       GundamStatisticalInference
+      ${BACKENDS_LIBRARIES}
       ${DICT_SIMPLEMCMC}
   )
 
@@ -59,6 +66,7 @@ else()
       ${LIB_NAME}
       PUBLIC
       GundamStatisticalInference
+      ${BACKENDS_LIBRARIES}
   )
 endif()
 

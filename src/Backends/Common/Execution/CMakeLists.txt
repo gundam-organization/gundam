@@ -1,0 +1,19 @@
+set(LIB_NAME GundamBackendsCommonExecution)
+
+set(SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DevicePropagationModel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DeviceWeightModel.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/EventStateCache.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/NativeDialProgramModel.cpp
+)
+
+if(USE_STATIC_LINKS)
+  add_library(${LIB_NAME} STATIC ${SRCFILES})
+else()
+  add_library(${LIB_NAME} SHARED ${SRCFILES})
+endif()
+
+target_include_directories(${LIB_NAME} BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(${LIB_NAME} PUBLIC GundamBackendsCommonModel GundamUtils)
+
+install(TARGETS ${LIB_NAME} DESTINATION lib)

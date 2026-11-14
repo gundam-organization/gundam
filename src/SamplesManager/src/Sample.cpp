@@ -10,7 +10,9 @@
 #include "GenericToolbox.Thread.h"
 #include "GenericToolbox.Loops.h"
 
+#include <algorithm>
 #include <string>
+#include <utility>
 
 
 void Sample::prepareConfig(ConfigReader &config_){
@@ -19,6 +21,8 @@ void Sample::prepareConfig(ConfigReader &config_){
     {FieldFlag::MANDATORY, "name"},
     {"isEnabled"},
     {"disableEventMcThrow"},
+    {"binningResponse"},
+    {"useDynamicBinning"},
     {"binning", {"binningFile", "binningFilePath"}},
     {"selectionCutStr", {"selectionCuts"}},
     {"sampleWeightFormula"},
@@ -35,6 +39,7 @@ void Sample::configureImpl(){
 
   _config_.fillValue(_name_, "name");
   _config_.fillValue(_isEnabled_, "isEnabled");
+  _config_.fillValue(_useDynamicBinning_, "useDynamicBinning");
   _config_.fillValue(_disableEventMcThrow_, "disableEventMcThrow");
   _config_.fillValue(_binningConfig_, "binning");
   _config_.fillValue(_selectionCutStr_, "selectionCutStr");
@@ -49,9 +54,18 @@ void Sample::configureImpl(){
   }
 
   LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _binningConfig_ << std::endl;
+  // CalcXsec resolves parameter-set binning after the dial collections exist.
+  if( _binningConfig_.empty() and _config_.hasField("parSetBinning") ){ return; }
   _histogram_.build(_binningConfig_);
+  if( _config_.hasField("binningResponse") ){
+    _histogram_.configureBinningResponse(_config_.fetchValue<ConfigReader>("binningResponse"));
+  }
 
   LogDebugIf(GundamGlobals::isDebug()) << "Histogram has " << _histogram_.getNbBins() << " bins." << std::endl;
+}
+void Sample::initializeImpl(){
+  LogThrowIf(_isEnabled_ and _binningConfig_.empty(), "Sample " << _name_ << ": binning has not been resolved.");
+  _config_.printUnusedKeys();
 }
 
 void Sample::writeEventRates(const GenericToolbox::TFilePath& saveDir_) const{
@@ -131,6 +145,14 @@ std::ostream& operator <<( std::ostream& o, const Sample& this_ ){
   o << this_.getSummary(); return o;
 }
 
+std::shared_ptr<std::function<void()>> Sample::addBinningUpdateListener(std::function<void()> listener_){
+  auto listener = std::make_shared<std::function<void()>>(std::move(listener_));
+  _binningUpdateListeners_.erase(std::remove_if(_binningUpdateListeners_.begin(), _binningUpdateListeners_.end(),
+      [](const auto& entry_){ return entry_.expired(); }), _binningUpdateListeners_.end());
+  _binningUpdateListeners_.emplace_back(listener);
+  return listener;
+}
+
 void Sample::updateEventBinning(){
   LogThrowIf(not _useDynamicBinning_, "Dynamic binning is disabled for sample \"" << _name_ << "\".");
 
@@ -140,6 +162,14 @@ void Sample::updateEventBinning(){
 }
 
 void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
+  // Notify before changing any state, so failed updates also invalidate observers.
+  for( auto it = _binningUpdateListeners_.begin(); it != _binningUpdateListeners_.end(); ){
+    if( auto listener = it->lock() ){
+      (*listener)();
+      ++it;
+    }
+    else{ it = _binningUpdateListeners_.erase(it); }
+  }
   LogThrowIf(not _useDynamicBinning_, "Dynamic binning is disabled for sample \"" << _name_ << "\".");
   if( _eventList_.empty() ){
     this->indexEventInHistogramBin();
@@ -153,6 +183,11 @@ void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
     for( auto& edges : binContext.bin.getEdgesList() ){
       edges.varIndexCache = variables.findVarIndex(edges.varName);
     }
+  }
+
+  if( _histogram_.isBinningResponseEnabled() ){
+    _histogram_.updateBinEventLists(_eventList_, threadPool_, true);
+    return;
   }
 
   threadPool_.runJob([&](int iThread_){
@@ -174,4 +209,8 @@ void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
 
 void Sample::indexEventInHistogramBin( int iThread_){
   _histogram_.updateBinEventList(_eventList_, iThread_);
+}
+
+void Sample::indexEventInHistogramBin(GenericToolbox::ParallelWorker& threadPool_){
+  _histogram_.updateBinEventLists(_eventList_, threadPool_);
 }

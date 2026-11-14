@@ -53,6 +53,14 @@ double Graph::evalResponse(const DialInputBuffer& input_) const {
   return CalculateGraph(dialInput, -1E20, 1E20, _data_.data(), _data_.size());
 }
 
+
+double Graph::evalGradient(const DialInputBuffer& input_, int iInput_) const {
+  if( iInput_ != 0 ){ return 0.; }
+  const double x = input_.getInputBuffer()[0];
+  if( not _allowExtrapolation_ and (x <= _data_[1] or x >= _data_.back()) ){ return 0.; }
+  return CalculateGraphGradient(x, -1E20, 1E20, _data_.data(), _data_.size());
+}
+
 std::vector<double> Graph::getSourceKnotPositions() const {
   std::vector<double> positions;
   positions.reserve(_data_.size() / 2);

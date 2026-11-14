@@ -1,6 +1,9 @@
 #include "FitterEngine.h"
 #include "RootMinimizer.h"
 #include "GundamGlobals.h"
+#ifdef GUNDAM_USING_BACKENDS
+#include "BackendManager.h"
+#endif
 
 #include <Fit/ParameterSettings.h>
 #include <TFile.h>
@@ -68,12 +71,13 @@ namespace {
       double x = .5;
       TTree tree("events", "events");
       tree.Branch("X", &x, "X/D");
-      for( int i = 0; i < 10; ++i ){ tree.Fill(); }
+      for( int i = 0; i < 10; ++i ){ x = .05 + .09 * i; tree.Fill(); }
       tree.Write();
     }
     void TearDown() override { std::remove(_path_.c_str()); }
 
-    void initializeEngine(FitterEngine& engine_) {
+    void initializeEngine(FitterEngine& engine_, const std::string& likelihood_ = "LeastSquares",
+                          const std::string& formula_ = "", bool eventInputs_ = false) {
       auto config = JsonType::parse(R"({
         "enablePca": false, "scaleParStepWithChi2Response": false,
         "generateSamplePlots": false, "generateOneSigmaPlots": false,
@@ -96,10 +100,23 @@ namespace {
               ]}]} }
         }
       })");
+      config["likelihoodInterfaceConfig"]["jointProbabilityConfig"]["type"] = likelihood_;
       auto& definitions = config["likelihoodInterfaceConfig"]["propagatorConfig"]
                                ["parametersManagerConfig"]["parameterSetList"][0]["parameterDefinitions"];
       for( auto& parameter : definitions ){
         parameter["dialSetDefinitions"] = JsonType::array({{{"dialType", "Normalization"}}});
+        if( not formula_.empty() ){
+          parameter["dialSetDefinitions"] = JsonType::array({{
+              {"dialType", "Formula"}, {"options", {{"formulaStr", formula_}}},
+              {"dialInputList", JsonType::array({{{"name", "value"},
+                  {"parameterName", parameter.at("name")}}})}}});
+          if( eventInputs_ ){
+            auto& inputs = parameter["dialSetDefinitions"][0]["dialInputList"];
+            inputs.insert(inputs.begin(), JsonType{{"name", "energy"}, {"eventVariable", "X"}});
+            // Two named formula inputs can reference the same fit parameter.
+            inputs.push_back({{"name", "alias"}, {"parameterName", parameter.at("name")}});
+          }
+        }
       }
       config["likelihoodInterfaceConfig"]["datasetList"][0]["model"]["filePathList"] = {_path_};
       engine_.configure(ConfigReader(config));
@@ -164,6 +181,91 @@ TEST_F(RootMinimizerSimplex, UsesSeparateAlgorithmsWithIdenticalPrecisionAndPres
   }
 }
 
+TEST_F(RootMinimizerSimplex, ReportsReevaluatedBestfitLikelihood) {
+  FitterEngine engine;
+  initializeEngine(engine);
+  auto& minimizer = dynamic_cast<RootMinimizer&>(engine.getMinimizer());
+  auto& parameter = *minimizer.getMinimizerFitParameterPtr().front();
+  parameter.setParameterValue(0.8, true);
+  minimizer.updateFitParameterSettings();
+
+  testing::internal::CaptureStdout();
+  minimizer.minimize();
+  const auto output = testing::internal::GetCapturedStdout();
+  EXPECT_NE(output.find("Best-fit likelihood:"), std::string::npos);
+  const std::string minuitLabel{"Minuit FVAL: "};
+  const std::string reevaluatedLabel{"Re-evaluated total: "};
+  const auto minuitPosition = output.find(minuitLabel);
+  const auto reevaluatedPosition = output.find(reevaluatedLabel);
+  ASSERT_NE(minuitPosition, std::string::npos);
+  ASSERT_NE(reevaluatedPosition, std::string::npos);
+  const double reportedMinuit = std::stod(output.substr(minuitPosition + minuitLabel.size()));
+  const double reportedTotal = std::stod(output.substr(reevaluatedPosition + reevaluatedLabel.size()));
+  EXPECT_DOUBLE_EQ(reportedMinuit, minimizer.getMinimizer()->MinValue());
+  EXPECT_DOUBLE_EQ(reportedTotal, engine.getLikelihoodInterface().getLastLikelihood());
+  EXPECT_NEAR(reportedTotal, reportedMinuit, 1.e-8 * std::max(1., std::abs(reportedMinuit)));
+  EXPECT_NE(output.find("Statistical: "), std::string::npos);
+  EXPECT_NE(output.find("Penalty: "), std::string::npos);
+  EXPECT_EQ(output.find("does not match Minuit FVAL"), std::string::npos);
+}
+
+TEST_F(RootMinimizerSimplex, SampleRatesUseHistogramContentsRatherThanEventWeights) {
+  FitterEngine engine;
+  initializeEngine(engine);
+  auto& likelihood = engine.getLikelihoodInterface();
+  auto& model = likelihood.getModelPropagator().getSampleSet().getSampleList().front();
+  auto& data = likelihood.getDataPropagator().getSampleSet().getSampleList().front();
+  // Model-only and data-only bin updates must both appear in the report,
+  // even though all event weights still sum to the initial 10 events.
+  model.getHistogram().getBinContentList().front().sumWeights = 23.;
+  data.getHistogram().getBinContentList().front().sumWeights = 42.;
+  EXPECT_DOUBLE_EQ(model.getSumWeights(), 10.);
+  EXPECT_DOUBLE_EQ(data.getSumWeights(), 10.);
+  const auto output = likelihood.getSampleBreakdownTable();
+  EXPECT_NE(output.find("Model (histogram)"), std::string::npos);
+  EXPECT_NE(output.find("Data (histogram)"), std::string::npos);
+  EXPECT_NE(output.find("23"), std::string::npos);
+  EXPECT_NE(output.find("42"), std::string::npos);
+  EXPECT_NE(output.find("82.6087"), std::string::npos);
+}
+
+#ifdef GUNDAM_USING_BACKENDS
+TEST_F(RootMinimizerSimplex, BackendDataUpdatesPreserveModelAndInvalidateDeferredResults) {
+  FitterEngine engine;
+  initializeEngine(engine);
+  auto& manager = engine.getBackendsManager();
+  auto& likelihood = engine.getLikelihoodInterface();
+  EXPECT_NO_THROW(manager.updateDataHistograms()); // No active backend.
+  manager.activate("CPU");
+  engine.evaluateLikelihood();
+  auto pending = manager.propagate();
+  const auto* backend = manager.getBackend();
+  const auto* events = manager.getEngineView().propagation.events.data();
+  const auto masks = manager.getEngineView().likelihood.samples.front().ignoredBins;
+  const auto variances = manager.getEngineView().likelihood.samples.front().nominalVariances;
+  auto& dataBins = likelihood.getDataPropagator().getSampleSet().getSampleList().front().getHistogram().getBinContentList();
+  for( double value : {8., 14., 10.} ){
+    dataBins.front().sumWeights = value;
+    manager.updateDataHistograms();
+    EXPECT_EQ(manager.getBackend(), backend);
+    EXPECT_EQ(manager.getEngineView().propagation.events.data(), events);
+    EXPECT_EQ(manager.getEngineView().likelihood.samples.front().ignoredBins, masks);
+    EXPECT_EQ(manager.getEngineView().likelihood.samples.front().nominalVariances, variances);
+    EXPECT_DOUBLE_EQ(manager.getEngineView().likelihood.samples.front().dataSums.front(), value);
+    EXPECT_THROW(manager.materialize(Backends::OutputRequest::Histograms), std::exception);
+    likelihood.propagateAndEvalLikelihood();
+    const double reference = likelihood.getLastLikelihood();
+    engine.evaluateLikelihood();
+    EXPECT_NEAR(likelihood.getLastLikelihood(), reference, 1.e-12);
+  }
+  EXPECT_THROW(static_cast<void>(pending.get()), std::exception);
+  dataBins.push_back({});
+  EXPECT_THROW(manager.updateDataHistograms(), std::exception);
+  dataBins.pop_back();
+  EXPECT_TRUE(manager.hasBackend()); // Rejected dimensions leave backend intact.
+}
+#endif
+
 TEST_F(RootMinimizerSimplex, RestoresMainMinimizerAfterAnObjectiveException) {
   FitterEngine engine;
   initializeEngine(engine);
@@ -178,4 +280,129 @@ TEST_F(RootMinimizerSimplex, RestoresMainMinimizerAfterAnObjectiveException) {
   EXPECT_EQ(minimizer.getMinimizer().get(), original);
   EXPECT_EQ(original->Precision(), 1e-6);
   EXPECT_EQ(original->Options().MinimizerAlgorithm(), "Migrad");
+}
+
+
+TEST_F(RootMinimizerSimplex, AnalyticGradientIsOptInAndValidatesConfiguration) {
+  FitterEngine engine;
+  initializeEngine(engine);
+  auto* root = dynamic_cast<RootMinimizer*>(&engine.getMinimizer());
+  ASSERT_NE(root, nullptr);
+  EXPECT_FALSE(root->isUsingAnalyticGradient());
+  EXPECT_EQ(root->getNbGradientCalls(), 0u);
+  RecordingMinimizer invalid(&engine);
+  EXPECT_THROW(invalid.configure(ConfigReader(JsonType{{"useAnalyticGradient", "true"}})), std::exception);
+  invalid.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}, {"minimizer", "Minuit"}}));
+  EXPECT_THROW(invalid.initialize(), std::exception);
+  auto& sample = engine.getLikelihoodInterface().getModelPropagator().getSampleSet().getSampleList()[0];
+  sample.setUseDynamicBinning(true);
+  invalid.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}, {"minimizer", "Minuit2"}}));
+  EXPECT_THROW(invalid.initialize(), std::exception);
+}
+
+
+TEST_F(RootMinimizerSimplex, UnsupportedLikelihoodStopsAnalyticGradientInitialization) {
+  FitterEngine engine;
+  initializeEngine(engine, "BarlowLLH_BANFF_OA2021");
+  RecordingMinimizer minimizer(&engine);
+  minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}}));
+  try {
+    minimizer.initialize();
+    FAIL() << "Unsupported likelihood was accepted with an analytic gradient";
+  }
+  catch( const std::exception& error ){
+    EXPECT_NE(std::string(error.what()).find("Analytic bin gradients are unsupported for likelihood"), std::string::npos);
+  }
+  EXPECT_EQ(minimizer.getNbGradientCalls(), 0u);
+}
+
+
+TEST_F(RootMinimizerSimplex, RootFormulaGradientMatchesFullLikelihoodFiniteDifferences) {
+#ifndef GUNDAM_TEST_HAS_CLAD
+  GTEST_SKIP() << "ROOT was built without Clad";
+#endif
+  FitterEngine engine;
+  initializeEngine(engine, "BarlowBeestonLiteGaussian", "exp(.2*[value])+[value]*[value]");
+  RecordingMinimizer minimizer(&engine);
+  minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}, {"useNormalizedFitSpace", false}}));
+  minimizer.initialize();
+  std::vector<double> point;
+  for( auto* parameter : minimizer.getMinimizerFitParameterList() ){
+    point.push_back(parameter->getParameterValue() + (parameter->isFixed() ? 0. : .15));
+  }
+  std::vector<double> gradient(point.size());
+  minimizer.evalFitGradientAt(point.data(), gradient.data());
+  for( size_t i = 0; i < point.size(); ++i ){
+    if( minimizer.getMinimizerFitParameterList()[i]->isFixed() ){
+      EXPECT_EQ(0., gradient[i]);
+      continue;
+    }
+    auto up = point, down = point;
+    up[i] += 1e-5;
+    down[i] -= 1e-5;
+    const double numeric = (minimizer.evalFit(up.data()) - minimizer.evalFit(down.data())) / 2e-5;
+    EXPECT_NEAR(numeric, gradient[i], 1e-5);
+  }
+}
+
+TEST_F(RootMinimizerSimplex, RootFormulaNumericalFallbackStopsAnalyticGradientInitialization) {
+  FitterEngine engine;
+  // Value-only initialization must remain usable for unsupported derivatives.
+  initializeEngine(engine, "LeastSquares", "2+TMath::BesselJ0([value])");
+  RecordingMinimizer minimizer(&engine);
+  minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}}));
+  EXPECT_THROW(minimizer.initialize(), std::exception);
+  EXPECT_EQ(0u, minimizer.getNbGradientCalls());
+}
+
+
+TEST_F(RootMinimizerSimplex, EventFormulaGradientMatchesFullLikelihoodFiniteDifferences) {
+#ifndef GUNDAM_TEST_HAS_CLAD
+  GTEST_SKIP() << "ROOT was built without Clad";
+#endif
+  const int previousThreads = GundamGlobals::getNbCpuThreads();
+  for( int threads : {1, 4} ){
+    GundamGlobals::setNumberOfThreads(threads);
+    for( const std::string expression : {
+        "exp(.2*[value])+[energy]*[alias]*[value]", "1+[energy]*[energy]"} ){
+      FitterEngine engine;
+      initializeEngine(engine, "BarlowBeestonLiteGaussian", expression, true);
+      for( bool normalized : {false, true} ){
+        RecordingMinimizer minimizer(&engine);
+        minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true},
+            {"useNormalizedFitSpace", normalized}}));
+        minimizer.initialize();
+        std::vector<double> point;
+        for( auto* parameter : minimizer.getMinimizerFitParameterList() ){
+          double value = parameter->getParameterValue() + (parameter->isFixed() ? 0. : .07);
+          if( normalized ){ value = ParameterSet::toNormalizedParValue(value, *parameter); }
+          point.push_back(value);
+        }
+        std::vector<double> gradient(point.size());
+        minimizer.evalFitGradientAt(point.data(), gradient.data());
+        for( size_t i = 0; i < point.size(); ++i ){
+          if( minimizer.getMinimizerFitParameterList()[i]->isFixed() ){
+            EXPECT_EQ(0., gradient[i]);
+            continue;
+          }
+          auto up = point, down = point;
+          up[i] += 1e-5;
+          down[i] -= 1e-5;
+          const double numeric = (minimizer.evalFit(up.data()) - minimizer.evalFit(down.data())) / 2e-5;
+          EXPECT_NEAR(numeric, gradient[i], 1e-5)
+              << expression << " threads=" << threads << " normalized=" << normalized << " input=" << i;
+        }
+      }
+    }
+  }
+  GundamGlobals::setNumberOfThreads(previousThreads);
+}
+
+TEST_F(RootMinimizerSimplex, EventFormulaNumericalFallbackStopsAnalyticGradientInitialization) {
+  FitterEngine engine;
+  initializeEngine(engine, "LeastSquares", "2+TMath::BesselJ0([value])+[energy]", true);
+  RecordingMinimizer minimizer(&engine);
+  minimizer.configure(ConfigReader(JsonType{{"useAnalyticGradient", true}}));
+  EXPECT_THROW(minimizer.initialize(), std::exception);
+  EXPECT_EQ(0u, minimizer.getNbGradientCalls());
 }
