@@ -333,6 +333,10 @@ void FitterEngine::initializeImpl(){
 }
 
 // Core
+void FitterEngine::evalGradient(ParameterGradient& gradient_){
+  getLikelihoodInterface().propagateAndEvalGradient(gradient_);
+}
+
 std::string FitterEngine::getPropagationMonitorTitle() const {
   return "Propagator";
 }

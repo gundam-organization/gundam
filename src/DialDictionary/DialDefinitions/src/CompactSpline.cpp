@@ -83,6 +83,18 @@ double CompactSpline::evalResponse(const DialInputBuffer& input_) const {
   return CalculateCompactSpline( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()-2) );
 }
 
+double CompactSpline::evalGradient(const DialInputBuffer& input_, int iInput_) const {
+  if( iInput_ != 0 ){ return 0.; }
+
+  double dialInput{input_.getInputBuffer()[0]};
+
+  if( not _allowExtrapolation_ ){
+    if( dialInput <= _splineBounds_.min or dialInput >= _splineBounds_.max ){ return 0.; }
+  }
+
+  return CalculateCompactSplineGradient( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()-2) );
+}
+
 std::string CompactSpline::getSummary() const {
   std::stringstream ss;
   ss << this->getDialTypeName() << ": spline data = " << GenericToolbox::toString(_splineData_);

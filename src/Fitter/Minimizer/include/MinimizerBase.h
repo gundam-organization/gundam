@@ -6,7 +6,7 @@
 #define GUNDAM_MINIMIZER_BASE_H
 
 #include "ConfigUtils.h"
-
+#include "ParameterGradient.h"
 
 
 #include "GenericToolbox.Utils.h"
@@ -94,6 +94,10 @@ public:
   /// point values and returns the likelihood. The meaning of the parameters is
   /// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
   virtual double evalFit( const double* parArray_ );
+  void evalFitGradient();
+  [[nodiscard]] const ParameterGradient& getGradient() const { return _gradient_; }
+  /// Analytic gradient callback in exactly the same coordinates as evalFit().
+  void evalFitGradientAt(const double* parArray_, double* gradient_);
 
   /// Throw a new parameter point around the post-fit best fit. By default,
   /// minimizers that do not provide post-fit throws leave the parameters
@@ -151,6 +155,9 @@ public:
   void printParameters();
   [[nodiscard]] int fetchNbDegreeOfFreedom() const;
 
+  std::vector<Parameter *> &getMinimizerFitParameterList(){ return _minimizerParameterPtrList_; }
+  const std::vector<Parameter *> &getMinimizerFitParameterList() const{ return _minimizerParameterPtrList_; }
+
 
 protected:
   /// Get a reference to the FitterEngine that owns this minimizer.
@@ -181,6 +188,7 @@ protected:
 
 protected:
   std::vector<Parameter*> _minimizerParameterPtrList_{};
+  ParameterGradient _gradient_;
   Monitor _monitor_{};
 
 private:

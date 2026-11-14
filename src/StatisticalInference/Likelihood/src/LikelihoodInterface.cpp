@@ -14,6 +14,18 @@
 
 #include "Logger.h"
 
+#include <algorithm>
+
+namespace {
+  bool containsParameter(const std::vector<const Parameter*>& parameterList_, const Parameter* parameter_){
+    return std::find(parameterList_.begin(), parameterList_.end(), parameter_) != parameterList_.end();
+  }
+
+  bool isEigenProjectedOriginalParameter(const Parameter& parameter_){
+    return ParameterSet::isValidCorrelatedParameter(parameter_);
+  }
+}
+
 
 void LikelihoodInterface::configureImpl(){
   _threadPool_.setNThreads(GundamGlobals::getNbCpuThreads() );
@@ -28,6 +40,7 @@ void LikelihoodInterface::configureImpl(){
     {FieldFlag::RELOCATED, "gaussStatThrowInToys", "propagatorConfig/gaussStatThrowInToys"},
     {FieldFlag::RELOCATED, "enableEventMcThrow", "propagatorConfig/enableEventMcThrow"},
     {"applyInfinitePenaltyOnOutOfBoundPar"},
+    {"externalConstraints"},
   });
   _config_.checkConfiguration();
 
@@ -76,6 +89,9 @@ void LikelihoodInterface::configureImpl(){
   _config_.fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
   _eventTreeWriter_.configure();
 
+  _config_.fillValue(_externalConstraints_.getConfig(), "externalConstraints");
+  _externalConstraints_.configure();
+
   // reading local parameters
   _config_.fillValue(_applyInfinitePenaltyOnOutOfBoundPar_, "applyInfinitePenaltyOnOutOfBoundPar");
 
@@ -91,6 +107,9 @@ void LikelihoodInterface::initializeImpl() {
   _modelPropagator_.initialize();
   _dataPropagator_.initialize();
   _modelPropagator_.printConfiguration();
+
+  _externalConstraints_.initialize();
+  _externalConstraints_.bindParameters(_modelPropagator_.getParametersManager());
 
   _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
   _plotGenerator_.setDataSampleSetPtr( &_dataPropagator_.getSampleSet().getSampleList() );
@@ -166,6 +185,96 @@ double LikelihoodInterface::evalLikelihood(std::future<bool>& propagation) const
   _buffer_.updateTotal();
   return _buffer_.totalLikelihood;
 }
+void LikelihoodInterface::validateWeightGradient(bool validateDials_) const {
+  LogThrowIf(not _jointProbabilityPtr_->hasAnalyticBinGradient(),
+             "Analytic bin gradients are unsupported for likelihood " << _jointProbabilityPtr_->getType());
+  _externalConstraints_.validateGradient();
+  const auto& samples = _modelPropagator_.getSampleSet().getSampleList();
+  for( const auto& sample : samples ){
+    LogThrowIf(sample.isUseDynamicBinning() and not sample.getHistogram().isBinningResponseEnabled(),
+               "Dynamic binning gradients require bin smoothing");
+  }
+  for( const auto& entry : _modelPropagator_.getEventDialCache().getCache() ){
+    if( entry.event != nullptr ){
+      const auto& histogram = samples.at(entry.event->getIndices().sample).getHistogram();
+      for( const auto& target : entry.variableResponseCacheList ){
+        const auto& name = entry.event->getVariables().getNameListPtr()->at(target.variableIndex);
+        histogram.validateGradientVariable(name);
+      }
+    }
+    if( not validateDials_ ){ continue; }
+    for( const auto& response : entry.dialResponseCacheList ){
+      const auto* dial = response.dialInterface->getDialBaseRef();
+      LogThrowIf(not dial->hasAnalyticGradient(), "CPU weight gradient is unsupported for dial " << dial->getDialTypeName());
+    }
+  }
+}
+
+void LikelihoodInterface::propagateAndEvalGradient(ParameterGradient& gradient_) {
+  validateWeightGradient();
+  auto propagation = _modelPropagator_.applyParameters();
+  LogThrowIf(not propagation.valid(), "Gradient propagation is unavailable.");
+  LogThrowIf(not propagation.get(), "Gradient propagation failed.");
+  auto statGradient = prepareGradient(gradient_);
+  evalStatLikelihoodGradient(statGradient);
+  // External measurements use physical parameters, including originals in
+  // eigen-decomposed sets. Add them before projecting to fit coordinates.
+  _externalConstraints_.evalGradient(statGradient);
+  finalizeGradient(statGradient, gradient_);
+}
+
+ParameterGradient LikelihoodInterface::prepareGradient(const ParameterGradient& gradient_) {
+  ParameterGradient statGradient;
+  std::vector<const Parameter*> parameterList;
+  parameterList.reserve(gradient_.values.size());
+  for( const auto& entry : gradient_.values ){
+    LogThrowIf(entry.first == nullptr, "Null parameter in gradient request.");
+    parameterList.push_back(entry.first);
+    statGradient.resetValue(entry.first);
+  }
+  for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
+    if( not parSet.isEnabled() or not parSet.isEnableEigenDecomp() ){ continue; }
+    const bool hasRequestedEigenParameter = std::any_of(
+        parSet.getEigenParameterList().begin(), parSet.getEigenParameterList().end(),
+        [&](const auto& parameter_){ return containsParameter(parameterList, &parameter_); });
+    if( not hasRequestedEigenParameter ){ continue; }
+    for( auto& par : parSet.getParameterList() ){
+      if( isEigenProjectedOriginalParameter(par) ){ statGradient.resetValue(&par); }
+    }
+  }
+  return statGradient;
+}
+
+void LikelihoodInterface::finalizeGradient(const ParameterGradient& statGradient_, ParameterGradient& gradient_) {
+  std::vector<const Parameter*> parameterList;
+  parameterList.reserve(gradient_.values.size());
+  for( auto& entry : gradient_.values ){
+    parameterList.push_back(entry.first);
+    entry.second = statGradient_.getValue(entry.first);
+  }
+  for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
+    if( not parSet.isEnabled() or not parSet.isEnableEigenDecomp() ){ continue; }
+    if( parSet.getEigenVectors() == nullptr ){ continue; }
+
+    for( int iEigen = 0 ; iEigen < int(parSet.getEigenParameterList().size()) ; iEigen++ ){
+      auto& eigenPar = parSet.getEigenParameterList()[iEigen];
+      if( not containsParameter(parameterList, &eigenPar) ){ continue; }
+
+      double eigenGradient{0};
+      int iOrig{0};
+      for( auto& par : parSet.getParameterList() ){
+        if( not isEigenProjectedOriginalParameter(par) ){ continue; }
+        eigenGradient += statGradient_.getValue(&par) * (*parSet.getEigenVectors())[iOrig++][iEigen];
+      }
+      gradient_.addValue(&eigenPar, eigenGradient);
+    }
+  }
+
+  evalPenaltyLikelihoodGradient(gradient_);
+  for( const auto* parameter : parameterList ){
+    LogThrowIf(not std::isfinite(gradient_.getValue(parameter)), "Non-finite likelihood gradient.");
+  }
+}
 double LikelihoodInterface::evalStatLikelihood(std::future<bool>& propagation) const {
   if (propagation.valid()) static_cast<void>(propagation.get());
   _buffer_.statLikelihood = 0.;
@@ -174,12 +283,145 @@ double LikelihoodInterface::evalStatLikelihood(std::future<bool>& propagation) c
   }
   return _buffer_.statLikelihood;
 }
+void LikelihoodInterface::evalStatLikelihoodGradient(ParameterGradient& gradient_) {
+  struct BinGradientScale{
+    double sumWeights{0};
+    double sqrtSumSqWeightsOverError{0};
+  };
+
+  std::vector<std::vector<BinGradientScale>> binGradientScaleList(
+      _modelPropagator_.getSampleSet().getSampleList().size()
+  );
+
+  for( auto& samplePair : _samplePairList_ ){
+    if( samplePair.model == nullptr or samplePair.data == nullptr ){ continue; }
+
+    const int sampleIndex{samplePair.model->getIndex()};
+    if( sampleIndex < 0 or sampleIndex >= int(binGradientScaleList.size()) ){ continue; }
+
+    auto& hist = samplePair.model->getHistogram();
+    auto& sampleGradientScaleList = binGradientScaleList[sampleIndex];
+    sampleGradientScaleList.resize(hist.getNbBins());
+
+    for( int iBin = 0 ; iBin < hist.getNbBins() ; iBin++ ){
+      const auto& binContent = hist.getBinContentList()[iBin];
+      auto& gradientScale = sampleGradientScaleList[iBin];
+      const auto derivatives = _jointProbabilityPtr_->evalBinGradient(samplePair, iBin);
+      LogThrowIf(not std::isfinite(derivatives.prediction) or not std::isfinite(derivatives.uncertainty),
+                 "Non-finite likelihood bin gradient in bin " << iBin);
+      gradientScale.sumWeights = derivatives.prediction;
+      if( binContent.sqrtSumSqWeights > 0 ){
+        gradientScale.sqrtSumSqWeightsOverError =
+            derivatives.uncertainty
+            / binContent.sqrtSumSqWeights;
+      }
+    }
+  }
+
+  auto& cache = _modelPropagator_.getEventDialCache();
+  std::vector<double> eventScales(cache.getCache().size(), 0.);
+  for( std::size_t i = 0; i < cache.getCache().size(); ++i ){
+    auto& cacheEntry = cache.getCache()[i];
+    if( cacheEntry.event == nullptr ){ continue; }
+
+    const int sampleIndex{cacheEntry.event->getIndices().sample};
+    const int binIndex{cacheEntry.event->getIndices().bin};
+    if( sampleIndex < 0 or sampleIndex >= int(binGradientScaleList.size()) ){ continue; }
+    const auto& histogram = _modelPropagator_.getSampleSet().getSampleList()[sampleIndex].getHistogram();
+    if( histogram.isBinningResponseEnabled() ){
+      const auto binning = histogram.evalBinningGradient(*cacheEntry.event);
+      std::vector<double> observableScales(binning.variableIndices.size(), 0.);
+      const double weight = cacheEntry.event->getEventWeight();
+      for( size_t row = 0; row < binning.response.binFractions.size(); ++row ){
+        const auto& fraction = binning.response.binFractions[row];
+        if( fraction.binIndex < 0 or fraction.binIndex >= int(binGradientScaleList[sampleIndex].size()) ){ continue; }
+        const auto& binScale = binGradientScaleList[sampleIndex][fraction.binIndex];
+        const double scale = binScale.sumWeights + binScale.sqrtSumSqWeightsOverError * weight * fraction.fraction;
+        eventScales[i] += scale * fraction.fraction;
+        for( size_t column = 0; column < observableScales.size(); ++column ){
+          observableScales[column] += scale * weight * binning.fractionGradients[row][column];
+        }
+      }
+      for( const auto& target : cacheEntry.variableResponseCacheList ){
+        for( size_t column = 0; column < observableScales.size(); ++column ){
+          if( binning.variableIndices[column] == target.variableIndex ){
+            cache.evalVariableResponseGradient(cacheEntry, target, gradient_, observableScales[column]);
+          }
+        }
+      }
+      continue;
+    }
+    if( binIndex < 0 or binIndex >= int(binGradientScaleList[sampleIndex].size()) ){ continue; }
+
+    const auto& gradientScale = binGradientScaleList[sampleIndex][binIndex];
+    const double eventGradientScale{
+        gradientScale.sumWeights
+        + gradientScale.sqrtSumSqWeightsOverError * cacheEntry.event->getEventWeight()
+    };
+    if( eventGradientScale == 0 ){ continue; }
+
+    eventScales[i] = eventGradientScale;
+  }
+  cache.evalEventWeightGradients(gradient_, eventScales, _modelPropagator_.getThreadPool());
+}
 double LikelihoodInterface::evalPenaltyLikelihood() const {
   _buffer_.penaltyLikelihood = 0;
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
     _buffer_.penaltyLikelihood += LikelihoodInterface::evalPenaltyLikelihood( parSet );
   }
+  _buffer_.penaltyLikelihood += _externalConstraints_.eval();
   return _buffer_.penaltyLikelihood;
+}
+void LikelihoodInterface::evalPenaltyLikelihoodGradient(ParameterGradient& gradient_) const {
+  for( const auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
+    this->evalPenaltyLikelihoodGradient(parSet, gradient_);
+  }
+}
+void LikelihoodInterface::evalPenaltyLikelihoodGradient(const ParameterSet& parSet_,
+                                                        ParameterGradient& gradient_) const {
+  if( not parSet_.isEnabled() ){ return; }
+  if( parSet_.getPriorCorrelationMatrix() == nullptr ){ return; }
+
+  if( parSet_.isEnableEigenDecomp() ){
+    bool hasRequestedOriginalParameter{false};
+    for( const auto& eigenPar : parSet_.getEigenParameterList() ){
+      if( gradient_.values.count(&eigenPar) == 0 ){ continue; }
+      if( eigenPar.isPenaltyDisabled() ){ continue; }
+      if( eigenPar.getStdDevValue() == 0 ){ continue; }
+      gradient_.addValue(&eigenPar,
+          2. * (eigenPar.getParameterValue() - eigenPar.getPriorValue())
+          / TMath::Sq(eigenPar.getStdDevValue())
+      );
+    }
+
+    for( const auto& par : parSet_.getParameterList() ){
+      if( not ParameterSet::isValidCorrelatedParameter(par) ){ continue; }
+      if( gradient_.values.count(&par) != 0 ){
+        hasRequestedOriginalParameter = true;
+        break;
+      }
+    }
+    if( not hasRequestedOriginalParameter ){ return; }
+  }
+
+  if( parSet_.getInversePriorCorrelationMatrix() == nullptr or parSet_.getDeltaVectorPtr() == nullptr ){
+    return;
+  }
+
+  parSet_.updateDeltaVector();
+  TVectorD penaltyGradient = (*parSet_.getInversePriorCorrelationMatrix()) * (*parSet_.getDeltaVectorPtr());
+  penaltyGradient *= 2.;
+
+  int iFit{0};
+  for( const auto& par : parSet_.getParameterList() ){
+    if( not ParameterSet::isValidCorrelatedParameter(par) ){ continue; }
+    if( gradient_.values.count(&par) != 0 ){
+      // updateDeltaVector() uses (value-prior)/sigma. Convert its derivative
+      // back to the physical parameter coordinate.
+      gradient_.addValue(&par, penaltyGradient[iFit] / par.getStdDevValue());
+    }
+    iFit++;
+  }
 }
 double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) const{
   if( not parSet_.isEnabled() ){ return 0; }
@@ -241,6 +483,9 @@ std::string LikelihoodInterface::getSummary() const {
         return ssSub.str();
       }
   );
+  if( _externalConstraints_.isEnabled() ){
+    ss << "; external constraints: " << _externalConstraints_.eval();
+  }
   return ss.str();
 }
 
@@ -341,9 +586,12 @@ void LikelihoodInterface::loadModelPropagator(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
-      sample.indexEventInHistogramBin(iThread);
+      if( not sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(iThread); }
     }
   });
+  for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
+    if( sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(_threadPool_); }
+  }
 
   LogInfo << "Filling up model sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){
@@ -459,9 +707,12 @@ void LikelihoodInterface::loadDataPropagator(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
-      sample.indexEventInHistogramBin(iThread);
+      if( not sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(iThread); }
     }
   });
+  for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
+    if( sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(_threadPool_); }
+  }
 
   LogInfo << "Filling up data sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){

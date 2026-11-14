@@ -118,6 +118,20 @@ if( WITH_GOOGLE_TEST )
   include(GoogleTest)
   cmessage( STATUS "Compiling google tests" )
 
+  # ROOT does not consistently expose an R__HAS_CLAD preprocessor macro.
+  # Query the installed ROOT build rather than silently skipping gradient tests.
+  execute_process(COMMAND ${ROOT_config_CMD} --has-clad
+    RESULT_VARIABLE rootCladResult
+    OUTPUT_VARIABLE rootHasClad
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(NOT rootCladResult EQUAL 0 OR NOT rootHasClad MATCHES "^(yes|no)$")
+    cmessage(FATAL_ERROR "Cannot determine Clad support using root-config --has-clad")
+  endif()
+  add_library(gundamTestFeatures INTERFACE)
+  if(rootHasClad STREQUAL "yes")
+    target_compile_definitions(gundamTestFeatures INTERFACE GUNDAM_TEST_HAS_CLAD=1)
+  endif()
+
   function(gundam_discover_tests target_ category_)
     if(APPLE)
       # DYLD_LIBRARY_PATH overrides even the build RPATHs and can load an older
@@ -172,9 +186,18 @@ if( WITH_GOOGLE_TEST )
     GTests/unitTest_ApplyMonotonicCondition.cpp)
   set(unitDialsSources
     GTests/unitTest_DialUtils.cpp
-    GTests/unitTest_DialDefinitions.cpp)
+    GTests/unitTest_DialDefinitions.cpp
+    GTests/unitTest_DialResponseSupervisor.cpp
+    GTests/unitTest_FormulaEvaluator.cpp
+    GTests/unitTest_CompositeGradient.cpp
+    GTests/unitTest_ExternalWeightGradient.cpp
+    GTests/unitTest_TableGradient.cpp
+    GTests/unitTest_BinningGradient.cpp
+  )
   set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
-  set(unitLikelihoodSources GTests/unitTest_JointProbability.cpp)
+  set(unitLikelihoodSources
+    GTests/unitTest_JointProbability.cpp
+    GTests/unitTest_ExternalConstraintGradient.cpp)
   set(unitMinimizerSources GTests/unitTest_RootMinimizerSimplex.cpp)
   set(unitBackendsSources)
 
@@ -183,7 +206,7 @@ if( WITH_GOOGLE_TEST )
     if(unit${unitCategory}Sources)
       set(unitTarget "gundamGTest_${unitCategory}.exe")
       add_executable(${unitTarget} ${unit${unitCategory}Sources})
-      target_link_libraries(${unitTarget} PRIVATE GTest::gtest_main GundamFitter)
+      target_link_libraries(${unitTarget} PRIVATE GTest::gtest_main GundamFitter gundamTestFeatures)
       if(WITH_FAST_TEST)
         gundam_discover_tests(${unitTarget} ${unitCategory}
           TEST_PREFIX "${unitCategory}/"
@@ -191,6 +214,11 @@ if( WITH_GOOGLE_TEST )
       endif()
     endif()
   endforeach()
+
+  add_library(gundamTableGradientPlugin SHARED GTests/TableGradientPlugin.cpp)
+  add_dependencies(gundamGTest_Dials.exe gundamTableGradientPlugin)
+  target_compile_definitions(gundamGTest_Dials.exe PRIVATE
+    GUNDAM_TABLE_GRADIENT_PLUGIN="$<TARGET_FILE:gundamTableGradientPlugin>")
 
   ## Create a list of all of the regular tests.  These are always
   ## compiled and are run when WITH_REGULAR_TEST is on.

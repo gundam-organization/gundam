@@ -1,0 +1,253 @@
+#!/usr/bin/env python3
+"""Original-engine weight gradients in serial and parallel propagation."""
+import copy
+from importlib import import_module
+import json
+import math
+from pathlib import Path
+import subprocess
+import sys
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+helpers = import_module('470DialsComposite')
+
+
+def nearby_fit_points(engine, normalized):
+    """Small shifts around the current point in the actual minimizer basis."""
+    parameters = list(engine.getMinimizer().getMinimizerFitParameterList())
+    center = [0. if normalized else p.getParameterValue() for p in parameters]
+    return [[value + shift * (1. if normalized else p.getStdDevValue()) * (-1. if i % 2 else 1.)
+             for i, (value, p) in enumerate(zip(center, parameters))]
+            for shift in (.07, -.05)]
+
+
+def make_fixture(threads):
+    import GUNDAM
+    GUNDAM.setLightOutputMode(True)
+    GUNDAM.setNumberOfThreads(threads)
+    path = Path.cwd() / '590NumericsWeightGradient.root'
+    helpers.write_input(path)
+    macro = path.with_suffix('.C')
+    macro.write_text('''#include <TFile.h>
+#include <TMatrixDSym.h>
+#include <TSystem.h>
+{ {
+ TFile file(INPUT, "UPDATE");
+ TMatrixDSym covariance(3);
+ double sigma[3] = {.5, .3, .7};
+ double corr[3][3] = {{1., .25, -.15}, {.25, 1., .35}, {-.15, .35, 1.}};
+ for(int i=0;i<3;++i) for(int j=0;j<3;++j) covariance(i,j)=sigma[i]*sigma[j]*corr[i][j];
+ covariance.Write("covariance");
+ } gSystem->Exit(0); }
+'''.replace('INPUT', json.dumps(str(path))))
+    subprocess.run(['root', '-n', '-l', '-b', '-q', str(macro)], check=True)
+    config = helpers.make_config(path, {})
+    li = config['likelihoodInterfaceConfig']
+    li['jointProbabilityConfig'] = {'type': 'BarlowBeestonLiteGaussian', 'ignoreBinsWithZeroPredictionAtPrior': True}
+    # Fourth bin is empty at the prior and must remain ignored in the gradient.
+    li['propagatorConfig']['sampleSetConfig']['sampleList'][0]['binning']['binningDefinition'][0]['edges'].append(4)
+    parameters = li['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]
+    parameters.pop('dialSetDefinitions')
+    parameters.update(parameterDefinitionFilePath=str(path), covarianceMatrix='covariance',
+                      parameterDefinitions=[
+        {'name': 'p', 'parameterIndex': 0, 'priorValue': .3, 'dialSetDefinitions': [{'dialType': 'Graph', 'dialLeafName': 'graph'}]},
+        {'name': 'q', 'parameterIndex': 1, 'priorValue': 1., 'dialSetDefinitions': [{'dialType': 'Normalization'}]},
+        {'name': 'r', 'parameterIndex': 2, 'priorValue': 1., 'dialSetDefinitions': [{'dialType': 'Normalization', 'applyCondition': 'X < 1.5'}]}])
+
+    def build(configuration, normalized, eigen, analytic=False):
+        cfg = copy.deepcopy(configuration)
+        cfg['minimizerConfig'] = {'useNormalizedFitSpace': normalized, 'writeLlhHistory': False,
+                                  'useAnalyticGradient': analytic}
+        cfg['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['enableEigenDecomp'] = eigen
+        engine = GUNDAM.FitterEngine()
+        engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(cfg))))
+        engine.getLikelihoodInterface().setDataType(GUNDAM.LikelihoodInterface.DataType.Asimov)
+        engine.initialize()
+        return engine
+
+    def close(actual, expected):
+        assert math.isfinite(actual) and math.isfinite(expected), (actual, expected)
+        assert math.isclose(actual, expected, rel_tol=3e-5, abs_tol=3e-6), (actual, expected)
+
+    def check(engine, point, one_sided=(), preserve_likelihood=True):
+        minimizer = engine.getMinimizer()
+        parameter_count = len(minimizer.getMinimizerFitParameterList())
+        assert len(point) == parameter_count, ('Wrong fit-point dimension', len(point), parameter_count, point)
+        # Deliberately leave the engine at another point: the callback must refresh it.
+        minimizer.evalFit([value + .02 for value in point])
+        likelihood = engine.getLikelihoodInterface()
+        previous = (likelihood.getLastLikelihood(), likelihood.getLastStatLikelihood(),
+                    likelihood.getLastPenaltyLikelihood())
+        gradient = minimizer.evalFitGradientAt(point)
+        if preserve_likelihood:
+            # The original gradient path propagates without evaluating scalar likelihoods.
+            current = (likelihood.getLastLikelihood(), likelihood.getLastStatLikelihood(),
+                       likelihood.getLastPenaltyLikelihood())
+            for actual, expected in zip(current, previous):
+                close(actual, expected)
+        minimizer.evalFit(point)
+        stat = likelihood.getLastStatLikelihood()
+        assert len(gradient) == len(point)
+        parameters = list(minimizer.getMinimizerFitParameterList())
+        physical_gradient = minimizer.getGradient()
+        stored_values = [physical_gradient.getValue(parameter) for parameter in parameters]
+        assert all(math.isfinite(value) for value in stored_values)
+        for i, value in enumerate(gradient):
+            step = 2e-5 * max(1., abs(point[i]))
+            up, down = list(point), list(point)
+            up[i] += step
+            down[i] -= step
+            if i in one_sided:
+                # Normalization response is clamped at zero: use its right derivative.
+                twice = list(point)
+                twice[i] += 2*step
+                numeric = (-3*minimizer.evalFit(point) + 4*minimizer.evalFit(up) - minimizer.evalFit(twice))/(2*step)
+            else:
+                numeric = (minimizer.evalFit(up) - minimizer.evalFit(down))/(2*step)
+            close(value, numeric)
+        # Value probes update parameters but must leave the stored gradient intact.
+        for parameter, value in zip(parameters, stored_values):
+            close(physical_gradient.getValue(parameter), value)
+        # The no-argument callback also refreshes current parameters without destroying the LLH.
+        minimizer.evalFit(point)
+        before = likelihood.getLastLikelihood()
+        minimizer.evalFitGradient()
+        close(likelihood.getLastLikelihood(), before)
+        close(likelihood.getLastStatLikelihood(), stat)
+        return gradient
+
+    return config, build, check, close
+
+
+def check_threads(threads):
+    import GUNDAM
+    config, build, check, close = make_fixture(threads)
+    for normalized in (False, True):
+        for eigen in (False, True):
+            engine = build(config, normalized, eigen)
+            pars = list(engine.getMinimizer().getMinimizerFitParameterList())
+            assert len(pars) == 3
+            point = [0. if normalized else p.getParameterValue() for p in pars]
+            check(engine, point)
+            shifted = [value + sign*.13*(1. if normalized else p.getStdDevValue())
+                       for value, sign, p in zip(point, (1., -1., 1.), pars)]
+            check(engine, shifted)
+            if not eigen:
+                # Away from knots, clamped Graph input has exactly zero statistical slope.
+                clamped = list(shifted)
+                clamped[0] = (3.-pars[0].getPriorValue())/pars[0].getStdDevValue() if normalized else 3.
+                check(engine, clamped)
+            try:
+                engine.getMinimizer().evalFitGradientAt(point[:-1])
+            except ValueError:
+                pass
+            else:
+                raise AssertionError('Wrong gradient dimension accepted')
+
+    # The original engine can fill an independent output, including eigen and
+    # penalty terms, without writing into the minimizer-owned gradient object.
+    for eigen in (False, True):
+        engine = build(config, False, eigen)
+        minimizer = engine.getMinimizer()
+        parameters = list(minimizer.getMinimizerFitParameterList())
+        first = [p.getParameterValue() + .07 * p.getStdDevValue() for p in parameters]
+        reference = list(minimizer.evalFitGradientAt(first))
+        likelihood = engine.getLikelihoodInterface()
+        output = GUNDAM.ParameterGradient()
+        for parameter in parameters:
+            output.resetValue(parameter)
+        likelihood.evalGradient(output)
+        for parameter, value in zip(parameters, reference):
+            close(output.getValue(parameter), value)
+        second = [value + .03 * p.getStdDevValue() for value, p in zip(first, parameters)]
+        minimizer.evalFit(second)
+        likelihood.evalGradient(output)
+        for parameter, value in zip(parameters, reference):
+            close(minimizer.getGradient().getValue(parameter), value)
+        updated = list(minimizer.evalFitGradientAt(second))
+        for parameter, value in zip(parameters, updated):
+            close(output.getValue(parameter), value)
+
+        # A caller may ask for a single component, including a fixed parameter.
+        # Eigen projection must not leak its temporary original coordinates.
+        subset = GUNDAM.ParameterGradient()
+        subset.resetValue(parameters[0])
+        parameters[0].setIsFixed(True)
+        fixed_gradient = list(minimizer.evalFitGradientAt(second))
+        close(fixed_gradient[0], 0.)
+        for actual, expected in zip(fixed_gradient[1:], updated[1:]):
+            close(actual, expected)
+        likelihood.evalGradient(subset)
+        close(subset.getValue(parameters[0]), updated[0])
+        try:
+            subset.getValue(parameters[1])
+        except IndexError:
+            pass
+        else:
+            raise AssertionError('Unrequested gradient component was added')
+        parameters[0].setIsFixed(False)
+
+    # Eigenvectors span only constrained parameters, not the remaining free coordinates.
+    mixed = copy.deepcopy(config)
+    mixed['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][1]['priorType'] = 'Flat'
+    for normalized in (False, True):
+        engine = build(mixed, normalized, True)
+        assert len(engine.getMinimizer().getMinimizerFitParameterList()) == 2
+        original = engine.getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList()[0].getParameterList()
+        free_parameter = original[1]
+        close(free_parameter.getParameterValue(), 1.)
+        # A free coordinate must not enter the two-dimensional eigen transform,
+        # even when its value differs from its prior.
+        free_parameter.setParameterValue(.87)
+        check(engine, [.1, -.13])
+        close(free_parameter.getParameterValue(), .87)
+    # Exercise spline dials through the same Gaussian BB histogram chain.
+    splines = copy.deepcopy(config)
+    splines['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'][0]['dialType'] = 'Spline'
+    engine = build(splines, False, False)
+    check(engine, [.43, .95, 1.08])
+
+    # Linear product derivatives must handle one and multiple zero dial responses.
+    least_squares = copy.deepcopy(config)
+    least_squares['likelihoodInterfaceConfig']['jointProbabilityConfig'] = {'type': 'LeastSquares'}
+    engine = build(least_squares, False, False)
+    check(engine, [.3, 0., 1.], (1,))
+    check(engine, [.3, 0., 0.], (1, 2))
+
+    unsupported = copy.deepcopy(config)
+    unsupported['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'] = [helpers.formula('unsupported', '2+TMath::BesselJ0([arg0])', {'parameterName': 'p'})]
+    engine = build(unsupported, False, False)
+    try:
+        engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
+    except RuntimeError as error:
+        assert 'numerical' in str(error).lower() or 'generate' in str(error).lower(), str(error)
+    else:
+        raise AssertionError('Unsupported dial silently differentiated')
+    smooth = copy.deepcopy(config)
+    smooth['likelihoodInterfaceConfig']['propagatorConfig']['sampleSetConfig']['sampleList'][0]['binningResponse'] = {
+        'isEnabled': True, 'variables': [{'name': 'X', 'width': .2}]}
+    engine = build(smooth, False, False)
+    check(engine, [.4, .95, 1.08])
+
+    # Observable migration through hard bin boundaries remains forbidden.
+    cfg = copy.deepcopy(config)
+    cfg['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['parameterDefinitions'][0]['dialSetDefinitions'][0].update(
+        applyToVariable='X', variableResponseMode='Override')
+    engine = build(cfg, False, False)
+    try:
+        engine.getMinimizer().evalFitGradientAt([.4, 1., 1.])
+    except RuntimeError as error:
+        assert 'smoothing' in str(error).lower(), str(error)
+    else:
+        raise AssertionError('Hard-binned observable gradient was accepted')
+    print(f'SUCCESS: original-engine weight gradients ({threads} threads)')
+
+
+def main():
+    for threads in (1, 4):
+        check_threads(threads)
+
+
+if __name__ == '__main__':
+    main()
