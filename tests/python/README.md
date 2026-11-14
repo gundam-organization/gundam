@@ -34,7 +34,7 @@ builds keep `requirements.txt` without Torch. With automatic venv preparation
 disabled, install the matching requirements yourself.
 
 `745BackendsMpsPythonWorkerBuffers.py` is registered only when the MPS backend
-target exists. It uses the YAML and PythonWorker in `fast/inputs/PythonWorkerBuffers`
+target exists. It embeds its YAML configuration and PythonWorker script in the test itself
 to check host/device detection, in-place weights and histogram results at several
 parameter points. The test requires a usable Metal device and Torch MPS; these
 are checked at runtime, and an unavailable device fails the test explicitly.
