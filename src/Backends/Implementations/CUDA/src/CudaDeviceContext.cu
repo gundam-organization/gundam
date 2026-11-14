@@ -618,10 +618,6 @@ namespace {
 }
 
 namespace {
-  struct GradientMath : Backends::LikelihoodSemantics::DoubleMath {
-    __host__ __device__ static double remainder(double a_, double b_) { return ::fmod(a_, b_); }
-    __host__ __device__ static int integer(double x_) { return int(x_); }
-  };
   __global__ void gradientDials(Backends::CudaGradient::View view_, const Backends::CudaGradientDirection* directions_,
       const double* parameters_, const double* external_, const double* producerSlopes_,
       Backends::CudaGradient::Dual* scratch_, Backends::GradientSemantics::DialEvaluation<double>* out_, unsigned count_) {
@@ -635,7 +631,7 @@ namespace {
   __global__ void gradientBins(const Backends::LikelihoodBin<double>* bins_, const double* sums_, const double* squares_,
       Backends::GradientSemantics::DialEvaluation<double>* out_, unsigned count_) {
     auto i = blockIdx.x*blockDim.x + threadIdx.x;
-    if( i < count_ ) out_[i] = Backends::GradientSemantics::binScales<GradientMath>(bins_[i], sums_[i], squares_[i]);
+    if( i < count_ ) out_[i] = Backends::GradientSemantics::binScales<Backends::LikelihoodSemantics::DoubleMath>(bins_[i], sums_[i], squares_[i]);
   }
   __global__ void gradientEvents(const Backends::GradientEvent<double>* events_, Backends::GradientWork<double> work_,
       Backends::CudaGradient::EventGradientView view_,
