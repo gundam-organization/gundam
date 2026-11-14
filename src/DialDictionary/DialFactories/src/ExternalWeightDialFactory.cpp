@@ -456,11 +456,15 @@ import json
 import runpy
 import sys
 import traceback
-import ctypes
-import math
 from multiprocessing import shared_memory
 
 import numpy as np
+
+)PY"
+#if defined(GUNDAM_USING_BACKENDS) && defined(__APPLE__)
+R"PY(
+import ctypes
+import math
 
 
 def _requireMpsTorch():
@@ -508,11 +512,20 @@ class _MpsMapping:
             self.library.gundamMpsWorkerClose(self.handle)
             self.handle = None
 
+)PY"
+#endif
+R"PY(
 
 def _attach(description):
+)PY"
+#if defined(GUNDAM_USING_BACKENDS) && defined(__APPLE__)
+R"PY(
     if description.get("transport") == "mps-shared":
         mapping = _MpsMapping(description)
         return mapping, mapping.tensor
+)PY"
+#endif
+R"PY(
     try:
         shm = shared_memory.SharedMemory(name=description["shmName"], track=False)
     except TypeError:
@@ -536,9 +549,15 @@ def _worker():
     user_args = sys.argv[2:-1]
     # Make argv useful both while importing the script and in configure().
     sys.argv = [script] + user_args
+)PY"
+#if defined(GUNDAM_USING_BACKENDS) && defined(__APPLE__)
+R"PY(
     if device_mode:
         # Check before loading user code, which may itself import Torch.
         _requireMpsTorch()
+)PY"
+#endif
+R"PY(
     namespace = runpy.run_path(script, run_name="__external_weight_user__")
 
     # Keep the old protocol usable while users migrate to run(command).
@@ -615,10 +634,16 @@ def _worker():
             user_command["command"] = "shutdown"
 
         result = run(user_command)
+)PY"
+#if defined(GUNDAM_USING_BACKENDS) && defined(__APPLE__)
+R"PY(
         if user_command.get("bufferDevice") == "mps":
             # Complete all writes before publishing the response to GUNDAM.
             import torch
             torch.mps.synchronize()
+)PY"
+#endif
+R"PY(
         _respond(result)
 
         if command_name == "shutdown":
