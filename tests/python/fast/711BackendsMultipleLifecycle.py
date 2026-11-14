@@ -98,6 +98,8 @@ def exercise(probability):
             # An explicitly dynamic coordinate is independent of the variable responses.
             sample = propagator.getSampleSet().getSampleList()[2]
             sample.getEventList()[0].getVariables().fetchVariable('Y').setValue(2. if index % 2 else .5)
+            # Publish host edits to the resident backend before propagation.
+            sample.updateEventBinning()
             current.evaluateLikelihood()
         if name in ('MPS', 'CUDA') and probability is not None:
             timing = manager.getLastTimingSummary()
