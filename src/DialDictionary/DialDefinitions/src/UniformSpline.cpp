@@ -70,3 +70,12 @@ double UniformSpline::evalGradient(const DialInputBuffer& input_, int iInput_) c
 
   return CalculateUniformSplineGradient( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );
 }
+
+std::vector<double> UniformSpline::getSourceKnotPositions() const {
+  if( _splineData_.empty() ){ return {}; }
+  std::vector<double> positions((_splineData_.size() - 2) / 2);
+  for( size_t i = 0; i < positions.size(); ++i ){
+    positions[i] = _splineData_[0] + i * _splineData_[1];
+  }
+  return positions;
+}

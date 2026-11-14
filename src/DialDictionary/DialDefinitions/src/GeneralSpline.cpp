@@ -52,3 +52,12 @@ double GeneralSpline::evalGradient(const DialInputBuffer& input_, int iInput_) c
 
   return CalculateGeneralSplineGradient( dialInput, -1E20, 1E20, _splineData_.data(), int(_splineData_.size()) );
 }
+
+std::vector<double> GeneralSpline::getSourceKnotPositions() const {
+  std::vector<double> positions;
+  positions.reserve(_splineData_.size() / 3);
+  for( size_t i = 4; i < _splineData_.size(); i += 3 ){
+    positions.emplace_back(_splineData_[i]);
+  }
+  return positions;
+}

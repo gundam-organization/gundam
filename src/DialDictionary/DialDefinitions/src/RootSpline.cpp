@@ -60,3 +60,12 @@ double RootSpline::evalGradient(const DialInputBuffer& input_, int iInput_) cons
 // c-basic-offset:2
 // compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
+
+std::vector<double> RootSpline::getSourceKnotPositions() const {
+  std::vector<double> positions(_spline_.GetNp());
+  for( size_t i = 0; i < positions.size(); ++i ){
+    double y;
+    _spline_.GetKnot(int(i), positions[i], y);
+  }
+  return positions;
+}

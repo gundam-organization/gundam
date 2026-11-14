@@ -16,8 +16,14 @@ def main():
                                (sys.executable + sys.version).encode()).hexdigest()
     stamp = directory / '.gundam-requirements'
     if python.exists() and stamp.exists() and stamp.read_text() == signature:
-        print('Reusing Python test environment:', directory, flush=True)
-        return
+        try:
+            subprocess.run([str(python), '-c', 'import sys'], check=True,
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            pass  # The base interpreter or its libraries may be absent on this node.
+        else:
+            print('Reusing Python test environment:', directory, flush=True)
+            return
 
     print('Preparing Python test environment:', directory, flush=True)
     # Preserve packages supplied by the selected interpreter (e.g. pybind11/ROOT).

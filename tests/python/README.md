@@ -13,8 +13,13 @@ when `WITH_REGULAR_TEST=ON`. Benchmarks are run manually. With the Python interf
 disabled, no Python tests are registered. Each script is registered separately as
 `gundam-python-<suite>-<script>`, with its own result and duration.
 
-CTest uses the last interpreter that successfully configured a Python interface,
-and loads the module from the build directory.
+At test time, CTest first tries the interpreter selected during configuration.
+If it is unavailable on the current node, it tries the other configured interface
+interpreters, then `python`, `python3` and the built `python3.x` versions on PATH.
+A candidate must match a built Python version and successfully import GUNDAM from
+the build directory. The preparation log reports the selected interpreter and any
+fallback. This supports cluster nodes with different mounted Python installations;
+it does not allow using a Python version for which no interface was built.
 
 By default, a CTest setup fixture
 creates `tests/python-venv` inside the build directory using that interpreter
@@ -22,6 +27,12 @@ and installs `requirements.txt`. The environment inherits its system packages
 and is reused until the requirements or selected interpreter change. The first
 `make test` needs network access if packages are not already available locally.
 No packages are installed into the system Python.
+
+The same selection fixture runs with automatic venv preparation disabled; it
+selects an existing interpreter without installing packages. All tests in an
+invocation use the selection saved by that fixture. If no compatible interpreter
+works, preparation fails with the attempted paths and import errors, and dependent
+tests remain `Not Run`.
 
 To use a prepared environment without automatic installation, configure with
 `-DWITH_PYTHON_TEST_VENV=OFF` and
