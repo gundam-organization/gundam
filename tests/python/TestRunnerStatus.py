@@ -19,7 +19,9 @@ class RunnerStatus(unittest.TestCase):
         self.fast.mkdir()
         shutil.copy(TESTS / 'run.py', self.folder / 'run.py')
         # Deterministic absent-device probe; these checks need neither GUNDAM nor a GPU.
-        (self.fast / 'BackendTestSupport.py').write_text('def mps_available(): return False\n')
+        (self.fast / 'shared').mkdir()
+        (self.fast / 'shared' / '__init__.py').write_text('')
+        (self.fast / 'shared' / 'BackendTestSupport.py').write_text('def mps_available(): return False\n')
         (self.folder / 'GUNDAM.py').write_text('class FitterEngine: getBackendsManager = None\n')
 
     def run_script(self, code, name='100Status.py'):

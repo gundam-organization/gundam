@@ -112,33 +112,41 @@ At the moment, the shared-memory transport exposes event inputs as `float64` arr
 ### Backend buffers
 
 `workerConfig.backendBufferMemoryLocation` defaults to `onHost`, preserving the
-existing NumPy float64 interface. With `onDevice` and an active MPS backend,
-inputs, `parameterBuffer`, `weights` and requested `gradients` are shared Torch MPS
-float32 tensors.
-`command['bufferDevice']` reports `cpu` or `mps`. `parameters` retains its named
-dictionary interface (its values are device scalar views on MPS), and
+existing NumPy float64 interface. With `onDevice`, inputs, `parameterBuffer`,
+`weights` and requested `gradients` are shared Torch tensors on the active GPU:
+MPS uses float32; CUDA uses float64. `command['bufferDevice']` reports `cpu`,
+`mps` or `cuda`. `parameters` retains its named
+dictionary interface (its values are device scalar views on GPU), and
 `parameterInfo` defines the order of `parameterBuffer`.
 
 CPU and the original engine use host buffers even when `onDevice` is requested.
-CUDA device worker transport is not implemented and is rejected explicitly.
+CUDA uses dedicated `cudaMalloc` allocations exported through CUDA IPC. The
+worker selects the same physical GPU by UUID and imports tensors through DLPack
+without a copy. Its Torch installation must support CUDA and the GPU in use.
+The selected GPU must be visible to both processes; device ordinals may differ.
+GUNDAM retains the allocations until the worker has exited. The runtime-loadable
+`GundamCudaWorkerBuffers` library requires CUDA but no Torch or Python headers.
 Selecting another backend restarts the worker when the buffer transport changes.
-The normal prior/loading pass can run on CPU before MPS is activated.
+The normal prior/loading pass can run on CPU before the GPU backend is activated.
 
 The MPS transport is compiled as `GundamMpsWorkerBuffers` inside the MPS backend
 implementation. The subprocess loads its C ABI via ctypes, using the configured
 `pythonExecutable` and venv packages. GUNDAM does not link CPython or Torch for
 this transport, and no compilation is performed in the worker venv. NumPy is
-required for the host protocol; Torch MPS is required for device views. If Torch
+required for the host protocol; a compatible Torch GPU build is required for device views. If Torch
 cannot be imported for MPS device buffers, initialization fails with the worker's
 Python executable and instructions to install Torch in that environment or set
 `workerConfig.backendBufferMemoryLocation: onHost`. Host workers do not import
 Torch through the bootstrap. The
-adapter currently uses Torch's private storage constructor, checked with 2.9.1;
-unsupported versions fail explicitly.
+MPS adapter currently uses Torch's private storage constructor, checked with
+2.9.1; unsupported versions fail explicitly. CUDA uses the public DLPack API.
 
 The script still defines `configure(arguments)` and `run(command)`. It writes
 weights in place. The bootstrap synchronizes MPS writes before acknowledging;
-the backend copies/packs the response on GPU into its weight layout. These first
+the backend copies/packs the response on GPU into its weight layout. CUDA
+publishes input uploads before sending a command and synchronizes worker writes
+on the selected GPU before replying; weight consumption uses a device-to-device
+copy on the backend stream, retaining stable addresses for CUDA graphs. These first
 handoffs are blocking. Tensor views remain valid until shutdown returns.
 When `supportsGradient` is true, gradient evaluations receive a lazily allocated
 `gradients` tensor of shape `(nBins, numberOfInputs)`, in dial input order.
@@ -146,7 +154,7 @@ The worker fills it in place and acknowledges `gradientGeneration`, just as in
 the host protocol. Missing or non-finite derivatives are rejected. The current
 dial gradient API consumes a host table, so gradient evaluations read the result
 back after synchronization; gradient consumption is not yet entirely resident
-on the GPU. Host diagnostics may explicitly materialize weights; normal MPS propagation avoids converting the response array to NumPy.
+on the GPU. Host diagnostics may explicitly materialize weights; normal GPU propagation avoids converting the response array to NumPy.
 
 The worker is launched as:
 
@@ -358,7 +366,7 @@ An `evaluate` command additionally exposes:
 | --- | --- |
 | `withGradient` | Whether both weights and derivatives must be written. |
 | `generation` | Integer identifying this evaluation. |
-| `gradients` | `None` for weights alone; otherwise a writable NumPy `float64` array of shape `(numberOfWeights, numberOfInputs)`. |
+| `gradients` | `None` for weights alone; otherwise a writable NumPy `float64` array (onHost), Torch MPS `float32` or Torch CUDA `float64` tensor (onDevice) of shape `(numberOfWeights, numberOfInputs)`. |
 
 The dense matrix uses C order: `gradients[row, column]` is
 `∂externalWeight[row] / ∂input[column]`. Columns follow the declared

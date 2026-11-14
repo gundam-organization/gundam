@@ -11,6 +11,8 @@
 struct WorkerBufferDescriptor {
   std::string transport, path, libraryPath;
   std::size_t count{0}, byteCount{0};
+  // Defaults preserve existing MPS descriptors; other transports override these.
+  std::string dtype{"float32"}, device{"mps"}, ipcHandle{}, deviceUuid{};
 };
 
 class WorkerBuffer {

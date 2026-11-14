@@ -8,6 +8,7 @@
 
 #ifdef GUNDAM_USING_CUDA
 #include "CudaDeviceContext.h"
+#include "CudaWorkerBuffer.h"
 #endif
 
 #include <algorithm>
@@ -51,6 +52,15 @@ bool Backends::CudaBackend::isCompiled() {
   return true;
 #else
   return false;
+#endif
+}
+
+WorkerBufferFactory Backends::CudaBackend::getWorkerBufferFactory() const {
+#ifdef GUNDAM_USING_CUDA
+  const int deviceIndex = _deviceIndex_;
+  return [deviceIndex](std::size_t count_){ return makeCudaWorkerBuffer(count_, deviceIndex); };
+#else
+  return {};
 #endif
 }
 

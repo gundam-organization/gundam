@@ -76,8 +76,8 @@ if(WITH_PYTHON_INTERFACE)
   set(pythonTestConfig "${CMAKE_CURRENT_BINARY_DIR}/python-test-config.cmake")
   set(pythonTestLauncher "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunPythonTest.cmake")
   set(pythonTestRequirements "${CMAKE_CURRENT_SOURCE_DIR}/python/requirements.txt")
-  if(WITH_FAST_TEST AND TARGET GundamBackendsMPS)
-    set(pythonTestRequirements "${CMAKE_CURRENT_SOURCE_DIR}/python/requirements-mps.txt")
+  if(WITH_FAST_TEST AND (TARGET GundamBackendsMPS OR TARGET GundamBackendsCUDA))
+    set(pythonTestRequirements "${CMAKE_CURRENT_SOURCE_DIR}/python/requirements-device.txt")
   endif()
   set(pythonCudaRunner "")
   if(TARGET gundamCudaTestRunner)
@@ -128,7 +128,7 @@ set(testPythonSelection [==[${CMAKE_CURRENT_BINARY_DIR}/python-test-selected.cma
             continue()
           endif()
           # 763-765 validate benchmark orchestration on the host, without a GPU.
-          if(pythonScriptName MATCHES "^76[0-2]")
+          if(pythonScriptName MATCHES "^76[0-2]" OR pythonScriptName MATCHES "^766")
             set(pythonTestBackend CUDA)
           endif()
         endif()
@@ -146,9 +146,11 @@ set(testPythonSelection [==[${CMAKE_CURRENT_BINARY_DIR}/python-test-selected.cma
         set_tests_properties("${pythonTestName}" PROPERTIES
           FIXTURES_REQUIRED gundamPythonEnvironment
           SKIP_REGULAR_EXPRESSION "GUNDAM_PYTHON_TEST_SKIPPED:")
-        if(pythonScriptName STREQUAL "745BackendsMpsPythonWorkerBuffers.py")
+        if(pythonScriptName STREQUAL "745BackendsMpsPythonWorkerBuffers.py"
+            OR pythonScriptName STREQUAL "766BackendsCudaPythonWorkerBuffers.py")
+          string(TOLOWER "${pythonTestBackend}" pythonBackendLabel)
           set_tests_properties("${pythonTestName}" PROPERTIES
-            LABELS "python;python-fast;mps" TIMEOUT 120)
+            LABELS "python;python-fast;${pythonBackendLabel}" TIMEOUT 120)
         endif()
       endforeach()
     endif()

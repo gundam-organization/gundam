@@ -1,3 +1,0 @@
-# Only selected by CTest when the MPS PythonWorker fast test is enabled.
--r requirements.txt
-torch

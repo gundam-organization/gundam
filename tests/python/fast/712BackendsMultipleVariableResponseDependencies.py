@@ -11,7 +11,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
-from BackendTestSupport import mps_available
+from shared.BackendTestSupport import mps_available
 
 
 def main():

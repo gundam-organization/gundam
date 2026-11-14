@@ -96,7 +96,7 @@ def main(full=False):
         subprocess.run(["bash", str(generator)], check=True)
     else:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from GradientTestInputs import writeCovariance
+        from shared.GradientTestInputs import writeCovariance
         writeCovariance()
     if not Path("100CovarianceTree.root").is_file():
         raise RuntimeError("Failed to generate 100CovarianceTree.root")

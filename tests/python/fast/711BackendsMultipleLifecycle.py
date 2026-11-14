@@ -10,7 +10,7 @@ import sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from BackendTestSupport import mps_available
+from shared.BackendTestSupport import mps_available
 
 fixture = import_module('430DialsVariable')
 capture = import_module('721BackendsCpuDynamicBinning').capture

@@ -903,11 +903,30 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       const auto& block = externalWeights_[i];
       if( b.cachePrimed and b.externalGenerations[i] == block.generation ){ continue; }
       if( block.count ){
-        checkCuda(cudaMemcpyAsync(b.externalWeights.data + block.destinationOffset, block.values,
-            block.count * sizeof(double), cudaMemcpyHostToDevice, stream), "external weight upload");
+        const void* source = block.values;
+        if( block.deviceValues ){
+          const auto description = block.deviceValues->describe();
+          if( description.transport != "cuda-ipc" or description.dtype != "float64"
+              or description.count != block.count ){
+            throw std::runtime_error("Invalid CUDA PythonWorker weight buffer.");
+          }
+          source = block.deviceValues->nativeHandle();
+          cudaPointerAttributes attributes{};
+          checkCuda(cudaPointerGetAttributes(&attributes, source), "worker weight pointer");
+          int device = 0;
+          checkCuda(cudaGetDevice(&device), "worker weight device");
+          if( attributes.type != cudaMemoryTypeDevice or attributes.device != device ){
+            throw std::runtime_error("CUDA PythonWorker weights belong to another device.");
+          }
+        }
+        checkCuda(cudaMemcpyAsync(b.externalWeights.data + block.destinationOffset, source,
+            block.count * sizeof(double), block.deviceValues ? cudaMemcpyDeviceToDevice : cudaMemcpyHostToDevice,
+            stream), "external weight copy");
       }
-      timing_.externalWeightUploadBytes += block.count * sizeof(double);
-      ++timing_.externalWeightUploadBlocks;
+      if( not block.deviceValues ){
+        timing_.externalWeightUploadBytes += block.count * sizeof(double);
+        ++timing_.externalWeightUploadBlocks;
+      }
     }
     timing_.externalWeightUploadSeconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - externalUploadStart).count();

@@ -92,7 +92,7 @@ def main(full=False):
         subprocess.run(["bash", str(generator)], check=True)
     else:
         sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from GradientTestInputs import writeNormalization
+        from shared.GradientTestInputs import writeNormalization
         writeNormalization()
     if not Path("100NormalizationTree.root").is_file():
         raise RuntimeError("Failed to generate 100NormalizationTree.root")

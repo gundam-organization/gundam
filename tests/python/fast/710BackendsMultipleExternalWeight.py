@@ -9,7 +9,7 @@ from pathlib import Path
 import sys
 
 
-from BackendTestSupport import mps_available
+from shared.BackendTestSupport import mps_available
 
 
 def assert_close(label, actual, expected, tolerance):

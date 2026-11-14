@@ -434,7 +434,9 @@ JsonType ExternalWeightPythonWorker::describeWorkerBuffer(
     const std::shared_ptr<WorkerBuffer>& buffer_, const std::vector<std::size_t>& shape_) {
   const auto description = buffer_->describe();
   return JsonType{{"transport", description.transport}, {"path", description.path},
-                  {"libraryPath", description.libraryPath}, {"dtype", "float32"},
+                  {"libraryPath", description.libraryPath}, {"dtype", description.dtype},
+                  {"device", description.device}, {"ipcHandle", description.ipcHandle},
+                  {"deviceUuid", description.deviceUuid},
                   {"shape", shape_}, {"byteCount", description.byteCount}};
 }
 
@@ -474,7 +476,7 @@ void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& input
   LogThrowIf(pipe(stdoutPipe) == -1, "Could not create ExternalWeight worker stdout pipe: " << std::strerror(errno));
 
     // The bootstrap owns the wire protocol.  A user script only needs to
-    // expose run(command); transport descriptions become NumPy or MPS views.
+    // expose run(command); transport descriptions become NumPy or device views.
     static const char* bootstrap = R"PY(
 import json
 import runpy
@@ -484,20 +486,18 @@ from multiprocessing import shared_memory
 
 import numpy as np
 
-)PY"
-#if defined(GUNDAM_USING_BACKENDS) && defined(__APPLE__)
-R"PY(
+
 import ctypes
 import math
 
 
-def _requireMpsTorch():
+def _requireTorch():
     try:
         import torch
     except ImportError as error:
         raise RuntimeError(
             "ExternalWeight PythonWorker cannot import torch with "
-            f"pythonExecutable={sys.executable!r}. MPS onDevice buffers require Torch. "
+            f"pythonExecutable={sys.executable!r}. onDevice buffers require Torch with support for the active backend. "
             "Install torch in that Python environment, or set "
             "workerConfig.backendBufferMemoryLocation: onHost to disable device propagation. "
             f"Import error: {error}"
@@ -505,51 +505,103 @@ def _requireMpsTorch():
     return torch
 
 
-class _MpsMapping:
+class _DeviceMapping:
+    def __init__(self, description, dtype):
+        self.torch = _requireTorch()
+        self.library = ctypes.CDLL(description["libraryPath"])
+        self.shape = tuple(description["shape"])
+        self.count = math.prod(self.shape)
+        itemsize = {"float32": 4, "float64": 8}[dtype]
+        if (description["dtype"] != dtype or any(dim < 0 for dim in self.shape)
+                or self.count * itemsize > description["byteCount"]):
+            raise RuntimeError("Invalid GUNDAM device buffer descriptor")
+        self.handle = None
+
+    def function(self, name, arguments, result):
+        function = getattr(self.library, name)
+        function.argtypes = arguments
+        function.restype = result
+        return function
+
+    def close(self):
+        if self.handle:
+            self.close_buffer(self.handle)
+            self.handle = None
+
+
+class _MpsMapping(_DeviceMapping):
     def __init__(self, description):
-        torch = _requireMpsTorch()
+        super().__init__(description, "float32")
+        torch = self.torch
         if not torch.backends.mps.is_available():
             raise RuntimeError("GUNDAM supplied MPS buffers, but this venv cannot use Torch MPS")
         if not hasattr(torch._C, "_construct_storage_from_data_pointer"):
             raise RuntimeError("This Torch version cannot import GUNDAM MPS storage")
-        self.library = ctypes.CDLL(description["libraryPath"])
-        self.library.gundamMpsWorkerOpen.argtypes = [ctypes.c_char_p, ctypes.c_size_t]
-        self.library.gundamMpsWorkerOpen.restype = ctypes.c_void_p
-        self.library.gundamMpsWorkerMetal.argtypes = [ctypes.c_void_p]
-        self.library.gundamMpsWorkerMetal.restype = ctypes.c_void_p
-        self.library.gundamMpsWorkerClose.argtypes = [ctypes.c_void_p]
-        self.library.gundamMpsWorkerClose.restype = None
-        self.library.gundamMpsWorkerError.restype = ctypes.c_char_p
-        shape = tuple(description["shape"])
-        count = math.prod(shape)
-        if description["dtype"] != "float32" or any(dim < 0 for dim in shape) or count * 4 > description["byteCount"]:
-            raise RuntimeError("Invalid GUNDAM MPS buffer descriptor")
-        self.handle = self.library.gundamMpsWorkerOpen(description["path"].encode(), count)
+        open_buffer = self.function("gundamMpsWorkerOpen", [ctypes.c_char_p, ctypes.c_size_t], ctypes.c_void_p)
+        metal_buffer = self.function("gundamMpsWorkerMetal", [ctypes.c_void_p], ctypes.c_void_p)
+        self.close_buffer = self.function("gundamMpsWorkerClose", [ctypes.c_void_p], None)
+        error = self.function("gundamMpsWorkerError", [], ctypes.c_char_p)
+        self.handle = open_buffer(description["path"].encode(), self.count)
         if not self.handle:
-            raise RuntimeError(self.library.gundamMpsWorkerError().decode())
-        pointer = self.library.gundamMpsWorkerMetal(self.handle)
-        storage = torch._C._construct_storage_from_data_pointer(pointer, torch.device("mps:0"), count * 4)
-        self.tensor = torch.empty(0, dtype=torch.float32, device="mps:0").set_(storage, 0, shape)
+            raise RuntimeError(error().decode())
+        try:
+            pointer = metal_buffer(self.handle)
+            storage = torch._C._construct_storage_from_data_pointer(pointer, torch.device("mps:0"), self.count * 4)
+            self.tensor = torch.empty(0, dtype=torch.float32, device="mps:0").set_(storage, 0, self.shape)
+        except BaseException:
+            self.close()
+            raise
 
-    def close(self):
-        if self.handle:
-            self.library.gundamMpsWorkerClose(self.handle)
-            self.handle = None
 
-)PY"
-#endif
-R"PY(
+class _CudaMapping(_DeviceMapping):
+    def __init__(self, description):
+        super().__init__(description, "float64")
+        torch = self.torch
+        if not torch.cuda.is_available():
+            raise RuntimeError("GUNDAM supplied CUDA buffers, but this venv cannot use Torch CUDA")
+        open_buffer = self.function("gundamCudaWorkerOpen",
+            [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t], ctypes.c_void_p)
+        self.close_buffer = self.function("gundamCudaWorkerClose", [ctypes.c_void_p], None)
+        tensor_buffer = self.function("gundamCudaWorkerTensor",
+            [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int64), ctypes.c_int32], ctypes.c_void_p)
+        delete_tensor = self.function("gundamCudaWorkerDeleteTensor", [ctypes.c_void_p], None)
+        error = self.function("gundamCudaWorkerError", [], ctypes.c_char_p)
+        self.handle = open_buffer(description["ipcHandle"].encode(), description["deviceUuid"].encode(), self.count)
+        if not self.handle:
+            raise RuntimeError(error().decode())
+        tensor = None
+        capsule = None
+        try:
+            shape = (ctypes.c_int64 * len(self.shape))(*self.shape)
+            tensor = tensor_buffer(self.handle, shape, len(self.shape))
+            if not tensor:
+                raise RuntimeError(error().decode())
+            # The C++ DLManagedTensor owns the IPC mapping until Torch releases
+            # the tensor. No Torch/CPython headers or private CUDA storage APIs.
+            new_capsule = ctypes.pythonapi.PyCapsule_New
+            new_capsule.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_void_p]
+            new_capsule.restype = ctypes.py_object
+            capsule = new_capsule(tensor, b"dltensor", None)
+            self.tensor = torch.utils.dlpack.from_dlpack(capsule)
+            self.tensor._gundam_worker_library = self.library
+        except BaseException:
+            is_valid = ctypes.pythonapi.PyCapsule_IsValid
+            is_valid.argtypes = [ctypes.py_object, ctypes.c_char_p]
+            is_valid.restype = ctypes.c_int
+            if tensor and (capsule is None or is_valid(capsule, b"dltensor")):
+                delete_tensor(tensor)
+            self.close()
+            raise
+
 
 def _attach(description):
-)PY"
-#if defined(GUNDAM_USING_BACKENDS) && defined(__APPLE__)
-R"PY(
-    if description.get("transport") == "mps-shared":
-        mapping = _MpsMapping(description)
+    transport = description.get("transport")
+    if transport in ("mps-shared", "cuda-ipc"):
+        mapping = {"mps-shared": _MpsMapping, "cuda-ipc": _CudaMapping}[transport](description)
         return mapping, mapping.tensor
-)PY"
-#endif
-R"PY(
+    if transport is not None:
+        raise RuntimeError(f"Unknown GUNDAM worker transport: {transport}")
+
     try:
         shm = shared_memory.SharedMemory(name=description["shmName"], track=False)
     except TypeError:
@@ -573,15 +625,11 @@ def _worker():
     user_args = sys.argv[2:-1]
     # Make argv useful both while importing the script and in configure().
     sys.argv = [script] + user_args
-)PY"
-#if defined(GUNDAM_USING_BACKENDS) && defined(__APPLE__)
-R"PY(
+
     if device_mode:
         # Check before loading user code, which may itself import Torch.
-        _requireMpsTorch()
-)PY"
-#endif
-R"PY(
+        _requireTorch()
+
     namespace = runpy.run_path(script, run_name="__external_weight_user__")
 
     # Keep the old protocol usable while users migrate to run(command).
@@ -645,7 +693,7 @@ R"PY(
             user_command["generation"] = command.get("generation")
             if user_command["withGradient"]:
                 description = command["gradients"]
-                buffer_name = description.get("path", description.get("shmName"))
+                buffer_name = description.get("ipcHandle") or description.get("path") or description.get("shmName")
                 if gradient_name != buffer_name:
                     shm, gradients = _attach(description)
                     shared_memory_list.append(shm)
@@ -659,16 +707,16 @@ R"PY(
             user_command["command"] = "shutdown"
 
         result = run(user_command)
-)PY"
-#if defined(GUNDAM_USING_BACKENDS) && defined(__APPLE__)
-R"PY(
-        if user_command.get("bufferDevice") == "mps":
+
+        device = user_command.get("bufferDevice")
+        if device in ("mps", "cuda"):
             # Complete all writes before publishing the response to GUNDAM.
             import torch
-            torch.mps.synchronize()
-)PY"
-#endif
-R"PY(
+            if device == "cuda":
+                torch.cuda.synchronize(user_command["weights"].device)
+            else:
+                torch.mps.synchronize()
+
         _respond(result)
 
         if command_name == "shutdown":
@@ -763,7 +811,7 @@ except Exception as error:
       {"shape", {getWeightCount()}}
   };
 
-  initCommand["bufferDevice"] = _deviceWeights_ ? "mps" : "cpu";
+  initCommand["bufferDevice"] = _deviceWeights_ ? _deviceWeights_->describe().device : "cpu";
   if( _deviceWeights_ ){
     for( std::size_t i = 0; i < inputNameList.size(); ++i ){
       initCommand["inputs"][inputNameList[i]] = describeWorkerBuffer(_deviceInputs_.at(i), {getWeightCount()});

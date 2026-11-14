@@ -17,7 +17,7 @@ Tests numbered `7xx` are registered only with `WITH_BACKENDS=ON`. The `74x`
 (MPS) and `76x` (CUDA) families additionally require their backend target.
 Device tests check hardware at runtime: no usable Metal device or CUDA GPU/driver
 produces `Skipped`, while execution and numerical errors remain failures.
-The CUDA device tests (`760`–`762`) enable CUDA validation automatically under
+The CUDA device tests (`760`–`762`, `766`) enable CUDA validation automatically under
 CTest; `763`–`765` check benchmark tooling on the host and need no GPU.
 Mixed CPU/MPS tests keep their CPU coverage when Metal is unavailable.
 
@@ -41,16 +41,31 @@ and is reused until the requirements or selected interpreter change. The first
 `make test` needs network access if packages are not already available locally.
 No packages are installed into the system Python.
 
-When the MPS backend is compiled and the fast suite is enabled, preparation uses
-`requirements-mps.txt`, which includes the common requirements and Torch. Other
+When the MPS or CUDA backend is compiled and the fast suite is enabled, preparation
+uses `requirements-device.txt`, which includes the common requirements and Torch. Other
 builds keep `requirements.txt` without Torch. With automatic venv preparation
 disabled, install the matching requirements yourself.
 
 `745BackendsMpsPythonWorkerBuffers.py` is registered only when the MPS backend
-target exists. It embeds its YAML configuration and PythonWorker script in the test itself
+target exists. The shared `fast/shared/PythonWorkerBuffers.py` module embeds the YAML
+configuration and PythonWorker script
 to check host/device detection, in-place weights and gradients, histogram results,
 backend switches and invalid gradient responses at several parameter points. The test requires a usable Metal device and Torch MPS; these
-are checked at runtime, and an unavailable device marks the test as `Skipped`.
+are checked at runtime. An unavailable Metal device marks the test as `Skipped`;
+a missing or incompatible Torch installation is a failure.
+
+`766BackendsCudaPythonWorkerBuffers.py` runs the same contract through CUDA IPC,
+with both propagation modes, float64 tensors and device-to-device weight copies.
+It is registered only with the CUDA backend and is `Skipped` without a usable GPU.
+For a V100 allocation, use a Torch CUDA build that includes support for that GPU:
+
+```bash
+ctest --test-dir <build> -R 'gundam-python-fast-766BackendsCudaPythonWorkerBuffers$' --output-on-failure
+```
+
+The venv inherits system packages, so an existing compatible Torch installation
+can be used. GUNDAM's CUDA transport is compiled by CMake, without Torch headers
+or compilation in the Python environment.
 
 The same selection fixture runs with automatic venv preparation disabled; it
 selects an existing interpreter without installing packages. All tests in an
@@ -68,6 +83,9 @@ C++ dependency sources before configuring GUNDAM. CMake uses those local sources
 with `FETCHCONTENT_FULLY_DISCONNECTED=ON` and disables automatic test venv
 preparation with `WITH_PYTHON_TEST_VENV=OFF`. The existing `make test` step then runs
 the Python tests too, and Python failures fail the CI check.
+
+Shared helper modules and inline input generators live in `fast/shared/`;
+numbered scripts in `fast/` remain the test entry points.
 
 ## How to run the tests manually?
 

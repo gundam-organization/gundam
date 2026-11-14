@@ -9,7 +9,7 @@ import tempfile
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent / 'fast'))
-from BackendTestSupport import mps_available
+from shared.BackendTestSupport import mps_available
 
 
 def main():
@@ -54,7 +54,7 @@ def main():
         backend = args.require_backend
         if backend is None and script.name.startswith('74'):
             backend = 'MPS'
-        if backend is None and script.name[:3] in ('760', '761', '762'):
+        if backend is None and script.name[:3] in ('760', '761', '762', '766'):
             backend = 'CUDA'
         reason = None
         if script.name.startswith('7'):

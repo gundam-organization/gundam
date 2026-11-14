@@ -38,6 +38,7 @@ ENUM_FIELD( sparseGroups )
     [[nodiscard]] static bool isCompiled();
     [[nodiscard]] std::string getName() const override;
     [[nodiscard]] BackendCapabilities getCapabilities() const override;
+    [[nodiscard]] WorkerBufferFactory getWorkerBufferFactory() const override;
     [[nodiscard]] PropagationStatus getStatus(const PropagationToken& token_) const override;
     [[nodiscard]] const EngineView& getEngineView() const override;
 
