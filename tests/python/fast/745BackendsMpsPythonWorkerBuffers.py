@@ -125,7 +125,8 @@ def main():
     import uproot
     import torch
     if not torch.backends.mps.is_available():
-        raise RuntimeError('MPS PythonWorker test requires a usable Metal device and Torch MPS')
+        print('SKIP: Torch MPS has no usable Metal device')
+        return 77
 
     work = Path.cwd()
     workerPath = work / 'Reweight.py'

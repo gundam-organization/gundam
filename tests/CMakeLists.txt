@@ -79,6 +79,10 @@ if(WITH_PYTHON_INTERFACE)
   if(WITH_FAST_TEST AND TARGET GundamBackendsMPS)
     set(pythonTestRequirements "${CMAKE_CURRENT_SOURCE_DIR}/python/requirements-mps.txt")
   endif()
+  set(pythonCudaRunner "")
+  if(TARGET gundamCudaTestRunner)
+    set(pythonCudaRunner "$<TARGET_FILE:gundamCudaTestRunner>")
+  endif()
   file(GENERATE OUTPUT "${pythonTestConfig}" CONTENT
 "set(testPythonCandidates [==[${gundamTestPython};${gundamTestPythonCandidates}]==])
 set(testPythonVersions [==[${gundamTestPythonVersions}]==])
@@ -87,6 +91,7 @@ set(testPythonVenv [==[${CMAKE_CURRENT_BINARY_DIR}/python-venv]==])
 set(testPythonUseVenv ${WITH_PYTHON_TEST_VENV})
 set(testPythonPrepareScript [==[${CMAKE_CURRENT_SOURCE_DIR}/python/PrepareTestEnvironment.py]==])
 set(testPythonRequirements [==[${pythonTestRequirements}]==])
+set(testPythonCudaRunner [==[${pythonCudaRunner}]==])
 set(testPythonRunner [==[${CMAKE_CURRENT_SOURCE_DIR}/python/run.py]==])
 set(testPythonSelection [==[${CMAKE_CURRENT_BINARY_DIR}/python-test-selected.cmake]==])
 ")
@@ -108,9 +113,24 @@ set(testPythonSelection [==[${CMAKE_CURRENT_BINARY_DIR}/python-test-selected.cma
         if(NOT pythonScriptName MATCHES "^([0-9]|test)")
           continue()
         endif()
-        if(pythonScriptName STREQUAL "745BackendsMpsPythonWorkerBuffers.py"
-            AND NOT TARGET GundamBackendsMPS)
+        # 7xx tests exercise resident backends; do not register unbuilt features.
+        if(pythonScriptName MATCHES "^7[0-9][0-9]" AND NOT WITH_BACKENDS)
           continue()
+        endif()
+        set(pythonTestBackend "")
+        if(pythonScriptName MATCHES "^74[0-9]")
+          if(NOT TARGET GundamBackendsMPS)
+            continue()
+          endif()
+          set(pythonTestBackend MPS)
+        elseif(pythonScriptName MATCHES "^76[0-9]")
+          if(NOT TARGET GundamBackendsCUDA)
+            continue()
+          endif()
+          # 763-765 validate benchmark orchestration on the host, without a GPU.
+          if(pythonScriptName MATCHES "^76[0-2]")
+            set(pythonTestBackend CUDA)
+          endif()
         endif()
         get_filename_component(pythonTestStem "${pythonScript}" NAME_WE)
         set(pythonTestName "gundam-python-${pythonSuite}-${pythonTestStem}")
@@ -119,11 +139,13 @@ set(testPythonSelection [==[${CMAKE_CURRENT_BINARY_DIR}/python-test-selected.cma
           COMMAND ${pythonTestEnvironment} "${CMAKE_COMMAND}"
             "-DTEST_CONFIG=${pythonTestConfig}" -DTEST_MODE=RUN
             "-DTEST_SUITE=${pythonSuite}" "-DTEST_NAME=${pythonScriptName}"
+            "-DTEST_BACKEND=${pythonTestBackend}"
             -P "${pythonTestLauncher}"
         )
         set_tests_properties("${pythonTestName}" PROPERTIES LABELS "python;python-${pythonSuite}")
         set_tests_properties("${pythonTestName}" PROPERTIES
-          FIXTURES_REQUIRED gundamPythonEnvironment)
+          FIXTURES_REQUIRED gundamPythonEnvironment
+          SKIP_REGULAR_EXPRESSION "GUNDAM_PYTHON_TEST_SKIPPED:")
         if(pythonScriptName STREQUAL "745BackendsMpsPythonWorkerBuffers.py")
           set_tests_properties("${pythonTestName}" PROPERTIES
             LABELS "python;python-fast;mps" TIMEOUT 120)

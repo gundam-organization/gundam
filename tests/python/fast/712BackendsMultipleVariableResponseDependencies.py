@@ -11,6 +11,9 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
+from BackendTestSupport import mps_available
+
+
 def main():
     import GUNDAM
     import numpy as np
@@ -106,7 +109,7 @@ def run(command):
         return results
 
     reference = run('standard')
-    for backend in ['CPU'] + (['MPS'] if sys.platform == 'darwin' else []):
+    for backend in ['CPU'] + (['MPS'] if mps_available() else []):
         actual = run(backend)
         tolerance = 2e-5 if backend == 'MPS' else 1e-10
         for row, expected in zip(actual, reference):

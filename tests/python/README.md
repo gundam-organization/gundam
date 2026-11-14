@@ -13,6 +13,19 @@ when `WITH_REGULAR_TEST=ON`. Benchmarks are run manually. With the Python interf
 disabled, no Python tests are registered. Each script is registered separately as
 `gundam-python-<suite>-<script>`, with its own result and duration.
 
+Tests numbered `7xx` are registered only with `WITH_BACKENDS=ON`. The `74x`
+(MPS) and `76x` (CUDA) families additionally require their backend target.
+Device tests check hardware at runtime: no usable Metal device or CUDA GPU/driver
+produces `Skipped`, while execution and numerical errors remain failures.
+The CUDA device tests (`760`–`762`) enable CUDA validation automatically under
+CTest; `763`–`765` check benchmark tooling on the host and need no GPU.
+Mixed CPU/MPS tests keep their CPU coverage when Metal is unavailable.
+
+Python tests can return 77 to signal a skip. The runner preserves that status
+for a single skipped test, and the CMake launcher forwards it to CTest.
+For manual CUDA device tests, pass `--cuda-runner <build>/tests/cuda/gundamCudaTestRunner`
+to `python/run.py` so it can probe hardware using the build's CUDA runtime.
+
 At test time, CTest first tries the interpreter selected during configuration.
 If it is unavailable on the current node, it tries the other configured interface
 interpreters, then `python`, `python3` and the built `python3.x` versions on PATH.
@@ -37,7 +50,7 @@ disabled, install the matching requirements yourself.
 target exists. It embeds its YAML configuration and PythonWorker script in the test itself
 to check host/device detection, in-place weights and histogram results at several
 parameter points. The test requires a usable Metal device and Torch MPS; these
-are checked at runtime, and an unavailable device fails the test explicitly.
+are checked at runtime, and an unavailable device marks the test as `Skipped`.
 
 The same selection fixture runs with automatic venv preparation disabled; it
 selects an existing interpreter without installing packages. All tests in an

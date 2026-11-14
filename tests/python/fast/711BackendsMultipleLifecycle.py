@@ -10,6 +10,8 @@ import sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from BackendTestSupport import mps_available
+
 fixture = import_module('430DialsVariable')
 capture = import_module('721BackendsCpuDynamicBinning').capture
 
@@ -70,7 +72,7 @@ def exercise(probability):
     assert manager.getActiveBackendName() == 'CPU'
     path.unlink()  # Every following operation must use the already-loaded events and dials.
     transitions = [('CPU', None), ('', None), ('CPU', None)]
-    if sys.platform == 'darwin':
+    if mps_available():
         transitions += [('MPS', {'propagationMode': 'recomputeResponses'}), ('CPU', None),
                         ('MPS', None), ('', None), ('MPS', {'propagationMode': 'cachedResponses'})]
     if os.environ.get('GUNDAM_TEST_CUDA') == '1':

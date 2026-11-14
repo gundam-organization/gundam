@@ -9,6 +9,9 @@ from pathlib import Path
 import sys
 
 
+from BackendTestSupport import mps_available
+
+
 def assert_close(label, actual, expected, tolerance):
     if not math.isclose(actual, expected, rel_tol=tolerance, abs_tol=tolerance):
         raise RuntimeError(f"{label}: {actual} != {expected}")
@@ -101,7 +104,7 @@ def main():
         return results
 
     backends = [('CPU', None)]
-    if sys.platform == 'darwin':
+    if mps_available():
         backends.append(('MPS', None))
     # Explicit opt-in: a requested CUDA validation must fail if unavailable.
     # Default fast tests stay runnable in builds without CUDA or GPU hardware.
