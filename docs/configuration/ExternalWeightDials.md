@@ -127,7 +127,11 @@ The MPS transport is compiled as `GundamMpsWorkerBuffers` inside the MPS backend
 implementation. The subprocess loads its C ABI via ctypes, using the configured
 `pythonExecutable` and venv packages. GUNDAM does not link CPython or Torch for
 this transport, and no compilation is performed in the worker venv. NumPy is
-required for the host protocol; Torch MPS is required for device views. The
+required for the host protocol; Torch MPS is required for device views. If Torch
+cannot be imported for MPS device buffers, initialization fails with the worker's
+Python executable and instructions to install Torch in that environment or set
+`workerConfig.backendBufferMemoryLocation: onHost`. Host workers do not import
+Torch through the bootstrap. The
 adapter currently uses Torch's private storage constructor, checked with 2.9.1;
 unsupported versions fail explicitly.
 

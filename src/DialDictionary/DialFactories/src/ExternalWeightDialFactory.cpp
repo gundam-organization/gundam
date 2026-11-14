@@ -463,9 +463,23 @@ from multiprocessing import shared_memory
 import numpy as np
 
 
+def _requireMpsTorch():
+    try:
+        import torch
+    except ImportError as error:
+        raise RuntimeError(
+            "ExternalWeight PythonWorker cannot import torch with "
+            f"pythonExecutable={sys.executable!r}. MPS onDevice buffers require Torch. "
+            "Install torch in that Python environment, or set "
+            "workerConfig.backendBufferMemoryLocation: onHost to disable device propagation. "
+            f"Import error: {error}"
+        ) from error
+    return torch
+
+
 class _MpsMapping:
     def __init__(self, description):
-        import torch
+        torch = _requireMpsTorch()
         if not torch.backends.mps.is_available():
             raise RuntimeError("GUNDAM supplied MPS buffers, but this venv cannot use Torch MPS")
         if not hasattr(torch._C, "_construct_storage_from_data_pointer"):
@@ -522,6 +536,9 @@ def _worker():
     user_args = sys.argv[2:-1]
     # Make argv useful both while importing the script and in configure().
     sys.argv = [script] + user_args
+    if device_mode:
+        # Check before loading user code, which may itself import Torch.
+        _requireMpsTorch()
     namespace = runpy.run_path(script, run_name="__external_weight_user__")
 
     # Keep the old protocol usable while users migrate to run(command).
@@ -712,6 +729,9 @@ except Exception as error:
 
   this->sendWorkerCommand(initCommand);
   auto response = this->readWorkerResponse();
+  // An initialization error terminates the bootstrap; do not send shutdown
+  // to an exited worker while unwinding the GUNDAM exception.
+  if( response.value("status", std::string{}) != "ok" ){ _isWorkerStarted_ = false; }
   LogThrowIf(response.value("status", std::string{}) != "ok",
              "ExternalWeight worker initialization failed: " << response.dump());
   LogThrowIf(response.contains("supportsGradient") and not response["supportsGradient"].is_boolean(),
