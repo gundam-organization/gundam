@@ -5,6 +5,7 @@
 #include "BackendTypes.h"
 #include "PropagationInputs.h"
 #include "ConfigUtils.h"
+#include "WorkerBuffer.h"
 
 #include <memory>
 #include <string>
@@ -16,6 +17,7 @@ namespace Backends {
   class Backend : public JsonBaseClass {
   public:
     virtual ~Backend() = default;
+    [[nodiscard]] virtual WorkerBufferFactory getWorkerBufferFactory() const { return {}; }
 
     [[nodiscard]] virtual std::string getName() const = 0;
     [[nodiscard]] virtual BackendCapabilities getCapabilities() const = 0;

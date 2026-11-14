@@ -2,6 +2,7 @@
 #define GUNDAM_MPS_BACKEND_INTERNAL_H
 
 #include "MpsBackend.h"
+#include "MpsWorkerBuffer.h"
 
 #include "EngineView.h"
 #include "PropagationResult.h"
@@ -230,6 +231,11 @@ namespace {
     for( std::size_t i = 0; i < inputs_.externalWeights.size(); ++i ){
       const auto& block = inputs_.externalWeights[i];
       if( generations_[i] == block.generation ){ continue; }
+      if( block.deviceValues ){
+        Backends::copyMpsWorkerWeights(*block.deviceValues, (void*)destination_, block.destinationOffset, block.count, sizeof(Scalar));
+        generations_[i] = block.generation;
+        continue;
+      }
       if( block.count ){
         std::transform(block.values, block.values + block.count, destination + block.destinationOffset,
                        [](double value_){ return Scalar(value_); });

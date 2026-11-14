@@ -12,6 +12,7 @@ set(SRCFILES
     )
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WorkerBuffer.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DeviceMath/SharedSurface.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DeviceMath/SharedSplineCommon.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DeviceMath/SharedSplineCompact.h

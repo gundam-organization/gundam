@@ -26,6 +26,7 @@ ENUM_FIELD( recomputeResponses )
   public:
     MpsBackend();
     ~MpsBackend() override;
+    [[nodiscard]] WorkerBufferFactory getWorkerBufferFactory() const override;
 
     [[nodiscard]] std::string getName() const override;
     [[nodiscard]] BackendCapabilities getCapabilities() const override;

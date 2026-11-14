@@ -83,6 +83,17 @@ configure_file(
 
 set(LIB_NAME GundamBackendsMPS)
 
+# Runtime-loadable C ABI for independent Python venvs. Always shared, including
+# static GUNDAM builds. No dependency on CPython, NumPy or Torch.
+add_library(GundamMpsWorkerBuffers SHARED src/MpsWorkerBuffer.mm)
+set_target_properties(GundamMpsWorkerBuffers PROPERTIES
+    CXX_STANDARD ${CMAKE_CXX_STANDARD} OBJCXX_STANDARD ${CMAKE_CXX_STANDARD}
+    CXX_VISIBILITY_PRESET default OBJCXX_VISIBILITY_PRESET default)
+target_include_directories(GundamMpsWorkerBuffers PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(GundamMpsWorkerBuffers PRIVATE ${CMAKE_SOURCE_DIR}/src/Utils/include)
+target_link_libraries(GundamMpsWorkerBuffers PRIVATE "-framework Foundation" "-framework Metal")
+install(TARGETS GundamMpsWorkerBuffers DESTINATION lib)
+
 set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsBackend.mm
     ${CMAKE_CURRENT_SOURCE_DIR}/src/MpsEventPropagation.mm
@@ -98,7 +109,7 @@ else()
 endif()
 
 target_include_directories(${LIB_NAME} BEFORE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(${LIB_NAME} PUBLIC GundamBackendsCommonExecution)
+target_link_libraries(${LIB_NAME} PUBLIC GundamBackendsCommonExecution GundamMpsWorkerBuffers)
 
 target_include_directories(${LIB_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_link_libraries(${LIB_NAME} PUBLIC "-framework Foundation" "-framework Metal")

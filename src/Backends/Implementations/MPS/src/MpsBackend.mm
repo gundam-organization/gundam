@@ -1,12 +1,18 @@
 #include "MpsBackend.h"
 
 #include "MpsBackendInternal.h"
+#include "MpsWorkerBuffer.h"
 #include "MpsGradientModel.h"
 #include "LikelihoodModel.h"
 #include "Semantics/BackendHostPropagation.h"
 
 Backends::MpsBackend::MpsBackend() : _impl_(std::make_unique<MpsBackendImpl>()) {}
 Backends::MpsBackend::~MpsBackend() = default;
+
+WorkerBufferFactory Backends::MpsBackend::getWorkerBufferFactory() const {
+  if( not _impl_->isAvailable or (not _impl_->useEventPropagation and not _impl_->isWeightModelSupported) ){ return {}; }
+  return [](std::size_t count_){ return Backends::makeMpsWorkerBuffer(count_); };
+}
 
 void Backends::MpsBackend::configureImpl() {
   _config_.clearFields();
@@ -143,6 +149,9 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Propag
   }
 
   if( not usedDevicePropagation ){
+    LogThrowIf(std::any_of(inputs_.externalWeights.begin(), inputs_.externalWeights.end(),
+                          [](const auto& block_){ return bool(block_.deviceValues); }),
+               "MPS propagation failed with device PythonWorker buffers; refusing an implicit host fallback.");
     Semantics::calculateEventWeights(_impl_->lastResult.eventWeights, _impl_->model, inputs_);
     _impl_->lastResult.status.eventWeights = OutputState::ReadyOnHost;
   }

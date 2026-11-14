@@ -354,6 +354,9 @@ void Backends::BackendManager::deactivateBackend() {
         if( state == OutputState::ReadyOnDevice or state == OutputState::ReadyOnHost ){ materialize(output); }
       }
     }
+    for( const auto& binding : _backendEngineLayout_->bindings.externalWeights ){
+      if( binding.source ){ binding.source->setWorkerBackend("CPU"); }
+    }
     _activeBackendPtr_ = nullptr;
     for( auto& entry : _availableBackendList_ ){
       if( entry.name != _activeBackendName_ ){ continue; }
@@ -404,6 +407,9 @@ void Backends::BackendManager::activateImpl(const std::string& name_, const Conf
   _activeBackendPtr_ = found->backend.get();
   _activeBackendName_ = name_;
   _type_ = name_;
+  for( const auto& binding : _backendEngineLayout_->bindings.externalWeights ){
+    if( binding.source ){ binding.source->setWorkerBackend(name_, _activeBackendPtr_->getWorkerBufferFactory()); }
+  }
   LogInfo << "Backend " << _activeBackendPtr_->getName() << " ready ("
           << std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() << " s)." << std::endl;
 }
@@ -442,7 +448,9 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
       inputs.externalWeights.push_back({binding.table->data(), binding.table->size(), layout.offset, ++binding.generation});
     }
     else{
-      inputs.externalWeights.push_back({source->data(), source->size(), layout.offset, source->getGeneration()});
+      const auto& device = source->getDeviceValues();
+      inputs.externalWeights.push_back({device ? nullptr : source->data(), source->size(), layout.offset,
+                                        source->getGeneration(), device});
     }
   }
   const auto& model = _backendEngineLayout_->view.propagation;

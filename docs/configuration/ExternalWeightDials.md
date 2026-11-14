@@ -61,6 +61,7 @@ parameterSetList:
 | workerConfig.pythonExecutable | string     | Python executable used to start `PythonWorker`                  |         |
 | workerConfig.evalScript       | string     | Python worker script                                            |         |
 | workerConfig.scriptArgs       | list(str)  | Extra command-line arguments passed to the Python worker script | empty   |
+| workerConfig.backendBufferMemoryLocation | string | `onHost` or `onDevice`; MPS device buffers use shared float32 storage | onHost |
 | workerConfig.initScript       | string     | Currently ignored by the shared-memory Python worker            |         |
 
 `inputEventVarList` entries use the same variable naming as other event formulas. In practice, prefer bracket notation for variables from the dataset `variableDict`:
@@ -107,6 +108,35 @@ through `command_["inputs"]` and `command_["weights"]`.
 At the moment, the shared-memory transport exposes event inputs as `float64` arrays. If an input is semantically an integer, such as a flavor code, the worker should cast it explicitly before using it.
 
 ## Python Worker Contract
+
+### Backend buffers
+
+`workerConfig.backendBufferMemoryLocation` defaults to `onHost`, preserving the
+existing NumPy float64 interface. With `onDevice` and an active MPS backend,
+inputs, `parameterBuffer` and `weights` are shared Torch MPS float32 tensors.
+`command['bufferDevice']` reports `cpu` or `mps`. `parameters` retains its named
+dictionary interface (its values are device scalar views on MPS), and
+`parameterInfo` defines the order of `parameterBuffer`.
+
+CPU and the original engine use host buffers even when `onDevice` is requested.
+CUDA device worker transport is not implemented and is rejected explicitly.
+Selecting another backend restarts the worker when the buffer transport changes.
+The normal prior/loading pass can run on CPU before MPS is activated.
+
+The MPS transport is compiled as `GundamMpsWorkerBuffers` inside the MPS backend
+implementation. The subprocess loads its C ABI via ctypes, using the configured
+`pythonExecutable` and venv packages. GUNDAM does not link CPython or Torch for
+this transport, and no compilation is performed in the worker venv. NumPy is
+required for the host protocol; Torch MPS is required for device views. The
+adapter currently uses Torch's private storage constructor, checked with 2.9.1;
+unsupported versions fail explicitly.
+
+The script still defines `configure(arguments)` and `run(command)`. It writes
+weights in place. The bootstrap synchronizes MPS writes before acknowledging;
+the backend copies/packs the response on GPU into its weight layout. These first
+handoffs are blocking. Tensor views remain valid until shutdown returns.
+Device gradients are not supported. Host diagnostics may explicitly materialize
+weights; normal MPS propagation avoids converting the response array to NumPy.
 
 The worker is launched as:
 

@@ -52,6 +52,10 @@ protected:
   [[nodiscard]] bool isGradientRequested() const { return _weightSource_->isGradientRequested(); }
   [[nodiscard]] std::uint64_t getEvaluationGeneration() const { return _weightSource_->getGeneration() + 1; }
   void setSupportsGradient(bool supported_){ _weightSource_->_supportsGradient_ = supported_; }
+  void setDeviceWeightBuffer(std::shared_ptr<WorkerBuffer> buffer_){
+    _weightSource_->_deviceValues_ = std::move(buffer_);
+    _weightSource_->_hostGeneration_ = std::uint64_t(-1);
+  }
   [[nodiscard]] std::size_t getEventCount() const { return _eventCount_; }
   [[nodiscard]] std::size_t getWeightCount() const { return _weightCount_; }
 
@@ -77,6 +81,7 @@ private:
   BinSet _binning_{};
   bool _areEventsLoaded_{false};
   bool _isEvaluationPending_{true};
+  std::uint64_t _bufferRevision_{std::uint64_t(-1)};
   mutable std::mutex _eventRegistrationMutex_{};
 };
 
@@ -99,6 +104,11 @@ private:
   std::string _initScript_{};
   std::string _evalScript_{};
   std::vector<std::string> _scriptArgs_{};
+  std::string _backendBufferMemoryLocation_{"onHost"};
+  std::vector<std::shared_ptr<WorkerBuffer>> _deviceInputs_{};
+  std::shared_ptr<WorkerBuffer> _deviceParameters_{}, _deviceWeights_{};
+  std::uint64_t _workerBufferRevision_{std::uint64_t(-1)};
+  void prepareWorkerBuffers();
   bool _isWorkerStarted_{false};
   int _workerInputFd_{-1};
   int _workerOutputFd_{-1};

@@ -3,6 +3,7 @@
 
 #include "EngineView.h"
 #include "ParameterSnapshot.h"
+#include "WorkerBuffer.h"
 
 #include <stdexcept>
 
@@ -13,10 +14,12 @@ namespace Backends {
     std::size_t count{0};
     std::size_t destinationOffset{0};
     std::uint64_t generation{0};
+    std::shared_ptr<WorkerBuffer> deviceValues{};
   };
 
-  // Borrowed host blocks: a backend must consume or copy their contents before
-  // requestPropagation returns. Producers must not write during that call.
+  // Host blocks are borrowed; device blocks retain their transport allocation.
+  // Producers finish writes before publication and must not write during
+  // requestPropagation. The backend consumes/copies before returning its token.
   struct PropagationInputs {
     ParameterSnapshot parameters{};
     // Optional per-dial Jacobians for external/table producers, with respect
@@ -65,7 +68,7 @@ namespace Backends {
         const auto& block = externalWeights[iBlock];
         const auto& layout = model_.externalWeightBlocks[iBlock];
         if( block.count != layout.count or block.destinationOffset != layout.offset
-            or (block.count != 0 and block.values == nullptr) or block.generation == 0 ){
+            or (block.count != 0 and block.values == nullptr and not block.deviceValues) or block.generation == 0 ){
           throw std::runtime_error("Backend external weight block is invalid or unpublished.");
         }
       }
