@@ -106,8 +106,9 @@ private:
   std::vector<std::string> _scriptArgs_{};
   std::string _backendBufferMemoryLocation_{"onHost"};
   std::vector<std::shared_ptr<WorkerBuffer>> _deviceInputs_{};
-  std::shared_ptr<WorkerBuffer> _deviceParameters_{}, _deviceWeights_{};
+  std::shared_ptr<WorkerBuffer> _deviceParameters_{}, _deviceWeights_{}, _deviceGradients_{};
   std::uint64_t _workerBufferRevision_{std::uint64_t(-1)};
+  static JsonType describeWorkerBuffer(const std::shared_ptr<WorkerBuffer>& buffer_, const std::vector<std::size_t>& shape_);
   void prepareWorkerBuffers();
   bool _isWorkerStarted_{false};
   int _workerInputFd_{-1};

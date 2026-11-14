@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the real PythonWorker host/MPS buffers and backend weight consumption."""
+"""Check the real PythonWorker host/MPS buffers and backend weight/gradient consumption."""
 import json
 from pathlib import Path
 import sys
@@ -12,11 +12,14 @@ fitterEngineConfig:
   scaleParStepWithChi2Response: false
   generateSamplePlots: false
   generateOneSigmaPlots: false
+  minimizerConfig:
+    useAnalyticGradient: true
+    useNormalizedFitSpace: false
+    print_level: 0
 
   likelihoodInterfaceConfig:
     jointProbabilityConfig:
-      type: LeastSquares
-      lsqPoissonianApproximation: true
+      type: BarlowBeestonLiteGaussian
 
     backendManagerConfig:
       isEnabled: true
@@ -80,8 +83,9 @@ import torch
 
 
 def configure(arguments):
-    global auditPath
+    global auditPath, configuredMode
     auditPath = Path(arguments[0])
+    configuredMode = arguments[1] if len(arguments) > 1 else 'ok'
 
 
 def run(command):
@@ -89,7 +93,10 @@ def run(command):
     if action == 'shutdown':
         return {'status': 'ok'}
     device = command['bufferDevice']
+    mode = configuredMode if device == 'mps' else 'ok'
     arrays = [command['inputs']['X'], command['parameterBuffer'], command['weights']]
+    if command.get('withGradient'):
+        arrays.append(command['gradients'])
     for array in arrays:
         if device == 'mps':
             if not isinstance(array, torch.Tensor) or array.device.type != 'mps' or array.dtype != torch.float32:
@@ -103,16 +110,28 @@ def run(command):
         if [entry['name'] for entry in command['parameterInfo']] != ['scale', 'offset']:
             raise RuntimeError('Unexpected parameter order')
     elif action == 'evaluate':
-        x, parameters, weights = map(torch.as_tensor, arrays)
+        x, parameters, weights = map(torch.as_tensor, arrays[:3])
         # No allocation or transfer of the output; Torch writes the supplied view.
         with torch.no_grad():
             torch.mul(x, parameters[0], out=weights)
             weights.add_(parameters[1])
+            if command['withGradient']:
+                gradients = torch.as_tensor(command['gradients'])
+                if tuple(gradients.shape) != (x.numel(), 2):
+                    raise RuntimeError('Unexpected gradient shape')
+                gradients[:, 0].copy_(x)
+                if mode != 'partial':
+                    gradients[:, 1].fill_(1.)
+                if mode == 'nonfinite':
+                    gradients[0, 0] = float('inf')
     else:
         raise RuntimeError(f'Unexpected command: {action}')
     with auditPath.open('a') as stream:
         stream.write(json.dumps({'command': action, 'device': device}) + '\n')
-    return {'status': 'ok', 'supportsGradient': False}
+    result = {'status': 'ok', 'supportsGradient': True}
+    if command.get('withGradient') and mode != 'missingAck':
+        result['gradientGeneration'] = command['generation'] + (mode == 'staleAck')
+    return result
 '''
 
 
@@ -140,8 +159,9 @@ def main():
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(1)
 
+    referenceGradients = []
     for backend, location, expectedDevice in [
-            ('MPS', 'onDevice', 'mps'), ('MPS', 'onHost', 'cpu'), ('CPU', 'onDevice', 'cpu')]:
+            ('CPU', 'onDevice', 'cpu'), ('MPS', 'onHost', 'cpu'), ('MPS', 'onDevice', 'mps')]:
         auditPath = work / f'{backend}-{location}.jsonl'
         auditPath.write_text('')
         builder = GUNDAM.ConfigUtils.ConfigBuilder()
@@ -163,7 +183,8 @@ def main():
         propagator = interface.getModelPropagator()
         parameters = propagator.getParametersManager().getParameterSetsList()[0].getParameterList()
         # Check initial activation, updates, a repeated point and a return to prior.
-        for scale, offset in [(2., .25), (.5, 1.), (.5, 1.), (2., .25)]:
+        points = [(2., .25), (.5, 1.), (.5, 1.), (2., .25)]
+        for index, (scale, offset) in enumerate(points):
             parameters[0].setParameterValue(scale)
             parameters[1].setParameterValue(offset)
             engine.evaluateLikelihood()
@@ -177,8 +198,48 @@ def main():
                                        [weights[mask].sum() for mask in masks], rtol=1e-6, atol=1e-6)
             np.testing.assert_allclose([b.sqrtSumSqWeights**2 for b in bins],
                                        [(weights[mask]**2).sum() for mask in masks], rtol=1e-6, atol=1e-6)
+            minimizer = engine.getMinimizer()
+            gradient = list(minimizer.evalFitGradientAt([scale, offset]))
+            records = [json.loads(line) for line in auditPath.read_text().splitlines()]
+            if records[-1] != {'command': 'evaluate', 'device': expectedDevice}:
+                raise RuntimeError(f'Gradient worker used the wrong device: {records}')
+            if backend == 'CPU':
+                referenceGradients.append(gradient)
+                for i in range(2):
+                    up, down = [scale, offset], [scale, offset]
+                    up[i] += 1e-5
+                    down[i] -= 1e-5
+                    numeric = (minimizer.evalFit(up) - minimizer.evalFit(down)) / 2e-5
+                    np.testing.assert_allclose(gradient[i], numeric, rtol=3e-5, atol=3e-6)
+            else:
+                np.testing.assert_allclose(gradient, referenceGradients[index], rtol=3e-5, atol=3e-6)
             GUNDAM.flushOutput()
-        print(f'PASS {backend}/{location}: {expectedDevice} buffers and analytic histogram moments')
+        print(f'PASS {backend}/{location}: {expectedDevice} buffers, histogram moments and gradients')
+        del minimizer, engine
+    # A transport restart must also remap the lazily allocated gradient table.
+    engine = GUNDAM.FitterEngine()
+    engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
+    engine.initialize()
+    manager = engine.getBackendsManager()
+    for backend in ('MPS', 'CPU', 'MPS'):
+        manager.activate(backend)
+        gradient = engine.getMinimizer().evalFitGradientAt([.5, 1.])
+        np.testing.assert_allclose(gradient, referenceGradients[1], rtol=3e-5, atol=3e-6)
+    del engine
+    for mode, expected in [('partial', 'missing/non-finite gradient'),
+                           ('nonfinite', 'missing/non-finite gradient'),
+                           ('missingAck', 'gradientGeneration'), ('staleAck', 'gradientGeneration')]:
+        worker['scriptArgs'] = [str(auditPath), mode]
+        engine = GUNDAM.FitterEngine()
+        engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
+        try:
+            engine.initialize()
+            engine.getMinimizer().evalFitGradientAt([.5, 1.])
+        except RuntimeError as error:
+            if expected not in str(error):
+                raise
+        else:
+            raise AssertionError(f'Invalid device gradient accepted: {mode}')
         del engine
     return 0
 

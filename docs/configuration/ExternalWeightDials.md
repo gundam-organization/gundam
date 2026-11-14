@@ -113,7 +113,8 @@ At the moment, the shared-memory transport exposes event inputs as `float64` arr
 
 `workerConfig.backendBufferMemoryLocation` defaults to `onHost`, preserving the
 existing NumPy float64 interface. With `onDevice` and an active MPS backend,
-inputs, `parameterBuffer` and `weights` are shared Torch MPS float32 tensors.
+inputs, `parameterBuffer`, `weights` and requested `gradients` are shared Torch MPS
+float32 tensors.
 `command['bufferDevice']` reports `cpu` or `mps`. `parameters` retains its named
 dictionary interface (its values are device scalar views on MPS), and
 `parameterInfo` defines the order of `parameterBuffer`.
@@ -139,8 +140,13 @@ The script still defines `configure(arguments)` and `run(command)`. It writes
 weights in place. The bootstrap synchronizes MPS writes before acknowledging;
 the backend copies/packs the response on GPU into its weight layout. These first
 handoffs are blocking. Tensor views remain valid until shutdown returns.
-Device gradients are not supported. Host diagnostics may explicitly materialize
-weights; normal MPS propagation avoids converting the response array to NumPy.
+When `supportsGradient` is true, gradient evaluations receive a lazily allocated
+`gradients` tensor of shape `(nBins, numberOfInputs)`, in dial input order.
+The worker fills it in place and acknowledges `gradientGeneration`, just as in
+the host protocol. Missing or non-finite derivatives are rejected. The current
+dial gradient API consumes a host table, so gradient evaluations read the result
+back after synchronization; gradient consumption is not yet entirely resident
+on the GPU. Host diagnostics may explicitly materialize weights; normal MPS propagation avoids converting the response array to NumPy.
 
 The worker is launched as:
 

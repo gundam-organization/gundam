@@ -399,8 +399,19 @@ void ExternalWeightPythonWorker::evaluateImpl(const DialInputBuffer& inputBuffer
   if( isGradientRequested() ){
     const auto* gradients = getGradientBuffer();
     LogThrowIf(gradients == nullptr, "ExternalWeight gradient buffer is not initialized.");
-    command["gradients"] = {{"shmName", gradients->name}, {"dtype", "float64"},
-        {"shape", {getWeightCount(), std::size_t(inputBuffer_.getInputSize())}}};
+    const std::vector<std::size_t> shape{getWeightCount(), std::size_t(inputBuffer_.getInputSize())};
+    if( _deviceWeights_ ){
+      if( not _deviceGradients_ ){
+        _deviceGradients_ = getWeightSource()->getWorkerBufferFactory()(gradients->nbDoubles);
+      }
+      // Preserve the host protocol's detection of partially written outputs.
+      _deviceGradients_->writeValues(gradients->ptr, gradients->nbDoubles);
+      _deviceWeights_->writeValues(getWeightBuffer()->ptr, getWeightCount());
+      command["gradients"] = describeWorkerBuffer(_deviceGradients_, shape);
+    }
+    else{
+      command["gradients"] = {{"shmName", gradients->name}, {"dtype", "float64"}, {"shape", shape}};
+    }
   }
   this->sendWorkerCommand(command);
   auto response = this->readWorkerResponse();
@@ -410,7 +421,21 @@ void ExternalWeightPythonWorker::evaluateImpl(const DialInputBuffer& inputBuffer
     LogThrowIf(not response.contains("gradientGeneration") or not response["gradientGeneration"].is_number_integer()
                or response["gradientGeneration"] != command["generation"],
                "ExternalWeight worker must acknowledge gradientGeneration for the current evaluation: " << response.dump());
+    if( _deviceGradients_ ){
+      // Dial gradient consumers currently use the dense host table. The worker
+      // has synchronized its device writes before publishing this response.
+      _deviceGradients_->readValues(getGradientBuffer()->ptr, getGradientBuffer()->nbDoubles);
+      _deviceWeights_->readValues(getWeightBuffer()->ptr, getWeightCount());
+    }
   }
+}
+
+JsonType ExternalWeightPythonWorker::describeWorkerBuffer(
+    const std::shared_ptr<WorkerBuffer>& buffer_, const std::vector<std::size_t>& shape_) {
+  const auto description = buffer_->describe();
+  return JsonType{{"transport", description.transport}, {"path", description.path},
+                  {"libraryPath", description.libraryPath}, {"dtype", "float32"},
+                  {"shape", shape_}, {"byteCount", description.byteCount}};
 }
 
 void ExternalWeightPythonWorker::prepareWorkerBuffers() {
@@ -423,9 +448,8 @@ void ExternalWeightPythonWorker::prepareWorkerBuffers() {
   if( _workerBufferRevision_ == source->getBufferRevision() and bool(_deviceWeights_) == device ){ return; }
   stopWorkerProcess();
   setDeviceWeightBuffer({});
-  _deviceInputs_.clear(); _deviceParameters_.reset(); _deviceWeights_.reset();
+  _deviceInputs_.clear(); _deviceParameters_.reset(); _deviceWeights_.reset(); _deviceGradients_.reset();
   if( device ){
-    LogThrowIf(isGradientRequested(), "Device PythonWorker buffers currently support weights only.");
     for( const auto& input : getInputBufferList() ){
       auto buffer = factory(input->nbDoubles);
       buffer->writeValues(input->ptr, input->nbDoubles);
@@ -621,10 +645,11 @@ R"PY(
             user_command["generation"] = command.get("generation")
             if user_command["withGradient"]:
                 description = command["gradients"]
-                if gradient_name != description["shmName"]:
+                buffer_name = description.get("path", description.get("shmName"))
+                if gradient_name != buffer_name:
                     shm, gradients = _attach(description)
                     shared_memory_list.append(shm)
-                    gradient_name = description["shmName"]
+                    gradient_name = buffer_name
                 user_command["gradients"] = gradients
             else:
                 user_command["gradients"] = None
@@ -740,16 +765,11 @@ except Exception as error:
 
   initCommand["bufferDevice"] = _deviceWeights_ ? "mps" : "cpu";
   if( _deviceWeights_ ){
-    auto description = [](const std::shared_ptr<WorkerBuffer>& buffer_){
-      const auto d = buffer_->describe();
-      return JsonType{{"transport", d.transport}, {"path", d.path}, {"libraryPath", d.libraryPath},
-                      {"dtype", "float32"}, {"shape", {d.count}}, {"byteCount", d.byteCount}};
-    };
     for( std::size_t i = 0; i < inputNameList.size(); ++i ){
-      initCommand["inputs"][inputNameList[i]] = description(_deviceInputs_.at(i));
+      initCommand["inputs"][inputNameList[i]] = describeWorkerBuffer(_deviceInputs_.at(i), {getWeightCount()});
     }
-    initCommand["parameterBuffer"] = description(_deviceParameters_);
-    initCommand["weights"] = description(_deviceWeights_);
+    initCommand["parameterBuffer"] = describeWorkerBuffer(_deviceParameters_, {std::size_t(inputBuffer_.getInputSize())});
+    initCommand["weights"] = describeWorkerBuffer(_deviceWeights_, {getWeightCount()});
   }
 
   this->sendWorkerCommand(initCommand);
@@ -761,7 +781,7 @@ except Exception as error:
              "ExternalWeight worker initialization failed: " << response.dump());
   LogThrowIf(response.contains("supportsGradient") and not response["supportsGradient"].is_boolean(),
              "ExternalWeight supportsGradient must be a boolean.");
-  setSupportsGradient(not _deviceWeights_ and response.value("supportsGradient", false));
+  setSupportsGradient(response.value("supportsGradient", false));
 }
 
 void ExternalWeightPythonWorker::sendWorkerCommand(const JsonType& command_) {

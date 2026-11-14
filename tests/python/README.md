@@ -48,8 +48,8 @@ disabled, install the matching requirements yourself.
 
 `745BackendsMpsPythonWorkerBuffers.py` is registered only when the MPS backend
 target exists. It embeds its YAML configuration and PythonWorker script in the test itself
-to check host/device detection, in-place weights and histogram results at several
-parameter points. The test requires a usable Metal device and Torch MPS; these
+to check host/device detection, in-place weights and gradients, histogram results,
+backend switches and invalid gradient responses at several parameter points. The test requires a usable Metal device and Torch MPS; these
 are checked at runtime, and an unavailable device marks the test as `Skipped`.
 
 The same selection fixture runs with automatic venv preparation disabled; it
