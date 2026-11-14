@@ -57,6 +57,9 @@ a missing or incompatible Torch installation is a failure.
 `766BackendsCudaPythonWorkerBuffers.py` runs the same contract through CUDA IPC,
 with both propagation modes, float64 tensors and device-to-device weight copies.
 It is registered only with the CUDA backend and is `Skipped` without a usable GPU.
+Its CTest timeout is 600 seconds to allow repeated Torch/CUDA worker startups on
+cluster nodes. Timestamped stages are streamed to CTest and saved in `test.log`,
+including when CTest terminates a test on timeout.
 For a V100 allocation, use a Torch CUDA build that includes support for that GPU:
 
 ```bash

@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import sys
+import time
 
 
 CONFIG_YAML = r'''
@@ -142,6 +143,13 @@ def run(command):
 
 
 def run(deviceBackend, propagationMode=None):
+    started = time.perf_counter()
+
+    def progress(stage):
+        elapsed = time.perf_counter() - started
+        print(f'[{deviceBackend}/{propagationMode or "default"} +{elapsed:.1f}s] {stage}', flush=True)
+
+    progress('Starting buffer contract')
     import GUNDAM
     if not hasattr(GUNDAM.FitterEngine, 'getBackendsManager'):
         print('SKIP: GUNDAM was built without backends')
@@ -185,6 +193,7 @@ def run(deviceBackend, propagationMode=None):
         worker = likelihood['propagatorConfig']['parametersManagerConfig']['parameterSetList'][0]['dialSetDefinitions'][0]['options']['workerConfig']
         worker.update(pythonExecutable=sys.executable, evalScript=str(workerPath),
                       backendBufferMemoryLocation=location, scriptArgs=[str(auditPath)])
+        progress(f'Initializing {backend}/{location}')
         engine = GUNDAM.FitterEngine()
         engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
         engine.initialize()
@@ -197,6 +206,7 @@ def run(deviceBackend, propagationMode=None):
         # Check initial activation, updates, a repeated point and a return to prior.
         points = [(2., .25), (.5, 1.), (.5, 1.), (2., .25)]
         for index, (scale, offset) in enumerate(points):
+            progress(f'{backend}/{location}: weights and gradient at point {index + 1}/{len(points)}')
             parameters[0].setParameterValue(scale)
             parameters[1].setParameterValue(offset)
             engine.evaluateLikelihood()
@@ -228,14 +238,16 @@ def run(deviceBackend, propagationMode=None):
             else:
                 np.testing.assert_allclose(gradient, referenceGradients[index], rtol=gradientRtol, atol=gradientAtol)
             GUNDAM.flushOutput()
-        print(f'PASS {backend}/{location}: {expectedDevice} buffers, histogram moments and gradients')
+        progress(f'PASS {backend}/{location}: {expectedDevice} buffers, histogram moments and gradients')
         del minimizer, engine
     # A transport restart must also remap the lazily allocated gradient table.
+    progress('Initializing backend-switch checks')
     engine = GUNDAM.FitterEngine()
     engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
     engine.initialize()
     manager = engine.getBackendsManager()
     for backend in (deviceBackend, 'CPU', deviceBackend):
+        progress(f'Switching to {backend} and evaluating gradient')
         manager.activate(backend)
         gradient = engine.getMinimizer().evalFitGradientAt([.5, 1.])
         np.testing.assert_allclose(gradient, referenceGradients[1], rtol=gradientRtol, atol=gradientAtol)
@@ -243,6 +255,7 @@ def run(deviceBackend, propagationMode=None):
     for mode, expected in [('partial', 'missing/non-finite gradient'),
                            ('nonfinite', 'missing/non-finite gradient'),
                            ('missingAck', 'gradientGeneration'), ('staleAck', 'gradientGeneration')]:
+        progress(f'Checking rejection of {mode}')
         worker['scriptArgs'] = [str(auditPath), mode]
         engine = GUNDAM.FitterEngine()
         engine.configure(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
@@ -255,4 +268,5 @@ def run(deviceBackend, propagationMode=None):
         else:
             raise AssertionError(f'Invalid device gradient accepted: {mode}')
         del engine
+    progress('PASS complete buffer contract')
     return 0

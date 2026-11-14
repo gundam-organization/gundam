@@ -151,6 +151,11 @@ set(testPythonSelection [==[${CMAKE_CURRENT_BINARY_DIR}/python-test-selected.cma
           string(TOLOWER "${pythonTestBackend}" pythonBackendLabel)
           set_tests_properties("${pythonTestName}" PROPERTIES
             LABELS "python;python-fast;${pythonBackendLabel}" TIMEOUT 120)
+          if(pythonTestBackend STREQUAL "CUDA")
+            # Both propagation modes restart independent Torch/CUDA workers.
+            # Cluster startup/I/O can dominate this small numerical fixture.
+            set_tests_properties("${pythonTestName}" PROPERTIES TIMEOUT 600)
+          endif()
         endif()
       endforeach()
     endif()
