@@ -344,7 +344,9 @@ if( WITH_GOOGLE_TEST )
   ## Create a list of all of the regular tests.  These are always
   ## compiled and are run when WITH_REGULAR_TEST is on.
   list(APPEND REGULAR_TESTS "")
-  list(APPEND REGULAR_TESTS GTests/unitTest_BackendFitCovariance.cpp)
+  if(WITH_BACKENDS)
+    list(APPEND REGULAR_TESTS GTests/unitTest_BackendFitCovariance.cpp)
+  endif()
 
   # Compile the regular test executable, but only add them to ctest if
   # WITH_REGULAR_TEST is on. This should NOT be "optimized" to skip

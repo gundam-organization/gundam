@@ -33,19 +33,15 @@
 #include <vector>
 
 namespace {
+#ifdef GUNDAM_TEST_HAS_CUDA
   std::string cudaUnavailableReason() {
-#ifndef GUNDAM_USING_BACKENDS
-    return "GUNDAM was built without the backend library";
-#elif !defined(GUNDAM_TEST_HAS_CUDA)
-    return "GUNDAM was built without CUDA support";
-#else
     int count = 0;
     const auto status = cudaGetDeviceCount(&count);
     if( status != cudaSuccess ){ return std::string("CUDA device enumeration unavailable: ") + cudaGetErrorString(status); }
     if( count == 0 ){ return "no CUDA device visible; request a GPU allocation"; }
     return {};
-#endif
   }
+#endif
 
 #ifdef GUNDAM_USING_BACKENDS
   constexpr std::size_t parameterCount = 3;
@@ -358,6 +354,7 @@ namespace {
   }
 #endif
 
+#ifdef GUNDAM_TEST_HAS_CUDA
   class CudaFitCovariance : public testing::TestWithParam<const char*> {
   protected:
     void SetUp() override {
@@ -368,6 +365,7 @@ namespace {
       GTEST_SKIP() << reason;
     }
   };
+#endif
 }
 
 TEST(BackendFitCovariance, CpuMatchesOriginalFitAndCovariance) {
@@ -436,6 +434,7 @@ TEST(BackendFitCovariance, ResidentReplacementPreservesLoadedModelAndRejectsStal
 #endif
 }
 
+#ifdef GUNDAM_TEST_HAS_CUDA
 TEST_P(CudaFitCovariance, MatchesCpuFitAndCovariance) {
 #ifdef GUNDAM_USING_BACKENDS
   compareFits("CPU", "CUDA", GetParam());
@@ -477,6 +476,7 @@ TEST_P(CudaFitCovariance, ResidentSwitchMatchesCpu) {
 INSTANTIATE_TEST_SUITE_P(Modes, CudaFitCovariance,
     testing::Values("cachedResponses", "recomputeResponses"),
     [](const testing::TestParamInfo<const char*>& info_){ return info_.param; });
+#endif
 
 #if defined(GUNDAM_TEST_MPS_AVAILABLE) && defined(GUNDAM_USING_BACKENDS)
 TEST(BackendFitCovariance, DeviceStatLikelihoodMatchesOriginalFitAndHesse) {
@@ -558,6 +558,7 @@ TEST(BackendFitCovariance, MetalAnalyticGradientMatchesCpuFitAndHesse) {
   }
 }
 #endif
+#ifdef GUNDAM_TEST_HAS_CUDA
 TEST_P(CudaFitCovariance, AnalyticGradientMatchesCpuFitAndHesse) {
 #ifdef GUNDAM_USING_BACKENDS
   FitEnvironment environment;
@@ -581,3 +582,4 @@ TEST_P(CudaFitCovariance, AnalyticGradientMatchesCpuFitAndHesse) {
   }
 #endif
 }
+#endif
