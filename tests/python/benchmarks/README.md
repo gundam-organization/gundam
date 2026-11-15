@@ -4,6 +4,11 @@ These scripts measure performance; they are not part of the regular regression
 suite. Use a Release build with the Python interface enabled and select the
 matching installed `GUNDAM` Python module.
 
+For real-input CUDA profiling with a nu-waves PythonWorker, see
+[BackendRuntimeProfile.md](BackendRuntimeProfile.md). It accepts the fitter's
+configuration overrides and toy options and can record synchronized worker costs
+alongside backend stages with `--profile-python-workers`.
+
 `--output` is optional. By default, scripts create a directory in the launch
 directory named `benchmark-<script-name>-YYYYMMDDHHmmss`, using local time and
 the script name without its extension. An explicit `--output` path takes

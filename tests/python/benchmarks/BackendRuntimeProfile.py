@@ -11,9 +11,11 @@ import os
 from pathlib import Path
 import platform
 import re
+import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 import traceback
 
@@ -57,6 +59,28 @@ def distribution(values):
     ordered = sorted(values)
     return dict(mean=statistics.mean(values), median=statistics.median(values), min=min(values),
                 max=max(values), p95=ordered[math.ceil(.95 * len(ordered)) - 1], count=len(values))
+
+
+class WorkerProfile:
+    """Read newly completed worker records outside the callback timer."""
+    def __init__(self, directory):
+        self.directory = directory
+        self.offsets = {}
+
+    def read(self):
+        records = []
+        for path in sorted(self.directory.glob('worker-*.jsonl')):
+            with path.open() as stream:
+                stream.seek(self.offsets.get(path, 0))
+                while True:
+                    offset = stream.tell()
+                    line = stream.readline()
+                    if not line.endswith('\n'):
+                        stream.seek(offset)
+                        break
+                    records.append(json.loads(line))
+                self.offsets[path] = stream.tell()
+        return records
 
 
 def snapshot(manager, include_gradient):
@@ -138,17 +162,21 @@ def write_report(output, summary):
     for scenario, workloads in summary.items():
         for workload, entry in workloads.items():
             lines.extend(['', f'## {scenario} / {workload}', '',
-                          '| Callback / metric | Median ms | p95 ms |', '|---|---:|---:|'])
+                          '| Callback / metric | Unit | Median | p95 |', '|---|---|---:|---:|'])
             for callback, values in entry['callbacks'].items():
                 metrics = values['metrics']
                 for name in ('wallSeconds', 'managerPreparationSeconds', 'propagationWallSeconds',
+                             'workerCalls', 'workerWithGradientCalls', 'workerWallSeconds',
+                             'workerRunSeconds', 'workerSynchronizeSeconds', 'workerWallFraction',
                              'managerSnapshotSeconds', 'hostVariableReadSeconds',
                              'cachePreparationSeconds', 'eventSelectionSeconds',
                              *values['gpuStageRanking'], 'gradientWallSeconds',
                              'gradientModelPreparationSeconds', 'devicePropagationSeconds', 'gradientDeviceSeconds'):
                     if name in metrics:
                         value = metrics[name]
-                        lines.append(f"| {callback} / {name} | {1000*value['median']:.4f} | {1000*value['p95']:.4f} |")
+                        scale = 1000 if name.endswith('Seconds') else 1
+                        unit = 'ms' if scale == 1000 else ('fraction' if name.endswith('Fraction') else 'count')
+                        lines.append(f"| {callback} / {name} | {unit} | {scale*value['median']:.4f} | {scale*value['p95']:.4f} |")
             gradient = entry['callbacks'].get('gradient', {}).get('metrics', {})
             if 'gradientCacheHit' in gradient:
                 lines.extend(['', f"Gradient cache hit fraction: {gradient['gradientCacheHit']['mean']:.1%}."])
@@ -157,6 +185,8 @@ def write_report(output, summary):
                   'Observables/search is fused; binning includes scans, sorting and allocation synchronization.',
                   'A gradient callback includes its own propagation. In valueThenGradient it usually reuses prediction.',
                   'Host remainder includes preparation, producer evaluation, penalties, launches and Python conversion.',
+                  'workerWallSeconds includes user run(command) and device synchronization; run/synchronize split is not CPU/GPU attribution.',
+                  'Worker fractions use sums of durations per callback; they exclude IPC, buffer attachment and GUNDAM readbacks.',
                   'See samples.jsonl for counts, transfer volumes and individual callback records.',
                   'See local-coordinate-costs.json for parameter-dependent migration and response costs.', ''])
     (output / 'report.md').write_text('\n'.join(lines))
@@ -164,6 +194,13 @@ def write_report(output, summary):
 
 def benchmark(args, report):
     import GUNDAM as G
+    worker_profile = None
+    if args.profile_python_workers:
+        # Keep per-call writes off the input/output filesystem (often NFS at CC).
+        directory = Path(tempfile.mkdtemp(prefix='gundam-worker-profile-'))
+        args.worker_profile_directory = directory
+        os.environ['GUNDAM_PYTHON_WORKER_PROFILE'] = str(directory)
+        worker_profile = WorkerProfile(directory)
     # Fail before the expensive dataset load if the installation is stale.
     required = PROPAGATION_FIELDS + COUNT_FIELDS + (GRADIENT_FIELDS if args.backend == 'CUDA' else ())
     missing = [name for name in required if not hasattr(G.BackendTimingSummary, name)]
@@ -171,6 +208,8 @@ def benchmark(args, report):
                                     'getLastHostVariableReadCount') if not hasattr(G.BackendManager, name))
     if args.backend == 'CUDA' and not hasattr(G.BackendTimingSummary, 'gradientCacheHit'):
         missing.append('gradientCacheHit')
+    if args.toy is not None and not hasattr(G.Propagator, 'setIThrow'):
+        missing.append('Propagator.setIThrow')
     if missing:
         raise RuntimeError('Recompile and reinstall GUNDAM including PythonInterface; missing timers: ' + ', '.join(missing))
     report.update(module=G.__file__, nvidiaSmi=run_command(['nvidia-smi']))
@@ -197,14 +236,21 @@ def benchmark(args, report):
     engine = G.FitterEngine()
     engine.configure(reader.fetchValueConfigReader('fitterEngineConfig'))
     likelihood = engine.getLikelihoodInterface()
-    likelihood.setDataType(G.LikelihoodInterface.DataType.Asimov if args.asimov else G.LikelihoodInterface.DataType.RealData)
+    data_type = 'Toy' if args.toy is not None else ('Asimov' if args.asimov else 'RealData')
+    likelihood.setDataType(G.LikelihoodInterface.DataType(data_type))
     likelihood.setForceAsimovData(args.asimov)
+    if args.toy is not None:
+        likelihood.getModelPropagator().setIThrow(args.toy)
     minimizer = engine.getMinimizer()
     minimizer.setDisableCalcError(True)
     progress('Loading inputs ONCE and initializing; no minimization will run')
     start = time.perf_counter()
     engine.initialize()
     report['initializationSeconds'] = time.perf_counter() - start
+    if worker_profile:
+        report['workerInitialization'] = worker_profile.read()
+        if not report['workerInitialization']:
+            raise RuntimeError('No PythonWorker profile records: rebuild GUNDAM with worker profiling support and enable a PythonWorker dial')
     manager = engine.getBackendsManager()
     if not manager.hasBackend() or manager.getActiveBackendName() != args.backend:
         raise RuntimeError('Requested backend is not active: ' + args.backend)
@@ -226,11 +272,21 @@ def benchmark(args, report):
     progress(f"Initialized in {report['initializationSeconds']:.1f} s; {report['events']} events, {len(parameters)} fit coordinates")
 
     def evaluate(callback, point):
+        if worker_profile:
+            worker_profile.read()  # Discard initialization, warmup and local resets.
         start_cpu, start_wall = time.process_time(), time.perf_counter()
         result = minimizer.evalFit(point) if callback == 'value' else minimizer.evalFitGradientAt(point)
         wall, cpu = time.perf_counter() - start_wall, time.process_time() - start_cpu
         metrics = snapshot(manager, args.backend == 'CUDA' and callback == 'gradient')
         metrics.update(wallSeconds=wall, cpuSeconds=cpu)
+        if worker_profile:
+            records = [row for row in worker_profile.read() if row['command'] == 'evaluate']
+            metrics.update(workerCalls=len(records),
+                           workerWithGradientCalls=sum(row['withGradient'] for row in records),
+                           workerWallSeconds=sum(row['wallSeconds'] for row in records),
+                           workerRunSeconds=sum(row['runSeconds'] for row in records),
+                           workerSynchronizeSeconds=sum(row['synchronizeSeconds'] for row in records))
+            metrics['workerWallFraction'] = metrics['workerWallSeconds'] / wall if wall else 0.
         if callback == 'value':
             values = [float(result)]
         else:
@@ -312,7 +368,9 @@ def main():
     parser.add_argument('--warmup', type=int, default=3)
     parser.add_argument('--amplitude', type=float, default=.01, help='Displacement in parameter standard deviations')
     parser.add_argument('--parameter-match', help='Regex selecting coordinates to perturb; full gradient still computed')
-    parser.add_argument('--seed', type=int, default=1234)
+    parser.add_argument('--toy', nargs='?', type=int, const=-1, help='Toy fit data, with optional throw index (same as gundamFitter)')
+    parser.add_argument('-s', '--seed', type=int, default=1234)
+    parser.add_argument('--profile-python-workers', action='store_true', help='Record synchronized worker timings; requires rebuilt GUNDAM')
     parser.add_argument('--output', type=Path, required=True, help='New output directory')
     args = parser.parse_args()
     if min(args.threads, args.calls, args.trials) < 1 or min(args.local_calls, args.warmup) < 0:
@@ -338,6 +396,10 @@ def main():
         report['error'] = traceback.format_exc()
         raise
     finally:
+        directory = getattr(args, 'worker_profile_directory', None)
+        if directory is not None:
+            shutil.copytree(directory, args.output / 'python-workers')
+            shutil.rmtree(directory)
         write_json(args.output / 'summary.json', report)
     progress(f'Complete: {args.output / "report.md"}')
 

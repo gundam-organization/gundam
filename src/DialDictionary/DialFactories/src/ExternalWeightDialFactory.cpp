@@ -479,8 +479,10 @@ void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& input
     // expose run(command); transport descriptions become NumPy or device views.
     static const char* bootstrap = R"PY(
 import json
+import os
 import runpy
 import sys
+import time
 import traceback
 from multiprocessing import shared_memory
 
@@ -657,6 +659,11 @@ def _worker():
     parameters = {}
     user_command = None
     read_line = sys.stdin.buffer.readline
+    # Opt-in diagnostics: one file per process, separate from the wire protocol.
+    profile_directory = os.environ.get("GUNDAM_PYTHON_WORKER_PROFILE")
+    profile = None
+    if profile_directory:
+        profile = open(os.path.join(profile_directory, f"worker-{os.getpid()}.jsonl"), "a", buffering=1)
 
     while True:
         line = read_line()
@@ -706,7 +713,9 @@ def _worker():
         elif command_name == "shutdown":
             user_command["command"] = "shutdown"
 
+        started = time.perf_counter() if profile else None
         result = run(user_command)
+        returned = time.perf_counter() if profile else None
 
         device = user_command.get("bufferDevice")
         if device in ("mps", "cuda"):
@@ -717,9 +726,23 @@ def _worker():
             else:
                 torch.mps.synchronize()
 
+        if profile:
+            completed = time.perf_counter()
+            profile.write(json.dumps({
+                "pid": os.getpid(), "script": script, "command": command_name,
+                "withGradient": user_command.get("withGradient", False),
+                "device": str(getattr(weights, "device", "cpu")), "dtype": str(weights.dtype),
+                "rows": int(weights.shape[0]), "parameters": len(parameter_names),
+                "runSeconds": returned - started,
+                "synchronizeSeconds": completed - returned,
+                "wallSeconds": completed - started,
+            }) + "\n")
+
         _respond(result)
 
         if command_name == "shutdown":
+            if profile:
+                profile.close()
             for shm in shared_memory_list:
                 shm.close()
             return 0

@@ -466,6 +466,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   ;
 
   pybind11::class_<Propagator>(module, "Propagator")
+  .def("setIThrow", &Propagator::setIThrow)
+  .def("getIThrow", &Propagator::getIThrow)
   .def(pybind11::init())
   .def("propagateParameters", &Propagator::propagateParameters)
   .def("throwToyParameters", &Propagator::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
