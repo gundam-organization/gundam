@@ -11,13 +11,11 @@
 #include "BinSet.h"
 #include "GundamGlobals.h"
 
-#include "GenericToolbox.Root.h" // TFile
-#include "GenericToolbox.Loops.h"
 
 #include <vector>
 #include <string>
 
-namespace GenericToolbox { class ParallelWorker; }
+namespace GenericToolbox { class ParallelWorker; class TFilePath; }
 
 class Sample : public JsonBaseClass {
 

@@ -39,15 +39,15 @@ if( ROOT_FOUND )
   )
   cmessage( STATUS "[ROOT]: ROOT Version: ${ROOT_VERSION}" )
 
-  # Grab functions such as generate dictionary
+  # Grab functions such as generate dictionary without inheriting ROOT's
+  # include directories. ROOT can bundle nlohmann headers with a different
+  # ABI; each target must get its includes from its declared dependencies.
+  get_property(gundamIncludeDirectories DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
   include( ${ROOT_USE_FILE} )
+  set_property(DIRECTORY PROPERTY INCLUDE_DIRECTORIES "${gundamIncludeDirectories}")
 
-  # Add the libraries and include files here.  These "should" go in
-  # the target_link_libraries or target_include_directories for each library
-  # that uses them, but they all use them, so put them here. This keeps the
-  # symmetry when root-config (if find_package didn't work)
-  link_libraries(${ROOT_LIBRARIES})
-  include_directories(${ROOT_INCLUDE_DIRS})
+  # ROOT libraries reach every GUNDAM target through GundamUtils (linked
+  # PUBLIC there), so they are not linked globally here.
 
   if (ROOT_VERSION VERSION_GREATER_EQUAL 6.30.00)
     set(ROOT_minuit2_FOUND "yes")
@@ -90,7 +90,22 @@ else( ROOT_FOUND )
   cmessage( STATUS "[ROOT]: root-config --cflags: ${ROOT_CXX_FLAGS}")
   cmessage( STATUS "[ROOT]: root-config --ldflags: ${ROOT_LINK_FLAGS}")
 
-  add_compile_options("SHELL:${ROOT_CXX_FLAGS}")
+  # Pass ROOT includes through GundamUtils, as in the CMake-package path.
+  # Keeping -I flags globally would also affect the independent toolbox modules.
+  execute_process(COMMAND ${ROOT_config_CMD} --incdir
+      OUTPUT_VARIABLE ROOT_INCLUDE_DIRS
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  separate_arguments(gundamRootCompileOptions UNIX_COMMAND "${ROOT_CXX_FLAGS}")
+  set(gundamRootIncludeArgument OFF)
+  foreach(gundamRootCompileOption IN LISTS gundamRootCompileOptions)
+    if(gundamRootIncludeArgument)
+      set(gundamRootIncludeArgument OFF)
+    elseif(gundamRootCompileOption STREQUAL "-I" OR gundamRootCompileOption STREQUAL "-isystem")
+      set(gundamRootIncludeArgument ON)
+    elseif(NOT gundamRootCompileOption MATCHES "^(-I|-isystem).+")
+      add_compile_options("${gundamRootCompileOption}")
+    endif()
+  endforeach()
   add_link_options("SHELL:${ROOT_LINK_FLAGS}")
 
   if (ROOT_VERSION VERSION_GREATER_EQUAL 6.30.00)

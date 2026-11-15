@@ -14,6 +14,7 @@ the minimizer type is set to `RootMinimizer`.
 |---------------------------------|--------|------------------------------------------------------------------------------|---------------------|
 | type                            | string | Must be "RootMinimizer" for this configuration                               |                     |
 | checkParameterValidity          | bool   | Turn on parameter validity checks (in physical, in domain, etc)              | false               |
+| checkFlatDirectionsBeforeMinimize | bool | Diagnose local flat LLH directions before minimization (including dry-runs), without blocking the fit. Error calculation always runs this check. | false |
 | showParametersOnFitMonitor      | bool   | Display fit parameter parameter values on the monitor                        | false               |
 | enablePostFitErrorFit           | bool   | Evaluate the Hessian after the fit                                           | true                |
 | maxNbParametersPerLineOnMonitor | int    | Number of parameters on a monitor line                                       | 15                  |

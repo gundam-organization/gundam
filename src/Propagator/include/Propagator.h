@@ -19,6 +19,8 @@
 #include <vector>
 #include <map>
 #include <future>
+#include <string>
+#include <utility>
 
 class Propagator : public JsonBaseClass {
 
@@ -38,6 +40,8 @@ public:
   void setIThrow(int iThrow){ _iThrow_ = iThrow; }
   void setParameterInjectorConfig(const JsonType &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
 
+  void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
+
   // const getters
   [[nodiscard]] auto getIThrow() const { return _iThrow_; }
   [[nodiscard]] auto isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
@@ -49,6 +53,8 @@ public:
   [[nodiscard]] auto& getDialCollectionList() const{ return _dialManager_.getDialCollectionList(); }
   [[nodiscard]] auto& getParameterInjectorMc() const { return _parameterInjectorMc_; }
 
+  [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const;
+
   // mutable getters
   auto& getSampleSet(){ return _sampleSet_; }
   auto& getThreadPool(){ return _threadPool_; }
@@ -57,8 +63,17 @@ public:
   auto& getParametersManager(){ return _parManager_; }
   auto& getDialCollectionList(){ return _dialManager_.getDialCollectionList(); }
 
+  auto& getEnableStatThrowInToys(){ return _enableStatThrowInToys_; }
+  auto& getGaussStatThrowInToys(){ return _gaussStatThrowInToys_; }
+  auto& getEnableEventMcThrow(){ return _enableEventMcThrow_; }
+
   // Core
+  void throwToyParameters();
+  void throwStatErrors();
   void clearContent();
+  [[nodiscard]] bool isConfiguredWith(const JsonType& config_) const{
+    return isInitialized() and _configuredConfig_ == config_;
+  }
   void buildDialCache();
   /// Reassign events in dynamic samples using their current stored variables.
   /// Rebuild bin event lists; the next propagation refills the histograms.
@@ -108,6 +123,8 @@ protected:
   void refillHistograms();
 
 private:
+  // Snapshot of the last successfully configured content, including after overrides.
+  JsonType _configuredConfig_{};
 
   // Parameters
   bool _showTimeStats_{false};
@@ -116,7 +133,10 @@ private:
   bool _devSingleThreadHistFill_{false};
   int _debugPrintLoadedEventsNbPerSample_{5};
   JsonType _parameterInjectorMc_;
-  JsonType _parameterInjectorToy_;
+  JsonType _toyParameterInjector_{};
+  bool _enableStatThrowInToys_{true};
+  bool _gaussStatThrowInToys_{false};
+  bool _enableEventMcThrow_{true};
 
   // Internals
   bool _showNbEventParameterBreakdown_{true};

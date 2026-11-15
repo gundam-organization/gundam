@@ -3,6 +3,7 @@
 //
 
 #include "DialManager.h"
+#include "GundamUtils.h"
 
 
 void DialManager::configureImpl(){
@@ -56,14 +57,16 @@ void DialManager::invalidateInputBuffers(){
   }
 }
 void DialManager::shrinkDialContainers(){
+  LogInfo << "RAM before resizing dial containers: " << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
   LogInfo << "Resizing dial containers..." << std::endl;
   for( auto& dialCollection : _dialCollectionList_ ) {
     if( dialCollection.isEventByEvent() ){ dialCollection.resizeContainers(); }
   }
+  LogInfo << "RAM after resizing dial containers: " << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
 }
 void DialManager::clearEventByEventDials(){
   for( auto& dialCollection: _dialCollectionList_ ) {
-    if( dialCollection.hasDialBranchData() ) { dialCollection.clear(); }
+    dialCollection.resetForLoad();
   }
   invalidateInputBuffers();
 }

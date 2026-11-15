@@ -17,6 +17,7 @@ and are described separately.
 |---------------------------------|--------|------------------------------------------------------------------------|---------------|
 | type                            | string | Choose the SimpleMcmc or RootMinimizer                                 | RootMinimizer |
 | checkParameterValidity          | bool   | Turn on parameter validity checks (in physical, in domain, etc)        | false         |
+| checkFlatDirectionsBeforeMinimize | bool | Diagnose local flat LLH directions before minimization (including dry-runs), without blocking the fit. Error calculation always runs this check. | false |
 | showParametersOnFitMonitor      | bool   | Display fit parameter parameter values on the monitor                  | false         |
 | enablePostFitErrorFit           | bool   | Apply error evaluation after the minimization (may not be implemented) | true          |
 | maxNbParametersPerLineOnMonitor | int    | Number of parameters on a monitor line                                 | 15            |

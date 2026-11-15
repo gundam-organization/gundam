@@ -264,6 +264,7 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<DialInterface>(module, "DialInterface")
   .def("evalResponse", &DialInterface::evalResponse)
+  .def("getSourceKnotPositions", &DialInterface::getSourceKnotPositions)
   .def("getInputBuffer", &DialInterface::getInputBuffer, pybind11::return_value_policy::reference_internal)
   .def("getSummary", &DialInterface::getSummary, pybind11::arg("shallow") = true);
 
@@ -289,6 +290,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::bind_vector<std::vector<EventDialCache::CacheEntry>>(module, "EventDialCacheEntryList");
 
   pybind11::class_<EventDialCache>(module, "EventDialCache")
+  .def("getCacheMemorySize", &EventDialCache::getCacheMemorySize,
+       "Allocated bytes in cache vector buffers; excludes events, dial objects and allocator overhead.")
   .def("getFillIndex", &EventDialCache::getFillIndex)
   .def("getCache", pybind11::overload_cast<>(&EventDialCache::getCache), pybind11::return_value_policy::reference_internal)
   ;
@@ -297,6 +300,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getName", &Parameter::getName)
   .def("getFullTitle", &Parameter::getFullTitle)
   .def("isEnabled", &Parameter::isEnabled)
+  .def("isFree", &Parameter::isFree)
   .def("getStepSize", &Parameter::getStepSize)
   .def("getPriorValue", &Parameter::getPriorValue)
   .def("getStdDevValue", &Parameter::getStdDevValue)
@@ -329,7 +333,8 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getName", &ParameterSet::getName)
   .def("getParameterList", pybind11::overload_cast<>(&ParameterSet::getParameterList), pybind11::return_value_policy::reference_internal)
   .def("getEigenParameterList", pybind11::overload_cast<>(&ParameterSet::getEigenParameterList), pybind11::return_value_policy::reference_internal)
-  .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCovarianceMatrix, pybind11::const_))
+  .def("getPriorCorrelationMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorCorrelationMatrix, pybind11::const_))
+  .def("getPriorCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::generatePriorCovarianceMatrix, pybind11::const_))
   .def("getPriorFullCovarianceMatrix", pybind11::overload_cast<>(&ParameterSet::getPriorFullCovarianceMatrix, pybind11::const_))
   .def("propagateOriginalToEigen", &ParameterSet::propagateOriginalToEigen)
   .def("propagateEigenToOriginal", &ParameterSet::propagateEigenToOriginal)
@@ -429,6 +434,8 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<Propagator>(module, "Propagator")
   .def(pybind11::init())
+  .def("throwToyParameters", &Propagator::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("throwStatErrors", &Propagator::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("updateEventSampleBinning", &Propagator::updateEventSampleBinning,
        "Reassign events in all dynamic samples; propagate afterwards to refill histograms.")
   .def("initialize", pybind11::overload_cast<>(&Propagator::initialize), pybind11::return_value_policy::reference)
@@ -480,8 +487,6 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getLastStatLikelihood", &LikelihoodInterface::getLastStatLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("throwToyParameters", &LikelihoodInterface::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
-  .def("throwStatErrors", &LikelihoodInterface::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setCurrentParameterValuesAsPrior", &LikelihoodInterface::setCurrentParameterValuesAsPrior, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setDataType", &LikelihoodInterface::setDataType, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getModelPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getModelPropagator), pybind11::return_value_policy::reference)
@@ -509,6 +514,7 @@ PYBIND11_MODULE(GUNDAM, module) {
      pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("minimize", &MinimizerBase::minimize)
   .def("getMinimizerStatus", &MinimizerBase::getMinimizerStatus)
+  .def("checkFlatDirections", &MinimizerBase::checkFlatDirections, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),

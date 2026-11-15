@@ -6,6 +6,7 @@
 #include "GundamGlobals.h"
 
 #include "Logger.h"
+#include "GenericToolbox.Root.h"
 #include "GenericToolbox.Thread.h"
 #include "GenericToolbox.Loops.h"
 

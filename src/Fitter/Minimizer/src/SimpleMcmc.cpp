@@ -369,7 +369,7 @@ bool SimpleMcmc::adaptiveDefaultProposalCovariance( AdaptiveStepMCMC& mcmc,
               par->getStepSize(), *par);
       mcmc.GetProposeStep().SetGaussian(count0-1,step);
     }
-    else if (par->getPriorType() == Parameter::PriorType::Flat) {
+    else if (par->isFree()) {
       // Gundam uses flat to mean "free", so this doesn't use a Uniform
       // step between bounds.
       double step = std::min(par->getStepSize(),par->getStdDevValue());

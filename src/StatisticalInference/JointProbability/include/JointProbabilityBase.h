@@ -7,6 +7,8 @@
 
 #include "SamplePair.h"
 
+#include <cmath>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -33,13 +35,37 @@ namespace JointProbability{
     // testing.
     virtual double eval(double data_, double pred_, double err_, int bin_) const = 0;
 
+    // Evaluate propagated bin values while retaining sample-specific likelihood
+    // settings. err_ is sqrt(sum of squared event weights), as in Histogram.
+    [[nodiscard]] virtual double evalWithPrediction(const SamplePair& samplePair_, double data_, double pred_, double err_, int bin_) const {
+      return eval(data_, pred_, err_, bin_);
+    }
+
+    [[nodiscard]] virtual double evalPredictionGradient(double data_, double pred_, double err_, int bin_) const {
+      return evalGradientByFiniteDifference(pred_, [&](double predVal_){ return eval(data_, predVal_, err_, bin_); });
+    }
+
+    [[nodiscard]] virtual double evalSqrtSumSqWeightsGradient(double data_, double pred_, double err_, int bin_) const {
+      return evalGradientByFiniteDifference(err_, [&](double errVal_){ return eval(data_, pred_, errVal_, bin_); });
+    }
+
     // Likelihood for a single bin llh from histogram and bin index.  Override this if precalculation is needed.
     [[nodiscard]] virtual double eval( const SamplePair& samplePair_, int bin_ ) const {
       if( this->isBinIgnored(samplePair_, bin_) ){ return 0.; }
       const double dataVal{samplePair_.data->getHistogram().getBinContentList()[bin_].sumWeights};
       const double predVal{samplePair_.model->getHistogram().getBinContentList()[bin_].sumWeights};
       const double predErr{samplePair_.model->getHistogram().getBinContentList()[bin_].sqrtSumSqWeights};
-      return eval(dataVal, predVal, predErr, bin_);
+      return evalWithPrediction(samplePair_, dataVal, predVal, predErr, bin_);
+    }
+
+    [[nodiscard]] virtual double evalPredictionGradient( const SamplePair& samplePair_, int bin_ ) const {
+      auto& binContent = samplePair_.model->getHistogram().getBinContentList()[bin_];
+      return evalGradientByFiniteDifference(binContent.sumWeights, [&](double){ return eval(samplePair_, bin_); });
+    }
+
+    [[nodiscard]] virtual double evalSqrtSumSqWeightsGradient( const SamplePair& samplePair_, int bin_ ) const {
+      auto& binContent = samplePair_.model->getHistogram().getBinContentList()[bin_];
+      return evalGradientByFiniteDifference(binContent.sqrtSumSqWeights, [&](double){ return eval(samplePair_, bin_); });
     }
 
     // classic binned llh. Could be overriden to introduce correlations for instance.
@@ -56,6 +82,33 @@ namespace JointProbability{
     void updateZeroPredictionBinsAtPriorFlag(const std::vector<SamplePair>& samplePairList_);
 
     [[nodiscard]] bool isIgnoreBinsWithZeroPredictionAtPrior() const { return _ignoreBinsWithZeroPredictionAtPrior_; }
+
+  protected:
+    template<typename EvalFct>
+    [[nodiscard]] static double evalGradientByFiniteDifference(double& value_, const EvalFct& evalFct_){
+      const double nominal{value_};
+      const double step{std::sqrt(std::numeric_limits<double>::epsilon()) * (std::abs(nominal) + 1.)};
+
+      double gradient{0};
+      if( nominal - step > 0 ){
+        value_ = nominal + step;
+        const double up{evalFct_(value_)};
+        value_ = nominal - step;
+        const double down{evalFct_(value_)};
+        gradient = (up - down) / (2. * step);
+      }
+      else{
+        value_ = nominal + step;
+        const double up{evalFct_(value_)};
+        value_ = nominal;
+        const double center{evalFct_(value_)};
+        gradient = (up - center) / step;
+      }
+
+      value_ = nominal;
+      if( not std::isfinite(gradient) ){ return 0.; }
+      return gradient;
+    }
 
   protected:
     [[nodiscard]] bool isBinIgnored(const SamplePair& samplePair_, int bin_) const;

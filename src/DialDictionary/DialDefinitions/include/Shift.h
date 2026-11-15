@@ -20,6 +20,8 @@ public:
   [[nodiscard]] std::string getDialTypeName() const override { return {"Shift"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override { return _shiftValue_; }
 
+  [[nodiscard]] double getShiftValue() const { return _shiftValue_; }
+
   // setters
   void setShiftValue(double shift_){ _shiftValue_ = shift_; }
 

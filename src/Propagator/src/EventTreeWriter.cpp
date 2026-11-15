@@ -160,8 +160,8 @@ template<typename T> void EventTreeWriter::writeEventsTemplate(const GenericTool
         graphParResponse.emplace_back( new TGraph(_nPointsPerDial_) );
 
         // determining eval points
-        double min = par.getParameterValue() - 5*par.getStdDevValue();
-        double max = par.getParameterValue() + 5*par.getStdDevValue();
+        double min = par.getParameterValue() - ParameterSet::toRealParRange(5., par);
+        double max = par.getParameterValue() + ParameterSet::toRealParRange(5., par);
         for( int iPt = 0 ; iPt < _nPointsPerDial_ ; iPt++ ){
           parameterXvalues.back()[iPt] = min + (max - min)*iPt/(_nPointsPerDial_-1);
           graphParResponse.back()->SetPointX(iPt, parameterXvalues.back()[iPt]);

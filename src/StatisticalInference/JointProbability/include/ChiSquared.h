@@ -8,6 +8,8 @@
 #include "JointProbabilityBase.h"
 
 
+#include <TMath.h>
+
 namespace JointProbability{
 
   class ChiSquared : public JointProbabilityBase {

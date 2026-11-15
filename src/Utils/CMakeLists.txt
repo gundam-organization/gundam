@@ -20,6 +20,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamGreetings.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/VariableDictionary.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ConfigUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/PoissonDeviance.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/FormulaUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamApp.h
@@ -55,7 +56,16 @@ target_include_directories( GundamUtils BEFORE PUBLIC
   ${CMAKE_BINARY_DIR}/generated
 )
 
-target_link_libraries( GundamUtils PUBLIC GenericToolbox::GenericToolbox SimpleCppLogger ${ROOT_LIBRARIES} yaml-cpp::yaml-cpp)
+# Installed JSON packages expose system includes through their imported target.
+# ROOT also bundles nlohmann/json.hpp: explicitly order the selected JSON first
+# even when both dependencies use system includes. Propagate this order to all
+# GUNDAM consumers, including installations using the root-config fallback.
+target_include_directories( GundamUtils SYSTEM BEFORE PUBLIC
+  "$<TARGET_PROPERTY:nlohmann_json::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>"
+)
+target_include_directories( GundamUtils SYSTEM PUBLIC ${ROOT_INCLUDE_DIRS} )
+
+target_link_libraries( GundamUtils PUBLIC nlohmann_json::nlohmann_json GenericToolbox::GenericToolbox SimpleCppLogger ${ROOT_LIBRARIES} yaml-cpp::yaml-cpp GundamCmdLineParser)
 install( TARGETS GundamUtils DESTINATION lib )
 
 #Can uncomment this to install the headers... but is it really neccessary?

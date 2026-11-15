@@ -24,7 +24,12 @@ public:
   DialManager() = default;
 
   // setters
-  void setParametersManager(ParametersManager* parameterManagerPtr_){ _parametersManagerPtr_ = parameterManagerPtr_; }
+  void setParametersManager(ParametersManager* parameterManagerPtr_){
+    _parametersManagerPtr_ = parameterManagerPtr_;
+    for( auto& collection : _dialCollectionList_ ){
+      collection.setParameterSetList(&_parametersManagerPtr_->getParameterSetsList());
+    }
+  }
 
   // const getters
   [[nodiscard]] auto& getDialCollectionList() const{ return _dialCollectionList_; }
@@ -34,6 +39,7 @@ public:
 
   // main methods
   void shrinkDialContainers();
+  // Reset event interfaces and stateful factories while retaining static definitions.
   void clearEventByEventDials();
   void invalidateInputBuffers();
   void updateDialState();

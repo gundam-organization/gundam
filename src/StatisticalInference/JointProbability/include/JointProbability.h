@@ -17,7 +17,9 @@
 #define ENUM_FIELDS \
   ENUM_FIELD( PoissonLLH, 0 ) \
   ENUM_FIELD( LeastSquares ) \
-  ENUM_FIELD( BarlowLLH ) \
+  ENUM_FIELD( BarlowBeeston ) \
+  ENUM_FIELD( BarlowBeestonLiteGaussian ) \
+  ENUM_FIELD( BarlowBeestonLitePoisson ) \
   ENUM_FIELD( BarlowLLH_BANFF_OA2020 ) \
   ENUM_FIELD( BarlowLLH_BANFF_OA2021 ) \
   ENUM_FIELD( BarlowLLH_BANFF_OA2021_SFGD ) \

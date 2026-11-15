@@ -11,6 +11,8 @@
 #include "GenericToolbox.Yaml.h"
 #include "Logger.h"
 
+#include <yaml-cpp/yaml.h>
+
 #include <string>
 #include <vector>
 #include <sstream>
