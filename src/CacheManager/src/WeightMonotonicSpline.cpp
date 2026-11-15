@@ -74,8 +74,8 @@ Cache::Weight::MonotonicSpline::MonotonicSpline(
     LogThrowIf(not fSplineSpace, "Bad SplineSpace alloc");
   }
   catch (...) {
-    LogError << "Uncaught exception in WeightGraph" << std::endl;
-    LogThrow("WeightGraph -- uncaught exception");
+    LogError << "Uncaught exception in WeightMonotonicSpline" << std::endl;
+    LogThrow("WeightMonotonicSpline -- uncaught exception");
   }
 
   // Initialize the caches.  Don't try to zero everything since the
