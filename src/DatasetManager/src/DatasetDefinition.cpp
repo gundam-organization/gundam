@@ -34,7 +34,10 @@ void DatasetDefinition::configureImpl() {
 
   // optional
   _config_.fillValue(_isEnabled_, "isEnabled");
-  LogReturnIf(not _isEnabled_, "\"" << _name_ << "\" is disabled.");
+  if ( not _isEnabled_ ){
+    LogInfo << "\"" << _name_ << "\" is disabled." << std::endl;
+    return;
+  }
 
   _modelDispenser_ = DataDispenser(this);
   _modelDispenser_.getParameters().name = "Asimov";
