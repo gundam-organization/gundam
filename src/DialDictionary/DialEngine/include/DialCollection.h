@@ -6,6 +6,7 @@
 #define GUNDAM_DIALCOLLECTION_H
 
 #include "DialBase.h"
+#include "EventFormula.h"
 #include "DialUtils.h"
 #include "DialInterface.h"
 #include "DialInputBuffer.h"
@@ -35,13 +36,22 @@ public:
   ENUM_FIELD( CompiledLibDial ) \
   ENUM_FIELD( Tabulated ) \
   ENUM_FIELD( Kriged ) \
-  ENUM_FIELD( ExternalWeight )
+  ENUM_FIELD( ExternalWeight ) \
+  ENUM_FIELD( Composite )
 #define ENUM_DICT \
    ENUM_DICT_ENTRY("Normalization", "Norm") \
    ENUM_DICT_ENTRY("RootFormula", "Formula") \
    ENUM_DICT_ENTRY("ExternalWeightResponse", "ExternalWeight")
 #include "GenericToolbox.MakeEnum.h"
   MAKE_ENUM_JSON_INTERFACE(DialType);
+
+#define ENUM_NAME VariableResponseMode
+#define ENUM_FIELDS \
+  ENUM_FIELD( Multiply ) \
+  ENUM_FIELD( Add ) \
+  ENUM_FIELD( Override )
+#include "GenericToolbox.MakeEnum.h"
+  MAKE_ENUM_JSON_INTERFACE(VariableResponseMode);
 
   static void prepareConfig(ConfigReader &config_);
 
@@ -61,6 +71,8 @@ public:
   void setIndex(int index){ _index_ = index; }
   void setSupervisedParameterIndex(int supervisedParameterIndex){ _supervisedParameterIndex_ = supervisedParameterIndex; }
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex){ _supervisedParameterSetIndex_ = supervisedParameterSetIndex; }
+  void setIsCompositeNode(bool isCompositeNode_){ _isCompositeNode_ = isCompositeNode_; }
+  void setCompositeParentIndex(int index_){ _compositeParentIndex_ = index_; }
   void setParameterSetList(std::vector<ParameterSet>* parameterSetList_){ _parameterSetListPtr_ = parameterSetList_; }
 
   // const getters
@@ -81,6 +93,12 @@ public:
 
   // Check if the dial is enabled during this run
   [[nodiscard]] bool isEnabled() const{ return _isEnabled_; }
+  [[nodiscard]] const auto& getEventFormulaDefinition() const{ return _eventFormulaDefinition_; }
+  [[nodiscard]] DialInputBuffer::ParameterReference::MirrorEdges getEventInputMirrorEdges() const{
+    return {_useMirrorDial_ ? _mirrorLowEdge_ : std::nan("unset"), _mirrorRange_};
+  }
+  [[nodiscard]] bool isCompositeNode() const{ return _isCompositeNode_; }
+  [[nodiscard]] int getCompositeParentIndex() const{ return _compositeParentIndex_; }
 
   // Check if the DialBase should be allowed to calculate an extrapolation out
   // outside of the defined parameter bounds.
@@ -109,6 +127,9 @@ public:
 
   [[nodiscard]] auto& getDialType() const{ return _dialType_; }
   [[nodiscard]] auto& getDialOptions() const{ return _dialOptions_; }
+
+  [[nodiscard]] const std::string& getApplyToVariable() const{ return _applyToVariable_; }
+  [[nodiscard]] VariableResponseMode getVariableResponseMode() const{ return _variableResponseMode_; }
 
   // mutable getters
   BinSet &getDialBinSet(){ return _dialBinSet_; }
@@ -194,12 +215,13 @@ public:
   // methods to generate dials with factory
   std::unique_ptr<DialBase> makeDial() const;
   std::unique_ptr<DialBase> makeDial(const TObject* src_) const;
-  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_) const;
+  std::unique_ptr<DialBase> makeDial(const ConfigReader& config_, const Bin* bin_ = nullptr) const;
 
 protected:
   void configureImpl() override;
   void initializeImpl() override;
 
+  void prepareCompositeInputs(ConfigReader& config_);
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
   bool initializeBinnedDials(const ConfigReader& dialsDefinition);
@@ -207,6 +229,7 @@ protected:
   bool initializeDialsWithKriging(const ConfigReader& dialsDefinition);
   bool initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition);
 
+  void readVariableResponseConfig(const ConfigReader& config_);
   void readParametersFromConfig(const ConfigReader &config_);
   ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;
 
@@ -224,6 +247,8 @@ private:
 
   // parameters
   bool _isEventByEvent_{false};
+  bool _isCompositeNode_{false};
+  int _compositeParentIndex_{-1};
   bool _isEnabled_{true};
   bool _useMirrorDial_{false};
   bool _enableDialsSummary_{false};
@@ -238,6 +263,9 @@ private:
   std::string _dialLeafName_{};
   std::string _dialParameterValuesBranch_{};
   std::string _dialResponsesBranch_{};
+
+  std::string _applyToVariable_{};
+  VariableResponseMode _variableResponseMode_{VariableResponseMode::Multiply};
 
   DialType _dialType_{DialType::Norm}; // Graph, Spline...
   std::string _dialOptions_{}; // monotonic, catmull-rom...
@@ -264,6 +292,7 @@ private:
   // set of parameters for each DialBase (i.e. the number of DialInputBuffer
   // objects is 1, or _dialBaseList_.size()).  set, but for
   std::vector<DialInputBuffer> _dialInputBufferList_{};
+  std::shared_ptr<const EventFormula::Definition> _eventFormulaDefinition_{};
 
   // The response supervisors (which apply an upper and lower clamp).  There
   // is a single supervisor for all the interfaces, or one for each
