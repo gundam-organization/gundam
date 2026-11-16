@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dataset templates merge in order before the dataset's own overrides."""
+"""Shared model/data templates merge before each dispenser's own overrides."""
 import json
 import math
 from importlib import import_module
@@ -29,9 +29,9 @@ def main():
     disabled = {'name': 'input', 'model': {}, 'isEnabled': False}
     expect_error({'datasetTemplateList': [{'name': 'duplicate'}, {'name': 'duplicate'}]})
     expect_error({'datasetTemplateList': [{}]})
-    expect_error({'datasetList': [dict(disabled, useTemplates=[{'name': 'missing'}])]})
-    engine = configure({'datasetList': [dict(disabled, useTemplates=[
-        {'name': 'missing', 'isEnabled': False}])]})
+    expect_error({'datasetList': [dict(disabled, model={'useTemplates': [{'name': 'missing'}]})]})
+    engine = configure({'datasetList': [dict(disabled, model={'useTemplates': [
+        {'name': 'missing', 'isEnabled': False}]})]})
     assert len(engine.getLikelihoodInterface().getDatasetList()) == 1
 
     path = Path.cwd() / '836CompatibilityDatasetTemplates.root'
@@ -46,26 +46,45 @@ def main():
         manager = f'''    datasetManagerConfig:
       datasetTemplateList:
         - name: base
-          model:
-            tree: missing
-            filePathList: ["{path}"]
+          tree: missing
+          filePathList: ["{path}"]
         - name: selection
-          model:
-            tree: {second_tree}
+          tree: {second_tree}
       datasetList:
         - name: TestSample
-          useTemplates:
-            - name: base
-            - name: missing
-              isEnabled: false
-            - name: selection
+          model:
+            useTemplates:
+              - name: base
+              - name: missing
+                isEnabled: false
+              - name: selection
+          data:
+            - name: measurement
+              useTemplates:
+                - name: base
+                - name: selection
+              tree: tree_mc
+              fromModel: {str(own_override).lower()}
+          selectedDataEntry: measurement
 '''
         if own_override:
-            manager += '          model:\n            tree: tree_mc\n'
+            manager = manager.replace('          data:', '            tree: tree_mc\n          data:')
         value = fixture.evaluate_config(original[:begin] + manager + original[end:],
                                         Path.cwd(), str(own_override))
         reference = fixture.evaluate_config(original, Path.cwd(), 'reference')
         assert math.isclose(value, reference, rel_tol=1e-12, abs_tol=1e-12)
+        builder = GUNDAM.ConfigUtils.ConfigBuilder()
+        builder.setConfigFromYamlString(original[:begin] + manager + original[end:])
+        reader = GUNDAM.ConfigUtils.ConfigReader(builder.getConfig())
+        reader.defineField(GUNDAM.ConfigUtils.ConfigReader.FieldDefinition('fitterEngineConfig'))
+        engine = GUNDAM.FitterEngine()
+        engine.configure(reader.fetchValueConfigReader('fitterEngineConfig'))
+        likelihood = engine.getLikelihoodInterface()
+        likelihood.setDataType(GUNDAM.LikelihoodInterface.DataType.RealData)
+        likelihood.initialize()
+        sample = likelihood.getDataPropagator().getSampleSet().getSampleList()[0]
+        assert sum(b.sumWeights for b in sample.getHistogram().getBinContentList()) == 10
+
 
 
 if __name__ == '__main__':

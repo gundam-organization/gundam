@@ -28,29 +28,24 @@ void DatasetManager::configureImpl(){
   _datasetList_.clear();
   _datasetList_.reserve(datasetListConfig.getConfig().size());
   for( const auto& datasetConfig : datasetListConfig.loop() ){
-    ConfigReader datasetReader(datasetConfig);
-    datasetReader.defineFields({{"useTemplates"}});
-    ConfigUtils::ConfigBuilder configBuilder;
-    for( auto& templateReference : datasetReader.loop("useTemplates") ){
-      templateReference.clearFields();
-      templateReference.defineFields({
-        {FieldFlag::MANDATORY, "name"},
-        {"isEnabled"},
-      });
-      templateReference.checkConfiguration();
-      if( not templateReference.fetchValue("isEnabled", true) ){ continue; }
-      const auto name = templateReference.fetchValue<std::string>("name");
-      auto templateIndex = templateIndexDict.find(name);
-      LogThrowIf(templateIndex == templateIndexDict.end(), "Unknown dataset template: " << name);
-      auto templateConfig = _datasetTemplateList_.at(templateIndex->second).getConfig().getConfig();
-      templateConfig.erase("name");
-      configBuilder.override(templateConfig);
+    ConfigReader effectiveConfig(datasetConfig);
+    effectiveConfig.defineFields({{"model", {"mc"}}, {"data"}});
+    if( effectiveConfig.hasField("model") ){
+      auto modelConfig = effectiveConfig.fetchValue<ConfigReader>("model");
+      DataDispenser::applyTemplates(modelConfig, _datasetTemplateList_);
+      effectiveConfig.getConfig().erase("mc");
+      effectiveConfig.getConfig()["model"] = modelConfig.getConfig();
     }
-    auto ownConfig = datasetConfig.getConfig();
-    ownConfig.erase("useTemplates");
-    configBuilder.override(ownConfig);
-    ConfigReader effectiveConfig(configBuilder.getConfig());
-    effectiveConfig.setParentPath(datasetConfig.getParentPath());
+    if( effectiveConfig.hasField("data") ){
+      auto dataConfig = effectiveConfig.fetchValue<ConfigReader>("data");
+      for( auto& entry : dataConfig.getConfig() ){
+        ConfigReader dispenserConfig(entry);
+        DataDispenser::applyTemplates(dispenserConfig, _datasetTemplateList_);
+        entry = dispenserConfig.getConfig();
+      }
+      effectiveConfig.getConfig()["data"] = dataConfig.getConfig();
+    }
+    effectiveConfig.clearFields();
     _datasetList_.emplace_back(effectiveConfig, int(_datasetList_.size()));
   }
 }

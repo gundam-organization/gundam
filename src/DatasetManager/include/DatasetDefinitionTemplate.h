@@ -5,8 +5,8 @@
 
 #include <string>
 
-// Holds a partial dataset configuration. Its fields are validated only after
-// the templates and the dataset configuration have been combined.
+// Holds a partial data dispenser configuration. Its fields are validated only after
+// the templates and the dispenser configuration have been combined.
 class DatasetDefinitionTemplate : public JsonBaseClass {
 protected:
   void configureImpl() override;
