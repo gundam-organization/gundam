@@ -994,6 +994,12 @@ void DataDispenser::fetchRequestedLeaves(){
     }
   }
 
+  // Variable dial targets must be available even when they are not binning axes.
+  for( const auto& name : _cache_.propagatorPtr->getSampleSet().getEventVariableNameList() ){
+    std::set<std::string> variableDictStack;
+    addVariableDictRequestedByName(_cache_, name, _parameters_.variableDict, _parameters_.variableDictTransform, variableDictStack);
+  }
+
   // Sample binning variables are also stored when dynamic binning is enabled.
   {
     std::vector<std::string> varForIndexingListBuffer{};
@@ -1307,6 +1313,14 @@ void DataDispenser::loadFromHistContent(){
     auto* histObj = fHist->Get( sampleHistDef->hist.c_str() );
     LogExitIf( histObj == nullptr, "Could not find TObject \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
 
+    if( sample->getHistogram().isBinningResponseEnabled() ){
+      // Imported bin contents already define the data histogram. Dummy events
+      // retain their assigned bin; they must not undergo another binning response.
+      LogInfo << "Disabling binning response for sample \"" << sample->getName()
+              << "\" loaded from histogram content." << std::endl;
+      sample->getHistogram().configureBinningResponse(ConfigReader(JsonType{{"isEnabled", false}}));
+    }
+
     if( histObj->InheritsFrom("THnD") ){
       auto* hist = (THnD*) histObj;
       int nBins = 1;
@@ -1329,6 +1343,11 @@ void DataDispenser::loadFromHistContent(){
         }
         sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
         sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+
+        // Every dummy event needs a cache entry, even without attached dials.
+        auto* eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
+        eventDialCacheEntry->event.sampleIndex = std::size_t(sample->getIndex());
+        eventDialCacheEntry->event.eventIndex = _cache_.sampleIndexOffsetList[sample->getIndex()]++;
       }
     }
     else if(histObj->InheritsFrom("TH1D")){
@@ -1896,6 +1915,8 @@ void DataDispenser::loadEvent(int iThread_){
   auto& threadSharedData = threadSharedDataList[iThread_];
 
   // local
+  // Snapshot conditions while the reader still owns this entry's tree buffers.
+  std::vector<bool> dialApplyConditionList(_cache_.dialCollectionsRefList.size(), true);
   Event eventIndexingBuffer;
   eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
 
@@ -2234,6 +2255,11 @@ void DataDispenser::loadEvent(int iThread_){
         dialCloneArrayIndex = static_cast<int>(threadSharedData.buffer.dialIndexFormula.eval(eventIndexingBuffer));
       }
 
+      for( size_t iCollection = 0 ; iCollection < dialApplyConditionList.size() ; ++iCollection ){
+        auto& condition = threadSharedData.buffer.dialApplyConditionFormulaList[iCollection];
+        dialApplyConditionList[iCollection] = not condition.isEnabled() or condition.eval(eventIndexingBuffer) != 0;
+      }
+
       // only load event-by-event dials, binned dials etc. will be processed later
       for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
         auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
@@ -2241,12 +2267,7 @@ void DataDispenser::loadEvent(int iThread_){
         // if not event-by-event dial -> leave
         if( not dialCollectionRef->hasDialBranchData() ){ continue; }
 
-        if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
-          if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
-            // next dialSet
-            continue;
-          }
-        }
+        if( not dialApplyConditionList[iDialCollection] ){ continue; }
 
         if( not dialCollectionRef->getDialParameterValuesBranch().empty() ){
           const auto* parameterValues = readArray(dialCollectionRef->getDialParameterValuesBranch());
@@ -2333,12 +2354,7 @@ void DataDispenser::loadEvent(int iThread_){
           continue; // skip the rest
         }
 
-        if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
-          if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
-            // next dialSet
-            continue;
-          }
-        }
+        if( not dialApplyConditionList[iDialCollection] ){ continue; }
 
         int iCollection = dialCollectionRef->getIndex();
 
