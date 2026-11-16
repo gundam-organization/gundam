@@ -3,8 +3,8 @@
 //
 
 #include "EventDialCache.h"
-#include "CompositeDial.h"
 #include "EventFormula.h"
+#include "CompositeDial.h"
 
 #include "Logger.h"
 
@@ -168,15 +168,24 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
           LogThrow("DEV ERROR: Please report this issue to github!! This should not happen");
         }
 
-        auto* interface = bindInterface(bindInterface, dialIndex.collectionIndex, dialIndex.interfaceIndex);
-        auto bound = boundInterfaces.find(dialIndex.collectionIndex);
-        if( bound != boundInterfaces.end() ){
-          // Child interfaces are needed only while binding. Composite nodes
-          // retain their dials, supervisors and input mappings directly.
-          cacheEntry.boundDialInterfaces.emplace_back(bound->second);
+        cacheEntry.dialResponseCacheList.emplace_back(
+            dialCollectionList_.at(dialIndex.collectionIndex)
+            .getDialInterfaceList().at(dialIndex.interfaceIndex)
+        );
+        const auto& collection = dialCollectionList_.at(dialIndex.collectionIndex);
+        auto* interface = &dialCollectionList_.at(dialIndex.collectionIndex)
+            .getDialInterfaceList().at(dialIndex.interfaceIndex);
+        if( const auto& definition = collection.getEventFormulaDefinition() ){
+          auto eventInterface = std::make_shared<DialInterface>();
+          eventInterface->setDial(DialBaseObject(std::make_unique<EventFormula>(
+              interface->getDialBaseRef(), definition, *cacheEntry.event, collection.getEventInputMirrorEdges())));
+          eventInterface->setInputBufferRef(interface->getInputBufferRef());
+          eventInterface->setResponseSupervisorRef(interface->getResponseSupervisorRef());
+          eventInterface->setDialBinRef(interface->getDialBinRef());
+          interface = eventInterface.get();
+          cacheEntry.boundDialInterfaces.emplace_back(std::move(eventInterface));
         }
         cacheEntry.dialResponseCacheList.emplace_back(*interface);
-        const auto& collection = dialCollectionList_.at(dialIndex.collectionIndex);
         if( collection.getApplyToVariable().empty() ){ continue; }
         _hasVariableResponses_ = true;
         cacheEntry.dialResponseCacheList.back().appliesToVariable = true;

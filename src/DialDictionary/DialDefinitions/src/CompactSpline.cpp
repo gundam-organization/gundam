@@ -90,3 +90,12 @@ std::string CompactSpline::getSummary() const {
   ss << std::endl << this->getDialTypeName() << ": allow extrapolation ? " << _allowExtrapolation_;
   return ss.str();
 };
+
+std::vector<double> CompactSpline::getSourceKnotPositions() const {
+  if( _splineData_.empty() ){ return {}; }
+  std::vector<double> positions(_splineData_.size() - 2);
+  for( size_t i = 0; i < positions.size(); ++i ){
+    positions[i] = _splineData_[0] + i * _splineData_[1];
+  }
+  return positions;
+}

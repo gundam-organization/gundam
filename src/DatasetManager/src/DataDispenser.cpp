@@ -56,14 +56,11 @@ namespace {
   ){
     RootFileAndTreePath out;
     out.filePath = GenericToolbox::expandEnvironmentVariables(configuredPath_);
-    GenericToolbox::replaceSubstringInsideInputString(out.filePath, "//", "/");
 
     out.treePath = defaultTreePath_;
-    auto chunks = GenericToolbox::splitString(out.filePath, ":", true);
-    if( chunks.size() > 1 ){
-      out.treePath = chunks[1];
-      out.filePath = chunks[0];
-    }
+    const auto path = GenericToolbox::parseRootObjectPath(out.filePath);
+    out.filePath = path.filePath;
+    if( path.hasObjectPath ){ out.treePath = path.objectPath; }
 
     LogExitIf(out.treePath.empty(), "TTree path not set for ROOT file: " << configuredPath_);
     return out;
@@ -680,7 +677,7 @@ void DataDispenser::configureImpl(){
             auto treeList = friendConfig.fetchValue<std::vector<std::string>>("treeList");
             LogExitIf(treeList.empty(), "Friend \"" << friendEntry.name << "\": treeList must not be empty.");
             LogExitIf(
-                friendEntry.path.find(':') != std::string::npos,
+                GenericToolbox::parseRootObjectPath(friendEntry.path).hasObjectPath,
                 "Friend \"" << friendEntry.name << "\": path must contain only the ROOT file path when treeList is provided."
             );
             for( const auto& treePath : treeList ){

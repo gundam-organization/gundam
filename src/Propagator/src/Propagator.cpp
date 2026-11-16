@@ -48,13 +48,13 @@ void Propagator::configureImpl(){
     {"debugPrintLoadedEventsNbPerSample"},
     {"devSingleThreadReweight"},
     {"devSingleThreadHistFill"},
+    {"enableStatThrowInToys"},
+    {"gaussStatThrowInToys"},
+    {"enableEventMcThrow"},
     {"globalEventReweightCap"},
     // relocated:
     {FieldFlag::RELOCATED, "parameterSetListConfig", "parametersManagerConfig/parameterSetList"},
     {FieldFlag::RELOCATED, "throwToyParametersWithGlobalCov", "parametersManagerConfig"},
-    {FieldFlag::RELOCATED, "enableStatThrowInToys", "likelihoodInterfaceConfig/enableStatThrowInToys"},
-    {FieldFlag::RELOCATED, "gaussStatThrowInToys", "likelihoodInterfaceConfig/gaussStatThrowInToys"},
-    {FieldFlag::RELOCATED, "enableEventMcThrow", "likelihoodInterfaceConfig/enableEventMcThrow"},
     {FieldFlag::RELOCATED, "plotGeneratorConfig", "likelihoodInterfaceConfig/plotGeneratorConfig"},
     {FieldFlag::RELOCATED, "llhStatFunction", "likelihoodInterfaceConfig/jointProbabilityConfig/type"},
     {FieldFlag::RELOCATED, "llhConfig", "likelihoodInterfaceConfig/jointProbabilityConfig"},
@@ -92,6 +92,10 @@ void Propagator::configureImpl(){
   _config_.fillValue(_devSingleThreadHistFill_, "devSingleThreadHistFill");
   _config_.fillValue(_eventDialCache_.getGlobalEventReweightCap().maxReweight, "globalEventReweightCap");
 
+  _config_.fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
+  _config_.fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
+  _config_.fillValue(_enableEventMcThrow_, "enableEventMcThrow");
+
   _configuredConfig_ = _config_.getConfig();
 
 }
@@ -111,6 +115,74 @@ void Propagator::initializeImpl(){
 }
 
 // core
+void Propagator::throwToyParameters(){
+
+  LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
+  reweightEvents();
+
+  LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
+  std::cout << getSampleSet().getSampleBreakdown() << std::endl;
+
+  if( isDebugPrintLoadedEvents() ){
+    LogInfo << "Toy events:" << std::endl;
+    LogInfo << GET_VAR_NAME_VALUE(getDebugPrintLoadedEventsNbPerSample()) << std::endl;
+    int iEvt{0};
+    for( auto& entry : getEventDialCache().getCache() ) {
+      LogInfo << "Event #" << iEvt++ << "{" << std::endl;
+      {
+        LogScopeIndent;
+        LogInfo << entry.getSummary() << std::endl;
+      }
+      LogInfo << "}" << std::endl;
+      if( iEvt >= getDebugPrintLoadedEventsNbPerSample() ) break;
+    }
+  }
+
+  if( not _toyParameterInjector_.empty() ){
+    LogInfo << "Injecting parameters..." << std::endl;
+    getParametersManager().injectParameterValues( _toyParameterInjector_ );
+  }
+  else{
+    LogInfo << "Throwing toy parameters according to covariance matrices..." << std::endl;
+    getParametersManager().throwParameters();
+  }
+
+  // reweighting the events accordingly
+  reweightEvents();
+}
+void Propagator::throwStatErrors(){
+  LogInfo << "Throwing statistical error..." << std::endl;
+
+  if( not _enableStatThrowInToys_ ){
+    LogAlert << "Stat error throw is disabled. Skipping..." << std::endl;
+    return;
+  }
+
+  if( _enableEventMcThrow_ ){
+    // Take into account the finite amount of event in MC
+    LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
+    for( auto& sample : getSampleSet().getSampleList() ) {
+      if( sample.isEventMcThrowDisabled() ){
+        LogAlert << "MC event throw is disabled for sample: " << sample.getName() << std::endl;
+      }
+
+      sample.getHistogram().throwEventMcError();
+    }
+  }
+  else{
+    LogWarning << "enableEventMcThrow is disabled. Not throwing individual MC events" << std::endl;
+  }
+
+  LogInfo << "Throwing statistical error on histograms..." << std::endl;
+  if( _gaussStatThrowInToys_ ) {
+    LogWarning << "Using Gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
+  }
+  for( auto& sample : getSampleSet().getSampleList() ){
+    // Asimov bin content -> toy data
+    sample.getHistogram().throwStatError( _gaussStatThrowInToys_ );
+  }
+}
+
 void Propagator::clearContent(){
   _eventVariableResponseCache_.invalidate();
 

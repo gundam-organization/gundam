@@ -14,6 +14,8 @@
 
 #include "GenericToolbox.Wrappers.h"
 
+#include <memory>
+#include <cstdint>
 #include <vector>
 #include <utility>
 
