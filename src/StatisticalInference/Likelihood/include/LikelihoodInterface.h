@@ -5,6 +5,7 @@
 #ifndef GUNDAM_LIKELIHOOD_INTERFACE_H
 #define GUNDAM_LIKELIHOOD_INTERFACE_H
 
+#include "ExternalConstraints.h"
 #include "SamplePair.h"
 #include "Propagator.h"
 #include "ParameterSet.h"
@@ -63,6 +64,7 @@ public:
   void setDataType(const DataType& dataType_){ _dataType_ = dataType_; }
 
   // const getters
+  [[nodiscard]] auto& getExternalConstraints() const{ return _externalConstraints_; }
   [[nodiscard]] auto getNbParameters() const{ return _nbParameters_; }
   [[nodiscard]] auto getNbSampleBins() const{ return _nbSampleBins_; }
   [[nodiscard]] auto getLastLikelihood() const{ return _buffer_.totalLikelihood; }
@@ -134,6 +136,8 @@ private:
 
   EventTreeWriter _eventTreeWriter_{};
   PlotGenerator _plotGenerator_{};
+
+  ExternalConstraints _externalConstraints_{};
 
   /// Statistical likelihood
   std::shared_ptr<JointProbability::JointProbabilityBase> _jointProbabilityPtr_{nullptr};
