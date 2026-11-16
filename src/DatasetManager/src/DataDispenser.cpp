@@ -760,7 +760,7 @@ void DataDispenser::load(Propagator& propagator_){
       ch.setParentPath(_cache_.propagatorPtr->getConfig().getParentPath());
       _cache_.propagatorPtr->setConfig(ch);
 
-      LogWarning << "Re-configuring the propagator with overriden parameters..." << std::endl;
+      LogInfo << "Re-configuring the propagator with overriden parameters..." << std::endl;
       _cache_.propagatorPtr->configure();
       _cache_.propagatorPtr->initialize();
     }
@@ -769,7 +769,7 @@ void DataDispenser::load(Propagator& propagator_){
   this->buildSampleToFillList();
 
   if( _cache_.samplesToFillList.empty() ){
-    LogAlert << "No samples were selected for dataset: " << getTitle() << std::endl;
+    LogWarning << "No samples were selected for dataset: " << getTitle() << std::endl;
     return;
   }
 
@@ -810,7 +810,7 @@ void DataDispenser::load(Propagator& propagator_){
              << std::endl;
     LogExit("Incorrect event selection or likelihood binning");
 #else
-    LogWarning << "Mismatch between event selection and likelihood definitions"
+    LogAlert << "Mismatch between event selection and likelihood definitions"
              << std::endl
              << "Events selected, but not included in likelihood: "
              << this->_unbinnedEvents_.getValue()
@@ -1246,7 +1246,7 @@ void DataDispenser::readAndFill(){
 
 }
 void DataDispenser::loadFromHistContent(){
-  LogWarning << "Creating dummy PhysicsEvent entries for loading hist content" << std::endl;
+  LogInfo << "Creating dummy PhysicsEvent entries for loading hist content" << std::endl;
 
   // non-trivial as we need to propagate systematics. Need to merge with the original data loader, but not straight forward?
   LogExitIf( _parameters_.useReweightEngine, "Hist loader not implemented for MC containers" );
@@ -1408,7 +1408,7 @@ std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
       nMaxEntries = Long64_t( double(sourceNbEntries) * _parameters_.fractionOfEntries );
       if( verbose_ ){
         LogScopeIndent;
-        LogWarning << "Max entries: " << nMaxEntries << std::endl;
+        LogInfo << "Max entries: " << nMaxEntries << std::endl;
       }
 
     }
@@ -2061,7 +2061,7 @@ void DataDispenser::loadEvent(int iThread_){
     LogInfoIf(hasEventDials) << LOGGER_STR_COLOR_MAGENTA_BG << "      " << LOGGER_STR_COLOR_RESET << " -> Dials stored in RAM" << std::endl;
 
     if( _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
-      LogAlert << "Loading data in single thread (devSingleThreadEventLoaderAndIndexer option set to true)" << std::endl;
+      LogInfo << "Loading data in single thread (devSingleThreadEventLoaderAndIndexer option set to true)" << std::endl;
     }
   }
 
