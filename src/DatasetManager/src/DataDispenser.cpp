@@ -1001,7 +1001,7 @@ void DataDispenser::fetchRequestedLeaves(){
       for (const auto& binContext : sample.getHistogram().getBinContextList()) {
         for (const auto& edges : binContext.bin.getEdgesList()) {
           GenericToolbox::addIfNotInVector(edges.varName, varForIndexingListBuffer);
-          if( sample.isUseDynamicBinning() ){
+          if( sample.isUseDynamicBinning() or sample.getHistogram().isBinningResponseEnabled() ){
             GenericToolbox::addIfNotInVector(edges.varName, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
           }
         }
@@ -2184,7 +2184,7 @@ void DataDispenser::loadEvent(int iThread_){
         sampleBinIdxList.emplace_back(eventIndexingBuffer.getIndices().bin);
 
         // No bin found -> warning
-        if( sampleBinIdxList.back() == -1 and not eventSample.isUseDynamicBinning() ){
+        if( sampleBinIdxList.back() == -1 and not (eventSample.isUseDynamicBinning() or eventSample.getHistogram().isBinningResponseEnabled()) ){
           const int unbinnedEventThrottle = 5;
           if( this->_unbinnedEvents_++ < unbinnedEventThrottle ){
 
@@ -2220,7 +2220,7 @@ void DataDispenser::loadEvent(int iThread_){
         }
 
         hasSampleToFill = hasSampleToFill or (
-            (sampleBinIdxList.back() != -1 or eventSample.isUseDynamicBinning())
+            (sampleBinIdxList.back() != -1 or eventSample.isUseDynamicBinning() or eventSample.getHistogram().isBinningResponseEnabled())
             and sampleWeightList.back() != 0 );
       }
 
@@ -2290,7 +2290,8 @@ void DataDispenser::loadEvent(int iThread_){
     for( int iSample = 0 ; iSample < int(sampleIdxList.size()) ; iSample++ ){
       if( sampleWeightList[iSample] == 0. ){ continue; }
       if( sampleBinIdxList[iSample] == -1
-          and not _cache_.samplesToFillList[sampleIdxList[iSample]]->isUseDynamicBinning() ){ continue; }
+          and not (_cache_.samplesToFillList[sampleIdxList[iSample]]->isUseDynamicBinning()
+                  or _cache_.samplesToFillList[sampleIdxList[iSample]]->getHistogram().isBinningResponseEnabled()) ){ continue; }
 
       // update for this specific sample
       eventIndexingBuffer.getIndices().sample = _cache_.samplesToFillList[sampleIdxList[iSample]]->getIndex();
