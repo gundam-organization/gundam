@@ -117,7 +117,7 @@ void Propagator::throwToyParameters(){
   reweightEvents();
 
   LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
-  std::cout << getSampleSet().getSampleBreakdown() << std::endl;
+  LogInfo << getSampleSet().getSampleBreakdown() << std::endl;
 
   if( isDebugPrintLoadedEvents() ){
     LogInfo << "Toy events:" << std::endl;
@@ -274,7 +274,7 @@ void Propagator::writeEventRates(const GenericToolbox::TFilePath& saveDir_) cons
 }
 void Propagator::writeParameterStateTree(const GenericToolbox::TFilePath& saveDir_) const{
   if( saveDir_.getRootDir() == nullptr ) {
-    LogError << "TFilePath has no root TDirectory set. Skipping " << __METHOD_NAME__ << std::endl;
+    LogAlert << "TFilePath has no root TDirectory set. Skipping " << __METHOD_NAME__ << std::endl;
     return;
   }
 
