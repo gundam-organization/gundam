@@ -51,7 +51,7 @@ public:
   [[nodiscard]] auto isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
   [[nodiscard]] auto isDialUpdateRequestedPtr() const{ return &_isDialUpdateRequested_; }
   [[nodiscard]] auto getBufferSize() const{ return _inputArraySize_; }
-  [[nodiscard]] auto getInputSize() const{ return _inputParameterReferenceList_.size(); }
+  [[nodiscard]] auto getInputSize() const{ return _isInitialized_ ? size_t(_inputArraySize_) : _inputParameterReferenceList_.size(); }
   [[nodiscard]] auto& getInputBuffer() const { return _inputBuffer_; }
   [[nodiscard]] auto& getInputParameterIndicesList() const{ return _inputParameterReferenceList_; }
 
@@ -71,6 +71,9 @@ public:
   /// Update the buffer to flag if any parameter has changed, and apply any
   /// mirroring to the parameter values.
   void update();
+
+  // Call-local inputs for event formula evaluations; no parameter references.
+  void setInputValues(std::vector<double> values_);
 
   // nested getters
   [[nodiscard]] auto& getParameterSet(int iInput_) const{ return _inputParameterReferenceList_[iInput_].getParameterSet(_parSetListPtr_); }

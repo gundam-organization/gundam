@@ -5,6 +5,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamGreetings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ConfigUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/FormulaUtils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/FormulaEvaluator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RootUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamApp.cpp
@@ -22,6 +23,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/ConfigUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/PoissonDeviance.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/FormulaUtils.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/FormulaEvaluator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamApp.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamBacktrace.h
