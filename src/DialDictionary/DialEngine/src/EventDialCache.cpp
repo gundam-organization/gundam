@@ -3,8 +3,8 @@
 //
 
 #include "EventDialCache.h"
-#include "CompositeDial.h"
 #include "EventFormula.h"
+#include "CompositeDial.h"
 
 #include "Logger.h"
 #include "Parameter.h"
