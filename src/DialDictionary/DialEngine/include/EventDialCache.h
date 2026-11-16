@@ -14,6 +14,8 @@
 
 #include "GenericToolbox.Wrappers.h"
 
+#include <memory>
+#include <cstdint>
 #include <vector>
 #include <utility>
 
@@ -79,6 +81,8 @@ public:
     Event* event;
     std::vector<DialResponseCache> dialResponseCacheList{};
     std::vector<VariableResponseCache> variableResponseCacheList{};
+    // Stable ownership for event-specific formula interfaces.
+    std::vector<std::shared_ptr<DialInterface>> boundDialInterfaces{};
 
     [[nodiscard]] std::string getSummary(bool shallow_ = true) const {
       std::stringstream ss;

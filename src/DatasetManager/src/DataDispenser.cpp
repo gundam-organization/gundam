@@ -56,14 +56,11 @@ namespace {
   ){
     RootFileAndTreePath out;
     out.filePath = GenericToolbox::expandEnvironmentVariables(configuredPath_);
-    GenericToolbox::replaceSubstringInsideInputString(out.filePath, "//", "/");
 
     out.treePath = defaultTreePath_;
-    auto chunks = GenericToolbox::splitString(out.filePath, ":", true);
-    if( chunks.size() > 1 ){
-      out.treePath = chunks[1];
-      out.filePath = chunks[0];
-    }
+    const auto path = GenericToolbox::parseRootObjectPath(out.filePath);
+    out.filePath = path.filePath;
+    if( path.hasObjectPath ){ out.treePath = path.objectPath; }
 
     LogExitIf(out.treePath.empty(), "TTree path not set for ROOT file: " << configuredPath_);
     return out;
@@ -464,21 +461,8 @@ namespace {
       const std::string& formulaStr_,
       const std::vector<std::string>& eventVariableNameList_
   ){
-    eventFormula_.expr = FormulaUtils::convertBareVariablesToFormulaParameters(formulaStr_);
-    eventFormula_.formula = TFormula(eventFormula_.expr.c_str(), eventFormula_.expr.c_str());
-    LogExitIf(not eventFormula_.formula.IsValid(), "\"" << formulaStr_ << "\" -> \"" << eventFormula_.expr << "\": could not be parsed as event-buffer formula.");
-
-    eventFormula_.varIndexList.clear();
-    eventFormula_.varIndexList.reserve(eventFormula_.formula.GetNpar());
-    for( int iPar = 0 ; iPar < eventFormula_.formula.GetNpar() ; iPar++ ){
-      auto varIndex = GenericToolbox::findElementIndex(eventFormula_.formula.GetParName(iPar), eventVariableNameList_);
-      LogExitIf(
-          varIndex == -1,
-          "Formula \"" << formulaStr_ << "\" requires event variable \"" << eventFormula_.formula.GetParName(iPar)
-                       << "\", but it is not available in the event buffer."
-      );
-      eventFormula_.varIndexList.emplace_back(varIndex);
-    }
+    eventFormula_.evaluator.setFormulaStr(FormulaUtils::convertBareVariablesToFormulaParameters(formulaStr_));
+    eventFormula_.evaluator.setInputNames(eventVariableNameList_);
   }
 
   void compileRuntimeFormula(
@@ -693,7 +677,7 @@ void DataDispenser::configureImpl(){
             auto treeList = friendConfig.fetchValue<std::vector<std::string>>("treeList");
             LogExitIf(treeList.empty(), "Friend \"" << friendEntry.name << "\": treeList must not be empty.");
             LogExitIf(
-                friendEntry.path.find(':') != std::string::npos,
+                GenericToolbox::parseRootObjectPath(friendEntry.path).hasObjectPath,
                 "Friend \"" << friendEntry.name << "\": path must contain only the ROOT file path when treeList is provided."
             );
             for( const auto& treePath : treeList ){
@@ -978,6 +962,13 @@ void DataDispenser::fetchRequestedLeaves(){
   if( not _cache_.dialCollectionsRefList.empty() ) {
     std::vector<std::string> indexRequests;
     for( auto& dialCollection : _cache_.dialCollectionsRefList ) {
+      if( const auto& definition = dialCollection->getEventFormulaDefinition() ){
+        for( const auto& name : definition->eventVariables ){
+          std::set<std::string> variableDictStack;
+          addVariableDictRequestedByName(_cache_, name, _parameters_.variableDict, _parameters_.variableDictTransform, variableDictStack);
+          GenericToolbox::addIfNotInVector(name, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
+        }
+      }
       auto applyConditionFormulaStr = dialCollection->getApplyConditionStr();
       if( not applyConditionFormulaStr.empty() ) {
         addVariablesRequestedByFormula(_cache_, applyConditionFormulaStr, _parameters_.variableDict, _parameters_.variableDictTransform, false);

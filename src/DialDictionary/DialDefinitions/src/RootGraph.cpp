@@ -18,3 +18,11 @@ double RootGraph::evalResponse(const DialInputBuffer& input_) const {
   }
   return _graph_.Eval(dialInput);
 }
+
+std::vector<double> RootGraph::getSourceKnotPositions() const {
+  std::vector<double> positions(_graph_.GetN());
+  for( size_t i = 0; i < positions.size(); ++i ){
+    positions[i] = _graph_.GetX()[i];
+  }
+  return positions;
+}

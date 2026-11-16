@@ -55,7 +55,7 @@ public:
   void setDial(DialBaseObject&& dial_){ _dial_ = std::move(dial_); }
   // Share the immutable curve; bin, inputs and response supervisor stay local.
   void shareDial(const DialInterface& other_){ _dial_.dialPtr = other_._dial_.dialPtr; }
-  void setInputBufferRef(DialInputBuffer *inputBufferRef){ _inputBufferPtr_ = inputBufferRef; }
+  void setInputBufferRef(const DialInputBuffer *inputBufferRef){ _inputBufferPtr_ = inputBufferRef; }
   void setResponseSupervisorRef(const DialResponseSupervisor *responseSupervisorRef){ _responseSupervisorPtr_ = responseSupervisorRef; }
   void setDialBinRef(const Bin *dialBinRef){ _dialBinRef_ = dialBinRef; }
 
@@ -81,6 +81,11 @@ public:
 
   /// Get the data bin definition for the dial.
   [[nodiscard]] const Bin* getDialBinRef() const {return _dialBinRef_;}
+
+  [[nodiscard]] std::vector<double> getSourceKnotPositions() const {
+    if( not _dial_.get() ){ return {}; }
+    return _dial_->getSourceKnotPositions();
+  }
 
   [[nodiscard]] double evalResponse() const { return _responseSupervisorPtr_->process(_dial_->evalResponse(*_inputBufferPtr_)); }
   [[nodiscard]] std::string getSummary(bool shallow_=true) const;
