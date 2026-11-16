@@ -2,7 +2,7 @@
 #define GUNDAM_DATASET_MANAGER_H
 
 #include "DatasetDefinition.h"
-#include "DatasetDefinitionTemplates.h"
+#include "DatasetDefinitionTemplate.h"
 #include "ConfigUtils.h"
 
 #include <vector>
@@ -17,7 +17,7 @@ public:
   auto& getDatasetList(){ return _datasetList_; }
 
 private:
-  std::vector<DatasetDefinitionTemplates> _datasetTemplateList_{};
+  std::vector<DatasetDefinitionTemplate> _datasetTemplateList_{};
   std::vector<DatasetDefinition> _datasetList_{};
 };
 

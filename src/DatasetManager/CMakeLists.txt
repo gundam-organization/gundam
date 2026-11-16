@@ -5,7 +5,7 @@
 set( LIB_NAME GundamDatasetManager )
 
 set( SRCFILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/DatasetDefinitionTemplates.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DatasetDefinitionTemplate.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DatasetManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/LoaderUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DatasetDefinition.cpp

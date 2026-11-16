@@ -1,8 +1,8 @@
-#include "DatasetDefinitionTemplates.h"
+#include "DatasetDefinitionTemplate.h"
 
 #include "Logger.h"
 
-void DatasetDefinitionTemplates::configureImpl(){
+void DatasetDefinitionTemplate::configureImpl(){
   _config_.clearFields();
   _config_.defineFields({{FieldFlag::MANDATORY, "name"}});
   // Other fields are deliberately unrestricted: this is a partial dataset.
