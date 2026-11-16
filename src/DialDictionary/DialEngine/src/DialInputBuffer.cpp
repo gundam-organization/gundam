@@ -95,6 +95,7 @@ void DialInputBuffer::setInputValues(std::vector<double> values_){
   _inputArraySize_ = int(_inputBuffer_.size());
   _isInitialized_ = true;
   _isDialUpdateRequested_ = true;
+  ++_revision_;
 }
 
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){

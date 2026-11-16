@@ -60,6 +60,7 @@ public:
   void setDialBinRef(const Bin *dialBinRef){ _dialBinRef_ = dialBinRef; }
 
   auto& getDial(){ return _dial_; }
+  const auto& getDial() const{ return _dial_; }
 
   /// Return the input buffer containing the connection to the Parameter(s)
   /// used by this dial.  The number of Parameters contained in the input

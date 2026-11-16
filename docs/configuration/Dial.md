@@ -19,7 +19,7 @@ external libraries to calculate weights.
 | Option                 | Type         | Description                                                            | Default |
 |------------------------|--------------|------------------------------------------------------------------------|---------|
 | dialType               | string       | See below                                                              |         |
-| options                | string or object | Interpolation subtype or structured dial configuration | empty |
+| options                | string or object | Type-specific settings: interpolation subtype or structured dial configuration | empty |
 | isEnabled              | bool         | Dial is not used if this is false                                      | true    |
 | applyOnDataSets        | list(string) | list (regex) of datasets the corresponding dials will apply to         | `["*"]` |
 | applyCondition         | string       | Only apply this dial with formula evaluates to non-zero                | empty   |
@@ -107,9 +107,11 @@ choice: `Spline` for `dialType: Spline`, `Graph` for `dialType: Graph`. This
 implicit curve-branch selection emits a deprecation warning. The existing
 `dialsFilePath` plus `dialsList` object-array syntax is unchanged.
 
-`options` is the common key for type-specific settings. `dialSubType` and
-`dialConfig` remain readable aliases with a rename warning. If multiple names
-are supplied, their values must agree.
+`options` is the common key for type-specific settings. `Spline`, `Graph` and
+`Surface` retain their string options (for example, `options: Bilinear`).
+`Formula`, `CompiledLibDial`, `Composite` and `ExternalWeight` use an object.
+The old keys `dialSubType` and `dialConfig` remain readable aliases, with a
+rename warning. If multiple aliases are supplied, their values must agree.
 
 ### Config options that apply to specific types of dials
 
@@ -138,6 +140,90 @@ can still exceed these bounds between or beyond knots; `minDialResponse` and
 leaves the input knots unchanged.
 
 ### Configuration for different dial types
+
+#### `dialType: Composite`
+
+A composite evaluates a directed acyclic graph of ordinary dials and exposes
+one output. Only this output multiplies the event weight or updates the
+observable selected by `applyToVariable` / `variableResponseMode`.
+
+```yaml
+dialSetDefinitions:
+  - name: combinedResponse
+    dialType: Composite
+    options:
+      nodes:
+        - name: first
+          dialType: Formula
+          dialInputList: [{name: value, parameterName: par0}]
+          options:
+            formulaStr: "[value] * [value]"
+        - name: second
+          dialType: Formula
+          dialInputList: [{name: value, parameterName: par1}]
+          options:
+            formulaStr: "exp([value])"
+        - name: combine
+          dialType: Formula
+          dialInputList:
+            - {name: x, dialResponse: first}
+            - {name: y, dialResponse: second}
+          options:
+            formulaStr: "[x] + [y]"
+      output: combine
+```
+
+`parameterName` references a fit parameter in the owning parameter set;
+`parameterIndex` references its zero-based index in that set. `dialResponse`
+names another node in the same graph. Formula nodes also accept `eventVariable`,
+naming a loaded event variable. Exactly one of these four keys is required
+for each node input. Inputs may mix these sources. `inputIndex` is unsupported.
+Formula inputs require a unique `name`, used as `[name]` in the expression.
+Other dial types retain positional argument order. Node declaration order
+does not matter; shared dependencies are evaluated once per graph evaluation.
+Node names must be non-empty and unique, dependencies must exist, and every
+node must contribute to `output`. Cycles are rejected.
+
+Omit `dialInputList` on Composite definitions, including nested composites.
+Their parameter dependencies are inferred from all their nodes, so a change
+in any referenced fit parameter invalidates the final response cache. This
+also applies to composites attached to a single parameter. Other nodes need
+an explicit, non-empty `dialInputList`.
+
+Nodes use the ordinary dial configuration, including interpolation options,
+response limits, extrapolation and input mirroring. Intermediate
+responses are unbounded by default so signed quantities can pass between
+nodes. Explicit node limits are applied before downstream evaluation. The
+composite's final response retains the usual weight/observable response limits.
+
+| Node type | Supported inputs / loading |
+|-----------|----------------------------|
+| `Normalization` | One input of either source kind |
+| `Formula` | Multiple parameter/response inputs, plus `eventVariable` inputs |
+| `CompiledLibDial` | Multiple parameter/response inputs |
+| `Graph`, `Spline` | One input; ordinary binned-file or event-branch loading, including paired TArray branches |
+| `Surface` | Two inputs; ordinary binned-file or event-branch loading |
+| `Composite` | Another graph; its parameter dependencies are inferred recursively |
+| `Tabulated`, `Kriged`, `ExternalWeight` | Parameter inputs only; their prepared tables/buffers can feed downstream nodes |
+
+Prepared factories cannot consume `dialResponse` inputs, including through a
+nested composite, or inputs mirrored by an enclosing composite. Their updates
+run before per-event graph evaluation. These cases are rejected explicitly.
+`CompiledLibDial` exposes no arity metadata: its implementation must agree
+with the configured input list.
+
+Put the final `applyToVariable` and `variableResponseMode` on the composite.
+Put `binning` and `dialBranchData` on individual nodes. Node dataset filters,
+conditions and bin selections use the normal loading rules and select a dial
+for the **same event**. If the composite applies but a required node has no
+dial (including an empty branch curve), cache construction fails. Constant
+unit responses are preserved as valid node values. Disabled nodes and the
+indirect selectors `dialsDefinitions` / `parametersBinningPath` are unsupported
+inside a composite; use direct node definitions with explicit inputs.
+
+This first implementation uses the standard propagation engine, with its
+normal multithreaded event evaluation and response caching. `CacheManager`
+automatically disables itself when composites are present.
 
 #### `dialType: Normalization`
 
@@ -282,6 +368,11 @@ For example, `{name: offset, parameterName: delta}` binds `[offset]` to `delta`.
 Input declaration order does not determine ROOT parameter order: names are
 resolved once when configuring the dial. Positional `x[i]` expressions and
 parameter references using only `{name: delta}` are unsupported for Formula.
+
+Inside a composite, use the same `{name: delta, parameterName: delta}` or
+`{name: alpha, parameterIndex: 1}` syntax for fit parameter inputs. Event references remain
+`{name: q3, eventVariable: q3}`; responses from other nodes use
+`{name: shift, dialResponse: nodeName}`.
 
 Event variables are requested automatically. Bracketed source names such as
 `{name: momentum, eventVariable: "[q3]"}` are accepted. Different input aliases

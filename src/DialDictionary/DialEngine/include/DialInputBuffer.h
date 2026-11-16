@@ -18,8 +18,9 @@ class DialInputBuffer {
   /// for the evaluation of a collection of dials.
 
   /// The buffer is updated in single thread before the evaluation of
-  /// individual dials is done. This means DialInputBuffer is only meant
-  /// to handle Parameters. Not Event variables.
+  /// individual dials is done. Collection buffers only reference Parameters,
+  /// not Event variables. Composite evaluations use separate call-local
+  /// buffers populated with intermediate values via setInputValues().
 
 public:
   /// definition of data structs
@@ -75,7 +76,7 @@ public:
   /// mirroring to the parameter values.
   void update();
 
-  // Call-local inputs for event formula evaluations; no parameter references.
+  // Call-local inputs for composed evaluations; no parameter references.
   void setInputValues(std::vector<double> values_);
 
   // nested getters
