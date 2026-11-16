@@ -520,6 +520,11 @@ PYBIND11_MODULE(GUNDAM, module) {
   dataTypeClass.attr("Toy") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::Toy));
   dataTypeClass.attr("RealData") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::RealData));
 
+  pybind11::class_<DatasetManager>(module, "DatasetManager")
+  .def(pybind11::init())
+  .def("getDatasetList", pybind11::overload_cast<>(&DatasetManager::getDatasetList), pybind11::return_value_policy::reference_internal)
+  ;
+
   pybind11::class_<GaussianConstraint>(module, "GaussianConstraint")
   .def("getName", &GaussianConstraint::getName)
   .def("isEnabled", &GaussianConstraint::isEnabled)
@@ -553,6 +558,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("setDataType", &LikelihoodInterface::setDataType, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getModelPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getModelPropagator), pybind11::return_value_policy::reference)
   .def("getDataPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getDataPropagator), pybind11::return_value_policy::reference)
+  .def("getDatasetManager", pybind11::overload_cast<>(&LikelihoodInterface::getDatasetManager), pybind11::return_value_policy::reference_internal)
   .def("getDatasetList", pybind11::overload_cast<>(&LikelihoodInterface::getDatasetList), pybind11::return_value_policy::reference)
   .def("initialize", pybind11::overload_cast<>(&LikelihoodInterface::initialize), pybind11::return_value_policy::reference)
   ;

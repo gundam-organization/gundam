@@ -13,7 +13,7 @@
 #include "JointProbability.h"
 #include "Propagator.h"
 #include "EventTreeWriter.h"
-#include "DatasetDefinition.h"
+#include "DatasetManager.h"
 
 #include "GenericToolbox.Utils.h"
 #include "GenericToolbox.Time.h"
@@ -65,6 +65,8 @@ public:
   void setForceAsimovData(bool forceAsimovData_){ _forceAsimovData_ = forceAsimovData_; }
   void setDataType(const DataType& dataType_){ _dataType_ = dataType_; }
 
+  [[nodiscard]] auto& getDatasetManager() const { return _datasetManager_; }
+
   // const getters
   [[nodiscard]] auto& getExternalConstraints() const{ return _externalConstraints_; }
   [[nodiscard]] auto getNbParameters() const{ return _nbParameters_; }
@@ -76,17 +78,18 @@ public:
   [[nodiscard]] auto& getModelPropagator() const{ return _modelPropagator_; }
   [[nodiscard]] auto& getDataPropagator() const{ return _dataPropagator_; }
   [[nodiscard]] auto& getPlotGenerator() const{ return _plotGenerator_; }
-  [[nodiscard]] auto& getDatasetList() const { return _datasetList_; }
+  [[nodiscard]] auto& getDatasetList() const { return _datasetManager_.getDatasetList(); }
   [[nodiscard]] auto& getSamplePairList() const { return _samplePairList_; }
   [[nodiscard]] auto& getBuffer() const { return _buffer_; }
   [[nodiscard]] auto& getDataType() const { return _dataType_; }
 
   // mutable getters
+  auto& getDatasetManager(){ return _datasetManager_; }
   auto& getBuffer(){ return _buffer_; }
   auto& getModelPropagator(){ return _modelPropagator_; }
   auto& getDataPropagator(){ return _dataPropagator_; }
   auto& getPlotGenerator(){ return _plotGenerator_; }
-  auto& getDatasetList(){ return _datasetList_; }
+  auto& getDatasetList(){ return _datasetManager_.getDatasetList(); }
   auto& getSamplePairList(){ return _samplePairList_; }
 
   // mutable core
@@ -143,7 +146,7 @@ private:
   GenericToolbox::ParallelWorker _threadPool_{};
 
   /// user defined datasets
-  std::vector<DatasetDefinition> _datasetList_;
+  DatasetManager _datasetManager_{};
 
   /// this is where model and data are kept to be compared
   Propagator _modelPropagator_{};

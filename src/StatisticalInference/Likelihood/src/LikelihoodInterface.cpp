@@ -32,7 +32,8 @@ void LikelihoodInterface::configureImpl(){
 
   _config_.defineFields({
     {"propagatorConfig"},
-    {"datasetList"},
+    {"datasetManagerConfig"},
+    {FieldFlag::RELOCATED, "datasetList", "datasetManagerConfig/datasetList"},
     {"jointProbabilityConfig"},
     {"plotGeneratorConfig"},
     {"eventTreeWriter"},
@@ -70,10 +71,13 @@ void LikelihoodInterface::configureImpl(){
 
   // defining datasets:
   _config_.fillValue(datasetListConfig, "datasetList");
-  _datasetList_.reserve(datasetListConfig.getConfig().size() );
-  for( const auto& dataSetConfig : datasetListConfig.loop() ){
-    _datasetList_.emplace_back(dataSetConfig, int(_datasetList_.size()));
+  ConfigReader datasetManagerConfig{};
+  _config_.fillValue(datasetManagerConfig, "datasetManagerConfig");
+  datasetManagerConfig.defineFields({{"datasetList"}});
+  if( not datasetManagerConfig.hasField("datasetList") and not datasetListConfig.empty() ){
+    datasetManagerConfig.getConfig()["datasetList"] = datasetListConfig.getConfig();
   }
+  _datasetManager_.configure(datasetManagerConfig);
 
   // new config structure
   _config_.fillValue(jointProbabilityConfig, "jointProbabilityConfig");
@@ -101,7 +105,7 @@ void LikelihoodInterface::initializeImpl() {
 
   _config_.printUnusedKeys();
 
-  for( auto& dataSet : _datasetList_ ){ dataSet.initialize(); }
+  _datasetManager_.initialize();
 
   _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
 
@@ -579,7 +583,7 @@ void LikelihoodInterface::loadModelPropagator(){
   _modelPropagator_.clearContent();
 
   LogInfo << "Loading datasets..." << std::endl;
-  for( auto& dataSet : _datasetList_ ){
+  for( auto& dataSet : _datasetManager_.getDatasetList() ){
     dataSet.getModelDispenser().setPlotGeneratorPtr( &_plotGenerator_ );
     dataSet.getModelDispenser().load( _modelPropagator_ );
   }
@@ -626,7 +630,7 @@ void LikelihoodInterface::loadDataPropagator(){
   _dataPropagator_.clearContent();
 
   bool isAsimov{_dataType_ == DataType::Asimov or _forceAsimovData_};
-  for( auto& dataSet : _datasetList_ ){
+  for( auto& dataSet : _datasetManager_.getDatasetList() ){
     if( _dataType_ == DataType::Toy ){
       if( dataSet.getSelectedToyEntry().empty() or dataSet.getSelectedToyEntry() == "Asimov" ){
         isAsimov = true;
@@ -659,7 +663,7 @@ void LikelihoodInterface::loadDataPropagator(){
   }
   else{
     LogInfo << "Loading datasets..." << std::endl;
-    for( auto& dataSet : _datasetList_ ){
+    for( auto& dataSet : _datasetManager_.getDatasetList() ){
       // let the llh interface choose witch data entry to load
       auto* dataDispenser{this->getDataDispenser( dataSet )};
 

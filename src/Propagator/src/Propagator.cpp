@@ -59,7 +59,7 @@ void Propagator::configureImpl(){
     {FieldFlag::RELOCATED, "llhConfig", "likelihoodInterfaceConfig/jointProbabilityConfig"},
     {FieldFlag::RELOCATED, "scanConfig", "fitterEngineConfig/scanConfig"},
     {FieldFlag::RELOCATED, "eventTreeWriter", "likelihoodInterfaceConfig/eventTreeWriter"},
-    {FieldFlag::RELOCATED, "dataSetList", {"fitSampleSetConfig/dataSetList"}, "likelihoodInterfaceConfig/dataSetList"},
+    {FieldFlag::RELOCATED, "dataSetList", {"fitSampleSetConfig/dataSetList"}, "likelihoodInterfaceConfig/datasetManagerConfig/datasetList"},
   });
   _config_.checkConfiguration();
 

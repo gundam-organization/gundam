@@ -5,6 +5,7 @@
 #ifndef GUNDAM_DATA_DISPENSER_H
 #define GUNDAM_DATA_DISPENSER_H
 
+#include "DatasetDefinitionTemplate.h"
 #include "EventVarTransformLib.h"
 #include "DataDispenserUtils.h"
 
@@ -26,6 +27,7 @@ class DatasetDefinition; // owner
 class DataDispenser : public JsonBaseClass {
 
 public:
+  static void applyTemplates(ConfigReader& config_, const std::vector<DatasetDefinitionTemplate>& templates_);
   static void prepareConfig(ConfigReader &config_);
 
 protected:
