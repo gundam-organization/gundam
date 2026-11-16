@@ -65,7 +65,9 @@ if(WITH_PYTHON_INTERFACE)
     list(APPEND pythonTestEnvironment --unset=DYLD_LIBRARY_PATH)
   endif()
   set(pythonModuleDirectory "$<TARGET_FILE_DIR:${gundamTestPythonTarget}>")
-  list(APPEND pythonTestEnvironment "PYTHONPATH=${pythonModuleDirectory}")
+  list(APPEND pythonTestEnvironment "PYTHONPATH=${pythonModuleDirectory}"
+    "GUNDAM_CALC_XSEC=$<TARGET_FILE:gundamCalcXsec>"
+    "GUNDAM_FITTER=$<TARGET_FILE:gundamFitter>")
   set(pythonTestConfig "${CMAKE_CURRENT_BINARY_DIR}/python-test-config.cmake")
   set(pythonTestLauncher "${CMAKE_CURRENT_SOURCE_DIR}/cmake/RunPythonTest.cmake")
   file(GENERATE OUTPUT "${pythonTestConfig}" CONTENT
