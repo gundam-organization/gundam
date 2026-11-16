@@ -14,7 +14,8 @@ using `jointProbabilityConfig`.
 | Likelihood Interface Options        | Type | Descriptions                                | default   |
 |-------------------------------------|------|---------------------------------------------|-----------|
 | [propagatorConfig](./Propagator.md) | Json | Configure the parameter propagation         |           |
-| dataSetList                         | Json | Configure the input data sets               |           |
+| [datasetManagerConfig](./DatasetManager.md) | Json | Configure the input datasets | |
+| datasetList | Json | Deprecated: use `datasetManagerConfig.datasetList` | |
 | jointProbabilityConfig              | Json | Configure the joint probability calculation | BarlowLLH |
 | plotGeneratorConfig                 | Json |                                             |           |
 | enableStatThrowInToys               | bool |                                             |           |
@@ -35,3 +36,20 @@ probability implementation.
 This option is intended for analyses where the user-defined binning contains
 bins that are meant to stay empty, for example with square binning layouts
 that include unreachable phase-space regions.
+
+### `datasetManagerConfig`
+
+```yaml
+likelihoodInterfaceConfig:
+  datasetManagerConfig:
+    datasetList:
+      - name: input
+        model:
+          tree: events
+          filePathList: [input.root]
+```
+
+The former `datasetList` directly under `likelihoodInterfaceConfig` is still
+read with a relocation warning. If both lists are present, the list in
+`datasetManagerConfig` takes precedence, including an explicitly empty list.
+The older `propagatorConfig.dataSetList` location remains supported as a fallback.
