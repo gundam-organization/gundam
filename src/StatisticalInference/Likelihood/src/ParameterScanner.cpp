@@ -40,7 +40,7 @@ void ParameterScanner::initializeImpl() {
 
   _config_.printUnusedKeys();
 
-  LogWarning << "Initializing ParameterScanner..." << std::endl;
+  LogInfo << "Initializing ParameterScanner..." << std::endl;
 
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "_likelihoodInterfacePtr_ not set.");
 
@@ -139,7 +139,7 @@ void ParameterScanner::initializeImpl() {
     }
   }
 
-  LogWarning << "ParameterScanner initialized." << std::endl;
+  LogInfo << "ParameterScanner initialized." << std::endl;
 }
 
 void ParameterScanner::scanParameterList( std::vector<Parameter>& par_, TDirectory* saveDir_){
@@ -248,7 +248,7 @@ void ParameterScanner::scanParameter(Parameter& par_, TDirectory* saveDir_) {
 }
 void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, const JsonType &start_, int nSteps_) {
   if( nSteps_ == -1 ){ nSteps_ = _nbPointsLineScan_; }
-  LogWarning << "Scanning along a segment with " << nSteps_ << " steps." << std::endl;
+  LogInfo << "Scanning along a segment with " << nSteps_ << " steps." << std::endl;
 
   // don't shout while re-injecting parameters
   Logger::ScopedMute muteLogger;
@@ -292,7 +292,7 @@ void ParameterScanner::scanSegment(TDirectory *saveDir_, const JsonType &end_, c
   }
 
   std::stringstream ss;
-  ss << LogWarning.getPrefixString() << "Scanning...";
+  ss << LogInfo.getPrefixString() << "Scanning...";
 
   LogInfo << "Scanning along the line..." << std::endl;
   for( int iStep = 0 ; iStep < nTotalSteps ; iStep++ ){
