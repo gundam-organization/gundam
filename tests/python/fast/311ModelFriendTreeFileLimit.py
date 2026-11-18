@@ -59,7 +59,7 @@ def main():
     for mode in ('insufficient', 'occupied', 'sufficient', 'shared', 'single', 'capped', 'serial'):
         result = subprocess.run(
             [sys.executable, '-B', str(Path(__file__).resolve()), '--worker', mode],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60,
         )
         expected_status = 1 if mode in ('insufficient', 'occupied') else 0
         if result.returncode != expected_status:
