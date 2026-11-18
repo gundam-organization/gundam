@@ -2151,15 +2151,33 @@ void DataDispenser::loadEvent(int iThread_){
   std::vector<int> sampleBinIdxList;
   std::vector<double> sampleWeightList;
 
-  // TArray does not inherit from TObject. Validate the ROOT class before casting.
-  auto readArray = [&threadSharedData](const std::string& branchName_) -> const TArray* {
-    auto* branch = threadSharedData.treeChain->GetBranch(branchName_.c_str());
-    LogThrowIf(branch == nullptr, "Missing dialBranchData branch: " << branchName_);
+  struct ArrayBranchBuffer{
+    TBranch* branch{nullptr};
     TClass* arrayClass{nullptr};
-    EDataType dataType{kOther_t};
-    branch->GetExpectedType(arrayClass, dataType);
-    LogThrowIf(arrayClass == nullptr or not arrayClass->InheritsFrom(TArray::Class()),
-               "dialBranchData branch '" << branchName_ << "' must contain a TArray");
+  };
+  std::unordered_map<std::string, ArrayBranchBuffer> arrayBranchBuffers;
+  int arrayBranchTreeNumber{-1};
+
+  // TArray does not inherit from TObject. Validate the ROOT class before casting.
+  auto readArray = [&threadSharedData, &arrayBranchBuffers, &arrayBranchTreeNumber](const std::string& branchName_) -> const TArray* {
+    // Friend lookup walks all trees. Resolve each branch once per input file,
+    // while the reader is waiting for this filler to release the current entry.
+    const int treeNumber = threadSharedData.treeChain->GetTreeNumber();
+    if( arrayBranchTreeNumber != treeNumber ){
+      arrayBranchBuffers.clear();
+      arrayBranchTreeNumber = treeNumber;
+    }
+    auto& buffer = arrayBranchBuffers[branchName_];
+    if( buffer.branch == nullptr ){
+      buffer.branch = threadSharedData.treeChain->GetBranch(branchName_.c_str());
+      LogThrowIf(buffer.branch == nullptr, "Missing dialBranchData branch: " << branchName_);
+      EDataType dataType{kOther_t};
+      buffer.branch->GetExpectedType(buffer.arrayClass, dataType);
+      LogThrowIf(buffer.arrayClass == nullptr or not buffer.arrayClass->InheritsFrom(TArray::Class()),
+                 "dialBranchData branch '" << branchName_ << "' must contain a TArray");
+    }
+    auto* branch = buffer.branch;
+    auto* arrayClass = buffer.arrayClass;
     branch->SetStatus(true);
     if( branch->GetAddress() == nullptr ){ branch->SetAddress(nullptr); }
     // Read on demand. ROOT owns the object buffer.
