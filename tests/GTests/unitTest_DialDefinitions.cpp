@@ -319,6 +319,50 @@ TEST(DialLoading, ConcurrentDuplicates){
   EXPECT_EQ(1, collection.getDialInterfaceList().size());
 }
 
+TEST(DialLoading, ConcurrentDistinctSignaturesSurviveIndexGrowth){
+  auto collection = makeLoadingCollection();
+  const size_t count = 4096;
+  auto build = [](size_t value_){
+    auto dial = std::make_unique<Graph>();
+    // Exactly representable values exercise aligned floating-point hashes.
+    dial->buildDial(std::vector<DialUtils::DialPoint>{{0, 1, 0}, {1, 1. + value_ / 4096., 0}});
+    return dial;
+  };
+  std::vector<std::future<std::vector<size_t>>> results;
+  for( size_t worker = 0; worker < 4; ++worker ){
+    results.emplace_back(std::async(std::launch::async, [&, worker](){
+      std::vector<size_t> indices(count);
+      for( size_t i = 0; i < count; ++i ){
+        const auto value = (i + worker * 997) % count;
+        indices[value] = collection.storeEventDial(build(value));
+      }
+      return indices;
+    }));
+  }
+  const auto reference = results.front().get();
+  for( size_t worker = 1; worker < results.size(); ++worker ){
+    EXPECT_EQ(reference, results[worker].get());
+  }
+  EXPECT_EQ(count, collection.getDialInterfaceList().size());
+  // Look up every signature again after all table growth and concurrent inserts.
+  for( size_t value = 0; value < count; ++value ){
+    EXPECT_EQ(reference[value], collection.storeEventDial(build(value)));
+    const auto* dial = collection.getDialInterfaceList()[reference[value]].getDialBaseRef();
+    EXPECT_EQ(build(value)->getDialData(), dial->getDialData());
+  }
+}
+
+TEST(DialLoading, SignedZeroSignaturesShareAnInterface){
+  auto collection = makeLoadingCollection();
+  auto build = [](double zero_){
+    auto dial = std::make_unique<Graph>();
+    dial->buildDial(std::vector<DialUtils::DialPoint>{{zero_, 1, 0}, {1, 2, 0}});
+    return dial;
+  };
+  EXPECT_EQ(collection.storeEventDial(build(-0.)), collection.storeEventDial(build(0.)));
+  EXPECT_EQ(1, collection.getDialInterfaceList().size());
+}
+
 TEST(DialLoading, SimplifiesAffineAndPreservesDomain){
   TGraph graph;
   for( int i = 0; i < 5; ++i ){ graph.SetPoint(i, i, 2 * i + 1); }
