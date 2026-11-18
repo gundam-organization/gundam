@@ -1,5 +1,8 @@
 #include "LikelihoodInterface.h"
+#include "DatasetTreeChain.h"
 #include "GundamGlobals.h"
+
+#include "GenericToolbox.Root.h"
 
 #include <TFile.h>
 #include <TGraph.h>
@@ -127,3 +130,81 @@ TEST_P(RootReaderCleanup, ClosesMainAndFriendFilesBeforePropagation){
 }
 
 INSTANTIATE_TEST_SUITE_P(LoadingThreads, RootReaderCleanup, testing::Values(1, 2));
+
+TEST(DatasetTreeChain, SharesFriendFilesAndRefreshesFormulasAcrossTruncatedAndBackwardReads){
+  TemporaryRootFile firstMain;
+  TemporaryRootFile secondMain;
+  TemporaryRootFile firstFriends;
+  TemporaryRootFile secondFriends;
+  auto writeInput = [](const std::string& mainPath_, const std::string& friendPath_, double shift_){
+    {
+      TFile file(mainPath_.c_str(), "RECREATE");
+      double raw{0}, local{3};
+      TTree main("events", "events");
+      TTree localTree("local", "local");
+      main.Branch("raw", &raw, "raw/D");
+      localTree.Branch("value", &local, "value/D");
+      for( int entry = 0; entry < 4; ++entry ){
+        raw = entry;
+        main.Fill();
+        localTree.Fill();
+      }
+      main.Write();
+      localTree.Write();
+    }
+    {
+      TFile file(friendPath_.c_str(), "RECREATE");
+      double weight{0}, offset{0}, unused{0};
+      TTree weights("weights", "weights");
+      TTree offsets("offsets", "offsets");
+      weights.Branch("value", &weight, "value/D");
+      weights.Branch("unused", &unused, "unused/D");
+      offsets.Branch("value", &offset, "value/D");
+      for( int entry = 0; entry < 4; ++entry ){
+        weight = shift_ + entry;
+        offset = 10 * shift_ + 2 * entry;
+        weights.Fill();
+        offsets.Fill();
+      }
+      weights.Write();
+      offsets.Write();
+    }
+  };
+  writeInput(firstMain.path, firstFriends.path, 1.);
+  writeInput(secondMain.path, secondFriends.path, 10.);
+  const int initialFiles = gROOT->GetListOfFiles()->GetSize();
+  {
+    DatasetTreeChain chain;
+    auto addInput = [&](const std::string& mainPath_, const std::string& friendPath_, Long64_t entries_){
+      chain.addFile(mainPath_, "events", 4, {
+        {"w", friendPath_, "weights"}, {"o", friendPath_, "offsets"}, {"l", mainPath_, "local"}
+      }, entries_);
+    };
+    addInput(firstMain.path, firstFriends.path, 2);
+    addInput(secondMain.path, secondFriends.path, 4);
+    ASSERT_EQ(6, chain.GetEntries());
+    GenericToolbox::TreeBuffer buffer;
+    buffer.setTree(&chain);
+    const std::string expression = "w.value + o.value + l.value + raw";
+    buffer.addExpression(expression);
+    buffer.initialize();
+    for( Long64_t entry : {0, 1, 2, 5, 1, 4, 0} ){
+      ASSERT_GT(chain.GetEntry(entry), 0);
+      EXPECT_EQ(entry, chain.GetReadEntry());
+      EXPECT_EQ(6, chain.GetEntries());
+      buffer.saveExpressions();
+      const double shift = entry < 2 ? 1. : 10.;
+      const Long64_t localEntry = entry < 2 ? entry : entry - 2;
+      EXPECT_DOUBLE_EQ(11 * shift + 4 * localEntry + 3,
+                       buffer.getExpressionBuffer(expression)->getBuffer().getValueAsDouble());
+      ASSERT_NE(nullptr, chain.GetFriend("w"));
+      EXPECT_EQ(chain.GetFriend("w")->GetCurrentFile(), chain.GetFriend("o")->GetCurrentFile());
+      EXPECT_EQ(chain.GetCurrentFile(), chain.GetFriend("l")->GetCurrentFile());
+      EXPECT_FALSE(chain.GetFriend("w")->GetBranchStatus("unused"));
+      EXPECT_EQ(initialFiles + 2, gROOT->GetListOfFiles()->GetSize());
+    }
+    chain.SetNotify(nullptr);
+    chain.ResetBranchAddresses();
+  }
+  EXPECT_EQ(initialFiles, gROOT->GetListOfFiles()->GetSize());
+}
