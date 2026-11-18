@@ -4,6 +4,7 @@
 
 #include "DataDispenser.h"
 #include "DatasetDefinition.h"
+#include "DatasetTreeChain.h"
 #include "LoaderUtils.h"
 
 #include "Propagator.h"
@@ -31,11 +32,13 @@
 #include <TBranchElement.h>
 #include <TLeafObject.h>
 #include <TClass.h>
+#include <TDirectory.h>
 #include <TGraph.h>
 
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <cstdlib>
 #include <exception>
 #include <unordered_map>
 #include <map>
@@ -43,6 +46,12 @@
 #include <string>
 #include <vector>
 #include <sstream>
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/resource.h>
+#endif
 
 namespace {
 
@@ -821,6 +830,7 @@ void DataDispenser::load(Propagator& propagator_){
     }
   }
 
+  this->checkFileDescriptorLimit();
   this->parseStringParameters();
   this->fetchRequestedLeaves();
   this->doEventSelection();
@@ -1420,6 +1430,53 @@ void DataDispenser::loadFromHistContent(){
   fHist->Close();
 }
 
+void DataDispenser::checkFileDescriptorLimit() const{
+#if defined(__unix__) || defined(__APPLE__)
+  struct rlimit fileLimit{};
+  if( getrlimit(RLIMIT_NOFILE, &fileLimit) != 0 or fileLimit.rlim_cur == RLIM_INFINITY ){ return; }
+
+  size_t nbFilesPerReader{0};
+  for( const auto& fileEntry : _parameters_.filePathList ){
+    if( not fileEntry.isEnabled ){ continue; }
+    std::set<std::string> files{resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath).filePath};
+    for( const auto& friendEntry : fileEntry.friendList ){
+      if( not friendEntry.isEnabled ){ continue; }
+      files.insert(resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath).filePath);
+    }
+    nbFilesPerReader = std::max(nbFilesPerReader, files.size());
+  }
+  const int nbReaders = (
+      _owner_->isDevSingleThreadEventSelection() and _owner_->isDevSingleThreadEventLoaderAndIndexer()
+  ) ? 1 : getNbParallelCpu();
+  const auto nbInputFiles = static_cast<rlim_t>(nbReaders) * nbFilesPerReader;
+
+  rlim_t nbOpenFiles{0};
+  if( auto* directory = opendir("/dev/fd") ){
+    const int directoryFd = dirfd(directory);
+    while( const auto* entry = readdir(directory) ){
+      if( entry->d_name[0] < '0' or entry->d_name[0] > '9' ){ continue; }
+      if( std::strtol(entry->d_name, nullptr, 10) != directoryFd ){ ++nbOpenFiles; }
+    }
+    closedir(directory);
+  }
+  else{
+    // Some POSIX systems do not expose /dev/fd.
+    for( rlim_t fd = 0; fd < fileLimit.rlim_cur; ++fd ){
+      if( fcntl(static_cast<int>(fd), F_GETFD) != -1 ){ ++nbOpenFiles; }
+    }
+  }
+
+  LogExitIf(
+      nbOpenFiles >= fileLimit.rlim_cur or nbInputFiles > fileLimit.rlim_cur - nbOpenFiles,
+      "Open-file limit is insufficient for dataset " << _owner_->getName()
+      << ": " << nbReaders << " reader(s) x up to " << nbFilesPerReader << " distinct input files require "
+      << nbInputFiles << " additional file descriptors; " << nbOpenFiles << " are already open, and the soft limit is "
+      << fileLimit.rlim_cur << ". Friend trees in the same file share one file descriptor per reader. "
+      << "Increase the open-file limit before launching GUNDAM (ulimit -n), or reduce nbMaxThreadsForLoad."
+  );
+#endif
+}
+
 int DataDispenser::getNbParallelCpu() const{
   return GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
 }
@@ -1429,93 +1486,48 @@ const std::string& DataDispenser::getVariableExpression(const std::string& varia
 std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
   LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
 
-  // TFriendElement does not own a TChain supplied through AddFriend(TTree*, ...).
-  // Keep the friend chains alive through the lifetime of their master chain.
-  auto friendChainList = std::make_shared<std::vector<std::shared_ptr<TChain>>>();
-  std::shared_ptr<TChain> treeChain(new TChain(), [friendChainList](TChain* chain){ delete chain; });
-
+  auto treeChain = std::make_shared<DatasetTreeChain>();
   for( const auto& fileEntry : _parameters_.filePathList ){
     if( not fileEntry.isEnabled ){ continue; }
-    auto source = resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath);
-
+    const auto source = resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath);
     if( verbose_ ){
       LogScopeIndent;
       LogInfo << source.filePath << ":" << source.treePath << std::endl;
     }
 
-    validateRootFileAndTreePath(source, "ROOT file");
-
-    Long64_t sourceNbEntries{-1};
-    std::unique_ptr<TFile> temp{};
-    bool hasEnabledFriend{false};
-    for( const auto& friendEntry : fileEntry.friendList ){
-      if( friendEntry.isEnabled ){ hasEnabledFriend = true; break; }
-    }
-    if( _parameters_.fractionOfEntries != 1. or hasEnabledFriend ){
-      temp.reset(TFile::Open(source.filePath.c_str()));
-      LogExitIf(temp == nullptr, "Error while opening TFile: " << source.filePath);
-
-      auto* tree = temp->Get<TTree>(source.treePath.c_str());
-      LogExitIf(tree == nullptr, "Error while opening TTree: " << source.treePath << " in " << source.filePath);
-      sourceNbEntries = tree->GetEntries();
-    }
-
-    Long64_t nMaxEntries{TTree::kMaxEntries};
-    if( _parameters_.fractionOfEntries != 1. ){
-      nMaxEntries = Long64_t( double(sourceNbEntries) * _parameters_.fractionOfEntries );
-      if( verbose_ ){
-        LogScopeIndent;
-        LogWarning << "Max entries: " << nMaxEntries << std::endl;
+    // Share metadata reads too: a file with many friend trees is opened once
+    // for this entry, instead of once per friend. These files close before
+    // the reader loads its first entry.
+    std::map<std::string, std::unique_ptr<TFile>> files;
+    auto fetchTree = [&](const RootFileAndTreePath& path_){
+      auto& file = files[path_.filePath];
+      if( file == nullptr ){
+        TDirectory::TContext context;
+        file.reset(TFile::Open(path_.filePath.c_str(), "READ"));
       }
-
-    }
-    treeChain->AddFile(source.filePath.c_str(), nMaxEntries, source.treePath.c_str());
-
+      LogThrowIf(file == nullptr or file->IsZombie(), "Could not open input file " << path_.filePath);
+      auto* tree = file->Get<TTree>(path_.treePath.c_str());
+      LogThrowIf(tree == nullptr, "Missing input tree " << path_.treePath << " in " << path_.filePath);
+      return tree;
+    };
+    const Long64_t sourceNbEntries = fetchTree(source)->GetEntries();
+    std::vector<DatasetTreeChain::FriendTree> friends;
     for( const auto& friendEntry : fileEntry.friendList ){
       if( not friendEntry.isEnabled ){ continue; }
-      auto friendSource = resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath);
-      validateRootFileAndTreePath(friendSource, "friend \"" + friendEntry.name + "\"");
-
-      std::unique_ptr<TFile> friendFile{TFile::Open(friendSource.filePath.c_str())};
-      LogExitIf(friendFile == nullptr, "Error while opening friend file: " << friendSource.filePath);
-      auto* friendTree = friendFile->Get<TTree>(friendSource.treePath.c_str());
-      LogExitIf(friendTree == nullptr, "Error while opening friend TTree: " << friendSource.treePath << " in " << friendSource.filePath);
-      LogExitIf(
-          friendTree->GetEntries() != sourceNbEntries,
-          "Friend \"" << friendEntry.name << "\" in " << friendSource.filePath << " has " << friendTree->GetEntries()
-          << " entries, while its main tree in " << source.filePath << " has " << sourceNbEntries << ". Friends must be entry-aligned."
-      );
-
-      std::shared_ptr<TChain> friendChain;
-      for( const auto& existingFriendChain : *friendChainList ){
-        if( existingFriendChain->GetName() == friendEntry.name ){ friendChain = existingFriendChain; break; }
-      }
-      if( friendChain == nullptr ){
-        friendChain = std::make_shared<TChain>(friendEntry.name.c_str());
-        friendChainList->emplace_back(friendChain);
-      }
-      friendChain->AddFile(friendSource.filePath.c_str(), nMaxEntries, friendSource.treePath.c_str());
+      const auto friendSource = resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath);
+      const Long64_t friendNbEntries = fetchTree(friendSource)->GetEntries();
+      LogThrowIf(friendNbEntries != sourceNbEntries,
+                 "Friend \"" << friendEntry.name << "\" in " << friendSource.filePath << " has " << friendNbEntries
+                 << " entries, while its main tree in " << source.filePath << " has " << sourceNbEntries
+                 << ". Friends must be entry-aligned.");
+      friends.push_back({friendEntry.name, friendSource.filePath, friendSource.treePath});
     }
-
+    const Long64_t nbEntries = _parameters_.fractionOfEntries == 1. ? sourceNbEntries
+        : Long64_t(double(sourceNbEntries) * _parameters_.fractionOfEntries);
+    treeChain->addFile(source.filePath, source.treePath, sourceNbEntries, std::move(friends), nbEntries);
   }
-
-  for( const auto& friendChain : *friendChainList ){
-    LogExitIf(
-        friendChain->GetEntries() != treeChain->GetEntries(),
-        "Friend TChain \"" << friendChain->GetName() << "\" has " << friendChain->GetEntries()
-        << " entries while the main TChain has " << treeChain->GetEntries() << ". Friends must be entry-aligned."
-    );
-    LogExitIf(
-        treeChain->AddFriend(friendChain.get(), friendChain->GetName()) == nullptr,
-        "Could not attach friend TChain: " << friendChain->GetName()
-    );
-  }
-
-  // ROOT 6.24 connects the current trees of friend TChains lazily. Load the
-  // first entry now so qualified friend expressions are available when a
-  // TreeBuffer/TTreeFormula is initialized immediately after openChain().
-  if( not friendChainList->empty() and treeChain->GetEntries() > 0 ){
-    LogExitIf(treeChain->LoadTree(0) < 0, "Could not load the first entry of the main TChain with its friends.");
+  if( treeChain->GetEntries() > 0 ){
+    LogThrowIf(treeChain->LoadTree(0) < 0, "Could not load the first input tree and its friends.");
   }
 
   return treeChain;
