@@ -26,10 +26,13 @@ public:
                const Event& event_, const DialInputBuffer::ParameterReference::MirrorEdges& mirrorEdges_);
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<EventFormula>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return "EventFormula"; }
+  [[nodiscard]] bool hasAnalyticGradient() const override;
+  [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override;
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
   [[nodiscard]] std::string getSummary() const override;
 
 private:
+  [[nodiscard]] DialInputBuffer bindInputs(const DialInputBuffer& input_) const;
   // Owned by the source DialCollection, like the input buffer and supervisor.
   const DialBase* _formula_;
   std::shared_ptr<const Definition> _definition_;

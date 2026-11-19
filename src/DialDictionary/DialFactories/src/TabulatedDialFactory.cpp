@@ -25,6 +25,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
         {FieldFlag::MANDATORY, "initArguments"},
         {FieldFlag::MANDATORY, "binningVariables"},
         {"bins"},
+        {"gradientFunction"},
     });
     tableConfig.checkConfiguration();
 
@@ -97,11 +98,25 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
         }
         bins = result;
     }
+    if( bins < 2 ){
+        throw std::runtime_error("Tabulated table " + _name_ + ": insufficient table entries");
+    }
     _table_.resize(bins);
 
     // Make sure things are going to fail badly if the table is used before
     // it is filled.
     for (auto& t : _table_) t = std::nan("not-set");
+
+    _gradientFuncName_ = tableConfig.fetchValue<std::string>("gradientFunction", "");
+    TableGradientBuffer::UpdateFunction gradientFunction = nullptr;
+    if( not _gradientFuncName_.empty() ){
+        gradientFunction = reinterpret_cast<TableGradientBuffer::UpdateFunction>(
+            dlsym(library, _gradientFuncName_.c_str()));
+        if( gradientFunction == nullptr ){
+            throw std::runtime_error("Table " + _name_ + ": gradientFunction symbol not found: " + _gradientFuncName_);
+        }
+    }
+    _gradientBuffer_ = std::make_shared<TableGradientBuffer>(gradientFunction);
 
     // Get the update function
     void* updateFunc = dlsym(library, getUpdateFunction().c_str());
@@ -132,11 +147,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
 
 void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
     std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
-    _updateFunc_(_name_.c_str(),
-                 _table_.data(),
-                 (int) _table_.size(),
-                 inputBuffer.getInputBuffer().data(),
-                 (int) inputBuffer.getInputBuffer().size());
+    _gradientBuffer_->update(_table_, inputBuffer.getInputBuffer(), _updateFunc_, _name_);
 }
 
 DialBase* TabulatedDialFactory::makeDial(const Event& event) {
@@ -151,6 +162,9 @@ DialBase* TabulatedDialFactory::makeDial(const Event& event) {
                                _binningVariableCache_.data(),
                                (int) _table_.size());
 
+    if( not std::isfinite(bin) ){
+        throw std::runtime_error("Tabulated table " + _name_ + ": non-finite binningFunction result");
+    }
     if (bin < 0.0) return nullptr;
 
     // Determine the bin index and the fractional part of the bin.
@@ -184,6 +198,6 @@ DialBase* TabulatedDialFactory::makeDial(const Event& event) {
 #endif
 
     // Do the unique_ptr dance in case there are exceptions.
-    std::unique_ptr<Tabulated> dialBase = std::make_unique<Tabulated>(&_table_, iBin, fracBin);
+    std::unique_ptr<Tabulated> dialBase = std::make_unique<Tabulated>(&_table_, iBin, fracBin, "", _gradientBuffer_);
     return dialBase.release();
 }

@@ -4,6 +4,9 @@
 
 #include "Logger.h"
 
+#include <algorithm>
+#include <cmath>
+
 int MinimizerBase::fetchNbDegreeOfFreedom() const{
   return getLikelihoodInterface().getNbSampleBins() - _nbFreeParameters_;
 }
@@ -308,6 +311,30 @@ double MinimizerBase::evalFit( const double* parArray_ ){
 
   _monitor_.externalTimer.start();
   return getLikelihoodInterface().getLastLikelihood();
+}
+void MinimizerBase::evalFitGradient(){
+  _gradient_.clear();
+  for( const auto* parameter : _minimizerParameterPtrList_ ){
+    if( parameter->isEnabled() and not parameter->isFixed() and not parameter->isPenaltyDisabled() ){
+      _gradient_.resetValue(parameter);
+    }
+  }
+  getOwner().evalGradient(_gradient_);
+}
+
+void MinimizerBase::evalFitGradientAt(const double* parArray_, double* gradient_){
+  LogThrowIf(parArray_ == nullptr or gradient_ == nullptr, "Null gradient callback buffer.");
+  LogThrowIf(not setFitParameterValues(parArray_), "Invalid parameter point for analytic gradient.");
+  evalFitGradient();
+  std::vector<double> result;
+  result.reserve(_minimizerParameterPtrList_.size());
+  for( const auto* parameter : _minimizerParameterPtrList_ ){
+    const double scale = _useNormalizedFitSpace_ ? ParameterSet::toRealParRange(1., *parameter) : 1.;
+    const double value = (_gradient_.values.count(parameter) ? _gradient_.getValue(parameter) * scale : 0.);
+    LogThrowIf(not std::isfinite(value), "Non-finite gradient in fit coordinates.");
+    result.push_back(value);
+  }
+  std::copy(result.begin(), result.end(), gradient_);
 }
 
 void MinimizerBase::setParameterValidity(const std::string& validity) {

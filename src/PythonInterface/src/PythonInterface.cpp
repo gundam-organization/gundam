@@ -10,6 +10,7 @@
 #include "Event.h"
 #include "Histogram.h"
 #include "Parameter.h"
+#include "ParameterGradient.h"
 #include "ParameterSet.h"
 #include "ParametersManager.h"
 #include "Sample.h"
@@ -306,6 +307,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getStdDevValue", &Parameter::getStdDevValue)
   .def("getThrowValue", &Parameter::getThrowValue)
   .def("getParameterValue", &Parameter::getParameterValue)
+  .def("isPenaltyDisabled", &Parameter::isPenaltyDisabled)
   .def("getSummary", &Parameter::getSummary)
   .def("setParameterValue", &Parameter::setParameterValue, pybind11::arg("parameterValue"), pybind11::arg("force") = false)
   .def("setIsFixed", &Parameter::setIsFixed)
@@ -465,6 +467,12 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("initialize", pybind11::overload_cast<>(&DatasetDefinition::initialize), pybind11::return_value_policy::reference)
   ;
 
+  pybind11::class_<ParameterGradient>(module, "ParameterGradient")
+  .def(pybind11::init())
+  .def("getValue", &ParameterGradient::getValue, pybind11::arg("parameter"))
+  .def("resetValue", &ParameterGradient::resetValue, pybind11::arg("parameter"))
+  ;
+
   auto likelihoodInterfaceClass = pybind11::class_<LikelihoodInterface>(module, "LikelihoodInterface");
 
   auto dataTypeClass = pybind11::class_<LikelihoodInterface::DataType>(likelihoodInterfaceClass, "DataType")
@@ -493,6 +501,23 @@ PYBIND11_MODULE(GUNDAM, module) {
   dataTypeClass.attr("Toy") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::Toy));
   dataTypeClass.attr("RealData") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::RealData));
 
+  pybind11::class_<GaussianConstraint>(module, "GaussianConstraint")
+  .def("getName", &GaussianConstraint::getName)
+  .def("isEnabled", &GaussianConstraint::isEnabled)
+  .def("getFormula", &GaussianConstraint::getFormula)
+  .def("getMean", &GaussianConstraint::getMean)
+  .def("getStdDev", &GaussianConstraint::getStdDev)
+  .def("evalFormula", &GaussianConstraint::evalFormula)
+  .def("evalResidual", &GaussianConstraint::evalResidual)
+  .def("eval", &GaussianConstraint::eval)
+  ;
+
+  pybind11::class_<ExternalConstraints>(module, "ExternalConstraints")
+  .def("isEnabled", &ExternalConstraints::isEnabled)
+  .def("getGaussianConstraintList", &ExternalConstraints::getGaussianConstraintList, pybind11::return_value_policy::reference_internal)
+  .def("eval", &ExternalConstraints::eval)
+  ;
+
   pybind11::class_<DatasetManager>(module, "DatasetManager")
   .def(pybind11::init())
   .def("getDatasetList", pybind11::overload_cast<>(&DatasetManager::getDatasetList), pybind11::return_value_policy::reference_internal)
@@ -504,7 +529,10 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getSampleBreakdownTable", &LikelihoodInterface::getSampleBreakdownTable, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getLastLikelihood", &LikelihoodInterface::getLastLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getExternalConstraints", &LikelihoodInterface::getExternalConstraints, pybind11::return_value_policy::reference_internal)
   .def("getLastStatLikelihood", &LikelihoodInterface::getLastStatLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("evalGradient", pybind11::overload_cast<ParameterGradient&>(&LikelihoodInterface::propagateAndEvalGradient),
+       pybind11::arg("gradient"))
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setCurrentParameterValuesAsPrior", &LikelihoodInterface::setCurrentParameterValuesAsPrior, pybind11::call_guard<pybind11::gil_scoped_release>())
@@ -537,14 +565,34 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getMinimizerStatus", &MinimizerBase::getMinimizerStatus)
   .def("checkFlatDirections", &MinimizerBase::checkFlatDirections, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwPostfitParameters", &MinimizerBase::throwPostfitParameters)
+  .def("setDisableCalcError", &MinimizerBase::setDisableCalcError)
   .def("fetchNbDegreeOfFreedom", &MinimizerBase::fetchNbDegreeOfFreedom)
   .def("getMinimizerFitParameterPtr", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterPtr),
        pybind11::return_value_policy::reference_internal)
+  .def("evalFit", [](MinimizerBase& this_, const std::vector<double>& parArray_){
+    return this_.evalFit(parArray_.data());
+  }, pybind11::arg("parArray"))
+  .def("evalFitGradientAt", [](MinimizerBase& this_, const std::vector<double>& parameters_){
+    if( parameters_.size() != this_.getMinimizerFitParameterPtr().size() ){
+      throw pybind11::value_error("Gradient point dimension does not match the fit parameter count.");
+    }
+    std::vector<double> gradient(parameters_.size());
+    this_.evalFitGradientAt(parameters_.data(), gradient.data());
+    return gradient;
+  }, pybind11::arg("parameters"))
+  .def("evalFitGradient", &MinimizerBase::evalFitGradient)
+  .def("getGradient", &MinimizerBase::getGradient, pybind11::return_value_policy::reference_internal)
+  .def("getMinimizerFitParameterList", pybind11::overload_cast<>(&MinimizerBase::getMinimizerFitParameterList), pybind11::return_value_policy::reference)
   ;
 
   pybind11::class_<RootMinimizer, MinimizerBase>(module, "RootMinimizer")
   .def("getFunctionPrecision", &RootMinimizer::getFunctionPrecision)
   .def("updateFitParameterSettings", &RootMinimizer::updateFitParameterSettings)
+  .def("getFunctionPrecision", &RootMinimizer::getFunctionPrecision)
+  .def("isUsingAnalyticGradient", &RootMinimizer::isUsingAnalyticGradient)
+  .def("getNbFunctionCalls", &RootMinimizer::getNbFunctionCalls)
+  .def("getEdm", &RootMinimizer::getEdm)
+  .def("getNbGradientCalls", &RootMinimizer::getNbGradientCalls)
   .def("hasConverged", &RootMinimizer::hasConverged)
   .def("isMinimizeDone", &RootMinimizer::isMinimizeDone)
   .def("throwPostfitParameters", &RootMinimizer::throwPostfitParameters)

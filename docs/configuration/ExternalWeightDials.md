@@ -292,3 +292,82 @@ At each propagation:
 The large numerical arrays are therefore never serialized to JSON and are not written to disk. JSON is only used as a small control protocol for metadata and commands.
 
 The current cache-manager backend does not support `ExternalWeight` dials. When such dials are present, GUNDAM falls back to the CPU propagation path.
+
+## Analytic gradients
+
+A worker can optionally supply the derivatives of its **external weight factor**
+with respect to its `dialInputList` inputs. GUNDAM combines these derivatives with
+other event weights, histogram moments and the statistical likelihood. Loaded
+event variables remain fixed. Mirror transformations and response limits are
+handled by GUNDAM; differentiate with respect to the input values received by
+the worker.
+
+Declare support in the response to `initialize`:
+
+```python
+return {"status": "ok", "supportsGradient": True}
+```
+
+Omitting `supportsGradient` keeps existing workers usable for value evaluations.
+Such workers are rejected when analytic gradients are enabled. Support must be
+declared during the initial weight evaluation, before gradient validation.
+
+An `evaluate` command additionally exposes:
+
+| Field | Meaning |
+| --- | --- |
+| `withGradient` | Whether both weights and derivatives must be written. |
+| `generation` | Integer identifying this evaluation. |
+| `gradients` | `None` for weights alone; otherwise a writable NumPy `float64` array of shape `(numberOfWeights, numberOfInputs)`. |
+
+The dense matrix uses C order: `gradients[row, column]` is
+`∂externalWeight[row] / ∂input[column]`. Columns follow the declared
+`dialInputList` order, also given by `parameterInfo`, including inputs the
+weight does not use (write zero for those). Rows use the same ordering as
+`weights`: one per registered event, or one per external bin in binned mode.
+
+For example, with inputs declared as `a, b` and weights `1 + a*a + b*energy`:
+
+```python
+def run(command):
+    if command["command"] == "initialize":
+        return {"status": "ok", "supportsGradient": True}
+    if command["command"] == "shutdown":
+        return {"status": "ok"}
+    a = command["parameters"]["a"]
+    b = command["parameters"]["b"]
+    energy = command["inputs"]["energy"]
+    command["weights"][:] = 1 + a*a + b*energy
+    result = {"status": "ok"}
+    if command["withGradient"]:
+        command["gradients"][:, 0] = 2*a
+        command["gradients"][:, 1] = energy
+        result["gradientGeneration"] = command["generation"]
+    return result
+```
+
+The gradient buffer is allocated and attached on the first gradient request,
+including when the worker is already running. Gradient requests are consumed
+by propagation; value-only evaluations can continue without computing derivatives.
+A cached gradient can be reused at unchanged inputs. The matrix costs `8 * numberOfWeights * numberOfInputs`
+bytes; no sparse format is currently provided.
+
+Every gradient evaluation must rewrite **all weights and all derivative
+entries**, then acknowledge the exact `gradientGeneration`. GUNDAM rejects
+missing/non-finite values or an absent/wrong acknowledgement and invalidates the
+previous gradient. A failed evaluation can be retried at unchanged inputs.
+Published derivatives are accepted only for the same input point and generation
+as their weights. Composite nodes must therefore supply the same input values
+as the external producer; arbitrary transformed inputs require a matching
+producer evaluation.
+
+Legacy scripts implementing their own `run_worker()` wire protocol receive
+`withGradient`, `generation` and, when requested, a `gradients` shared-memory
+description with `shmName`, `dtype` and `shape`. They must attach the matrix and
+implement the same capability declaration and generation acknowledgement.
+
+Native `ExternalWeightWorker` subclasses can declare support with
+`setSupportsGradient(true)` during configuration/initialization. Their
+`evaluateImpl()` reads `isGradientRequested()` and fills `getGradientBuffer()`
+when requested, in the same layout. Common code validates and publishes both
+buffers after the synchronous call returns.

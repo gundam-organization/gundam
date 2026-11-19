@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <sstream>
 #include <typeinfo>
 
@@ -50,6 +51,9 @@ void DialCollection::prepareConfig(ConfigReader &config_){
       {"dialBranchData", {"dialLeafName", "treeExpression"}},
       {"minDialResponse", {"minimumSplineResponse"}},
       {"maxDialResponse"},
+      {"dialResponseLimits"},
+      {"enableResponseSmoothing"},
+      {"dialResponseSmoothingWidth"},
       {"useMirrorDial"},
       {"mirrorLowEdge"},
       {"mirrorHighEdge"},
@@ -332,11 +336,22 @@ namespace {
   }
 
   size_t getDialSignatureHash(const DialBase& dial_, const std::vector<double>& signature_){
-    size_t hash = typeid(dial_).hash_code();
+    std::uint64_t hash = typeid(dial_).hash_code();
     auto combineHash = [&](size_t value_){ hash ^= value_ + 0x9e3779b9 + (hash << 6) + (hash >> 2); };
     combineHash(std::hash<bool>{}(dial_.getAllowExtrapolation()));
     for( double value : signature_ ){ combineHash(std::hash<double>{}(value)); }
-    return hash;
+    // combineHash can leave similar low bits, which alone select a table slot.
+    // MurmurHash3 fmix64 spreads changes across all bits to prevent clustering.
+    // Its fixed odd multipliers were selected for mixing quality, not primality.
+    // https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
+    hash ^= hash >> 33;
+    hash *= UINT64_C(0xff51afd7ed558ccd);
+    hash ^= hash >> 33;
+    hash *= UINT64_C(0xc4ceb9fe1a85ec53);
+    hash ^= hash >> 33;
+    // On a narrower size_t, fold the upper 32 bits before truncating the result.
+    if( sizeof(size_t) < sizeof(hash) ){ hash ^= hash >> 32; }
+    return static_cast<size_t>(hash);
   }
 
   bool matchesDialSignature(const DialBase& candidate_, const DialBase& dial_,
@@ -589,6 +604,77 @@ void DialCollection::setupDialInterfaceReferences(){
 }
 
 // init protected
+void DialCollection::readResponseSupervisorConfig(const ConfigReader& config_){
+  // FieldFlag::DEPRECATED rejects configurations. Keep these keys readable
+  // while warning users how to migrate them to the new response range.
+  for( const auto& entry : {std::make_pair("minDialResponse", "min"),
+                           std::make_pair("maxDialResponse", "max")} ){
+    if( not config_.hasField(entry.first) ){ continue; }
+    LogWarning << config_.getParentPath() << ": key \"" << config_.getConfigEntry(entry.first).first
+               << "\" is deprecated. Use \"dialResponseLimits\" with \"" << entry.second << "\" instead. "
+               << "Existing configurations remain supported." << std::endl;
+  }
+  GenericToolbox::Range limits;
+  // Intermediate responses and all variable responses may be negative.
+  limits.min = not _isCompositeNode_ and _applyToVariable_.empty()
+      ? 0. : std::nan("unset");
+  if( config_.hasField("dialResponseLimits") ){
+    limits = config_.fetchValue<GenericToolbox::Range>("dialResponseLimits");
+    for( const auto& entry : {std::make_pair("minDialResponse", limits.min),
+                             std::make_pair("maxDialResponse", limits.max)} ){
+      if( not config_.hasField(entry.first) ){ continue; }
+      const double legacyLimit = config_.fetchValue<double>(entry.first);
+      LogThrowIf(legacyLimit != entry.second and not (std::isnan(legacyLimit) and std::isnan(entry.second)),
+                 "dialResponseLimits conflicts with " << entry.first);
+    }
+  }
+  else{
+    if( config_.hasField("minDialResponse") ){ limits.min = config_.fetchValue<double>("minDialResponse"); }
+    if( config_.hasField("maxDialResponse") ){ limits.max = config_.fetchValue<double>("maxDialResponse"); }
+  }
+  LogThrowIf(limits.hasBothBounds() and limits.min > limits.max,
+             "dialResponseLimits: min must not exceed max");
+
+  const bool enableSmoothing = config_.hasField("enableResponseSmoothing")
+      ? config_.fetchValue<bool>("enableResponseSmoothing") : false;
+  GenericToolbox::Range widths;
+  if( config_.hasField("dialResponseSmoothingWidth") ){
+    const auto values = config_.fetchValue<JsonType>("dialResponseSmoothingWidth");
+    auto readWidth = [](const JsonType& value_){
+      LogThrowIf(not value_.is_number(), "dialResponseSmoothingWidth expects numeric widths");
+      const double width = value_.get<double>();
+      LogThrowIf(not std::isfinite(width) or width <= 0.,
+                 "dialResponseSmoothingWidth must be finite and strictly positive. "
+                 "Set enableResponseSmoothing to false to disable smoothing.");
+      return width;
+    };
+    if( values.is_number() ){ widths.min = widths.max = readWidth(values); }
+    else if( values.is_array() ){
+      LogThrowIf(values.size() != 2, "dialResponseSmoothingWidth expects [lowerWidth, upperWidth]");
+      // Unlike a limits range, widths must never be sorted by magnitude.
+      widths.min = readWidth(values.at(0));
+      widths.max = readWidth(values.at(1));
+    }
+    else{
+      LogThrowIf(not values.is_object(), "dialResponseSmoothingWidth expects a scalar or a range");
+      ConfigReader widthConfig(values);
+      widthConfig.defineFields({{"min"}, {"max"}});
+      widthConfig.checkConfiguration();
+      LogThrowIf(not widthConfig.hasField("min") and not widthConfig.hasField("max"),
+                 "dialResponseSmoothingWidth requires min or max");
+      if( widthConfig.hasField("min") ){ widths.min = readWidth(widthConfig.fetchValue<JsonType>("min")); }
+      if( widthConfig.hasField("max") ){ widths.max = readWidth(widthConfig.fetchValue<JsonType>("max")); }
+    }
+  }
+  LogThrowIf(enableSmoothing and not config_.hasField("dialResponseSmoothingWidth"),
+             "enableResponseSmoothing requires dialResponseSmoothingWidth");
+
+  _responseSupervisor_ = DialResponseSupervisor();
+  _responseSupervisor_.setMinResponse(limits.min);
+  _responseSupervisor_.setMaxResponse(limits.max);
+  if( enableSmoothing ){ _responseSupervisor_.setSmoothingWidths(widths.min, widths.max); }
+}
+
 void DialCollection::readVariableResponseConfig(const ConfigReader& config_){
   if( config_.hasField("applyToVariable") ){
     _applyToVariable_ = config_.fetchValue<std::string>("applyToVariable");
@@ -637,12 +723,7 @@ void DialCollection::readParametersFromConfig(const ConfigReader &config_) {
                  "TArray dialBranchData requires dialType Spline or Graph");
     }
   }
-// Only final event weights are nonnegative by default. Variable responses
-  // (including multipliers) and intermediate composite responses may be negative.
-  _minDialResponse_ = not _isCompositeNode_ and _applyToVariable_.empty()
-      ? 0. : std::nan("unset");
-  config_.fillValue(_minDialResponse_, "minDialResponse");
-  config_.fillValue(_maxDialResponse_, "maxDialResponse");
+  readResponseSupervisorConfig(config_);
   config_.fillValue(_useMirrorDial_, "useMirrorDial");
   config_.fillValue(_mirrorLowEdge_, "mirrorLowEdge");
   config_.fillValue(_mirrorHighEdge_, "mirrorHighEdge");
@@ -807,8 +888,7 @@ bool DialCollection::initializeNormDialsWithParBinning() {
 
   // By default use min dial response for norm dials
   _dialResponseSupervisorList_.resize( 1 );
-  _dialResponseSupervisorList_[0].setMinResponse( _minDialResponse_ );
-  _dialResponseSupervisorList_[0].setMaxResponse( _config_.fetchValue("maxDialResponse", _maxDialResponse_) );
+  _dialResponseSupervisorList_[0] = _responseSupervisor_;
 
   _dialInterfaceList_.reserve( _dialBinSet_.getBinList().size() );
   for(const auto & bin : _dialBinSet_.getBinList()) {
@@ -1416,13 +1496,7 @@ bool DialCollection::initializeDialsWithDefinition() {
     LogThrow("Invalid dial type");
   }
 
-  _dialResponseSupervisorList_.emplace_back();
-  _dialResponseSupervisorList_.back().setMinResponse(
-      _minDialResponse_
-  );
-  _dialResponseSupervisorList_.back().setMaxResponse(
-      _config_.fetchValue("maxDialResponse", _maxDialResponse_)
-  );
+  _dialResponseSupervisorList_.emplace_back(_responseSupervisor_);
 
   return true;
 }
@@ -1790,7 +1864,8 @@ bool DialCollection::makeDialShortCircuit(const std::vector<DialUtils::DialPoint
   if( pointList_.size() == 1 or DialUtils::isFlat(pointList_) ){
     // it's flat, let's shortcut
 
-    if( not _isCompositeNode_ and std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon() ){
+    if( not _isCompositeNode_ and std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon()
+        and _responseSupervisor_.process(1.) == 1. ){
       // one! no need for a dial
       if(_verboseShortCircuit_){ _verboseShortCircuitStr_ = "No dial: response is always 1."; }
       return true;

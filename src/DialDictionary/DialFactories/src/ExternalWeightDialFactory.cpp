@@ -7,9 +7,12 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
+#include <limits>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -21,6 +24,8 @@ ExternalWeightWorker::SharedMemoryBuffer::SharedMemoryBuffer(
     std::string name_,
     std::size_t nbDoubles_)
     : name(std::move(name_)), nbDoubles(nbDoubles_), nbBytes(std::max<std::size_t>(nbDoubles_, 1)*sizeof(double)) {
+  static std::atomic<std::uint64_t> nextBufferId{0};
+  name += "_" + std::to_string(nextBufferId++);
   const std::string posixName = "/" + name;
   fd = shm_open(posixName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0600);
   LogThrowIf(fd == -1, "Could not create shared memory \"" << posixName << "\": " << std::strerror(errno));
@@ -40,9 +45,9 @@ ExternalWeightWorker::SharedMemoryBuffer::~SharedMemoryBuffer(){
 std::unique_ptr<DialBase> ExternalWeightWorker::makeBinnedDial(std::size_t binIndex_) {
   LogThrowIf(not _useBinnedWeights_,
              "Cannot create a binned ExternalWeight dial when useBinnedWeights is false.");
-  LogThrowIf(binIndex_ >= _weightList_->size(),
-             "ExternalWeight bin index out of range: " << binIndex_ << " >= " << _weightList_->size());
-  return std::make_unique<ExternalWeightDispatcher>(_weightList_, binIndex_);
+  LogThrowIf(binIndex_ >= _weightSource_->size(),
+             "ExternalWeight bin index out of range: " << binIndex_ << " >= " << _weightSource_->size());
+  return std::make_unique<ExternalWeightDispatcher>(_weightSource_, binIndex_);
 }
 
 std::string ExternalWeightWorker::normalizeInputName(const std::string& inputName_) {
@@ -80,7 +85,7 @@ void ExternalWeightWorker::configureImpl() {
 
   _weightCount_ = _useBinnedWeights_ ? _binning_.getBinList().size() : 0;
   if( _useBinnedWeights_ ){
-    _weightList_->assign(_weightCount_, 1.);
+    _weightSource_->_size_ = _weightCount_;
   }
 
 }
@@ -91,13 +96,13 @@ std::size_t ExternalWeightWorker::registerEvent(const Event& event_) {
              "Binned ExternalWeight dials must be created from the configured binning.");
   LogThrowIf(_areEventsLoaded_, "Cannot register an event after loading ExternalWeight buffers.");
 
-  const std::size_t eventIndex = _weightList_->size();
+  const std::size_t eventIndex = _weightSource_->size();
   for( std::size_t iInput = 0 ; iInput < _inputEventVarNameList_.size() ; ++iInput ){
     _inputEventValueList_[iInput].emplace_back(
         event_.getVariables().fetchVariable(_inputEventVarNameList_[iInput]).getVarAsDouble()
     );
   }
-  _weightList_->emplace_back(1.);
+  ++_weightSource_->_size_;
   return eventIndex;
 }
 
@@ -126,20 +131,20 @@ void ExternalWeightWorker::finalizeEventLoading() {
       _inputBufferList_.emplace_back(std::move(inputBuffer));
     }
 
-    _weightList_->assign(_weightCount_, 1.);
-    _weightList_->shrink_to_fit();
-    _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
+    _weightSource_->_size_ = _weightCount_;
+    _weightBuffer_ = std::make_shared<SharedMemoryBuffer>(
         "gdmEW_" + std::to_string(getpid()) + "_w",
         _weightCount_
     );
     std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, 1.);
+    _weightSource_->_values_ = std::shared_ptr<double>(_weightBuffer_, _weightBuffer_->ptr);
     _areEventsLoaded_ = true;
     LogInfo << "ExternalWeight worker registered " << _weightCount_
             << " bins with inputs " << GenericToolbox::toString(_inputEventVarNameList_) << "." << std::endl;
   }
   else {
 
-    _eventCount_ = _weightList_->size();
+    _eventCount_ = _weightSource_->size();
     _weightCount_ = _eventCount_;
     _inputBufferList_.clear();
     _inputBufferList_.reserve(_inputEventValueList_.size());
@@ -157,12 +162,12 @@ void ExternalWeightWorker::finalizeEventLoading() {
       std::copy(_inputEventValueList_[iInput].begin(), _inputEventValueList_[iInput].end(), _inputBufferList_.back()->ptr);
     }
 
-    _weightList_->shrink_to_fit();
-    _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
+    _weightBuffer_ = std::make_shared<SharedMemoryBuffer>(
         "gdmEW_" + std::to_string(getpid()) + "_w",
         _eventCount_
     );
     std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, 1.);
+    _weightSource_->_values_ = std::shared_ptr<double>(_weightBuffer_, _weightBuffer_->ptr);
     _areEventsLoaded_ = true;
 
     LogInfo << "ExternalWeight worker registered " << _eventCount_
@@ -174,18 +179,26 @@ void ExternalWeightWorker::updateWeights(DialInputBuffer& inputBuffer_) {
   if( not _areEventsLoaded_ ){
     this->finalizeEventLoading();
   }
-  else if( not inputBuffer_.isDialUpdateRequested() ){
+  else if( not _isEvaluationPending_ and not inputBuffer_.isDialUpdateRequested()
+           and (not isGradientRequested() or _weightSource_->hasCurrentGradient()) ){
+    _weightSource_->_gradientRequested_ = false;
     return;
   }
+  _isEvaluationPending_ = true;
   this->evaluate(inputBuffer_);
+  // A first gradient request can recompute weights at unchanged inputs. Make
+  // every response cache consume this publication, including on a retry.
+  inputBuffer_.markUpdated();
+  _weightSource_->_gradientRequested_ = false;
+  _isEvaluationPending_ = false;
 }
 
 void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
   LogThrowIf(not this->isInitialized(), "ExternalWeight worker is not initialized.");
   LogThrowIf(_weightBuffer_ == nullptr, "ExternalWeight worker has no weight buffer.");
-  LogThrowIf(_weightCount_ != _weightList_->size(),
+  LogThrowIf(_weightCount_ != _weightSource_->size(),
              "ExternalWeight has " << _eventCount_ << " shared-memory weights for "
-             << _weightList_->size() << " registered dials.");
+             << _weightSource_->size() << " registered dials.");
 
   if( _parameterBuffer_ == nullptr ){
     _parameterBuffer_ = std::make_unique<SharedMemoryBuffer>(
@@ -199,8 +212,40 @@ void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
     _parameterBuffer_->ptr[iPar] = inputBuffer_.getInputBuffer().at(iPar);
   }
 
+  _weightSource_->_gradientValid_ = false;
+  LogThrowIf(_weightSource_->_generation_ == std::numeric_limits<std::uint64_t>::max(),
+             "ExternalWeight generation overflow.");
+  if( isGradientRequested() ){
+    LogThrowIf(not _weightSource_->supportsGradient(), "ExternalWeight worker does not provide analytic gradients.");
+    const auto inputs = std::size_t(inputBuffer_.getInputSize());
+    LogThrowIf(inputs != 0 and _weightCount_ > std::numeric_limits<std::size_t>::max() / sizeof(double) / inputs,
+               "ExternalWeight gradient buffer size overflow.");
+    const auto count = _weightCount_ * inputs;
+    if( _gradientBuffer_ == nullptr ){
+      _gradientBuffer_ = std::make_shared<SharedMemoryBuffer>(
+          "gdmEW_" + std::to_string(getpid()) + "_gradients", count);
+      _weightSource_->_gradients_ = std::shared_ptr<double>(_gradientBuffer_, _gradientBuffer_->ptr);
+      _weightSource_->_gradientInputCount_ = inputs;
+    }
+    LogThrowIf(_gradientBuffer_->nbDoubles != count or _weightSource_->_gradientInputCount_ != inputs,
+               "ExternalWeight gradient buffer shape mismatch.");
+    // A missing or partially filled derivative must never look like zero.
+    std::fill(_gradientBuffer_->ptr, _gradientBuffer_->ptr + count, std::numeric_limits<double>::quiet_NaN());
+    std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, std::numeric_limits<double>::quiet_NaN());
+  }
   this->evaluateImpl(inputBuffer_);
-  std::copy(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, _weightList_->begin());
+  if( isGradientRequested() ){
+    for( std::size_t i = 0; i < _weightCount_; ++i ){
+      LogThrowIf(not std::isfinite(_weightBuffer_->ptr[i]), "ExternalWeight worker returned a non-finite weight at row " << i);
+    }
+    for( std::size_t i = 0; i < _gradientBuffer_->nbDoubles; ++i ){
+      LogThrowIf(not std::isfinite(_gradientBuffer_->ptr[i]), "ExternalWeight worker returned a missing/non-finite gradient at entry " << i);
+    }
+    _weightSource_->_gradientGeneration_ = getEvaluationGeneration();
+    _weightSource_->_gradientValid_ = true;
+  }
+  _weightSource_->_inputValues_ = inputBuffer_.getInputBuffer();
+  ++_weightSource_->_generation_;
 }
 
 void ExternalWeightDialFactory::configureImpl() {
@@ -233,7 +278,7 @@ void ExternalWeightDialFactory::initializeImpl() {
 
 DialBase* ExternalWeightDialFactory::makeDial(const Event& event_) {
   const std::size_t eventIndex = _worker_->registerEvent(event_);
-  return new ExternalWeightDispatcher(_worker_->getWeightList(), eventIndex);
+  return new ExternalWeightDispatcher(_worker_->getWeightSource(), eventIndex);
 }
 
 void ExternalWeightPythonWorker::configureImpl() {
@@ -335,10 +380,23 @@ void ExternalWeightPythonWorker::evaluateImpl(const DialInputBuffer& inputBuffer
   }
   JsonType command;
   command["command"] = "evaluate";
+  command["withGradient"] = isGradientRequested();
+  command["generation"] = getEvaluationGeneration();
+  if( isGradientRequested() ){
+    const auto* gradients = getGradientBuffer();
+    LogThrowIf(gradients == nullptr, "ExternalWeight gradient buffer is not initialized.");
+    command["gradients"] = {{"shmName", gradients->name}, {"dtype", "float64"},
+        {"shape", {getWeightCount(), std::size_t(inputBuffer_.getInputSize())}}};
+  }
   this->sendWorkerCommand(command);
   auto response = this->readWorkerResponse();
   LogThrowIf(response.value("status", std::string{}) != "ok",
              "ExternalWeight worker evaluation failed: " << response.dump());
+  if( isGradientRequested() ){
+    LogThrowIf(not response.contains("gradientGeneration") or not response["gradientGeneration"].is_number_integer()
+               or response["gradientGeneration"] != command["generation"],
+               "ExternalWeight worker must acknowledge gradientGeneration for the current evaluation: " << response.dump());
+  }
 }
 
 void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& inputBuffer_) {
@@ -416,6 +474,8 @@ def _worker():
     parameter_names = []
     parameter_buffer = None
     weights = None
+    gradients = None
+    gradient_name = None
     parameters = {}
     user_command = None
     read_line = sys.stdin.buffer.readline
@@ -443,10 +503,23 @@ def _worker():
             user_command["inputs"] = inputs
             user_command["parameters"] = parameters
             user_command["weights"] = weights
+            user_command["gradients"] = None
+            user_command["withGradient"] = False
         elif command_name == "evaluate":
             # Reuse the command and parameter dictionary. This avoids
             # allocating three dictionaries on every propagation.
             user_command["command"] = "evaluate"
+            user_command["withGradient"] = command.get("withGradient", False)
+            user_command["generation"] = command.get("generation")
+            if user_command["withGradient"]:
+                description = command["gradients"]
+                if gradient_name != description["shmName"]:
+                    shm, gradients = _attach(description)
+                    shared_memory_list.append(shm)
+                    gradient_name = description["shmName"]
+                user_command["gradients"] = gradients
+            else:
+                user_command["gradients"] = None
             parameters.clear()
             parameters.update(zip(parameter_names, parameter_buffer))
         elif command_name == "shutdown":
@@ -539,6 +612,9 @@ except Exception as error:
   auto response = this->readWorkerResponse();
   LogThrowIf(response.value("status", std::string{}) != "ok",
              "ExternalWeight worker initialization failed: " << response.dump());
+  LogThrowIf(response.contains("supportsGradient") and not response["supportsGradient"].is_boolean(),
+             "ExternalWeight supportsGradient must be a boolean.");
+  setSupportsGradient(response.value("supportsGradient", false));
 }
 
 void ExternalWeightPythonWorker::sendWorkerCommand(const JsonType& command_) {
