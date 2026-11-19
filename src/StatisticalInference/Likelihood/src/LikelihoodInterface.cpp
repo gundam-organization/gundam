@@ -276,7 +276,7 @@ void LikelihoodInterface::writeEventRates(const GenericToolbox::TFilePath& saveD
 void LikelihoodInterface::printBreakdowns() const{
 
   LogInfo << "Samples breakdown:" << std::endl;
-  std::cout << getSampleBreakdownTable() << std::endl;
+  LogInfo << getSampleBreakdownTable() << std::endl;
 
 }
 std::string LikelihoodInterface::getSampleBreakdownTable() const{
