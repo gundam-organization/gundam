@@ -25,12 +25,14 @@ void ParametersManager::configureImpl(){
     {"throwToyParametersWithGlobalCov"},
     {"reThrowParSetIfOutOfBounds",{"reThrowParSetIfOutOfPhysical"}},
     {"parameterSetList"},
+    {"dialSetDefinitions"},
   });
   _config_.checkConfiguration();
 
   _config_.fillValue(_throwToyParametersWithGlobalCov_, "throwToyParametersWithGlobalCov");
   _config_.fillValue(_reThrowParSetIfOutOfPhysical_, "reThrowParSetIfOutOfBounds");
   _config_.fillValue(_parameterSetListConfig_, "parameterSetList");
+  _dialSetDefinitions_ = _config_.fetchValue("dialSetDefinitions", ConfigReader());
 
   LogDebugIf(GundamGlobals::isDebug()) << _parameterSetListConfig_.getConfig().size() << " parameter sets are defined." << std::endl;
 
