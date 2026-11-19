@@ -123,12 +123,12 @@ namespace {
             continue;
           }
           const auto slot = input.bufferIndex >= 0 ? arguments_.at(input.bufferIndex) : results.at(input.nodeIndex);
-          const auto& mirror = binding.mirrorEdges.at(inputs.size());
+          const auto& mirror = binding.settings->mirrorEdges.at(inputs.size());
           inputs.emplace_back(slot, not std::isnan(mirror.minValue), mirror.minValue, mirror.range);
         }
         CompositeInstruction instruction;
         auto& dial = instruction.dial;
-        packSupervisor(dial, binding.supervisor);
+        packSupervisor(dial, binding.settings->supervisor);
         if( const auto* nested = dynamic_cast<const CompositeDial*>(binding.dial.get()) ){
           // Materialize the outer node's mirrored arguments before entering its
           // graph. Retain its supervisor as a distinct instruction on exit.
