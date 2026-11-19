@@ -1075,10 +1075,6 @@ void ParameterSet::defineParameters(){
   _parameterList_.resize(_nbParameterDefinition_, Parameter(this));
   int parIndex{0};
 
-  if (_parameterList_.size() < 1) {
-    LogError << "CONFIG ERROR: Parameter set \"" << getName() << "\"<< defined without any parameters" << std::endl;
-  }
-
   for( auto& par : _parameterList_ ){
     par.setParameterIndex(parIndex++);
 

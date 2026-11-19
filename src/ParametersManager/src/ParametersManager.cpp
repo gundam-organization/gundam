@@ -168,7 +168,7 @@ void ParametersManager::throwParametersFromParSetCovariance(){
     LogContinueIf( not parSet.isEnabledThrowToyParameters(), "Toy throw is disabled for " << parSet.getName() );
 
     if( parSet.getPriorCorrelationMatrix() != nullptr ){
-      LogWarning << parSet.getName() << ": throwing correlated parameters..." << std::endl;
+      LogInfo << parSet.getName() << ": throwing correlated parameters..." << std::endl;
       LogScopeIndent;
       parSet.throwParameters(_reThrowParSetIfOutOfPhysical_);
     } // throw?
@@ -305,7 +305,7 @@ void ParametersManager::convertEigenToOrig(){
   }
 }
 void ParametersManager::injectParameterValues(const JsonType &config_) {
-  LogWarning << "Injecting parameters..." << std::endl;
+  LogInfo << "Injecting parameters..." << std::endl;
 
   if( not GenericToolbox::Json::doKeyExist(config_, "parameterSetList") ){
     LogError << "Bad parameter injector config: missing \"parameterSetList\" entry" << std::endl;
