@@ -176,3 +176,50 @@ TEST(CompositeGradient, EventInputsStayConstantAndUnsupportedNodesAreNamed) {
     EXPECT_NE(std::string::npos, std::string(error.what()).find("eventNode"));
   }
 }
+
+// Copies share graph metadata, but binding one event must not replace another
+// event's curves. Editing a collection copy must also preserve its source.
+TEST(CompositeGradient, CopiesShareDefinitionAndKeepEventBindingsIndependent) {
+  CompositeDial source(ConfigReader(JsonType{{"nodes", {
+      {{"name", "leaf"}, {"dialType", "Graph"},
+       {"dialInputList", {{{"parameterName", "p"}}}}}}}, {"output", "leaf"}}), {"p"});
+  source.getNodes()[0].collectionIndex = 0;
+  CompositeDial first(source), second(source);
+  const auto& sourceNodes = static_cast<const CompositeDial&>(source).getNodes();
+  EXPECT_EQ(&sourceNodes, &static_cast<const CompositeDial&>(first).getNodes());
+  EXPECT_EQ(&sourceNodes, &static_cast<const CompositeDial&>(second).getNodes());
+
+  std::vector<ParameterSet> parameters(1);
+  parameters[0].getParameterList().emplace_back(&parameters[0]);
+  DialInputBuffer buffer;
+  buffer.setParSetRef(&parameters);
+  DialInputBuffer::ParameterReference reference;
+  reference.parSetIndex = 0;
+  reference.parIndex = 0;
+  buffer.addParameterReference(reference);
+  buffer.initialise();
+  DialResponseSupervisor supervisor;
+  DialInterface interface;
+  interface.setInputBufferRef(&buffer);
+  interface.setResponseSupervisorRef(&supervisor);
+  Graph twice, threeTimes;
+  twice.buildDial(std::vector<DialUtils::DialPoint>{{0., 0., 0.}, {2., 4., 0.}});
+  threeTimes.buildDial(std::vector<DialUtils::DialPoint>{{0., 0., 0.}, {2., 6., 0.}});
+  interface.setDial(DialBaseObject(twice));
+  first.bind([&](int){ return &interface; });
+  interface.setDial(DialBaseObject(threeTimes));
+  second.bind([&](int){ return &interface; });
+  DialInputBuffer input;
+  input.setInputValues({1.});
+  EXPECT_DOUBLE_EQ(first.evalResponse(input), 2.);
+  EXPECT_DOUBLE_EQ(second.evalResponse(input), 3.);
+  auto cloned = first.clone();
+  EXPECT_DOUBLE_EQ(cloned->evalResponse(input), 2.);
+  EXPECT_EQ(&sourceNodes, &static_cast<const CompositeDial&>(first).getNodes());
+  EXPECT_EQ(&sourceNodes, &static_cast<const CompositeDial&>(second).getNodes());
+  EXPECT_FALSE(source.isBound());
+  second.getNodes()[0].collectionIndex = 7;
+  EXPECT_EQ(sourceNodes[0].collectionIndex, 0);
+  EXPECT_EQ(static_cast<const CompositeDial&>(first).getNodes()[0].collectionIndex, 0);
+  EXPECT_EQ(static_cast<const CompositeDial&>(second).getNodes()[0].collectionIndex, 7);
+}

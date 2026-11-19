@@ -214,7 +214,7 @@ TEST_P(CpuCompositeTest, MatchesOriginalBitsThroughNestedGraphAndCacheUpdates) {
       std::make_shared<Kriged>(nullptr, 0, std::vector<int>{}, std::vector<double>{}),
       std::make_shared<ExternalWeightDispatcher>(nullptr, 0)};
   for( const auto& dial : unsupported ){
-    bound->getNodes()[0].dial = dial;
+    bound->getNodeBindings()[0].dial = dial;
     try{
       layout.build(likelihood);
       FAIL() << "Accepted unsupported composite leaf " << dial->getDialTypeName();

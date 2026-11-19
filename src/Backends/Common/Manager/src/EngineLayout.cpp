@@ -110,25 +110,26 @@ namespace {
       std::vector<std::size_t> results(graph_.getNodes().size());
       for( auto index : graph_.getEvaluationOrder() ){
         const auto& node = graph_.getNodes().at(index);
+        const auto& binding = graph_.getNodeBindings().at(index);
         const auto path = path_ + "/" + node.name;
-        LogThrowIf(node.dial == nullptr, "Missing composite dial at " << path);
+        LogThrowIf(binding.dial == nullptr, "Missing composite dial at " << path);
         std::vector<BackendDialInputDescriptor> inputs;
         for( const auto& input : node.inputs ){
           // EventFormula already owns the loaded (and mirrored) event values.
           // Its ordinary buffer contains only parameter/response inputs.
           if( not input.eventVariable.empty() ){
-            LogThrowIf(dynamic_cast<const EventFormula*>(node.dial.get()) == nullptr,
+            LogThrowIf(dynamic_cast<const EventFormula*>(binding.dial.get()) == nullptr,
                        "Missing bound event formula at " << path);
             continue;
           }
           const auto slot = input.bufferIndex >= 0 ? arguments_.at(input.bufferIndex) : results.at(input.nodeIndex);
-          const auto& mirror = node.mirrorEdges.at(inputs.size());
+          const auto& mirror = binding.mirrorEdges.at(inputs.size());
           inputs.emplace_back(slot, not std::isnan(mirror.minValue), mirror.minValue, mirror.range);
         }
         CompositeInstruction instruction;
         auto& dial = instruction.dial;
-        packSupervisor(dial, node.supervisor);
-        if( const auto* nested = dynamic_cast<const CompositeDial*>(node.dial.get()) ){
+        packSupervisor(dial, binding.supervisor);
+        if( const auto* nested = dynamic_cast<const CompositeDial*>(binding.dial.get()) ){
           // Materialize the outer node's mirrored arguments before entering its
           // graph. Retain its supervisor as a distinct instruction on exit.
           std::vector<std::size_t> arguments;
@@ -137,7 +138,7 @@ namespace {
           results[index] = emit(instruction, {BackendDialInputDescriptor(output)});
           continue;
         }
-        const auto* base = node.dial.get();
+        const auto* base = binding.dial.get();
         const GenericToolbox::Range* bounds = nullptr;
         if( compileFormula(model_, dial, base, formulas_, path) ){}
         else if( dynamic_cast<const Norm*>(base) ){ dial.type = BackendDialType::Norm; }
