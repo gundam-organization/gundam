@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -17,7 +18,6 @@ public:
   struct Input {
     std::string name;
     int bufferIndex{-1};
-    std::string parameterName;
     int nodeIndex{-1};
     std::string eventVariable;
   };
@@ -26,12 +26,14 @@ public:
     std::shared_ptr<const ConfigReader> config;
     std::vector<Input> inputs;
     int collectionIndex{-1};
+    std::optional<DialInputBuffer::ParameterReference::MirrorEdges> configuredMirrorEdges;
     std::shared_ptr<const DialBase> dial;
     DialResponseSupervisor supervisor;
     std::vector<DialInputBuffer::ParameterReference::MirrorEdges> mirrorEdges;
   };
 
   CompositeDial(ConfigReader config_, const std::vector<std::string>& parameterNames_);
+  CompositeDial(ConfigReader config_, int inputCount_, const std::function<int(const JsonType&)>& findInput_);
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<CompositeDial>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return "Composite"; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;

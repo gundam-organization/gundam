@@ -10,8 +10,17 @@
 #include <algorithm>
 #include <map>
 #include <sstream>
+#include <stdexcept>
 
-CompositeDial::CompositeDial(ConfigReader config_, const std::vector<std::string>& parameterNames_): _inputCount_(int(parameterNames_.size())){
+CompositeDial::CompositeDial(ConfigReader config_, const std::vector<std::string>& parameterNames_)
+    : CompositeDial(std::move(config_), int(parameterNames_.size()), [&](const JsonType& input_){
+        const auto name = input_.at("parameterName").get<std::string>();
+        const auto position = std::find(parameterNames_.begin(), parameterNames_.end(), name);
+        return position == parameterNames_.end() ? -1 : int(std::distance(parameterNames_.begin(), position));
+      }){}
+
+CompositeDial::CompositeDial(ConfigReader config_, int inputCount_, const std::function<int(const JsonType&)>& findInput_)
+    : _inputCount_(inputCount_){
   config_.clearFields();
   config_.defineFields({{"nodes"}, {"output"}});
   config_.checkConfiguration();
@@ -38,22 +47,21 @@ CompositeDial::CompositeDial(ConfigReader config_, const std::vector<std::string
     LogThrowIf(not inputs.getConfig().is_array() or (inputs.getConfig().empty() and not nested),
                "Composite node " << node.name << ": dialInputList must be a non-empty list");
     for( auto source : inputs.loop() ){
-      source.defineFields({{"name"}, {"parameterName"}, {"dialResponse"}, {"eventVariable"}});
+      source.defineFields({{"name"}, {"parameterName"}, {"parameterIndex"}, {"parameterSetName"},
+                           {"dialResponse"}, {"eventVariable"}});
       source.checkConfiguration();
-      const int sourceCount = int(source.hasField("parameterName")) + int(source.hasField("dialResponse"))
-                              + int(source.hasField("eventVariable"));
-      LogThrowIf(sourceCount != 1,
-                 "Composite node " << node.name << ": specify exactly one of parameterName, dialResponse and eventVariable");
+      const int sourceCount = int(source.hasField("parameterName")) + int(source.hasField("parameterIndex"))
+                              + int(source.hasField("dialResponse")) + int(source.hasField("eventVariable"));
+      LogThrowIf(sourceCount != 1, "Composite node " << node.name << ": expected exactly one input source");
       Input input;
       if( node.config->fetchValue<DialCollection::DialType>("dialType") == DialCollection::DialType::Formula ){
         input.name = source.fetchValue("name", std::string());
         LogThrowIf(input.name.empty(), "Composite Formula input requires a name");
       }
-      if( source.hasField("parameterName") ){
-        input.parameterName = source.fetchValue<std::string>("parameterName");
-        const auto position = std::find(parameterNames_.begin(), parameterNames_.end(), input.parameterName);
-        LogThrowIf(position == parameterNames_.end(), "Composite: unresolved parameter: " << input.parameterName);
-        input.bufferIndex = int(std::distance(parameterNames_.begin(), position));
+      if( source.hasField("parameterName") or source.hasField("parameterIndex") ){
+        input.bufferIndex = findInput_(source.getConfig());
+        LogThrowIf(input.bufferIndex < 0 or input.bufferIndex >= _inputCount_,
+                   "Composite: unresolved parameter input for node " << node.name);
       }
       else if( source.hasField("dialResponse") ){
         const auto dependency = source.fetchValue<std::string>("dialResponse");
@@ -101,12 +109,17 @@ void CompositeDial::bind(const std::function<const DialInterface*(int)>& findInt
     }
     else{ node.dial = interface->getDialBaseRef()->clone(); }
     node.supervisor = *interface->getResponseSupervisorRef();
-    node.mirrorEdges.clear();
-    for( const auto& ref : interface->getInputBufferRef()->getInputParameterIndicesList() ){
-      node.mirrorEdges.emplace_back(ref.mirrorEdges);
-    }
     const auto parameterInputCount = std::count_if(node.inputs.begin(), node.inputs.end(),
         [](const Input& input_){ return input_.eventVariable.empty(); });
+    if( node.configuredMirrorEdges ){
+      node.mirrorEdges.assign(parameterInputCount, *node.configuredMirrorEdges);
+    }
+    else{
+      node.mirrorEdges.clear();
+      for( const auto& ref : interface->getInputBufferRef()->getInputParameterIndicesList() ){
+        node.mirrorEdges.emplace_back(ref.mirrorEdges);
+      }
+    }
     LogThrowIf(node.mirrorEdges.size() != parameterInputCount,
                "Composite node " << node.name << ": input buffer size mismatch");
     const auto type = node.config->fetchValue<std::string>("dialType");
