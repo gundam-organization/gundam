@@ -669,7 +669,7 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
     mcmc.GetProposeStep().SetAcceptanceRigidity(-1);
   }
   else {
-    LogWarning << "Step length will be updated" << std::endl;
+    LogInfo << "Step length will be updated" << std::endl;
     mcmc.GetProposeStep().SetAcceptanceRigidity(2.0);
   }
 
