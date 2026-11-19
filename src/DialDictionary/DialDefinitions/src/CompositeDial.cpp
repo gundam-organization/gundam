@@ -88,6 +88,35 @@ CompositeDial::CompositeDial(ConfigReader config_, const std::vector<std::string
   LogThrowIf(_definition_->evaluationOrder.size() != _definition_->nodes.size(), "Composite: every node must contribute to output");
 }
 
+std::shared_ptr<const CompositeDial::NodeSettings> CompositeDial::NodeSettingsCache::get(
+    const DialInterface& interface_){
+  const auto& supervisor = *interface_.getResponseSupervisorRef();
+  const auto& inputs = interface_.getInputBufferRef()->getInputParameterIndicesList();
+  const auto equal = [](double left_, double right_){
+    return left_ == right_ or (std::isnan(left_) and std::isnan(right_));
+  };
+  std::lock_guard<std::mutex> lock(_mutex_);
+  for( const auto& settings : _entries_ ){
+    if( not settings->supervisor.isEquivalentTo(supervisor) or settings->mirrorEdges.size() != inputs.size() ){ continue; }
+    bool matches = true;
+    for( size_t index = 0; index < inputs.size(); ++index ){
+      const auto& stored = settings->mirrorEdges[index];
+      const auto& requested = inputs[index].mirrorEdges;
+      if( not equal(stored.minValue, requested.minValue) or not equal(stored.range, requested.range) ){
+        matches = false;
+        break;
+      }
+    }
+    if( matches ){ return settings; }
+  }
+  auto settings = std::make_shared<NodeSettings>();
+  settings->supervisor = supervisor;
+  settings->mirrorEdges.reserve(inputs.size());
+  for( const auto& input : inputs ){ settings->mirrorEdges.emplace_back(input.mirrorEdges); }
+  _entries_.emplace_back(settings);
+  return settings;
+}
+
 void CompositeDial::bind(const std::function<const DialInterface*(int)>& findInterface_){
   _nodeBindings_.resize(_definition_->nodes.size());
   for( size_t index = 0; index < _definition_->nodes.size(); ++index ){
@@ -103,14 +132,10 @@ void CompositeDial::bind(const std::function<const DialInterface*(int)>& findInt
       binding.dial = std::move(bound);
     }
     else{ binding.dial = interface->getDialBaseRef()->clone(); }
-    binding.supervisor = *interface->getResponseSupervisorRef();
-    binding.mirrorEdges.clear();
-    for( const auto& ref : interface->getInputBufferRef()->getInputParameterIndicesList() ){
-      binding.mirrorEdges.emplace_back(ref.mirrorEdges);
-    }
+    binding.settings = node.settingsCache->get(*interface);
     const auto parameterInputCount = std::count_if(node.inputs.begin(), node.inputs.end(),
         [](const Input& input_){ return input_.eventVariable.empty(); });
-    LogThrowIf(binding.mirrorEdges.size() != parameterInputCount,
+    LogThrowIf(binding.settings->mirrorEdges.size() != parameterInputCount,
                "Composite node " << node.name << ": input buffer size mismatch");
     const auto type = node.config->fetchValue<std::string>("dialType");
     const bool surface = dynamic_cast<const Bilinear*>(binding.dial.get()) != nullptr
@@ -146,7 +171,7 @@ double CompositeDial::evalResponse(const DialInputBuffer& input_) const {
       // only the parameter/response inputs, in their original relative order.
       if( not source.eventVariable.empty() ){ continue; }
       double value = source.bufferIndex >= 0 ? input_.getInputBuffer()[source.bufferIndex] : responses[source.nodeIndex];
-      const auto& edges = binding.mirrorEdges[iParameter++];
+      const auto& edges = binding.settings->mirrorEdges[iParameter++];
       if( not std::isnan(edges.minValue) ){
         value = std::abs(std::fmod(value - edges.minValue, 2 * edges.range));
         if( value > edges.range ){ value = 2 * edges.range - value; }
@@ -155,7 +180,7 @@ double CompositeDial::evalResponse(const DialInputBuffer& input_) const {
       values.emplace_back(value);
     }
     buffer.setInputValues(std::move(values));
-    responses[index] = binding.supervisor.process(binding.dial->evalResponse(buffer));
+    responses[index] = binding.settings->supervisor.process(binding.dial->evalResponse(buffer));
   }
   return responses[_outputIndex_];
 }

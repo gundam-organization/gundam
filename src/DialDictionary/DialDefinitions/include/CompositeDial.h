@@ -7,6 +7,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -21,16 +22,27 @@ public:
     int nodeIndex{-1};
     std::string eventVariable;
   };
+  struct NodeSettings {
+    DialResponseSupervisor supervisor;
+    std::vector<DialInputBuffer::ParameterReference::MirrorEdges> mirrorEdges;
+  };
+  class NodeSettingsCache {
+  public:
+    std::shared_ptr<const NodeSettings> get(const DialInterface& interface_);
+  private:
+    std::mutex _mutex_;
+    std::vector<std::shared_ptr<const NodeSettings>> _entries_;
+  };
   struct Node {
     std::string name;
     std::shared_ptr<const ConfigReader> config;
     std::vector<Input> inputs;
     int collectionIndex{-1};
+    std::shared_ptr<NodeSettingsCache> settingsCache{std::make_shared<NodeSettingsCache>()};
   };
   struct NodeBinding {
     std::shared_ptr<const DialBase> dial;
-    DialResponseSupervisor supervisor;
-    std::vector<DialInputBuffer::ParameterReference::MirrorEdges> mirrorEdges;
+    std::shared_ptr<const NodeSettings> settings;
   };
 
   CompositeDial(ConfigReader config_, const std::vector<std::string>& parameterNames_);
@@ -46,6 +58,7 @@ public:
   [[nodiscard]] const auto& getNodes() const { return _definition_->nodes; }
   [[nodiscard]] bool isBound() const { return _isBound_; }
   [[nodiscard]] int getInputCount() const { return _inputCount_; }
+  [[nodiscard]] const auto& getNodeBindings() const { return _nodeBindings_; }
   void bind(const std::function<const DialInterface*(int)>& findInterface_);
 
 private:
