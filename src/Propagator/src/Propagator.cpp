@@ -274,7 +274,7 @@ void Propagator::writeEventRates(const GenericToolbox::TFilePath& saveDir_) cons
 }
 void Propagator::writeParameterStateTree(const GenericToolbox::TFilePath& saveDir_) const{
   if( saveDir_.getRootDir() == nullptr ) {
-    LogAlert << "TFilePath has no root TDirectory set. Skipping " << __METHOD_NAME__ << std::endl;
+    LogError << "TFilePath has no root TDirectory set. Skipping " << __METHOD_NAME__ << std::endl;
     return;
   }
 
