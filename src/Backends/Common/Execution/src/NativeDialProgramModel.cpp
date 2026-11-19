@@ -19,6 +19,7 @@ namespace {
     switch( op_ ){
       case FormulaOpcode::LoadInput:
       case FormulaOpcode::LoadConstant: return 0;
+      case FormulaOpcode::Select: return 3;
 #define GUNDAM_FORMULA_UNARY(opcode, operation) case FormulaOpcode::opcode: return 1;
 #include "DeviceMath/SharedFormulaOperations.h"
 #undef GUNDAM_FORMULA_UNARY
@@ -70,7 +71,7 @@ namespace {
   }
   struct Node {
     FormulaInstruction instruction{};
-    int left{-1}, right{-1};
+    int left{-1}, right{-1}, condition{-1};
     bool constant{false}, bound{false};
     double value{0.};
   };
@@ -97,12 +98,13 @@ namespace {
           }
         }
         else{
-          node.right = count == 2 ? stack.back() : -1;
-          if( count == 2 ){ stack.pop_back(); }
+          node.right = count >= 2 ? stack.back() : -1;
+          if( count >= 2 ){ stack.pop_back(); }
           node.left = stack.back(); stack.pop_back();
+          if( count == 3 ){ node.condition = stack.back(); stack.pop_back(); }
           const auto& a = nodes[node.left];
-          const auto& b = count == 2 ? nodes[node.right] : a;
-          node.bound = a.bound or b.bound;
+          const auto& b = count >= 2 ? nodes[node.right] : a;
+          node.bound = a.bound or b.bound or (node.condition >= 0 and nodes[node.condition].bound);
           if( a.constant and b.constant ){ node.constant = fold(instruction.opcode, a.value, b.value, node.value); }
         }
         stack.push_back(static_cast<int>(nodes.size())); nodes.push_back(node);
@@ -128,6 +130,7 @@ namespace {
           optimized.instructions.push_back({FormulaOpcode::LoadInput, found.first->second});
         }
         else{
+          if( node.condition >= 0 ){ self_(self_, node.condition); }
           self_(self_, node.left);
           if( node.right >= 0 ){ self_(self_, node.right); }
           optimized.instructions.push_back(node.instruction);

@@ -77,6 +77,15 @@ namespace {
       if( op == FormulaOpcode::LoadConstant ){
         stack.push_back({program_.constants.at(instruction.operand), 0.}); continue;
       }
+      if( op == FormulaOpcode::Select ){
+        const auto size = stack.size();
+        const auto selected = stack[size - 3].value != 0. ? stack[size - 2] : stack[size - 1];
+        stack.resize(size - 2); stack.back() = selected; continue;
+      }
+      if( op >= FormulaOpcode::Less and op <= FormulaOpcode::LogicalOr ){
+        stack.back().slope = 0.;
+        if( op != FormulaOpcode::LogicalNot ){ stack[stack.size() - 2].slope = 0.; }
+      }
       auto& a = stack.back();
       const double x = a.value;
       double partial = 0.;

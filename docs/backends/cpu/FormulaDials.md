@@ -25,6 +25,14 @@ The supported expression subset includes named inputs `[name]`, numeric literals
 `+ - * /`, and right-associative powers `^` and `**`. Power has higher precedence
 than unary minus: `-2^2` evaluates to `-4`.
 
+Comparisons `< <= > >= == !=`, logical operators `! && ||`, and nested
+right-associative conditionals `condition ? then : else` are supported with C++
+precedence. Boolean results are zero or one; any nonzero operand is true.
+Expressions are pure: the stack interpreter evaluates both branches, then copies
+only the selected value and derivative. A NaN in an unselected branch does not
+contaminate the result. Comparisons and logical operators have zero derivative;
+conditionals differentiate the selected branch (no derivative at a switching boundary).
+
 Supported functions are `exp`, `log`, `log10`, `sqrt`, `abs`, `fabs`, `sin`, `cos`,
 `tan`, `asin`, `acos`, `atan`, `atan2`, `sinh`, `cosh`, `tanh`, `erf`, `erfc`,
 `floor`, `ceil`, `pow`, `min`, and `max`. Common `TMath::` and `std::` spellings
@@ -45,7 +53,7 @@ During formula evaluation, named input bindings are resolved once into a
 contiguous worker-local array before interpreting the bytecode. The worker's
 preallocated formula scratch contains both this array and the evaluation stack.
 
-Unsupported syntax (including conditionals, comparisons, positional `x[i]`, ROOT
+Unsupported syntax (including positional `x[i]`, ROOT
 distribution shortcuts and arbitrary C++ calls) raises an error during layout
 construction. There is no fallback to ROOT evaluation. Floating-point results
 are compared with ROOT within numerical tolerances, rather than guaranteed to

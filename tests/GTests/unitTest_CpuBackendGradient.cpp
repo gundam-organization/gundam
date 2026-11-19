@@ -574,6 +574,10 @@ namespace {
         "sinh([p])+cosh([p])+tanh([p])+erf([p])+erfc([p])",
         "pow([p],[q])+atan2([p],[q])+[p]/[q]-[p]*[q]",
         "min([p],[q])+max([p],[q])+floor([p])+ceil([q])",
+        "[p]>.2 ? [p]*[q] : [q]^2",
+        "[p]<0 ? [p]^2 : [q]<0 ? [q]^2 : [p]+[q]",
+        "[p]<0 ? sqrt(-[p]) : sqrt([p])",
+        "2+([p]>=0 && [q]!=0)+!([p]<=0 || [q]==0)",
         "(-[p])^2+0*[p]+2"} ){
       SCOPED_TRACE(expression);
       auto view = gradientModel(1.);

@@ -10,6 +10,16 @@
 
 namespace Backends::FormulaMath {
   using Scalar = GundamDeviceMath::DoubleFloat;
+  inline Scalar less(Scalar left_, Scalar right_) { return Scalar(left_ < right_); }
+  inline Scalar lessEqual(Scalar left_, Scalar right_) { return Scalar(left_ <= right_); }
+  inline Scalar greater(Scalar left_, Scalar right_) { return Scalar(left_ > right_); }
+  inline Scalar greaterEqual(Scalar left_, Scalar right_) { return Scalar(left_ >= right_); }
+  inline Scalar equal(Scalar left_, Scalar right_) { return Scalar(left_ == right_); }
+  inline Scalar notEqual(Scalar left_, Scalar right_) { return Scalar(left_ != right_); }
+  inline Scalar logicalNot(Scalar value_) { return Scalar(value_ == Scalar(0)); }
+  inline Scalar logicalAnd(Scalar left_, Scalar right_) { return Scalar((left_ != Scalar(0)) && (right_ != Scalar(0))); }
+  inline Scalar logicalOr(Scalar left_, Scalar right_) { return Scalar((left_ != Scalar(0)) || (right_ != Scalar(0))); }
+
   inline bool finite(Scalar x_) { return GUNDAM_FORMULA_MATH::isfinite(x_.high); }
   inline Scalar pi() { return {3.14159265358979323846f, -8.742277657347586e-8f}; }
   inline Scalar ln2() { return {.69314718055994530942f, -1.904654299957768e-9f}; }

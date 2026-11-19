@@ -14,7 +14,8 @@ namespace Backends {
   enum class FormulaOpcode : FormulaIndex {
     LoadInput, LoadConstant, Add, Subtract, Multiply, Divide, Negate, Pow,
     Exp, Log, Log10, Sqrt, Abs, Sin, Cos, Tan, Asin, Acos, Atan, Atan2,
-    Sinh, Cosh, Tanh, Erf, Erfc, Floor, Ceil, Min, Max
+    Sinh, Cosh, Tanh, Erf, Erfc, Floor, Ceil, Min, Max,
+    Less, LessEqual, Greater, GreaterEqual, Equal, NotEqual, LogicalNot, LogicalAnd, LogicalOr, Select
   };
 
   struct FormulaInstruction {

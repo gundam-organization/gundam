@@ -1,6 +1,7 @@
 // Intentionally unguarded: expanded separately for unary and binary dispatch.
 // Callers supply case generation; math and memory operations remain backend-specific.
 #ifdef GUNDAM_FORMULA_UNARY
+GUNDAM_FORMULA_UNARY(LogicalNot, logicalNot)
 GUNDAM_FORMULA_UNARY(Negate, negate)
 GUNDAM_FORMULA_UNARY(Exp, exp)
 GUNDAM_FORMULA_UNARY(Log, log)
@@ -22,6 +23,14 @@ GUNDAM_FORMULA_UNARY(Floor, floor)
 GUNDAM_FORMULA_UNARY(Ceil, ceil)
 #endif
 #ifdef GUNDAM_FORMULA_BINARY
+GUNDAM_FORMULA_BINARY(Less, less)
+GUNDAM_FORMULA_BINARY(LessEqual, lessEqual)
+GUNDAM_FORMULA_BINARY(Greater, greater)
+GUNDAM_FORMULA_BINARY(GreaterEqual, greaterEqual)
+GUNDAM_FORMULA_BINARY(Equal, equal)
+GUNDAM_FORMULA_BINARY(NotEqual, notEqual)
+GUNDAM_FORMULA_BINARY(LogicalAnd, logicalAnd)
+GUNDAM_FORMULA_BINARY(LogicalOr, logicalOr)
 GUNDAM_FORMULA_BINARY(Add, add)
 GUNDAM_FORMULA_BINARY(Subtract, subtract)
 GUNDAM_FORMULA_BINARY(Multiply, multiply)

@@ -107,6 +107,10 @@ TEST(MpsFormula, AllOpcodesAndThreeParameterCacheMatchCpu) {
       "sin([delta])+cos([alpha])+tan([third])", "asin([delta])+acos([alpha])+atan([third])",
       "atan2([delta],[alpha])+pow([q3],.25)+[third]^3", "-[delta]^2+[alpha]/[q3]",
       "sinh([delta])+cosh([alpha])+tanh([third])", "erf([delta])+erfc([alpha])+floor([third])+ceil([delta])",
+      "[delta] > 0 ? [alpha]*[third] : [q3]",
+      "[delta] < 0 ? 1 : [delta] == 0 ? 2 : 3",
+      "([delta]<=0 || [alpha]>=0) && !([third]!=0)",
+      "[delta]>=0 ? sqrt([delta]) : sqrt(-[delta])",
       "2.5", "[q3]"};
   for( const auto* mode : {"cachedResponses", "recomputeResponses"} ){
     MpsBackend gpu;

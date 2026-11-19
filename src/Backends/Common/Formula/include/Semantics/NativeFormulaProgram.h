@@ -9,6 +9,25 @@
 #include <cstddef>
 
 namespace Backends::NativeFormulaMath {
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double less(double left_, double right_) { return double(left_ < right_); }
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double lessEqual(double left_, double right_) { return double(left_ <= right_); }
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double greater(double left_, double right_) { return double(left_ > right_); }
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double greaterEqual(double left_, double right_) { return double(left_ >= right_); }
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double equal(double left_, double right_) { return double(left_ == right_); }
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double notEqual(double left_, double right_) { return double(left_ != right_); }
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double logicalNot(double value_) { return double(value_ == double(0)); }
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double logicalAnd(double left_, double right_) { return double((left_ != double(0)) && (right_ != double(0))); }
+  GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE
+  double logicalOr(double left_, double right_) { return double((left_ != double(0)) || (right_ != double(0))); }
+
   // Statically selected native-double operations; no virtual/indirect dispatch.
 #define GUNDAM_NATIVE_FORMULA_UNARY(name) \
   GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE \
@@ -116,6 +135,10 @@ namespace Backends {
       const auto op = instruction.opcode;
       if( op == FormulaOpcode::LoadInput ){ stack_[top++] = readInput_(instruction.operand); continue; }
       if( op == FormulaOpcode::LoadConstant ){ stack_[top++] = program_.constants[instruction.operand]; continue; }
+      if( op == FormulaOpcode::Select ){
+        stack_[top - 3] = stack_[top - 3] != 0. ? stack_[top - 2] : stack_[top - 1];
+        top -= 2; continue;
+      }
       double& value = stack_[top - 1];
       switch( op ){
 #define GUNDAM_FORMULA_UNARY(opcode, operation) \

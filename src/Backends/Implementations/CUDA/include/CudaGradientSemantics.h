@@ -112,6 +112,14 @@ GUNDAM_BACKEND_FORCE_INLINE GUNDAM_BACKEND_HOST_DEVICE Dual formula(CudaFormulaP
     if( op == FormulaOpcode::LoadConstant ){
       stack[top++] = Dual(constants[program.firstConstant+instruction.operand]); continue;
     }
+    if( op == FormulaOpcode::Select ){
+      stack[top-3] = stack[top-3].value != S(0) ? stack[top-2] : stack[top-1];
+      top -= 2; continue;
+    }
+    if( op >= FormulaOpcode::Less && op <= FormulaOpcode::LogicalOr ){
+      stack[top-1].slope = S(0);
+      if( op != FormulaOpcode::LogicalNot ){ stack[top-2].slope = S(0); }
+    }
     Dual a = stack[top-1];
     S x = a.value, partial(0), value(0);
     bool unary = true;

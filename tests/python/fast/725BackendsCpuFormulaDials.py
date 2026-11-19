@@ -68,6 +68,9 @@ def main():
         helpers.formula('2+sin([offset])', [delta, alpha]),  # Unreferenced declared input.
         helpers.formula('1+.001*[momentum]', [q3]),
         helpers.formula('2.5', []),
+        helpers.formula('[offset]>0 ? 2+[slope] : [momentum]>500 ? 3 : 4', [delta, alpha, q3]),
+        helpers.formula('1+([offset]>=0 && [slope]<1 || [momentum]==0)', [delta, alpha, q3]),
+        helpers.formula('1+([offset]<0 ? sqrt(-[offset]) : sqrt([offset]))', [delta]),
         helpers.formula('[X]+.001*[momentum]*[offset]^2', [q3, delta], binning=binning),
         helpers.formula('[X]', [], binning=binning),
         helpers.formula('[X]', [{'name': 'X', 'eventVariable': 'X'}], binning=binning),
@@ -83,7 +86,7 @@ def main():
         for dial in cases:
             compare(path, dial)
     # A valid ROOT formula outside the supported subset must fail explicitly.
-    unsupported = helpers.config(path, helpers.formula('2+([offset]>0 ? 1 : 0)', [delta]))
+    unsupported = helpers.config(path, helpers.formula('2+std::fmod([offset],2)', [delta]))
     unsupported['likelihoodInterfaceConfig']['backendManagerConfig'] = {'isEnabled': True, 'type': 'CPU'}
     helpers.reject(unsupported, 'Formula bytecode')
     print('SUCCESS: CPU formula bytecode matches ROOT weights, histograms and observables.')

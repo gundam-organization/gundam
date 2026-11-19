@@ -41,6 +41,10 @@ TEST(BackendFormula, ArithmeticFunctionsAndPrecedenceMatchRoot) {
       "erf([delta])+erfc([delta])+floor([alpha])+ceil([alpha])",
       "min([delta],[alpha])+max([delta],[alpha])",
       "TMath::Exp([delta])+TMath::Power([q3],2)+TMath::Pi()",
+      "[delta]>0 ? ([alpha]^2) : [q3]", "[delta]?1:[alpha]?2:3",
+      "[delta]<=0 || [alpha]>=0 && [q3]!=7.5", "!([delta]<0)==([alpha]>0)",
+      "[delta]>=0 ? sqrt([delta]) : sqrt(-[delta])",
+      "[delta]<0 ? 1 : [delta]==0 ? 2 : 3",
       "std::sin([delta])+TMath::TwoPi()", "2.5"};
   for( const auto& expression : expressions ){
     SCOPED_TRACE(expression);
@@ -65,7 +69,7 @@ TEST(BackendFormula, ConstantsAndDomainErrors) {
   EXPECT_DOUBLE_EQ(evaluate(Backends::FormulaCompiler::compile("pi", {}), {}), std::acos(-1.));
   const auto program = Backends::FormulaCompiler::compile("[a]+[bin]", {"unused", "a"}, {{"bin", 4.5}});
   EXPECT_DOUBLE_EQ(evaluate(program, {99., 2.}), 6.5);
-  for( const auto& expression : {"sqrt([a])", "log([a])", "1/[a]", "asin([a])", "exp([a])"} ){
+  for( const auto& expression : {"sqrt([a])", "log([a])", "1/[a]", "asin([a])", "exp([a])", "[a]!=0", "![a]", "[a]<0", "[a]>=0", "[a] || 0", "[a] && 1"} ){
     TFormula root("formulaDomain", expression, false);
     ASSERT_TRUE(root.IsValid());
     const auto code = Backends::FormulaCompiler::compile(expression, {"a"});
@@ -77,7 +81,7 @@ TEST(BackendFormula, ConstantsAndDomainErrors) {
 
 TEST(BackendFormula, RejectsUnsupportedExpressionsAndInvalidBytecode) {
   for( const auto& expression : {"", "[missing]", "[a", "[a]+", "[a][a]", "sin()", "sin(1,2)",
-      "pow(2)", "max(1,2,3)", "(1+2", "x[0]", "gaus(0)", "[a]>0?1:0", "[a]=1", "1;2", "1e+"} ){
+      "pow(2)", "max(1,2,3)", "(1+2", "x[0]", "gaus(0)", "[a]>0?1", "[a]?1:", "[a]&1", "[a]=1", "1;2", "1e+"} ){
     SCOPED_TRACE(expression);
     EXPECT_THROW(Backends::FormulaCompiler::compile(expression, {"a"}), std::runtime_error);
   }
@@ -313,4 +317,32 @@ TEST(BackendFormula, BackendValidationDoesNotRequestOriginalFormulaGradient) {
   cache.back().dialResponseCacheList.emplace_back(interface);
   EXPECT_THROW(likelihood.validateWeightGradient(), std::runtime_error);
   EXPECT_NO_THROW(likelihood.validateWeightGradient(false));
+}
+
+TEST(BackendFormula, NestedEventSelectionMatchesRoot) {
+  const std::string expression =
+      "[iclass] == 11 ? ([p] > 100. && [erec] < 1.25) : [iclass] == 13 ? ([p] > 200.) : "
+      "([iclass] == 14 || [iclass] == 15) ? ([s]*[visible] > 100. && [erec] < 1.25) : "
+      "([s]*[visible] > 30. && ([iclass] == 32 || [s]*[loss] > 300.))";
+  const std::vector<std::string> names{"iclass", "p", "erec", "s", "visible", "loss"};
+  const auto program = Backends::FormulaCompiler::compile(expression, names);
+  TFormula reference("eventSelection", expression.c_str(), false);
+  ASSERT_TRUE(reference.IsValid());
+  for( double iclass : {11., 13., 14., 15., 32., 99.} ){
+    for( double p : {99., 100., 101., 200., 201.} ){
+      for( double erec : {1.24, 1.25, 1.26} ){
+        for( double s : {.5, 1., 2.} ){
+          for( double visible : {30., 100., 101.} ){
+            for( double loss : {299., 300., 301.} ){
+              const std::vector<double> values{iclass, p, erec, s, visible, loss};
+              for( std::size_t i = 0; i < names.size(); ++i ){
+                reference.SetParameter(names[i].c_str(), values[i]);
+              }
+              EXPECT_DOUBLE_EQ(evaluate(program, values), reference.Eval(0.));
+            }
+          }
+        }
+      }
+    }
+  }
 }

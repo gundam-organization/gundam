@@ -37,6 +37,10 @@ ObservableScalar evaluate_formula_program(DeviceFormulaProgram program, uint fir
       continue;
     }
     if( op == FormulaOpcode::LoadConstant ){ stack[top++] = constants[program.firstConstant + instruction.operand]; continue; }
+    if( op == FormulaOpcode::Select ){
+      stack[top - 3] = stack[top - 3] != ObservableScalar(0) ? stack[top - 2] : stack[top - 1];
+      top -= 2; continue;
+    }
     auto value = stack[top - 1];
     switch( op ){
 #define GUNDAM_FORMULA_UNARY(opcode, operation) \

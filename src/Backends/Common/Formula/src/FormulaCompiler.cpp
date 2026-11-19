@@ -39,6 +39,16 @@ namespace {
       case FormulaOpcode::Subtract:
       case FormulaOpcode::Multiply:
       case FormulaOpcode::Divide: return 2;
+      case FormulaOpcode::Less:
+      case FormulaOpcode::LessEqual:
+      case FormulaOpcode::Greater:
+      case FormulaOpcode::GreaterEqual:
+      case FormulaOpcode::Equal:
+      case FormulaOpcode::NotEqual:
+      case FormulaOpcode::LogicalAnd:
+      case FormulaOpcode::LogicalOr: return 2;
+      case FormulaOpcode::Select: return 3;
+      case FormulaOpcode::LogicalNot:
       case FormulaOpcode::Negate: return 1;
       default:
         for( const auto& function : functions ){
@@ -90,6 +100,13 @@ namespace {
       ++_position_;
       return true;
     }
+    bool take(const char* token_) {
+      whitespace();
+      const std::string token(token_);
+      if( _expression_.compare(_position_, token.size(), token) != 0 ){ return false; }
+      _position_ += token.size();
+      return true;
+    }
     void require(char token_) {
       if( not take(token_) ){ fail(std::string("expected '") + token_ + "'"); }
     }
@@ -103,6 +120,40 @@ namespace {
       _program_.constants.push_back(value_);
     }
     void expression() {
+      if( ++_depth_ > 128 ){ fail("expression nesting exceeds 128"); }
+      logicalOr();
+      if( take('?') ){
+        expression(); require(':'); expression(); emit(FormulaOpcode::Select);
+      }
+      --_depth_;
+    }
+    void logicalOr() {
+      logicalAnd();
+      while( take("||") ){ logicalAnd(); emit(FormulaOpcode::LogicalOr); }
+    }
+    void logicalAnd() {
+      equality();
+      while( take("&&") ){ equality(); emit(FormulaOpcode::LogicalAnd); }
+    }
+    void equality() {
+      comparison();
+      while( true ){
+        if( take("==") ){ comparison(); emit(FormulaOpcode::Equal); }
+        else if( take("!=") ){ comparison(); emit(FormulaOpcode::NotEqual); }
+        else{ return; }
+      }
+    }
+    void comparison() {
+      sum();
+      while( true ){
+        if( take("<=") ){ sum(); emit(FormulaOpcode::LessEqual); }
+        else if( take(">=") ){ sum(); emit(FormulaOpcode::GreaterEqual); }
+        else if( take('<') ){ sum(); emit(FormulaOpcode::Less); }
+        else if( take('>') ){ sum(); emit(FormulaOpcode::Greater); }
+        else{ return; }
+      }
+    }
+    void sum() {
       product();
       while( true ){
         if( take('+') ){ product(); emit(FormulaOpcode::Add); }
@@ -122,6 +173,7 @@ namespace {
       if( ++_depth_ > 128 ){ fail("expression nesting exceeds 128"); }
       if( take('+') ){ unary(); }
       else if( take('-') ){ unary(); emit(FormulaOpcode::Negate); }
+      else if( take('!') ){ unary(); emit(FormulaOpcode::LogicalNot); }
       else{ power(); }
       --_depth_;
     }
@@ -163,7 +215,10 @@ namespace {
       const auto begin = _position_;
       while( _position_ < _expression_.size() ){
         const auto c = static_cast<unsigned char>(_expression_[_position_]);
-        if( not std::isalnum(c) and c != '_' and c != ':' ){ break; }
+        if( c == ':' and _expression_.compare(_position_, 2, "::") == 0 ){
+          _position_ += 2; continue;
+        }
+        if( not std::isalnum(c) and c != '_' ){ break; }
         ++_position_;
       }
       std::string name = _expression_.substr(begin, _position_ - begin);
