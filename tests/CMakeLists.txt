@@ -34,9 +34,15 @@ endif(NOT DEFINED GUNDAM_TESTS_ARGUMENT OR GUNDAM_TESTS_ARGUMENT STREQUAL "")
 # Run the main executable test scripts.  These are relatively slow, so they
 if(WITH_INTERFACE_TEST)
   cmessage( STATUS "gundam-tests.sh run using: ${GUNDAM_TESTS_ARGUMENT}")
+  set(shellTestEnvironment "${CMAKE_COMMAND}" -E env)
+  if(APPLE)
+    list(APPEND shellTestEnvironment --unset=DYLD_LIBRARY_PATH)
+  endif()
   add_test(
     NAME gundam-tests
-    COMMAND "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh ${GUNDAM_TESTS_ARGUMENT} -a ${CMAKE_BINARY_DIR}/Testing/gundam-tests.$(date +%Y-%m-%d-%H%M%S) )"
+    COMMAND ${shellTestEnvironment}
+      "PATH=$<TARGET_FILE_DIR:gundamFitter>:$ENV{PATH}"
+      "sh" "-c" "(cd ${CMAKE_SOURCE_DIR}/tests && ./gundam-tests.sh ${GUNDAM_TESTS_ARGUMENT} -a ${CMAKE_BINARY_DIR}/Testing/gundam-tests.$(date +%Y-%m-%d-%H%M%S) )"
   )
   # Label the shell suite separately from the Python suites. The shell runner
   # defaults to fast; -r/-e/-s select increasingly inclusive suites.
@@ -194,7 +200,10 @@ if( WITH_GOOGLE_TEST )
     GTests/unitTest_TableGradient.cpp
     GTests/unitTest_BinningGradient.cpp
   )
-  set(unitDataLoadingSources GTests/unitTest_DataDispenser.cpp)
+  set(unitDataLoadingSources
+    GTests/unitTest_DataDispenser.cpp
+    GTests/unitTest_DialDefinitions.cpp
+  )
   set(unitLikelihoodSources
     GTests/unitTest_JointProbability.cpp
     GTests/unitTest_ExternalConstraintGradient.cpp)

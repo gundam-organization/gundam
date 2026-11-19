@@ -14,7 +14,8 @@ using `jointProbabilityConfig`.
 | Likelihood Interface Options        | Type | Descriptions                                | default   |
 |-------------------------------------|------|---------------------------------------------|-----------|
 | [propagatorConfig](./Propagator.md) | Json | Configure the parameter propagation         |           |
-| dataSetList                         | Json | Configure the input data sets               |           |
+| [datasetManagerConfig](./DatasetManager.md) | Json | Configure the input datasets | |
+| datasetList | Json | Deprecated: use `datasetManagerConfig.datasetList` | |
 | jointProbabilityConfig              | Json | Configure the joint probability calculation | BarlowLLH |
 | plotGeneratorConfig                 | Json |                                             |           |
 | enableStatThrowInToys               | bool |                                             |           |
@@ -86,3 +87,20 @@ constraint exposes its configuration getters, `evalFormula()`,
 Parameter references are resolved once during initialization. Evaluations read
 the current values through cached const pointers; parameter storage must remain
 alive and stable for the lifetime of the bound constraints.
+
+### `datasetManagerConfig`
+
+```yaml
+likelihoodInterfaceConfig:
+  datasetManagerConfig:
+    datasetList:
+      - name: input
+        model:
+          tree: events
+          filePathList: [input.root]
+```
+
+The former `datasetList` directly under `likelihoodInterfaceConfig` is still
+read with a relocation warning. If both lists are present, the list in
+`datasetManagerConfig` takes precedence, including an explicitly empty list.
+The older `propagatorConfig.dataSetList` location remains supported as a fallback.

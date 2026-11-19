@@ -33,6 +33,7 @@
 #include <TClass.h>
 #include <TGraph.h>
 
+#include <algorithm>
 #include <array>
 #include <cstring>
 #include <exception>
@@ -517,6 +518,33 @@ namespace {
 
 }
 
+
+void DataDispenser::applyTemplates(ConfigReader& config_, const std::vector<DatasetDefinitionTemplate>& templates_){
+  config_.defineFields({{"useTemplates"}});
+  if( not config_.hasField("useTemplates") ){ return; }
+
+  ConfigUtils::ConfigBuilder configBuilder;
+  for( auto& reference : config_.loop("useTemplates") ){
+    reference.clearFields();
+    reference.defineFields({
+      {FieldFlag::MANDATORY, "name"},
+      {"isEnabled"},
+    });
+    reference.checkConfiguration();
+    if( not reference.fetchValue("isEnabled", true) ){ continue; }
+    const auto name = reference.fetchValue<std::string>("name");
+    auto templateIt = std::find_if(templates_.begin(), templates_.end(),
+                                  [&name](const DatasetDefinitionTemplate& template_){ return template_.getName() == name; });
+    LogThrowIf(templateIt == templates_.end(), "Unknown data dispenser template: " << name);
+    auto templateConfig = templateIt->getConfig().getConfig();
+    templateConfig.erase("name");
+    if( not templateConfig.empty() ){ configBuilder.override(templateConfig); }
+  }
+  auto ownConfig = config_.getConfig();
+  ownConfig.erase("useTemplates");
+  if( not ownConfig.empty() ){ configBuilder.override(ownConfig); }
+  config_.setConfig(configBuilder.getConfig());
+}
 
 void DataDispenser::prepareConfig(ConfigReader &config_){
   config_.clearFields();
