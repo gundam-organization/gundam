@@ -157,7 +157,7 @@ void ParameterSet::configureImpl(){
   }
 
   if (_nbParameterDefinition_ < 1){
-    LogAlert << "Parameter set \"" << getName() << "\" is defined without parameters." << std::endl;
+    LogError << "CONFIG ERROR: Parameter set \"" << getName() << "\" without parameters." << std::endl;
   }
 
   this->defineParameters();
