@@ -8,6 +8,7 @@
 
 #include "Logger.h"
 #include "Parameter.h"
+#include "GundamUtils.h"
 
 #include <algorithm>
 
@@ -88,11 +89,12 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
 
   }
 
-  auto countValidDials = [](std::vector<DialIndexCacheEntry>& dialIndices_){
+  auto countValidDials = [&](std::vector<DialIndexCacheEntry>& dialIndices_){
     return std::count_if(dialIndices_.begin(), dialIndices_.end(),
-      []( DialIndexCacheEntry& dialIndex_){
+      [&]( DialIndexCacheEntry& dialIndex_){
         if( dialIndex_.collectionIndex == size_t(-1) ){ return false; }
         if( dialIndex_.interfaceIndex == size_t(-1) ){ return false; }
+        if( dialCollectionList_.at(dialIndex_.collectionIndex).isCompositeNode() ){ return false; }
         return true;
       });
   };
@@ -215,7 +217,8 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
   for( const auto& entry : _cache_ ){ responseCount += entry.dialResponseCacheList.size(); }
   LogInfo << "Reference cache has been setup: " << _cache_.size() << " events, "
           << responseCount << " responses (" << sizeof(DialResponseCache)
-          << " bytes/response), " << getCacheMemorySize() << " bytes in cache buffers." << std::endl;
+          << " bytes/response), " << getCacheMemorySize() << " bytes in cache buffers. RAM: "
+          << GundamUtils::getProcessMemoryUsageSummary() << std::endl;
 }
 void EventDialCache::allocateCacheEntries( size_t nEvent_, size_t nDialsMaxPerEvent_) {
     _indexedCache_.resize(
