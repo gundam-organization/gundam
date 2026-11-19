@@ -223,6 +223,7 @@ protected:
   void initializeImpl() override;
 
   void prepareCompositeInputs(ConfigReader& config_);
+  [[nodiscard]] DialInputBuffer::ParameterReference resolveParameterInput(const JsonType& input_) const;
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
   bool initializeBinnedDials(const ConfigReader& dialsDefinition);

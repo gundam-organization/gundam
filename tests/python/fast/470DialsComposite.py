@@ -113,11 +113,24 @@ def close(actual, expected):
     assert math.isclose(actual, expected, rel_tol=1e-10, abs_tol=1e-11), (actual, expected)
 
 
-def exercise(path, dial, expected, observable=False, points=None):
-    engine = build(make_config(path, dial))
+def exercise(path, dial, expected, observable=False, points=None, cross_set=None):
+    config = make_config(path, dial)
+    manager = config['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']
+    if cross_set is not None:
+        first_set = manager['parameterSetList'][0]
+        second_parameter = first_set['parameterDefinitions'].pop()
+        second_parameter['name'] = first_set['parameterDefinitions'][0]['name']
+        manager['parameterSetList'].append(dict(name='other parameters', isEnabled=True, nominalStepSize=.1,
+                                                parameterDefinitions=[second_parameter]))
+        if cross_set == 'manager':
+            manager['dialSetDefinitions'] = first_set.pop('dialSetDefinitions')
+    engine = build(config)
     likelihood = engine.getLikelihoodInterface()
     model = likelihood.getModelPropagator()
-    parameters = model.getParametersManager().getParameterSetsList()[0].getParameterList()
+    parameters = [parameter for parameter_set in model.getParametersManager().getParameterSetsList()
+                  for parameter in parameter_set.getParameterList()]
+    if cross_set is not None:
+        assert all(parameter.isEnabled() for parameter in parameters)
     sample = model.getSampleSet().getSampleList()[0]
     if points is None:
         points = [(.5, .25), (.5, .25), (-.5, .25), (-.5, .75), (1.2, -.25), (.5, .25)]
@@ -170,6 +183,9 @@ def main():
     second = {'parameterIndex': 1}
     upstream = {'dialResponse': 'source'}
     binning = {'binningDefinition': [{'name': 'X', 'edges': [0, 1, 2, 3]}]}
+    def abscissa(p, q, i):
+        return max(-40., min(40., p+q*(.056*250*i-41.6)))
+
     for threads in (1, 2):
         GUNDAM.setNumberOfThreads(threads)
         # Forward references, shared subgraph, signed intermediates, mixed inputs.
@@ -256,8 +272,6 @@ def main():
                            dialsFilePath=str(path), dialsList='wideCurves', dialInputList=[upstream])
         points = [(.5, .25), (.5, .25), (-.5, .25), (-.5, .75), (0., 1.), (30., 2.),
                   (-40., 0.), (40., 0.), (.5, .25)]
-        def abscissa(p, q, i):
-            return max(-40., min(40., p+q*(.056*250*i-41.6)))
         exercise(path, composite([source_node, spline_node], 'spline'),
                  lambda p, q, i: 5+.001*(i//2+1)*abscissa(p, q, i)**2, points=points)
         named_source = dict(name='source', dialType='Formula', dialInputList=[
@@ -281,6 +295,44 @@ def main():
         snapshot = formula('loadedX', '[arg0]+[arg1]', {'eventVariable': 'X'}, {'parameterName': 'p'},
                            applyToVariable='X', variableResponseMode='Override')
         exercise(path, snapshot, lambda p, q, i: .25+.5*i+p, observable=True)
+
+    # The sets deliberately reuse both index 0 and the name p. Vary either value
+    # independently to check that both dependencies invalidate the response.
+    other = {'parameterSetName': 'other parameters', 'parameterName': 'p'}
+    explicit_first = dict(first, parameterSetName='parameters')
+    points = [(.5, .25), (-.5, .25), (-.5, .75), (.5, .25)]
+    for scope, left in [('local', first), ('manager', explicit_first)]:
+        direct = formula('crossSet', '2+[arg0]+2*[arg1]+.001*[arg2]', left, other, {'eventVariable': 'q3'})
+        exercise(path, direct, lambda p, q, i: 2+p+2*q+.25*i, points=points, cross_set=scope)
+
+        nested = composite([formula('source', '[arg0]+[arg1]', left, other)], 'source')
+        nested['name'] = 'nested'
+        cross_set_dag = composite([
+            nested,
+            formula('output', '2+[arg0]+[arg1]+.001*[arg2]', {'dialResponse': 'nested'},
+                    {'parameterSetName': 'other parameters', 'parameterIndex': 0}, {'eventVariable': 'q3'})],
+            'output')
+        exercise(path, cross_set_dag, lambda p, q, i: 2+p+2*q+.25*i, points=points, cross_set=scope)
+        migration = copy.deepcopy(cross_set_dag)
+        migration.update(applyToVariable='X', variableResponseMode='Add')
+        migration['options']['nodes'][-1]['options']['formulaStr'] = '.1*(2+[arg0]+[arg1]+.001*[arg2])'
+        exercise(path, migration, lambda p, q, i: .25+.5*i+.1*(2+p+2*q+.25*i),
+                 points=points, observable=True, cross_set=scope)
+
+        cross_set_spline = dict(name='spline', dialType='Spline', binning=binning,
+                                dialsFilePath=str(path), dialsList='wideCurves', dialInputList=[upstream])
+        source_node = formula('source', '[arg0]+[arg1]*(.056*[arg2]-41.6)', left, other,
+                              {'eventVariable': 'q3'}, dialResponseLimits=[-40., 40.])
+        exercise(path, composite([source_node, cross_set_spline], 'spline'),
+                 lambda p, q, i: 5+.001*(i//2+1)*abscissa(p, q, i)**2, points=points, cross_set=scope)
+
+    for source, message in [(first, 'requires parameterSetName'),
+                            (dict(first, parameterSetName='missing'), 'Unknown dial input parameterSetName'),
+                            ({'eventVariable': 'q3', 'parameterSetName': 'parameters'}, 'requires a parameter input')]:
+        config = make_config(path, formula('invalid', '[arg0]', source))
+        manager = config['likelihoodInterfaceConfig']['propagatorConfig']['parametersManagerConfig']
+        manager['dialSetDefinitions'] = manager['parameterSetList'][0].pop('dialSetDefinitions')
+        reject(config, message)
 
     # Compiled functions can consume intermediate responses through DialInputBuffer.
     source = Path.cwd() / '470DialsComposite-library.cpp'
