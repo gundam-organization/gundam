@@ -121,7 +121,7 @@ void Propagator::throwToyParameters(){
   reweightEvents();
 
   LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
-  std::cout << getSampleSet().getSampleBreakdown() << std::endl;
+  LogInfo << getSampleSet().getSampleBreakdown() << std::endl;
 
   if( isDebugPrintLoadedEvents() ){
     LogInfo << "Toy events:" << std::endl;
