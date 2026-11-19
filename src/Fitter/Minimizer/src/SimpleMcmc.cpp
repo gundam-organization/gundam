@@ -324,7 +324,7 @@ bool SimpleMcmc::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
   std::unique_ptr<TFile> restoreFile
       (new TFile(fileName.c_str(), "old"));
   if (!restoreFile || !restoreFile->IsOpen()) {
-    LogInfo << "File to restore was not found: "
+    LogError << "File to restore was not found: "
             << fileName << std::endl;
     throw std::runtime_error("Old state file not open");
   }
@@ -332,7 +332,7 @@ bool SimpleMcmc::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
   // Get the tree with the state.
   TTree* restoreTree = dynamic_cast<TTree*>(restoreFile->Get(treeName.c_str()));
   if (!restoreTree) {
-    LogInfo << "Tree to restore state is not found in "
+    LogError << "Tree to restore state is not found in "
             << restoreFile->GetName()
             << treeName << std::endl;
     throw std::runtime_error("Old state tree not open");
@@ -500,7 +500,7 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
   std::unique_ptr<TFile> restoreFile
       (new TFile(fileName.c_str(), "old"));
   if (!restoreFile || !restoreFile->IsOpen()) {
-    LogInfo << "File to restore was not found: "
+    LogError << "File to restore was not found: "
             << fileName << std::endl;
     throw std::runtime_error("Old state file not open");
   }
@@ -669,7 +669,7 @@ bool SimpleMcmc::adaptiveRunCycle(AdaptiveStepMCMC& mcmc,
     mcmc.GetProposeStep().SetAcceptanceRigidity(-1);
   }
   else {
-    LogWarning << "Step length will be updated" << std::endl;
+    LogInfo << "Step length will be updated" << std::endl;
     mcmc.GetProposeStep().SetAcceptanceRigidity(2.0);
   }
 
