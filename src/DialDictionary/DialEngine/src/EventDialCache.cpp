@@ -6,9 +6,10 @@
 #include "EventFormula.h"
 #include "CompositeDial.h"
 
-#include "Logger.h"
 #include "Parameter.h"
 #include "GundamUtils.h"
+
+#include "Logger.h"
 
 #include <algorithm>
 
