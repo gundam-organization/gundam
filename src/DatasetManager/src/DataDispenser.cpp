@@ -4,6 +4,7 @@
 
 #include "DataDispenser.h"
 #include "DatasetDefinition.h"
+#include "DatasetTreeChain.h"
 #include "LoaderUtils.h"
 
 #include "Propagator.h"
@@ -31,18 +32,33 @@
 #include <TBranchElement.h>
 #include <TLeafObject.h>
 #include <TClass.h>
+#include <TDirectory.h>
 #include <TGraph.h>
 
 #include <algorithm>
 #include <array>
 #include <cstring>
+#include <cstdlib>
 #include <exception>
+#include <algorithm>
+#include <chrono>
+#include <fstream>
+#include <future>
+#include <limits>
+#include <stdexcept>
 #include <unordered_map>
 #include <map>
 #include <set>
 #include <string>
 #include <vector>
 #include <sstream>
+#include <sys/stat.h>
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/resource.h>
+#endif
 
 namespace {
 
@@ -777,6 +793,7 @@ void DataDispenser::load(Propagator& propagator_){
   LogExitIf(not propagator_.isInitialized(), "Can't load while propagator_ is not initialized.");
 
   _cache_.clear();
+  _nbThreadsForLoad_ = 0;
   _cache_.propagatorPtr = &propagator_;
 
   if( not _parameters_.overridePropagatorConfig.empty() ){
@@ -821,6 +838,8 @@ void DataDispenser::load(Propagator& propagator_){
     }
   }
 
+  this->selectLoadThreadCount();
+  this->checkFileDescriptorLimit();
   this->parseStringParameters();
   this->fetchRequestedLeaves();
   this->doEventSelection();
@@ -1241,6 +1260,8 @@ void DataDispenser::preAllocateMemory(){
     LogInfo << "Created "  << nTotalSlots << " slots (" << _cache_.totalNbEvents << " per set) for event-by-event dials:" << std::endl;
   }
 
+  // Only the event slots must stay at stable addresses while workers fill them.
+  // Dial lists are allocated after selection, with their actual number of dials.
   _cache_.propagatorPtr->getEventDialCache().allocateCacheEntries(_cache_.totalNbEvents, 0);
 }
 void DataDispenser::readAndFill(){
@@ -1420,8 +1441,235 @@ void DataDispenser::loadFromHistContent(){
   fHist->Close();
 }
 
+void DataDispenser::selectLoadThreadCount(){
+  const int maxThreads = getNbParallelCpu();
+  if( maxThreads <= 2 ){
+    _nbThreadsForLoad_ = maxThreads;
+    LogInfo << "Using " << maxThreads << " reader(s) for event selection and loading; skipping raw I/O probe"
+            << " (at most two readers allowed)." << std::endl;
+    return;
+  }
+  if( _owner_->isDevSingleThreadEventSelection() and _owner_->isDevSingleThreadEventLoaderAndIndexer() ){
+    return;
+  }
+
+  // TODO: disable this test?
+  return;
+
+  // File metadata is sufficient for small inputs; do not read payload data just
+  // to decide how to read it. Include enabled friends and count each file once.
+  constexpr Long64_t probeSizeThreshold{500LL * 1000 * 1000}; // 500 MB
+  std::set<std::string> filePaths;
+  for( const auto& fileEntry : _parameters_.filePathList ){
+    if( not fileEntry.isEnabled ){ continue; }
+    filePaths.insert(resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath).filePath);
+    for( const auto& friendEntry : fileEntry.friendList ){
+      if( not friendEntry.isEnabled ){ continue; }
+      filePaths.insert(resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath).filePath);
+    }
+  }
+
+  struct InputFile{
+    std::string path;
+    Long64_t size;
+  };
+  std::vector<InputFile> inputFiles;
+  std::set<std::pair<dev_t, ino_t>> fileIds;
+  Long64_t totalBytes{0};
+  for( const auto& filePath : filePaths ){
+    struct stat fileInfo{};
+    // Unknown sizes retain the configured limit rather than treating them as zero.
+    if( ::stat(filePath.c_str(), &fileInfo) != 0 or not S_ISREG(fileInfo.st_mode) or fileInfo.st_size < 0 ){
+      LogWarning << "Cannot determine input size for " << filePath
+                 << "; keeping the configured loading thread limit." << std::endl;
+      return;
+    }
+    // A friend may share a physical file with the main tree or another friend.
+    if( not fileIds.emplace(fileInfo.st_dev, fileInfo.st_ino).second ){ continue; }
+    if( fileInfo.st_size > std::numeric_limits<Long64_t>::max() - totalBytes ){ return; }
+    totalBytes += fileInfo.st_size;
+    if( fileInfo.st_size > 0 ){ inputFiles.push_back({filePath, fileInfo.st_size}); }
+  }
+
+  if( totalBytes < probeSizeThreshold ){
+    _nbThreadsForLoad_ = 2;
+    LogInfo << "Input files total " << totalBytes
+            << " bytes (< 500 MB): using two readers for event selection and loading; skipping raw I/O probe."
+            << std::endl;
+    return;
+  }
+
+  // Keep at least two readers to overlap I/O with decompression and processing.
+  std::vector<int> candidates;
+  for( int nReaders = 2; nReaders <= std::min(4, maxThreads); ++nReaders ){
+    candidates.push_back(nReaders);
+  }
+  // Above four readers, try 6, 8, 12, 16, 24, ... and the exact limit.
+  for( Long64_t scale = 4; candidates.back() < maxThreads; scale *= 2 ){
+    candidates.push_back(int(std::min(Long64_t(maxThreads), scale + scale / 2)));
+    if( candidates.back() < maxThreads ){
+      candidates.push_back(int(std::min(Long64_t(maxThreads), 2 * scale)));
+    }
+  }
+
+  // Each candidate gets a separate part of every physical file, including
+  // friends. Four rounds use 1 + 2 + 4 + 8 slots: no probe range is read twice.
+  // This reduces warming by our own reads, but cannot bypass an existing OS cache.
+  constexpr Long64_t initialProbeBytes{16LL * 1024 * 1024};
+  constexpr int maxProbeAttempts{4};
+  constexpr Long64_t slotsPerCandidate{(1LL << maxProbeAttempts) - 1};
+  const Long64_t slots = slotsPerCandidate * Long64_t(candidates.size());
+  const Long64_t baseBytes = std::min(initialProbeBytes, totalBytes / slots);
+  LogInfo << "Benchmarking raw input I/O across " << inputFiles.size()
+          << " physical files (main and enabled friends), " << totalBytes << " bytes." << std::endl;
+
+  using Clock = std::chrono::steady_clock;
+  const auto probeStart = Clock::now();
+  std::vector<double> rates(candidates.size());
+  try{
+    for( int round = 0; round < maxProbeAttempts; ++round ){
+      LogInfo << "Raw I/O probe attempt " << round + 1 << "/" << maxProbeAttempts << std::endl;
+      const Long64_t roundSlots = 1LL << round;
+      const Long64_t roundOffset = roundSlots - 1;
+      const Long64_t targetBytes = baseBytes * roundSlots;
+      double shortestSeconds = std::numeric_limits<double>::max();
+      for( size_t iCandidate = 0; iCandidate < candidates.size(); ++iCandidate ){
+        const int nReaders = candidates[iCandidate];
+        const auto start = Clock::now();
+        std::vector<std::future<Long64_t>> readers;
+        // Open independent streams just like the independent TChains used by
+        // the real loader. Every reader also reads its share of the friend files.
+        for( int iReader = 0; iReader < nReaders; ++iReader ){
+          readers.emplace_back(std::async(std::launch::async, [&, iReader]{
+            std::vector<char> buffer(1024 * 1024);
+            Long64_t bytesRead{0};
+            for( const auto& file : inputFiles ){
+              const Long64_t bytes = Long64_t(
+                  static_cast<long double>(targetBytes) * file.size / totalBytes / nReaders
+              );
+              if( bytes == 0 ){ continue; }
+              const long double slot = slotsPerCandidate * iCandidate + roundOffset
+                                       + static_cast<long double>(roundSlots) * iReader / nReaders;
+              const auto offset = static_cast<std::streamoff>(file.size * slot / slots);
+              std::ifstream stream(file.path, std::ios::binary);
+              stream.seekg(offset);
+              Long64_t remaining = bytes;
+              while( remaining > 0 ){
+                const auto chunk = static_cast<std::streamsize>(
+                    std::min(remaining, Long64_t(buffer.size()))
+                );
+                stream.read(buffer.data(), chunk);
+                if( stream.gcount() != chunk ){
+                  throw std::runtime_error("Raw I/O probe could not read " + file.path);
+                }
+                remaining -= chunk;
+              }
+              bytesRead += bytes;
+            }
+            return bytesRead;
+          }));
+        }
+        Long64_t bytesRead{0};
+        // Join every reader before propagating failures (all lambdas reference
+        // the current candidate's locals).
+        std::exception_ptr failure;
+        for( auto& reader : readers ){
+          try{ bytesRead += reader.get(); }
+          catch(...){ if( not failure ){ failure = std::current_exception(); } }
+        }
+        if( failure ){ std::rethrow_exception(failure); }
+        const double seconds = std::chrono::duration<double>(Clock::now() - start).count();
+        shortestSeconds = std::min(shortestSeconds, seconds);
+        rates[iCandidate] = seconds > 0 ? double(bytesRead) / seconds : 0.;
+        LogInfo << "Raw I/O probe: " << nReaders << " reader(s), " << bytesRead
+                << " bytes in " << seconds << " s, " << rates[iCandidate] / 1.e6 << " MB/s." << std::endl;
+      }
+      // Repeat with equal, larger byte budgets for every candidate when reads
+      // were too short. The total bytes are bounded, even on slow storage.
+      if( shortestSeconds >= 0.2
+          or std::chrono::duration<double>(Clock::now() - probeStart).count() >= 2. ){
+        break;
+      }
+      if( round + 1 < maxProbeAttempts ){
+        LogInfo << "Raw I/O probe measurements are shorter than 200 ms; data may be in the filesystem cache"
+                << " (or storage may be very fast). Retrying in different file regions with a larger read volume."
+                << std::endl;
+      }
+      else{
+        LogInfo << "Raw I/O probe reached the maximum of " << maxProbeAttempts
+                << " attempts; short measurements may still be influenced by the filesystem cache." << std::endl;
+      }
+    }
+  }
+  catch( const std::exception& error ){
+    LogWarning << "Raw I/O probe failed: " << error.what()
+               << "; keeping the configured loading thread limit." << std::endl;
+    return;
+  }
+
+  const double threshold = 0.9;
+  const double bestRate = *std::max_element(rates.begin(), rates.end());
+  if( bestRate <= 0 ){ return; }
+  for( size_t iCandidate = 0; iCandidate < candidates.size(); ++iCandidate ){
+    if( rates[iCandidate] < threshold * bestRate ){ continue; }
+    _nbThreadsForLoad_ = candidates[iCandidate];
+    break;
+  }
+  LogInfo << "Raw I/O probe selected " << _nbThreadsForLoad_
+          << " reader(s) for event selection and loading (at least " << threshold*100
+          << "% of best measured throughput)." << std::endl;
+}
+
+void DataDispenser::checkFileDescriptorLimit() const{
+#if defined(__unix__) || defined(__APPLE__)
+  struct rlimit fileLimit{};
+  if( getrlimit(RLIMIT_NOFILE, &fileLimit) != 0 or fileLimit.rlim_cur == RLIM_INFINITY ){ return; }
+
+  size_t nbFilesPerReader{0};
+  for( const auto& fileEntry : _parameters_.filePathList ){
+    if( not fileEntry.isEnabled ){ continue; }
+    std::set<std::string> files{resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath).filePath};
+    for( const auto& friendEntry : fileEntry.friendList ){
+      if( not friendEntry.isEnabled ){ continue; }
+      files.insert(resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath).filePath);
+    }
+    nbFilesPerReader = std::max(nbFilesPerReader, files.size());
+  }
+  const int nbReaders = (
+      _owner_->isDevSingleThreadEventSelection() and _owner_->isDevSingleThreadEventLoaderAndIndexer()
+  ) ? 1 : getNbParallelCpu();
+  const auto nbInputFiles = static_cast<rlim_t>(nbReaders) * nbFilesPerReader;
+
+  rlim_t nbOpenFiles{0};
+  if( auto* directory = opendir("/dev/fd") ){
+    const int directoryFd = dirfd(directory);
+    while( const auto* entry = readdir(directory) ){
+      if( entry->d_name[0] < '0' or entry->d_name[0] > '9' ){ continue; }
+      if( std::strtol(entry->d_name, nullptr, 10) != directoryFd ){ ++nbOpenFiles; }
+    }
+    closedir(directory);
+  }
+  else{
+    // Some POSIX systems do not expose /dev/fd.
+    for( rlim_t fd = 0; fd < fileLimit.rlim_cur; ++fd ){
+      if( fcntl(static_cast<int>(fd), F_GETFD) != -1 ){ ++nbOpenFiles; }
+    }
+  }
+
+  LogExitIf(
+      nbOpenFiles >= fileLimit.rlim_cur or nbInputFiles > fileLimit.rlim_cur - nbOpenFiles,
+      "Open-file limit is insufficient for dataset " << _owner_->getName()
+      << ": " << nbReaders << " reader(s) x up to " << nbFilesPerReader << " distinct input files require "
+      << nbInputFiles << " additional file descriptors; " << nbOpenFiles << " are already open, and the soft limit is "
+      << fileLimit.rlim_cur << ". Friend trees in the same file share one file descriptor per reader. "
+      << "Increase the open-file limit before launching GUNDAM (ulimit -n), or reduce nbMaxThreadsForLoad."
+  );
+#endif
+}
+
 int DataDispenser::getNbParallelCpu() const{
-  return GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
+  int nThreads = GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
+  return _nbThreadsForLoad_ > 0 ? std::min(nThreads, _nbThreadsForLoad_) : nThreads;
 }
 const std::string& DataDispenser::getVariableExpression(const std::string& variable_) const {
   return ::getVariableExpression(_cache_, _parameters_.variableDict, variable_);
@@ -1429,93 +1677,48 @@ const std::string& DataDispenser::getVariableExpression(const std::string& varia
 std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
   LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
 
-  // TFriendElement does not own a TChain supplied through AddFriend(TTree*, ...).
-  // Keep the friend chains alive through the lifetime of their master chain.
-  auto friendChainList = std::make_shared<std::vector<std::shared_ptr<TChain>>>();
-  std::shared_ptr<TChain> treeChain(new TChain(), [friendChainList](TChain* chain){ delete chain; });
-
+  auto treeChain = std::make_shared<DatasetTreeChain>();
   for( const auto& fileEntry : _parameters_.filePathList ){
     if( not fileEntry.isEnabled ){ continue; }
-    auto source = resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath);
-
+    const auto source = resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath);
     if( verbose_ ){
       LogScopeIndent;
       LogInfo << source.filePath << ":" << source.treePath << std::endl;
     }
 
-    validateRootFileAndTreePath(source, "ROOT file");
-
-    Long64_t sourceNbEntries{-1};
-    std::unique_ptr<TFile> temp{};
-    bool hasEnabledFriend{false};
-    for( const auto& friendEntry : fileEntry.friendList ){
-      if( friendEntry.isEnabled ){ hasEnabledFriend = true; break; }
-    }
-    if( _parameters_.fractionOfEntries != 1. or hasEnabledFriend ){
-      temp.reset(TFile::Open(source.filePath.c_str()));
-      LogExitIf(temp == nullptr, "Error while opening TFile: " << source.filePath);
-
-      auto* tree = temp->Get<TTree>(source.treePath.c_str());
-      LogExitIf(tree == nullptr, "Error while opening TTree: " << source.treePath << " in " << source.filePath);
-      sourceNbEntries = tree->GetEntries();
-    }
-
-    Long64_t nMaxEntries{TTree::kMaxEntries};
-    if( _parameters_.fractionOfEntries != 1. ){
-      nMaxEntries = Long64_t( double(sourceNbEntries) * _parameters_.fractionOfEntries );
-      if( verbose_ ){
-        LogScopeIndent;
-        LogWarning << "Max entries: " << nMaxEntries << std::endl;
+    // Share metadata reads too: a file with many friend trees is opened once
+    // for this entry, instead of once per friend. These files close before
+    // the reader loads its first entry.
+    std::map<std::string, std::unique_ptr<TFile>> files;
+    auto fetchTree = [&](const RootFileAndTreePath& path_){
+      auto& file = files[path_.filePath];
+      if( file == nullptr ){
+        TDirectory::TContext context;
+        file.reset(TFile::Open(path_.filePath.c_str(), "READ"));
       }
-
-    }
-    treeChain->AddFile(source.filePath.c_str(), nMaxEntries, source.treePath.c_str());
-
+      LogThrowIf(file == nullptr or file->IsZombie(), "Could not open input file " << path_.filePath);
+      auto* tree = file->Get<TTree>(path_.treePath.c_str());
+      LogThrowIf(tree == nullptr, "Missing input tree " << path_.treePath << " in " << path_.filePath);
+      return tree;
+    };
+    const Long64_t sourceNbEntries = fetchTree(source)->GetEntries();
+    std::vector<DatasetTreeChain::FriendTree> friends;
     for( const auto& friendEntry : fileEntry.friendList ){
       if( not friendEntry.isEnabled ){ continue; }
-      auto friendSource = resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath);
-      validateRootFileAndTreePath(friendSource, "friend \"" + friendEntry.name + "\"");
-
-      std::unique_ptr<TFile> friendFile{TFile::Open(friendSource.filePath.c_str())};
-      LogExitIf(friendFile == nullptr, "Error while opening friend file: " << friendSource.filePath);
-      auto* friendTree = friendFile->Get<TTree>(friendSource.treePath.c_str());
-      LogExitIf(friendTree == nullptr, "Error while opening friend TTree: " << friendSource.treePath << " in " << friendSource.filePath);
-      LogExitIf(
-          friendTree->GetEntries() != sourceNbEntries,
-          "Friend \"" << friendEntry.name << "\" in " << friendSource.filePath << " has " << friendTree->GetEntries()
-          << " entries, while its main tree in " << source.filePath << " has " << sourceNbEntries << ". Friends must be entry-aligned."
-      );
-
-      std::shared_ptr<TChain> friendChain;
-      for( const auto& existingFriendChain : *friendChainList ){
-        if( existingFriendChain->GetName() == friendEntry.name ){ friendChain = existingFriendChain; break; }
-      }
-      if( friendChain == nullptr ){
-        friendChain = std::make_shared<TChain>(friendEntry.name.c_str());
-        friendChainList->emplace_back(friendChain);
-      }
-      friendChain->AddFile(friendSource.filePath.c_str(), nMaxEntries, friendSource.treePath.c_str());
+      const auto friendSource = resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath);
+      const Long64_t friendNbEntries = fetchTree(friendSource)->GetEntries();
+      LogThrowIf(friendNbEntries != sourceNbEntries,
+                 "Friend \"" << friendEntry.name << "\" in " << friendSource.filePath << " has " << friendNbEntries
+                 << " entries, while its main tree in " << source.filePath << " has " << sourceNbEntries
+                 << ". Friends must be entry-aligned.");
+      friends.push_back({friendEntry.name, friendSource.filePath, friendSource.treePath});
     }
-
+    const Long64_t nbEntries = _parameters_.fractionOfEntries == 1. ? sourceNbEntries
+        : Long64_t(double(sourceNbEntries) * _parameters_.fractionOfEntries);
+    treeChain->addFile(source.filePath, source.treePath, sourceNbEntries, std::move(friends), nbEntries);
   }
-
-  for( const auto& friendChain : *friendChainList ){
-    LogExitIf(
-        friendChain->GetEntries() != treeChain->GetEntries(),
-        "Friend TChain \"" << friendChain->GetName() << "\" has " << friendChain->GetEntries()
-        << " entries while the main TChain has " << treeChain->GetEntries() << ". Friends must be entry-aligned."
-    );
-    LogExitIf(
-        treeChain->AddFriend(friendChain.get(), friendChain->GetName()) == nullptr,
-        "Could not attach friend TChain: " << friendChain->GetName()
-    );
-  }
-
-  // ROOT 6.24 connects the current trees of friend TChains lazily. Load the
-  // first entry now so qualified friend expressions are available when a
-  // TreeBuffer/TTreeFormula is initialized immediately after openChain().
-  if( not friendChainList->empty() and treeChain->GetEntries() > 0 ){
-    LogExitIf(treeChain->LoadTree(0) < 0, "Could not load the first entry of the main TChain with its friends.");
+  if( treeChain->GetEntries() > 0 ){
+    LogThrowIf(treeChain->LoadTree(0) < 0, "Could not load the first input tree and its friends.");
   }
 
   return treeChain;
@@ -2018,8 +2221,8 @@ void DataDispenser::loadEvent(int iThread_){
     return index;
   };
 
-
-  // Reuse per-worker scratch space; retained event lists contain selected dials only.
+  // Reuse one selection buffer per worker. Copying the selected range into
+  // each cache entry avoids retaining capacity for every possible collection.
   std::vector<EventDialCache::DialIndexCacheEntry> selectedDialIndices;
   selectedDialIndices.reserve(_cache_.dialCollectionsRefList.size());
 
@@ -2139,15 +2342,33 @@ void DataDispenser::loadEvent(int iThread_){
   std::vector<int> sampleBinIdxList;
   std::vector<double> sampleWeightList;
 
-  // TArray does not inherit from TObject. Validate the ROOT class before casting.
-  auto readArray = [&threadSharedData](const std::string& branchName_) -> const TArray* {
-    auto* branch = threadSharedData.treeChain->GetBranch(branchName_.c_str());
-    LogThrowIf(branch == nullptr, "Missing dialBranchData branch: " << branchName_);
+  struct ArrayBranchBuffer{
+    TBranch* branch{nullptr};
     TClass* arrayClass{nullptr};
-    EDataType dataType{kOther_t};
-    branch->GetExpectedType(arrayClass, dataType);
-    LogThrowIf(arrayClass == nullptr or not arrayClass->InheritsFrom(TArray::Class()),
-               "dialBranchData branch '" << branchName_ << "' must contain a TArray");
+  };
+  std::unordered_map<std::string, ArrayBranchBuffer> arrayBranchBuffers;
+  int arrayBranchTreeNumber{-1};
+
+  // TArray does not inherit from TObject. Validate the ROOT class before casting.
+  auto readArray = [&threadSharedData, &arrayBranchBuffers, &arrayBranchTreeNumber](const std::string& branchName_) -> const TArray* {
+    // Friend lookup walks all trees. Resolve each branch once per input file,
+    // while the reader is waiting for this filler to release the current entry.
+    const int treeNumber = threadSharedData.treeChain->GetTreeNumber();
+    if( arrayBranchTreeNumber != treeNumber ){
+      arrayBranchBuffers.clear();
+      arrayBranchTreeNumber = treeNumber;
+    }
+    auto& buffer = arrayBranchBuffers[branchName_];
+    if( buffer.branch == nullptr ){
+      buffer.branch = threadSharedData.treeChain->GetBranch(branchName_.c_str());
+      LogThrowIf(buffer.branch == nullptr, "Missing dialBranchData branch: " << branchName_);
+      EDataType dataType{kOther_t};
+      buffer.branch->GetExpectedType(buffer.arrayClass, dataType);
+      LogThrowIf(buffer.arrayClass == nullptr or not buffer.arrayClass->InheritsFrom(TArray::Class()),
+                 "dialBranchData branch '" << branchName_ << "' must contain a TArray");
+    }
+    auto* branch = buffer.branch;
+    auto* arrayClass = buffer.arrayClass;
     branch->SetStatus(true);
     if( branch->GetAddress() == nullptr ){ branch->SetAddress(nullptr); }
     // Read on demand. ROOT owns the object buffer.
@@ -2386,7 +2607,7 @@ void DataDispenser::loadEvent(int iThread_){
 
           const auto dial = eventByEventDialBuffer.find(dialCollectionRef->getIndex());
           if( dial != eventByEventDialBuffer.end() ){
-            selectedDialIndices.push_back({std::size_t(dialCollectionRef->getIndex()), dial->second});
+            selectedDialIndices.push_back({std::size_t(dialCollectionRef->getIndex()), std::size_t(dial->second)});
           }
 
           continue; // skip the rest

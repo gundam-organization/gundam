@@ -13,6 +13,19 @@ when `WITH_REGULAR_TEST=ON`. Benchmarks are run manually. With the Python interf
 disabled, no Python tests are registered. Each script is registered separately as
 `gundam-python-<suite>-<script>`, with its own result and duration.
 
+Tests numbered `7xx` are registered only with `WITH_BACKENDS=ON`. The `74x`
+(MPS) and `76x` (CUDA) families additionally require their backend target.
+Device tests check hardware at runtime: no usable Metal device or CUDA GPU/driver
+produces `Skipped`, while execution and numerical errors remain failures.
+The CUDA device tests (`760`–`762`, `766`) enable CUDA validation automatically under
+CTest; `763`–`765` check benchmark tooling on the host and need no GPU.
+Mixed CPU/MPS tests keep their CPU coverage when Metal is unavailable.
+
+Python tests can return 77 to signal a skip. The runner preserves that status
+for a single skipped test, and the CMake launcher forwards it to CTest.
+For manual CUDA device tests, pass `--cuda-runner <build>/tests/cuda/gundamCudaTestRunner`
+to `python/run.py` so it can probe hardware using the build's CUDA runtime.
+
 At test time, CTest first tries the interpreter selected during configuration.
 If it is unavailable on the current node, it tries the other configured interface
 interpreters, then `python`, `python3` and the built `python3.x` versions on PATH.
@@ -27,6 +40,39 @@ and installs `requirements.txt`. The environment inherits its system packages
 and is reused until the requirements or selected interpreter change. The first
 `make test` needs network access if packages are not already available locally.
 No packages are installed into the system Python.
+
+When the MPS or CUDA backend is compiled and a Python test suite is enabled, preparation
+uses `requirements-device.txt`, which includes the common requirements and Torch. Other
+builds keep `requirements.txt` without Torch. With automatic venv preparation
+disabled, install the matching requirements yourself.
+
+`745BackendsMpsPythonWorkerBuffers.py` is registered only when the MPS backend
+target exists. The shared `fast/shared/PythonWorkerBuffers.py` module embeds the YAML
+configuration and PythonWorker script
+to check host/device detection, in-place weights and gradients, and histogram
+results at the prior and one changed parameter point. The test requires a usable Metal device and Torch MPS; these
+are checked at runtime. An unavailable Metal device marks the test as `Skipped`;
+a missing or incompatible Torch installation is a failure.
+
+`766BackendsCudaPythonWorkerBuffers.py` runs the same contract through CUDA IPC,
+with float64 tensors and device-to-device weight copies in the default mode.
+It is registered only with the CUDA backend and is `Skipped` without a usable GPU.
+Each fast test creates only two engines: a CPU reference and an onDevice GPU
+engine, with a 120-second timeout. The corresponding `regular/*PythonWorkerBuffersFull.py`
+tests cover onHost GPU execution, repeated points, backend switching and invalid
+worker responses; the CUDA regular test also exercises both propagation modes.
+These full tests allow 600 seconds for repeated worker startups on cluster nodes.
+Timestamped stages are streamed to CTest and saved in `test.log`, including when
+CTest terminates a test on timeout.
+For a V100 allocation, use a Torch CUDA build that includes support for that GPU:
+
+```bash
+ctest --test-dir <build> -R 'gundam-python-fast-766BackendsCudaPythonWorkerBuffers$' --output-on-failure
+```
+
+The venv inherits system packages, so an existing compatible Torch installation
+can be used. GUNDAM's CUDA transport is compiled by CMake, without Torch headers
+or compilation in the Python environment.
 
 The same selection fixture runs with automatic venv preparation disabled; it
 selects an existing interpreter without installing packages. All tests in an
@@ -44,6 +90,9 @@ C++ dependency sources before configuring GUNDAM. CMake uses those local sources
 with `FETCHCONTENT_FULLY_DISCONNECTED=ON` and disables automatic test venv
 preparation with `WITH_PYTHON_TEST_VENV=OFF`. The existing `make test` step then runs
 the Python tests too, and Python failures fail the CI check.
+
+Shared helper modules and inline input generators live in `fast/shared/`;
+numbered scripts in `fast/` remain the test entry points.
 
 ## How to run the tests manually?
 
@@ -118,10 +167,32 @@ behavior being checked:
 | **8XX** | `Compatibility` | Configuration and input backward compatibility | Historical configuration keys and input conventions retain their results and expected deprecation warnings |
 | **9XX** | — | Reserved | Available for future categories |
 
-Numbers are independent between suites: backend regression tests and benchmarks
-both start at `700`, for example `fast/700BackendsCpuPropagation.py` and
-a backend benchmark numbered `700` in `benchmarks/`. Backend-specific scripts use the
-`7XXBackends<Subject>.py` naming convention.
+Backend-specific scripts use `7XXBackends<Subcategory><Subject>.py`, with the
+exact subcategory spelling `Common`, `Multiple`, `Cpu`, `Mps` or `Cuda`:
+
+| Range | Subcategory | Scope |
+|---|---|---|
+| **700–709** | `Common` | Backend-neutral checks with no implementation specialization; one selected backend per invocation |
+| **710–719** | `Multiple` | Several target backends, such as MPS and CUDA, or backend switching contracts |
+| **720–739** | `Cpu` | CPU implementations, execution and numerical behavior |
+| **740–759** | `Mps` | Apple Metal implementations and numerical behavior, including CPU reference checks |
+| **760–799** | `Cuda` | NVIDIA CUDA implementations, profiling and tooling, including CPU reference checks |
+
+Within each suite, assign consecutive identifiers to the existing tests in each
+subcategory. The ranges leave room for additions while keeping each group
+contiguous when sorted by filename. CPU is always available in a backend build:
+using it as a reference does not make a test `Multiple`. CPU/MPS comparisons
+belong to `Mps`; CPU/CUDA comparisons belong to `Cuda`. Apply the same rule to
+benchmark wrappers and the regression tests for those wrappers.
+
+Use `Multiple` when the test covers several target implementations, such as MPS
+and CUDA (including opt-in cases), or tests switching across backend types.
+`Common` is reserved for backend-neutral tests without implementation-specific
+behavior; a generic test accepting one `--backend` selection belongs there.
+
+Numbers are independent between suites: for example,
+`fast/720BackendsCpuPropagation.py` and `benchmarks/720BackendsCpuBenchmark.py`
+share a number. Both suites start `Common` at `700` and `Multiple` at `710`.
 
 Choose a category by the test's primary purpose. A general feature test may also
 exercise a backend without belonging to `7XX`. Model-content checks verify the
@@ -129,7 +200,8 @@ loaded objects and data; numerical-result checks verify the calculated values.
 Leave gaps when assigning new numbers, and keep a test's number when moving it
 between `fast` and `regular`, provided it does not collide with another test.
 Numbers do not imply execution dependencies: every script must run independently.
-Use PascalCase for the category and subject (`Api`, `Cpu`, `Mps`, `Cuda`). Avoid
+Use PascalCase for the category and subject (`Api`, `FitGradient`), keeping
+backend subcategories capitalized as `Common`, `Multiple`, `Cpu`, `Mps` and `Cuda`. Avoid
 repeating the category in the subject: use `470DialsComposite.py`, rather than
 `470DialsCompositeDials.py`. Benchmark wrappers retain the same category prefix
 with their appropriate `.sh`, `.sbatch` or `.mm` extension.
@@ -146,6 +218,8 @@ compatibility check.
 | `810CompatibilityEvalFromLib.py` | `variablesTransform` versus `variableDict/evalFromLib` |
 | `820CompatibilityFriendTrees.py` | Individual friend paths, mixed declarations and disabled friends |
 | `830CompatibilityDialBranchData.py` | `dialLeafName` and `treeExpression` versus `dialBranchData` |
+| `840CompatibilityBinnedDials.py` | Implicit `Graph`/`Spline` branches and deprecation warnings |
+| `850CompatibilityDialOptions.py` | `dialConfig` versus `options` for Formula, Composite and compiled dials |
 
 These scripts reuse input builders and assertion helpers without running another
 test's `main()`. They generate their own inputs in their own working directory.
@@ -186,3 +260,55 @@ CTest labels Python scripts with `python` and `python-fast` or `python-regular`.
 The `fast`, `regular`, `extended` and `slow` labels identify the selected shell
 suite run by `gundam-tests`; broader shell suites include the faster suites.
 Label totals overlap: `python` includes both Python suites and environment setup.
+
+Fast tests `560` use representative cases or small deterministic inputs.
+Their matching `*Full.py` tests in `regular/` retain the full validation.
+
+Fast tests `570` and `580` use representative cases or small deterministic inputs.
+Their matching `*Full.py` tests in `regular/` retain the full validation.
+
+Fast tests `711`, `726` and `743` keep representative backend scenarios; their
+matching `*Full.py` tests in `regular/` retain the complete validation.
+
+### Cross-section calculator
+
+The CalcXsec tests launch the real `gundamCalcXsec` executable and read its ROOT
+outputs with uproot. Configurations are explicit Python dictionaries in the test
+scripts and are written as formatted JSON beside every output and command log.
+Input trees, flux histograms and covariance matrices are generated locally; no
+external analysis files are needed. ROOT must be available on PATH to create the
+native `TMatrixDSym` input.
+
+| Suite / script | Coverage |
+|---|---|
+| fast / `150ConfigCalcXsec.py` | Required CLI arguments, invalid toy counts/ROOT files/normalizers and unknown parameter sets |
+| fast / `585NumericsCalcXsec.py` | Weighted yields, multidimensional volumes, empty bins, excluded dimensions, successive/disabled normalizers, seed and threads, central-value modes, overrides and dry-run |
+| fast / `586NumericsCalcXsecNormalizers.py` | Shared/independent Gaussian normalizers, weighted flux integrals, selections, unmatched bins, exact cancellation, explicit/inherited/inline binning |
+| fast / `587NumericsCalcXsecPostfit.py` | Real fit with nontrivial posterior, analytic best-fit/Hesse reference, prefit ROOT/config equivalence and exact covariance injection |
+| fast / `588NumericsCalcXsecOutputs.py` | Weighted reaction breakdowns with different parameter responses, per-event toy averages, saved error bars, canvases and empty-bin finiteness |
+| regular / `585NumericsCalcXsecConvergence.py` | 20000 throws per case: linear and squared Gaussian responses, cross-sample and parameter covariance, shared/independent normalization distributions |
+| regular / `586NumericsCalcXsecStatistics.py` | 20000 throws per case: all four statistical switches, per-sample MC suppression, Poisson and compound-Poisson moments |
+
+The output test checks each event and each reaction contribution, not only bin
+totals: plots must preserve unequal event weights and reaction-dependent dial
+responses when averaging normalized throws or selecting the best-fit value.
+
+Fast tests use 32 throws and exact relations; regular tests compare moments with
+independent formulas using six Monte Carlo standard errors. For covariance, the
+uncertainty comes from centered products, including non-Gaussian cases. Exported
+matrices are also checked against the actual TTree using population covariance
+(`ddof=0`); analytic comparisons remove that estimator's finite-sample bias.
+
+CTest selects executables from its own build. For manual runs with several
+installations, set absolute `GUNDAM_CALC_XSEC` and `GUNDAM_FITTER` paths. Otherwise,
+the helper first looks beside the imported GUNDAM interface, then on PATH.
+
+```bash
+python tests/python/run.py --test 585NumericsCalcXsec.py
+python tests/python/run.py --suite regular --test 585NumericsCalcXsecConvergence.py
+ctest --test-dir cmake-build-debug -R 'python-.*CalcXsec' --output-on-failure
+```
+
+Regular scripts are registered with CTest when `WITH_REGULAR_TEST=ON`. Each test
+runs independently in its own working directory. Failed command logs and all
+inputs remain in the output directory reported by the runner.

@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if command -v gundamFitter >/dev/null 2>&1 && ! gundamFitter --help 2>&1 | grep -q -- '--cache-manager'; then
+    echo 'SKIP: this test requires a GUNDAM build with WITH_CACHE_MANAGER=ON'
+    exit 0
+fi
+
 # Set the base name for this test (should match the script name)
 BASE=200CovarianceFit
 

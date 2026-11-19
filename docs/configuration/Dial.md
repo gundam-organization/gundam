@@ -24,8 +24,11 @@ external libraries to calculate weights.
 | applyOnDataSets        | list(string) | list (regex) of datasets the corresponding dials will apply to         | `["*"]` |
 | applyCondition         | string       | Only apply this dial with formula evaluates to non-zero                | empty   |
 | applyConditions        | list(json)   | Multiple condition formulas (only apply dial if all are true) formulas | n/a     |
-| minDialResponse        | double       | Minimum weight value returned by the dial response (should be zero)    | -inf    |
-| maxDialResponse        | double       | Maximum weight returned by the dial (typically you want about ten)     | inf     |
+| minDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | -inf    |
+| maxDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | inf     |
+| dialResponseLimits     | range        | Response bounds as `[min, max]`, `{min: ...}`, or `{max: ...}`           | existing response defaults |
+| enableResponseSmoothing | bool       | Apply centered C^2 transitions at finite response bounds | false |
+| dialResponseSmoothingWidth | positive number or range | Transition half-width, shared or separate for each bound | unset |
 | binningFilePath        | string       | binning definition of a set of spline (along with `dialsFilePath`)     |         |
 | useMirrorDial          | bool         | enable dial mirroring along the edges                                  | false   |
 | mirrorLowEdge          | double       | low edge where mirroring applies                                       |         |
@@ -39,6 +42,37 @@ external libraries to calculate weights.
 | dialsBranch            | string       | Explicit object branch in the binned dial tree                         |         |
 | binnedDialsPath        | string       | Binned dial source as `file:tree:branch`                                |         |
 | dialsBinningDefinition | list(object) | Explicit bin dimensions read from the dial TTree; exclusive with `binning` |       |
+
+`options` is the common key for type-specific settings. `Spline`, `Graph` and
+`Surface` retain their string options (for example, `options: Bilinear`).
+`Formula`, `CompiledLibDial`, `Composite` and `ExternalWeight` use an object.
+
+### Inputs from multiple parameter sets
+
+Define dials in `dialSetDefinitions` under either a parameter set or
+`parametersManagerConfig`. A parameter input can use `parameterName` or
+`parameterIndex` (zero-based). Add `parameterSetName` to select its set.
+Each parameter input in a manager-level dial must specify its set. Within a
+parameter set, omitting `parameterSetName` selects the enclosing set.
+Parameters used by these inputs can be defined without local dials.
+
+```yaml
+parametersManagerConfig:
+  dialSetDefinitions:
+    - name: bindingEnergyShift
+      dialType: Formula
+      dialInputList:
+        - {name: delta, parameterName: EB_bin_C_nu, parameterSetName: "Binding energy parameters"}
+        - {name: alpha, parameterName: EB_alpha, parameterSetName: "Migration parameters"}
+        - {name: q3, eventVariable: q3}
+      options:
+        formulaStr: "1 + 0.001 * ([delta] + [alpha] * (0.056 * [q3] - 41.6))"
+```
+
+Composite nodes use the same parameter input syntax, including in nested
+composites. Specify `parameterSetName` only on parameter inputs. Event
+variables and upstream dial responses use `eventVariable` and `dialResponse`
+respectively.
 
 ### Binned dials stored in a ROOT tree
 
@@ -107,11 +141,77 @@ choice: `Spline` for `dialType: Spline`, `Graph` for `dialType: Graph`. This
 implicit curve-branch selection emits a deprecation warning. The existing
 `dialsFilePath` plus `dialsList` object-array syntax is unchanged.
 
-`options` is the common key for type-specific settings. `Spline`, `Graph` and
-`Surface` retain their string options (for example, `options: Bilinear`).
-`Formula`, `CompiledLibDial`, `Composite` and `ExternalWeight` use an object.
-The old keys `dialSubType` and `dialConfig` remain readable aliases, with a
-rename warning. If multiple aliases are supplied, their values must agree.
+### Smooth response limits
+
+Smooth the evaluated response near its bounds using centered quartic transitions
+(original engine, CPU and Metal backends; CacheManager is unsupported):
+
+```yaml
+dialResponseLimits: [0.0, 2.0]
+enableResponseSmoothing: true
+dialResponseSmoothingWidth: 0.1
+```
+
+Limits also accept `{min: ...}` or `{max: ...}`; omitted bounds are unbounded.
+Widths accept a scalar for both bounds, `[lowerWidth, upperWidth]`, or
+`{min: ..., max: ...}`. Widths keep their order and must be finite and strictly
+positive. Each finite bound needs a width; widths for unbounded sides are unused.
+With two finite bounds, require `lowerWidth + upperWidth <= max - min`.
+
+For a lower bound `L`, half-width `c`, and raw response `w`:
+
+```text
+t = (w - L + c) / (2 * c)
+F(w; L, c) = L                       if w <= L - c
+             L + c * t^3 * (2 - t)  if L - c < w < L + c
+             w                       if w >= L + c
+```
+
+An upper bound `U` uses `U - F(U - w; 0, c)`. The transitions are C^2, with slopes
+between 0 and 1. At `L = 0`, `F(0) = 3*c/16`; zero is reached at `w = -c`.
+Kinks in the input dial itself can remain.
+
+Smoothing is disabled by default; limits then use hard clamping.
+`minDialResponse` (also `minimumSplineResponse`) and `maxDialResponse` are
+deprecated but still read with a warning. If combined with `dialResponseLimits`,
+their values must agree with it. Set `enableResponseSmoothing: false` to disable
+smoothing rather than supplying zero widths.
+
+### Smooth response limits
+
+Smooth the evaluated response near its bounds using centered quartic transitions
+(original engine only):
+
+```yaml
+dialResponseLimits: [0.0, 2.0]
+enableResponseSmoothing: true
+dialResponseSmoothingWidth: 0.1
+```
+
+Limits also accept `{min: ...}` or `{max: ...}`; omitted bounds are unbounded.
+Widths accept a scalar for both bounds, `[lowerWidth, upperWidth]`, or
+`{min: ..., max: ...}`. Widths keep their order and must be finite and strictly
+positive. Each finite bound needs a width; widths for unbounded sides are unused.
+With two finite bounds, require `lowerWidth + upperWidth <= max - min`.
+
+For a lower bound `L`, half-width `c`, and raw response `w`:
+
+```text
+t = (w - L + c) / (2 * c)
+F(w; L, c) = L                       if w <= L - c
+             L + c * t^3 * (2 - t)  if L - c < w < L + c
+             w                       if w >= L + c
+```
+
+An upper bound `U` uses `U - F(U - w; 0, c)`. The transitions are C^2, with slopes
+between 0 and 1. At `L = 0`, `F(0) = 3*c/16`; zero is reached at `w = -c`.
+Kinks in the input dial itself can remain.
+
+Smoothing is disabled by default; limits then use hard clamping.
+`minDialResponse` (also `minimumSplineResponse`) and `maxDialResponse` are
+deprecated but still read with a warning. If combined with `dialResponseLimits`,
+their values must agree with it. Set `enableResponseSmoothing: false` to disable
+smoothing rather than supplying zero widths.
 
 ### Config options that apply to specific types of dials
 
@@ -173,7 +273,7 @@ dialSetDefinitions:
       output: combine
 ```
 
-`parameterName` references a fit parameter in the owning parameter set;
+`parameterName` references a fit parameter in the selected set.
 `parameterIndex` references its zero-based index in that set. `dialResponse`
 names another node in the same graph. Formula nodes also accept `eventVariable`,
 naming a loaded event variable. Exactly one of these four keys is required
@@ -191,7 +291,7 @@ also applies to composites attached to a single parameter. Other nodes need
 an explicit, non-empty `dialInputList`.
 
 Nodes use the ordinary dial configuration, including interpolation options,
-response limits, extrapolation and input mirroring. Intermediate
+response limits and smoothing, extrapolation and input mirroring. Intermediate
 responses are unbounded by default so signed quantities can pass between
 nodes. Explicit node limits are applied before downstream evaluation. The
 composite's final response retains the usual weight/observable response limits.
@@ -223,7 +323,9 @@ inside a composite; use direct node definitions with explicit inputs.
 
 This first implementation uses the standard propagation engine, with its
 normal multithreaded event evaluation and response caching. `CacheManager`
-automatically disables itself when composites are present.
+automatically disables itself when composites are present. Explicit CPU,
+Metal and CUDA backends do not compile composite graphs yet: set
+`backendManagerConfig.isEnabled: false` when using a composite.
 
 #### `dialType: Normalization`
 
@@ -349,8 +451,7 @@ dialInputList:
   - {name: q3, eventVariable: q3}
 options:
   formulaStr: "[delta] + [alpha] * (0.056 * [q3] - 41.6)"
-minDialResponse: -40.
-maxDialResponse: 40.
+dialResponseLimits: [-40., 40.]
 ```
 
 Each input has a unique, non-empty `name`, which is the local alias used as

@@ -10,9 +10,10 @@ import venv
 def main():
     directory = Path(sys.argv[1])
     python = directory / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
-    requirements = Path(__file__).with_name('requirements.txt')
+    baseRequirements = Path(__file__).with_name('requirements.txt')
+    requirements = Path(sys.argv[2]) if len(sys.argv) > 2 else baseRequirements
     # Refresh the environment if the selected interpreter or requirements change.
-    signature = hashlib.sha256(requirements.read_bytes() +
+    signature = hashlib.sha256(baseRequirements.read_bytes() + requirements.read_bytes() +
                                (sys.executable + sys.version).encode()).hexdigest()
     stamp = directory / '.gundam-requirements'
     if python.exists() and stamp.exists() and stamp.read_text() == signature:

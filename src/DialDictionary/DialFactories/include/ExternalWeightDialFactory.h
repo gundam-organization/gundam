@@ -2,6 +2,7 @@
 #define GUNDAM_EXTERNAL_WEIGHT_DIAL_FACTORY_H
 
 #include "DialFactoryBase.h"
+#include "ExternalWeightBuffer.h"
 
 #include "ConfigUtils.h"
 #include "BinSet.h"
@@ -26,7 +27,7 @@ public:
   [[nodiscard]] const BinSet& getBinning() const { return _binning_; }
 
   [[nodiscard]] const std::vector<std::string>& getInputEventVarNameList() const { return _inputEventVarNameList_; }
-  [[nodiscard]] const std::shared_ptr<std::vector<double>>& getWeightList() const { return _weightList_; }
+  [[nodiscard]] const std::shared_ptr<ExternalWeightBuffer>& getWeightSource() const { return _weightSource_; }
 
 protected:
   struct SharedMemoryBuffer {
@@ -47,6 +48,14 @@ protected:
   [[nodiscard]] const std::vector<std::unique_ptr<SharedMemoryBuffer>>& getInputBufferList() const { return _inputBufferList_; }
   [[nodiscard]] const SharedMemoryBuffer* getParameterBuffer() const { return _parameterBuffer_.get(); }
   [[nodiscard]] const SharedMemoryBuffer* getWeightBuffer() const { return _weightBuffer_.get(); }
+  [[nodiscard]] const SharedMemoryBuffer* getGradientBuffer() const { return _gradientBuffer_.get(); }
+  [[nodiscard]] bool isGradientRequested() const { return _weightSource_->isGradientRequested(); }
+  [[nodiscard]] std::uint64_t getEvaluationGeneration() const { return _weightSource_->getGeneration() + 1; }
+  void setSupportsGradient(bool supported_){ _weightSource_->_supportsGradient_ = supported_; }
+  void setDeviceWeightBuffer(std::shared_ptr<WorkerBuffer> buffer_){
+    _weightSource_->_deviceValues_ = std::move(buffer_);
+    _weightSource_->_hostGeneration_ = std::uint64_t(-1);
+  }
   [[nodiscard]] std::size_t getEventCount() const { return _eventCount_; }
   [[nodiscard]] std::size_t getWeightCount() const { return _weightCount_; }
 
@@ -61,15 +70,18 @@ private:
 
   std::vector<std::string> _inputEventVarNameList_{};
   std::vector<std::vector<double>> _inputEventValueList_{};
-  std::shared_ptr<std::vector<double>> _weightList_{std::make_shared<std::vector<double>>()};
+  std::shared_ptr<ExternalWeightBuffer> _weightSource_{std::make_shared<ExternalWeightBuffer>()};
   std::vector<std::unique_ptr<SharedMemoryBuffer>> _inputBufferList_{};
   std::unique_ptr<SharedMemoryBuffer> _parameterBuffer_{nullptr};
-  std::unique_ptr<SharedMemoryBuffer> _weightBuffer_{nullptr};
+  std::shared_ptr<SharedMemoryBuffer> _weightBuffer_{nullptr};
+  std::shared_ptr<SharedMemoryBuffer> _gradientBuffer_{nullptr};
   std::size_t _eventCount_{0};
   std::size_t _weightCount_{0};
   bool _useBinnedWeights_{false};
   BinSet _binning_{};
   bool _areEventsLoaded_{false};
+  bool _isEvaluationPending_{true};
+  std::uint64_t _bufferRevision_{std::uint64_t(-1)};
   mutable std::mutex _eventRegistrationMutex_{};
 };
 
@@ -92,6 +104,12 @@ private:
   std::string _initScript_{};
   std::string _evalScript_{};
   std::vector<std::string> _scriptArgs_{};
+  std::string _backendBufferMemoryLocation_{"onHost"};
+  std::vector<std::shared_ptr<WorkerBuffer>> _deviceInputs_{};
+  std::shared_ptr<WorkerBuffer> _deviceParameters_{}, _deviceWeights_{}, _deviceGradients_{};
+  std::uint64_t _workerBufferRevision_{std::uint64_t(-1)};
+  static JsonType describeWorkerBuffer(const std::shared_ptr<WorkerBuffer>& buffer_, const std::vector<std::size_t>& shape_);
+  void prepareWorkerBuffers();
   bool _isWorkerStarted_{false};
   int _workerInputFd_{-1};
   int _workerOutputFd_{-1};

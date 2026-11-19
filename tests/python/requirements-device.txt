@@ -1,0 +1,3 @@
+# Selected when an MPS or CUDA PythonWorker fast test is registered.
+-r requirements.txt
+torch

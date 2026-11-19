@@ -35,6 +35,7 @@ public:
   };
 
   // const getters
+  [[nodiscard]] const BinningResponse& getBinningResponse() const{ return _binningResponse_; }
   [[nodiscard]] bool isBinningResponseEnabled() const{ return _binningResponse_.isEnabled(); }
   [[nodiscard]] auto& getOutsideBinContent() const{ return _outsideBinContent_; }
   [[nodiscard]] auto getNbBins() const { return nBins; }
@@ -48,11 +49,17 @@ public:
   // core
   void configureBinningResponse(const ConfigReader& config_);
   void build(const ConfigReader& binningConfig_);
+  auto& getOutsideBinContent(){ return _outsideBinContent_; }
+  auto& getOutsideContributionList(){ return _outsideContributionList_; }
   // Bin edge variable-index caches must match the event's variable layout.
   // Rebinning can reuse the previous bin when it still contains the event.
   [[nodiscard]] int findBinIndex(const Event& event_, int previousBinIndex_ = -1) const;
   [[nodiscard]] BinningResponse::EventResponse evaluateEventBinningResponse(const Event& event_) const;
   [[nodiscard]] std::vector<BinningResponse::BinFraction> evaluateBinningResponse(const Event& event_) const;
+  void validateGradientVariable(const std::string& name_) const;
+  [[nodiscard]] BinningResponse::ResponseGradient evalBinningGradient(const Event& event_) const{
+    return _binningResponse_.evalGradient(event_.getVariables());
+  }
   void throwEventMcError();
   // With a binning response, fluctuates bin contents only; refilling discards the throw.
   void throwStatError(bool useGaussThrow_ = false);

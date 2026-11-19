@@ -5,6 +5,7 @@
 #ifndef GUNDAM_EVENT_DIAL_CACHE_H
 #define GUNDAM_EVENT_DIAL_CACHE_H
 
+#include "ParameterGradient.h"
 #include "SampleSet.h"
 #include "DialCollection.h"
 #include "Event.h"
@@ -13,12 +14,14 @@
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Wrappers.h"
+#include "GenericToolbox.Thread.h"
 
 #include <memory>
 #include <cstdint>
 #include <vector>
 #include <utility>
 
+class Parameter;
 
 class EventDialCache{
 
@@ -40,20 +43,19 @@ public:
   struct DialResponseCache {
     DialResponseCache() = delete; // prevent not setting up the interface ptr
     explicit DialResponseCache( DialInterface& interface_ )
-      : dialInterface(&interface_), inputRevisionPtr(interface_.getInputBufferRef()->getRevisionPtr()) {}
+      : dialInterface(&interface_) {}
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.
     bool appliesToVariable{false};
     double response{std::nan("unset")};
-    // Cache the revision address to avoid following the interface and input
-    // buffer pointers for every response, including unchanged parameters.
-    const std::uint64_t* inputRevisionPtr{nullptr};
+    // Keep the consumed revision, but obtain the current revision through the
+    // interface: storing its address here costs a pointer per event/dial pair.
     std::uint64_t inputRevision{std::uint64_t(-1)};
     void update(){
       // Retain changes until this response consumes them, even when the
       // input buffer has been updated again in the meantime.
-      auto revision = *inputRevisionPtr;
+      auto revision = dialInterface->getInputBufferRef()->getRevision();
       if( inputRevision != revision ) {
         response = dialInterface->evalResponse();
         inputRevision = revision;
@@ -200,9 +202,11 @@ public:
   std::vector<CacheEntry> &getCache(){ return _cache_; }
   [[nodiscard]] const std::vector<CacheEntry> &getCache() const{ return _cache_; }
 
-  /// Allocated cache vector buffers, excluding events, dial objects and allocator overhead.
+  /// Allocated bytes in cache vector buffers, including unused capacity.
+  /// Excludes events, dial objects and allocator bookkeeping.
   [[nodiscard]] size_t getCacheMemorySize() const;
 
+  [[nodiscard]] const GlobalEventReweightCap& getGlobalEventReweightCap() const { return _globalEventReweightCap_; }
   GlobalEventReweightCap& getGlobalEventReweightCap(){ return _globalEventReweightCap_; }
 
   /// Allocate entries for events in the indexed cache.  The first parameter
@@ -230,7 +234,15 @@ public:
   void applyVariableResponses(CacheEntry& entry_);
   [[nodiscard]] bool hasVariableResponses() const{ return _hasVariableResponses_; }
 
+  void evalVariableResponseGradient(CacheEntry& entry_, const VariableResponseCache& target_,
+                                    ParameterGradient& gradient_, double scale_);
   void reweightEntry( CacheEntry& entry_);
+  /// Bulk CPU gradient: independent thread-local sums, followed by an ordered reduction.
+  void evalEventWeightGradients(ParameterGradient& gradient_,
+                                              const std::vector<double>& eventScales_,
+                                              GenericToolbox::ParallelWorker& workers_);
+  void evalEventWeightGradient(CacheEntry& entry_, ParameterGradient& gradient_,
+                               bool resetGradients_ = true, double gradientScale_ = 1.);
 
 
 private:

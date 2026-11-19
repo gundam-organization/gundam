@@ -2,6 +2,9 @@
 #define GUNDAM_TABULATED_H
 
 #include "DialBase.h"
+#include "TableGradientBuffer.h"
+
+#include <memory>
 
 // Implement a dial to look up a weight in a table and apply it.  This is a
 // very low level dial that depends on the Tabulated DialCollection to have
@@ -14,8 +17,9 @@ public:
     ~Tabulated() = default;
     Tabulated() = delete;
     Tabulated(const std::vector<double>* table_, int index_, double fraction_,
-              const std::string& options_="")
-        : _table_{table_}, _fraction_{(float) fraction_}, _index_{index_} {
+              const std::string& options_="",
+              std::shared_ptr<TableGradientBuffer> gradientBuffer_ = nullptr)
+        : _table_{table_}, _fraction_{(float) fraction_}, _index_{index_}, _gradientBuffer_{std::move(gradientBuffer_)} {
 #ifdef TABULATED_DEBUG_DIAL
         _options_ = options_;
 #endif
@@ -26,6 +30,29 @@ public:
 
     [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override
         { return _fraction_*(*_table_)[_index_] + (1.0-_fraction_)*(*_table_)[_index_+1]; }
+
+    [[nodiscard]] bool hasAnalyticGradient() const override {
+        return _gradientBuffer_ != nullptr and _gradientBuffer_->requestGradient();
+    }
+
+    [[nodiscard]] std::vector<double> evalGradients(const DialInputBuffer& input_) const override {
+        if( _gradientBuffer_ == nullptr ){ throw std::runtime_error("Tabulated: no gradientFunction configured"); }
+        const auto& values = input_.getInputBuffer();
+        _gradientBuffer_->validate(values, _table_->size());
+        std::vector<double> result(values.size(), 0.);
+        for( std::size_t p = 0; p < result.size(); ++p ){
+            result[p] = _fraction_ * _gradientBuffer_->getDerivative(_index_, p)
+                + (1. - _fraction_) * _gradientBuffer_->getDerivative(_index_ + 1, p);
+        }
+        return result;
+    }
+
+    [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override {
+        if( iInput_ < 0 or iInput_ >= input_.getInputSize() ){
+            throw std::runtime_error("Tabulated: invalid gradient input index");
+        }
+        return evalGradients(input_)[iInput_];
+    }
 
     // Provide the internal information for the dial.  These could (should) be
     // private and add the Cache::Manager classes as friends.
@@ -59,5 +86,6 @@ private:
 #ifdef TABULATED_DEBUG_DIAL
     std::string _options_;
 #endif
+    std::shared_ptr<TableGradientBuffer> _gradientBuffer_;
 };
 #endif //GUNDAM_TABULATED_H

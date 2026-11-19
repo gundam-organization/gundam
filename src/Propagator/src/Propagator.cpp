@@ -15,7 +15,6 @@
 
 #include "GenericToolbox.Utils.h"
 
-#include <memory>
 #include <vector>
 
 std::vector<std::pair<std::string, std::string>> Propagator::getMonitorColumns() const {
@@ -215,13 +214,17 @@ void Propagator::propagateParameters(){
   static_cast<void>(result.get());
 }
 
-std::future<bool> Propagator::applyParameters(){
+void Propagator::preparePropagation(bool updateEventVariables_){
   // Make sure the dial state is updated before reweighting and filling the
   // histograms.  This has to be done before the GPU and CPU calculations, and
   // should be shared for both.
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
   _dialManager_.updateDialState();
-  _eventVariableResponseCache_.update(_eventDialCache_, _sampleSet_, _threadPool_);
+  if( updateEventVariables_ ){ _eventVariableResponseCache_.update(_eventDialCache_, _sampleSet_, _threadPool_); }
+}
+
+std::future<bool> Propagator::applyParameters(){
+  preparePropagation();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Trigger the reweight on the GPU.  This will fill the histograms, but most

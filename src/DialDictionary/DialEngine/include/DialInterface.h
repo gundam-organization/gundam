@@ -89,6 +89,8 @@ public:
   }
 
   [[nodiscard]] double evalResponse() const { return _responseSupervisorPtr_->process(_dial_->evalResponse(*_inputBufferPtr_)); }
+  [[nodiscard]] double evalGradient(int iInput_) const;
+  [[nodiscard]] std::vector<double> evalGradients() const;
   [[nodiscard]] std::string getSummary(bool shallow_=true) const;
 
 private:

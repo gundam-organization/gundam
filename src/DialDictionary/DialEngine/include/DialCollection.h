@@ -71,9 +71,9 @@ public:
   void setIndex(int index){ _index_ = index; }
   void setSupervisedParameterIndex(int supervisedParameterIndex){ _supervisedParameterIndex_ = supervisedParameterIndex; }
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex){ _supervisedParameterSetIndex_ = supervisedParameterSetIndex; }
+  void setParameterSetList(std::vector<ParameterSet>* parameterSetList_){ _parameterSetListPtr_ = parameterSetList_; }
   void setIsCompositeNode(bool isCompositeNode_){ _isCompositeNode_ = isCompositeNode_; }
   void setCompositeParentIndex(int index_){ _compositeParentIndex_ = index_; }
-  void setParameterSetList(std::vector<ParameterSet>* parameterSetList_){ _parameterSetListPtr_ = parameterSetList_; }
 
   // const getters
   auto getSupervisedParameterSetIndex() const{ return _supervisedParameterSetIndex_; }
@@ -88,6 +88,7 @@ public:
   [[nodiscard]] bool canReuseGraphInput() const{
     return (_dialType_ == DialType::Graph or _dialType_ == DialType::Spline)
         and _dialOptions_.find("ROOT") == std::string::npos
+        and _eventFormulaDefinition_ == nullptr
         and _dialInputBufferList_.size() == 1 and _dialResponseSupervisorList_.size() == 1;
   }
 
@@ -222,6 +223,7 @@ protected:
   void initializeImpl() override;
 
   void prepareCompositeInputs(ConfigReader& config_);
+  [[nodiscard]] DialInputBuffer::ParameterReference resolveParameterInput(const JsonType& input_) const;
   bool initializeNormDialsWithParBinning();
   bool initializeDialsWithDefinition();
   bool initializeBinnedDials(const ConfigReader& dialsDefinition);
@@ -230,6 +232,7 @@ protected:
   bool initializeDialsWithExternalWeight(const ConfigReader& dialsDefinition);
 
   void readVariableResponseConfig(const ConfigReader& config_);
+  void readResponseSupervisorConfig(const ConfigReader& config_);
   void readParametersFromConfig(const ConfigReader &config_);
   ConfigReader fetchDialsDefinition(const ConfigReader &definitionsList_) const;
 
@@ -254,8 +257,7 @@ private:
   bool _enableDialsSummary_{false};
   bool _allowDialExtrapolation_{true};
   int _index_{-1};
-  double _minDialResponse_{std::nan("unset")};
-  double _maxDialResponse_{std::nan("unset")};
+  DialResponseSupervisor _responseSupervisor_{};
   double _mirrorLowEdge_{std::nan("unset")};
   double _mirrorHighEdge_{std::nan("unset")};
   double _mirrorRange_{std::nan("unset")};

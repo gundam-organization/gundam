@@ -4,6 +4,9 @@
 #include <DialCollection.h>
 
 #include "DialFactoryBase.h"
+#include "TableGradientBuffer.h"
+
+#include <memory>
 
 class Event;
 class DialBase;
@@ -19,6 +22,7 @@ class DialBase;
 ///      initArguments: [<arg1>, ...]      List of argument strings (e.g.
 ///                                           input file names)
 ///      updateFunction: <update-func-name> Function called to update table
+///      gradientFunction: <gradient-func-name> Optional table Jacobian producer
 ///      binningFunction: <bin-func-name>  Function to find bin index
 ///      binningVariables: [<var1>, ... ] Variables used for binning the
 ///                                           table "X" coordinate by the
@@ -71,6 +75,11 @@ class DialBase;
 ///    bins = 3, low = 1.0, high = 6.0
 ///       values calculated at 1.0, 3.5, and 6.0
 //
+/// OPTIONAL GRADIENT FUNCTION: Same signature as updateFunction. Fill
+/// derivatives[iEntry*npar+iParameter] with d(table[iEntry])/d(par[iParameter]).
+/// Return zero on success; all entries must be finite. Called once per table
+/// when gradients are requested, before event workers read the table.
+///
 /// BIN INDEX DETERMINATION: The binningFunction signature is:
 
 ///    extern "C"
@@ -157,6 +166,10 @@ private:
 
     // A cache to hold the table of calculated values
     std::vector<double> _table_;
+
+    // Optional derivative producer, with the same ABI as updateFunction.
+    std::string _gradientFuncName_;
+    std::shared_ptr<TableGradientBuffer> _gradientBuffer_;
 
     // The name of a symbol in the library that will be used to find the
     // bin associated with each event.
