@@ -660,6 +660,22 @@ TEST(CompositeDial, CopiesShareDefinitionAndKeepEventBindingsIndependent) {
   EXPECT_EQ(&sourceNodes, &static_cast<const CompositeDial&>(first).getNodes());
   EXPECT_EQ(&sourceNodes, &static_cast<const CompositeDial&>(second).getNodes());
   EXPECT_FALSE(source.isBound());
+  // Equal configurations share immutable snapshots, even with unset limits.
+  ASSERT_EQ(first.getNodeBindings()[0].settings, second.getNodeBindings()[0].settings);
+  supervisor.setMaxResponse(1.);
+  second.bind([&](int){ return &interface; });
+  EXPECT_NE(first.getNodeBindings()[0].settings, second.getNodeBindings()[0].settings);
+  EXPECT_DOUBLE_EQ(first.evalResponse(input), 2.);
+  EXPECT_DOUBLE_EQ(second.evalResponse(input), 1.);
+  EXPECT_DOUBLE_EQ(cloned->evalResponse(input), 2.);
+  supervisor.setMaxResponse(std::nan("unset"));
+  second.bind([&](int){ return &interface; });
+  EXPECT_EQ(first.getNodeBindings()[0].settings, second.getNodeBindings()[0].settings);
+  buffer.getInputParameterIndicesList()[0].mirrorEdges = {0., .5};
+  second.bind([&](int){ return &interface; });
+  EXPECT_NE(first.getNodeBindings()[0].settings, second.getNodeBindings()[0].settings);
+  EXPECT_DOUBLE_EQ(first.evalResponse(input), 2.);
+  EXPECT_DOUBLE_EQ(second.evalResponse(input), 0.);
   second.getNodes()[0].collectionIndex = 7;
   EXPECT_EQ(sourceNodes[0].collectionIndex, 0);
   EXPECT_EQ(static_cast<const CompositeDial&>(first).getNodes()[0].collectionIndex, 0);

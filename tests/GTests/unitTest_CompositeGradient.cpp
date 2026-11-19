@@ -119,9 +119,12 @@ TEST(CompositeGradient, BranchesRepeatedParametersMirrorsClampsAndNestedGraphs) 
     }
     for( auto& job : jobs ){ job.get(); }
   }
+  auto previousSettings = dial.getNodeBindings()[1].settings;
   supervisors[1].setSmoothingWidths(0., .1);
   dial.bind([&](int index_){ return &interfaces[index_]; });
   ASSERT_TRUE(dial.hasAnalyticGradient());
+  EXPECT_NE(previousSettings, dial.getNodeBindings()[1].settings);
+  EXPECT_DOUBLE_EQ(supervisors[1].process(.25), dial.getNodeBindings()[1].settings->supervisor.process(.25));
   checkCompositeGradient(dial, {.2, .4});
 }
 
