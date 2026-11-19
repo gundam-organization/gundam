@@ -205,7 +205,7 @@ double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) c
   }
 
   if( _applyInfinitePenaltyOnOutOfBoundPar_ and parSet_.hasOutOfBoundsParameters() ) {
-    LogWarning << "Returning an +inf penalty for out-of-bounds parameters in: " << parSet_.getName() << std::endl;
+    LogError << "Returning an +inf penalty for out-of-bounds parameters in: " << parSet_.getName() << std::endl;
     return std::numeric_limits<double>::infinity();
   }
 
