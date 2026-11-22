@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Getting started 
-next_page: "usage.html"
+next_page: "run-gundam.html"
 ---
 
 # Installation instructions

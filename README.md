@@ -20,7 +20,7 @@ but also in the ICARUS experiment (see [this paper](https://arxiv.org/abs/2604.2
 and actively promoted within DUNE.
 
 The applications are configurable with a set of YAML/JSON files (see the
-[configuration](./docs/configuration/TopLevel.md) documentation) so users do
+[configuration](./docs/configuration.md) documentation) so users do
 not need to modify the code for each new study. A lot of time and effort
 are usually invested by various working groups to debug and optimize pieces
 of code doing generic tasks, and GUNDAM lets that work be distributed to
