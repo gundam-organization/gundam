@@ -9,6 +9,7 @@
 
 #include <vector>
 #include <utility>
+#include <cstdint>
 
 
 class DialInputBuffer {
@@ -17,8 +18,9 @@ class DialInputBuffer {
   /// for the evaluation of a collection of dials.
 
   /// The buffer is updated in single thread before the evaluation of
-  /// individual dials is done. This means DialInputBuffer is only meant
-  /// to handle Parameters. Not Event variables.
+  /// individual dials is done. Collection buffers only reference Parameters,
+  /// not Event variables. Composite evaluations use separate call-local
+  /// buffers populated with intermediate values via setInputValues().
 
 public:
   /// definition of data structs
@@ -49,9 +51,11 @@ public:
 
   // const getters
   [[nodiscard]] auto isDialUpdateRequested() const{ return _isDialUpdateRequested_; }
+  [[nodiscard]] auto getRevision() const{ return _revision_; }
+  [[nodiscard]] const std::uint64_t* getRevisionPtr() const{ return &_revision_; }
   [[nodiscard]] auto isDialUpdateRequestedPtr() const{ return &_isDialUpdateRequested_; }
   [[nodiscard]] auto getBufferSize() const{ return _inputArraySize_; }
-  [[nodiscard]] auto getInputSize() const{ return _inputParameterReferenceList_.size(); }
+  [[nodiscard]] auto getInputSize() const{ return _isInitialized_ ? size_t(_inputArraySize_) : _inputParameterReferenceList_.size(); }
   [[nodiscard]] auto& getInputBuffer() const { return _inputBuffer_; }
   [[nodiscard]] auto& getInputParameterIndicesList() const{ return _inputParameterReferenceList_; }
 
@@ -71,6 +75,9 @@ public:
   /// Update the buffer to flag if any parameter has changed, and apply any
   /// mirroring to the parameter values.
   void update();
+
+  // Call-local inputs for composed evaluations; no parameter references.
+  void setInputValues(std::vector<double> values_);
 
   // nested getters
   [[nodiscard]] auto& getParameterSet(int iInput_) const{ return _inputParameterReferenceList_[iInput_].getParameterSet(_parSetListPtr_); }
@@ -92,6 +99,8 @@ private:
   /// Flag for if the dials need to be recalculated.  Dials don't need to
   /// be recalculated if the parameter values have not changed.
   bool _isDialUpdateRequested_{true};
+  // Monotonic invalidation token, independent of how often update() is called.
+  std::uint64_t _revision_{0};
 
   /// How many inputs are handled
   int _inputArraySize_{0};

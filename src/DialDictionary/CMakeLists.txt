@@ -7,10 +7,13 @@ set( SRCFILES
     DialEngine/src/DialResponseSupervisor.cpp
     DialEngine/src/DialCollection.cpp
     DialEngine/src/EventDialCache.cpp
+    DialEngine/src/EventVariableResponseCache.cpp
 
     # DialDefinitions
     DialDefinitions/src/DialUtils.cpp
     DialDefinitions/src/DialBase.cpp
+    DialDefinitions/src/CompositeDial.cpp
+    DialDefinitions/src/EventFormula.cpp
 
     DialDefinitions/src/Kriged.cpp
 
@@ -42,9 +45,12 @@ set( HEADERS
     DialEngine/include/DialResponseSupervisor.h
     DialEngine/include/DialCollection.h
     DialEngine/include/EventDialCache.h
+    DialEngine/include/EventVariableResponseCache.h
 
     # DialDefinitions
     DialDefinitions/include/DialBase.h
+    DialDefinitions/include/CompositeDial.h
+    DialDefinitions/include/EventFormula.h
 
     DialDefinitions/include/Norm.h
     DialDefinitions/include/Shift.h

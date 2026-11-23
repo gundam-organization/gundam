@@ -48,25 +48,26 @@ void Propagator::configureImpl(){
     {"debugPrintLoadedEventsNbPerSample"},
     {"devSingleThreadReweight"},
     {"devSingleThreadHistFill"},
+    {"enableStatThrowInToys"},
+    {"gaussStatThrowInToys"},
+    {"enableEventMcThrow"},
     {"globalEventReweightCap"},
     // relocated:
     {FieldFlag::RELOCATED, "parameterSetListConfig", "parametersManagerConfig/parameterSetList"},
     {FieldFlag::RELOCATED, "throwToyParametersWithGlobalCov", "parametersManagerConfig"},
-    {FieldFlag::RELOCATED, "enableStatThrowInToys", "likelihoodInterfaceConfig/enableStatThrowInToys"},
-    {FieldFlag::RELOCATED, "gaussStatThrowInToys", "likelihoodInterfaceConfig/gaussStatThrowInToys"},
-    {FieldFlag::RELOCATED, "enableEventMcThrow", "likelihoodInterfaceConfig/enableEventMcThrow"},
     {FieldFlag::RELOCATED, "plotGeneratorConfig", "likelihoodInterfaceConfig/plotGeneratorConfig"},
     {FieldFlag::RELOCATED, "llhStatFunction", "likelihoodInterfaceConfig/jointProbabilityConfig/type"},
     {FieldFlag::RELOCATED, "llhConfig", "likelihoodInterfaceConfig/jointProbabilityConfig"},
     {FieldFlag::RELOCATED, "scanConfig", "fitterEngineConfig/scanConfig"},
     {FieldFlag::RELOCATED, "eventTreeWriter", "likelihoodInterfaceConfig/eventTreeWriter"},
-    {FieldFlag::RELOCATED, "dataSetList", {"fitSampleSetConfig/dataSetList"}, "likelihoodInterfaceConfig/dataSetList"},
+    {FieldFlag::RELOCATED, "dataSetList", {"fitSampleSetConfig/dataSetList"}, "likelihoodInterfaceConfig/datasetManagerConfig/datasetList"},
   });
   _config_.checkConfiguration();
 
   // nested objects
   _config_.fillValue(_sampleSet_.getConfig(), "sampleSetConfig");
   _sampleSet_.configure();
+  _eventVariableResponseCache_ = EventVariableResponseCache();
 
   // relocated
   _config_.fillValue(_parManager_.getParameterSetListConfig(), "parameterSetListConfig");
@@ -79,6 +80,8 @@ void Propagator::configureImpl(){
   _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.configure();
 
+  _eventVariableResponseCache_.prepare(_sampleSet_, _dialManager_.getDialCollectionList());
+
   // Monitoring parameters
   _config_.fillValue(_showNbEventParameterBreakdown_, "showNbEventParameterBreakdown");
   _config_.fillValue(_showNbEventPerSampleParameterBreakdown_, "showNbEventPerSampleParameterBreakdown");
@@ -88,6 +91,10 @@ void Propagator::configureImpl(){
   _config_.fillValue(_devSingleThreadReweight_, "devSingleThreadReweight");
   _config_.fillValue(_devSingleThreadHistFill_, "devSingleThreadHistFill");
   _config_.fillValue(_eventDialCache_.getGlobalEventReweightCap().maxReweight, "globalEventReweightCap");
+
+  _config_.fillValue(_enableStatThrowInToys_, "enableStatThrowInToys");
+  _config_.fillValue(_gaussStatThrowInToys_, "gaussStatThrowInToys");
+  _config_.fillValue(_enableEventMcThrow_, "enableEventMcThrow");
 
   _configuredConfig_ = _config_.getConfig();
 
@@ -100,6 +107,7 @@ void Propagator::initializeImpl(){
   _sampleSet_.initialize();
   _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.initialize();
+  _eventVariableResponseCache_.prepare(_sampleSet_, _dialManager_.getDialCollectionList());
 
   initializeThreads();
 
@@ -107,7 +115,76 @@ void Propagator::initializeImpl(){
 }
 
 // core
+void Propagator::throwToyParameters(){
+
+  LogInfo << "Propagating prior parameters on the initially loaded events..." << std::endl;
+  reweightEvents();
+
+  LogInfo << "Sample breakdown prior to the throwing:" << std::endl;
+  std::cout << getSampleSet().getSampleBreakdown() << std::endl;
+
+  if( isDebugPrintLoadedEvents() ){
+    LogInfo << "Toy events:" << std::endl;
+    LogInfo << GET_VAR_NAME_VALUE(getDebugPrintLoadedEventsNbPerSample()) << std::endl;
+    int iEvt{0};
+    for( auto& entry : getEventDialCache().getCache() ) {
+      LogInfo << "Event #" << iEvt++ << "{" << std::endl;
+      {
+        LogScopeIndent;
+        LogInfo << entry.getSummary() << std::endl;
+      }
+      LogInfo << "}" << std::endl;
+      if( iEvt >= getDebugPrintLoadedEventsNbPerSample() ) break;
+    }
+  }
+
+  if( not _toyParameterInjector_.empty() ){
+    LogInfo << "Injecting parameters..." << std::endl;
+    getParametersManager().injectParameterValues( _toyParameterInjector_ );
+  }
+  else{
+    LogInfo << "Throwing toy parameters according to covariance matrices..." << std::endl;
+    getParametersManager().throwParameters();
+  }
+
+  // reweighting the events accordingly
+  reweightEvents();
+}
+void Propagator::throwStatErrors(){
+  LogInfo << "Throwing statistical error..." << std::endl;
+
+  if( not _enableStatThrowInToys_ ){
+    LogAlert << "Stat error throw is disabled. Skipping..." << std::endl;
+    return;
+  }
+
+  if( _enableEventMcThrow_ ){
+    // Take into account the finite amount of event in MC
+    LogInfo << "enableEventMcThrow is enabled: throwing individual MC events" << std::endl;
+    for( auto& sample : getSampleSet().getSampleList() ) {
+      if( sample.isEventMcThrowDisabled() ){
+        LogAlert << "MC event throw is disabled for sample: " << sample.getName() << std::endl;
+      }
+
+      sample.getHistogram().throwEventMcError();
+    }
+  }
+  else{
+    LogWarning << "enableEventMcThrow is disabled. Not throwing individual MC events" << std::endl;
+  }
+
+  LogInfo << "Throwing statistical error on histograms..." << std::endl;
+  if( _gaussStatThrowInToys_ ) {
+    LogWarning << "Using Gaussian statistical throws. (caveat: distribution truncated when the bins are close to zero)" << std::endl;
+  }
+  for( auto& sample : getSampleSet().getSampleList() ){
+    // Asimov bin content -> toy data
+    sample.getHistogram().throwStatError( _gaussStatThrowInToys_ );
+  }
+}
+
 void Propagator::clearContent(){
+  _eventVariableResponseCache_.invalidate();
 
   // clearing events in MC containers
   _sampleSet_.clearEventLists();
@@ -115,21 +192,23 @@ void Propagator::clearContent(){
   // Keep static dial definitions and reset only load-dependent state.
   _dialManager_.setParametersManager(&_parManager_);
   _dialManager_.clearEventByEventDials();
+  _eventVariableResponseCache_.prepare(_sampleSet_, _dialManager_.getDialCollectionList());
 
-  // reset the cache
+  // Reset event associations while preserving the configured weight cap.
+  auto reweightCap = _eventDialCache_.getGlobalEventReweightCap();
   _eventDialCache_ = EventDialCache();
+  _eventDialCache_.getGlobalEventReweightCap() = reweightCap;
 
 }
 void Propagator::buildDialCache(){
+  _eventVariableResponseCache_.invalidate();
   _eventDialCache_.shrinkIndexedCache();
   _eventDialCache_.buildReferenceCache(_sampleSet_, _dialManager_.getDialCollectionList());
   _dialManager_.invalidateInputBuffers();
+  _eventVariableResponseCache_.build(_dialManager_.getDialCollectionList());
 }
 void Propagator::updateEventSampleBinning(){
-  for( auto& sample : _sampleSet_.getSampleList() ){
-    if( not sample.isUseDynamicBinning() ){ continue; }
-    sample.updateEventBinning(_threadPool_);
-  }
+  _sampleSet_.updateEventBinning(_threadPool_);
 }
 void Propagator::propagateParameters(){
   std::future<bool> result = applyParameters();
@@ -142,6 +221,7 @@ std::future<bool> Propagator::applyParameters(){
   // should be shared for both.
   if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
   _dialManager_.updateDialState();
+  _eventVariableResponseCache_.update(_eventDialCache_, _sampleSet_, _threadPool_);
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   // Trigger the reweight on the GPU.  This will fill the histograms, but most
@@ -184,6 +264,7 @@ void Propagator::reweightEvents(bool updateDials) {
     // isForceCpuCalculation is true.
     if( _enableEigenToOrigInPropagate_ ){ _parManager_.convertEigenToOrig(); }
     _dialManager_.updateDialState();
+    _eventVariableResponseCache_.update(_eventDialCache_, _sampleSet_, _threadPool_);
   }
 
   // timer start/stop after the dials are updated.
@@ -416,6 +497,7 @@ void Propagator::refillHistogramsFct( int iThread_){
     sample.getHistogram().refillHistogram(iThread_);
   }
 }
+
 
 //  A Lesser GNU Public License
 
