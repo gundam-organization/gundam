@@ -19,6 +19,8 @@ void Sample::prepareConfig(ConfigReader &config_){
     {FieldFlag::MANDATORY, "name"},
     {"isEnabled"},
     {"disableEventMcThrow"},
+    {"binningResponse"},
+    {"useDynamicBinning"},
     {"binning", {"binningFile", "binningFilePath"}},
     {"selectionCutStr", {"selectionCuts"}},
     {"sampleWeightFormula"},
@@ -35,6 +37,7 @@ void Sample::configureImpl(){
 
   _config_.fillValue(_name_, "name");
   _config_.fillValue(_isEnabled_, "isEnabled");
+  _config_.fillValue(_useDynamicBinning_, "useDynamicBinning");
   _config_.fillValue(_disableEventMcThrow_, "disableEventMcThrow");
   _config_.fillValue(_binningConfig_, "binning");
   _config_.fillValue(_selectionCutStr_, "selectionCutStr");
@@ -50,6 +53,9 @@ void Sample::configureImpl(){
 
   LogDebugIf(GundamGlobals::isDebug()) << "Reading binning: " << _binningConfig_ << std::endl;
   _histogram_.build(_binningConfig_);
+  if( _config_.hasField("binningResponse") ){
+    _histogram_.configureBinningResponse(_config_.fetchValue<ConfigReader>("binningResponse"));
+  }
 
   LogDebugIf(GundamGlobals::isDebug()) << "Histogram has " << _histogram_.getNbBins() << " bins." << std::endl;
 }
@@ -155,6 +161,11 @@ void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
     }
   }
 
+  if( _histogram_.isBinningResponseEnabled() ){
+    _histogram_.updateBinEventLists(_eventList_, threadPool_, true);
+    return;
+  }
+
   threadPool_.runJob([&](int iThread_){
     auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(
         iThread_, threadPool_.getNbThreads(), _eventList_.size()
@@ -174,4 +185,8 @@ void Sample::updateEventBinning(GenericToolbox::ParallelWorker& threadPool_){
 
 void Sample::indexEventInHistogramBin( int iThread_){
   _histogram_.updateBinEventList(_eventList_, iThread_);
+}
+
+void Sample::indexEventInHistogramBin(GenericToolbox::ParallelWorker& threadPool_){
+  _histogram_.updateBinEventLists(_eventList_, threadPool_);
 }

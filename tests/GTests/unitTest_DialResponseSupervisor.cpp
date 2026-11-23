@@ -107,6 +107,7 @@ TEST(DialResponseSmoothingConfig, ValidatesConfigurationBeforeLoading){
     JsonType config{{"dialType", "Graph"}, {"dialBranchData", "graph"}};
     config.update(options_);
     DialCollection collection(nullptr);
+    collection.setSupervisedParameterSetIndex(0);
     collection.configure(ConfigReader(config));
   };
   const JsonType enabled{{"dialResponseLimits", {0., 2.}}, {"enableResponseSmoothing", true}};
@@ -132,6 +133,7 @@ TEST(DialResponseSmoothingConfig, ValidatesConfigurationBeforeLoading){
 TEST(DialResponseSmoothingConfig, LegacyLimitsWarnWithoutRejectingConfigurations){
   for( const std::string minKey : {"minDialResponse", "minimumSplineResponse"} ){
     DialCollection collection(nullptr);
+    collection.setSupervisedParameterSetIndex(0);
     testing::internal::CaptureStdout();
     EXPECT_NO_THROW(collection.configure(ConfigReader(JsonType{
         {"dialType", "Graph"}, {"dialBranchData", "graph"},

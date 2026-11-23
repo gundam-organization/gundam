@@ -5,18 +5,24 @@
 set( LIB_NAME GundamDatasetManager )
 
 set( SRCFILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DatasetDefinitionTemplate.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DatasetManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/LoaderUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DatasetDefinition.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataDispenser.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/DatasetTreeChain.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/DataDispenserUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/EventVarTransform.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/EventVarTransformLib.cpp
     )
 
 set(HEADERS
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/DatasetDefinitionTemplates.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/DatasetManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/LoaderUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DatasetDefinition.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DataDispenser.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/DatasetTreeChain.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/DataDispenserUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/EventVarTransform.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/EventVarTransformLib.h

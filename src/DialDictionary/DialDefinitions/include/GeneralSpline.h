@@ -24,6 +24,7 @@ public:
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<GeneralSpline>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return {"GeneralSpline"}; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] std::vector<double> getSourceKnotPositions() const override;
 
   // other overrides
   void setAllowExtrapolation(bool allowExtrapolation) override { _allowExtrapolation_ = allowExtrapolation; }

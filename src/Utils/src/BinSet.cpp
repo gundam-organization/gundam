@@ -8,6 +8,7 @@
 
 #include "Logger.h"
 
+#include <algorithm>
 #include <string>
 #include <sstream>
 #include <stdexcept>
@@ -43,6 +44,28 @@ void BinSet::initializeImpl(){
   _config_.printUnusedKeys();
 }
 void BinSet::checkBinning() const{
+
+  auto getVariableNames = [](const Bin& bin_){
+    std::vector<std::string> names;
+    names.reserve(bin_.getEdgesList().size());
+    for( const auto& edge : bin_.getEdgesList() ){ names.emplace_back(edge.varName); }
+    std::sort(names.begin(), names.end());
+    return names;
+  };
+  if( not _binList_.empty() ){
+    const auto expectedVariables = getVariableNames(_binList_.front());
+    for( const auto& bin : _binList_ ){
+      const auto variableNames = getVariableNames(bin);
+      auto duplicate = std::adjacent_find(variableNames.begin(), variableNames.end());
+      LogThrowIf(duplicate != variableNames.end(),
+                 "Duplicate variable in bin #" << bin.getIndex() << ": " << *duplicate);
+      LogThrowIf(variableNames != expectedVariables,
+                 "All bins must define the same variables. Bin #" << bin.getIndex()
+                 << " defines " << GenericToolbox::toString(variableNames)
+                 << "; expected " << GenericToolbox::toString(expectedVariables)
+                 << " as in bin #" << _binList_.front().getIndex() << ".");
+    }
+  }
 
   bool hasErrors{false};
 

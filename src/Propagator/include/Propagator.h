@@ -11,6 +11,7 @@
 #include "ParametersManager.h"
 #include "DialCollection.h"
 #include "EventDialCache.h"
+#include "EventVariableResponseCache.h"
 #include "SampleSet.h"
 
 #include "GenericToolbox.Time.h"
@@ -40,6 +41,8 @@ public:
   void setIThrow(int iThrow){ _iThrow_ = iThrow; }
   void setParameterInjectorConfig(const JsonType &parameterInjector){ _parameterInjectorMc_ = parameterInjector; }
 
+  void setToyParameterInjector(const JsonType& toyParameterInjector_){ _toyParameterInjector_ = toyParameterInjector_; }
+
   // const getters
   [[nodiscard]] auto getIThrow() const { return _iThrow_; }
   [[nodiscard]] auto isDebugPrintLoadedEvents() const { return _debugPrintLoadedEvents_; }
@@ -61,7 +64,13 @@ public:
   auto& getParametersManager(){ return _parManager_; }
   auto& getDialCollectionList(){ return _dialManager_.getDialCollectionList(); }
 
+  auto& getEnableStatThrowInToys(){ return _enableStatThrowInToys_; }
+  auto& getGaussStatThrowInToys(){ return _gaussStatThrowInToys_; }
+  auto& getEnableEventMcThrow(){ return _enableEventMcThrow_; }
+
   // Core
+  void throwToyParameters();
+  void throwStatErrors();
   void clearContent();
   [[nodiscard]] bool isConfiguredWith(const JsonType& config_) const{
     return isInitialized() and _configuredConfig_ == config_;
@@ -72,8 +81,8 @@ public:
   /// Event-to-dial associations are preserved.
   void updateEventSampleBinning();
 
-  /// Apply the current parameters and wait for it to finish.  This reweights
-  /// the events, and refills the histograms.  This is a convenience wrapper
+  /// Apply the current parameters and wait for it to finish. This updates
+  /// event variables and bin contributions before reweighting and filling histograms.  This is a convenience wrapper
   /// around applyParameters().get().
   void propagateParameters();
 
@@ -87,6 +96,8 @@ public:
   /// and false if the calculation started correctly, but failed.
   std::future<bool> applyParameters();
 
+  /// With updateDials=true, also update variable responses and dynamic binning.
+  /// With false, the caller must have prepared the dial and variable state.
   void reweightEvents(bool updateDials = true);
 
   // misc
@@ -125,7 +136,10 @@ private:
   bool _devSingleThreadHistFill_{false};
   int _debugPrintLoadedEventsNbPerSample_{5};
   JsonType _parameterInjectorMc_;
-  JsonType _parameterInjectorToy_;
+  JsonType _toyParameterInjector_{};
+  bool _enableStatThrowInToys_{true};
+  bool _gaussStatThrowInToys_{false};
+  bool _enableEventMcThrow_{true};
 
   // Internals
   bool _showNbEventParameterBreakdown_{true};
@@ -136,6 +150,7 @@ private:
   // Sub-layers
   SampleSet _sampleSet_{};
   EventDialCache _eventDialCache_{};
+  EventVariableResponseCache _eventVariableResponseCache_{};
   ParametersManager _parManager_{};
   DialManager _dialManager_{};
 

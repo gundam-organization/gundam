@@ -33,6 +33,8 @@ public:
   [[nodiscard]] auto& getStrippedCovarianceMatrix() const{ return _strippedCovarianceMatrix_; }
   [[nodiscard]] auto& getParameterSetsList() const{ return _parameterSetList_; }
 
+  [[nodiscard]] const auto& getDialSetDefinitions() const{ return _dialSetDefinitions_; }
+
   // getters
   auto& getGlobalCovarianceMatrix(){ return _globalCovarianceMatrix_; }
   auto& getParameterSetsList(){ return _parameterSetList_; }
@@ -84,6 +86,7 @@ private:
   bool _reThrowParSetIfOutOfPhysical_{true};
   bool _throwToyParametersWithGlobalCov_{false};
   ConfigReader _parameterSetListConfig_{};
+  ConfigReader _dialSetDefinitions_{};
 
   // internals
   std::vector<ParameterSet> _parameterSetList_{};
