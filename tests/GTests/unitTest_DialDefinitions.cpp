@@ -20,6 +20,7 @@
 #include "UniformSpline.h"
 #include "CalculateCompactSpline.h"
 #include "DialCollection.h"
+#include "ParameterSet.h"
 #include "Graph.h"
 #include "Norm.h"
 #include "RootSpline.h"
@@ -259,50 +260,65 @@ TEST(DialDefinitions,CatmullRomUniform) {
 // Loading optimizations must preserve the response and its domain.
 
 namespace {
-  DialCollection makeLoadingCollection(bool extrapolate_ = true, const std::string& options_ = ""){
-    DialCollection collection(nullptr);
-    collection.configure(ConfigReader(JsonType{
-        {"dialType", "Spline"}, {"dialBranchData", "graph"},
-        {"allowDialExtrapolation", extrapolate_}, {"options", options_}}));
-    collection.getDialInputBufferList().resize(1);
-    return collection;
-  }
-
-  template<typename T> void checkSharedSpline(){
-    auto collection = makeLoadingCollection();
-    std::vector<DialUtils::DialPoint> points{{-1, 2, -2}, {0, 1, 0}, {1, 2, 2}, {2, 5, 4}};
-    auto build = [&](){
-      auto dial = std::make_unique<T>();
-      dial->buildDial(points);
-      return dial;
-    };
-    const auto first = collection.storeEventDial(build());
-    EXPECT_EQ(first, collection.storeEventDial(build()));
-    // Equal knots with different Hermite slopes are different curves.
-    points[1].slope = 0.125;
-    auto changedSlope = build();
-    if( changedSlope->getDialData() != collection.getDialInterfaceList()[first].getDialBaseRef()->getDialData() ){
-      EXPECT_NE(first, collection.storeEventDial(std::move(changedSlope)));
+  class DialLoading : public ::testing::Test {
+  protected:
+    DialLoading(){
+      auto& set = _parameterSets_.front();
+      set.configure(ConfigReader(JsonType{
+          {"name", "testParameters"}, {"isEnabled", true}, {"numberOfParameters", 1}, {"nominalStepSize", 0.1}}));
     }
-    points[1].slope = 0;
-    auto extrapolated = build();
-    extrapolated->setAllowExtrapolation(true);
-    EXPECT_NE(first, collection.storeEventDial(std::move(extrapolated)));
-    points[1].y += 0.125;
-    EXPECT_NE(first, collection.storeEventDial(build()));
-    collection.clear();
-    EXPECT_EQ(0, collection.storeEventDial(build()));
-  }
+
+    DialCollection makeCollection(JsonType config_){
+      config_["dialInputList"] = {{{"parameterSetName", _parameterSets_.front().getName()}, {"parameterIndex", 0}}};
+      DialCollection collection(&_parameterSets_);
+      collection.configure(ConfigReader(config_));
+      return collection;
+    }
+
+    DialCollection makeLoadingCollection(bool extrapolate_ = true, const std::string& options_ = ""){
+      return makeCollection({{"dialType", "Spline"}, {"dialBranchData", "graph"},
+                             {"allowDialExtrapolation", extrapolate_}, {"options", options_}});
+    }
+
+    template<typename T> void checkSharedSpline(){
+      auto collection = makeLoadingCollection();
+      std::vector<DialUtils::DialPoint> points{{-1, 2, -2}, {0, 1, 0}, {1, 2, 2}, {2, 5, 4}};
+      auto build = [&](){
+        auto dial = std::make_unique<T>();
+        dial->buildDial(points);
+        return dial;
+      };
+      const auto first = collection.storeEventDial(build());
+      EXPECT_EQ(first, collection.storeEventDial(build()));
+      // Equal knots with different Hermite slopes are different curves.
+      points[1].slope = 0.125;
+      auto changedSlope = build();
+      if( changedSlope->getDialData() != collection.getDialInterfaceList()[first].getDialBaseRef()->getDialData() ){
+        EXPECT_NE(first, collection.storeEventDial(std::move(changedSlope)));
+      }
+      points[1].slope = 0;
+      auto extrapolated = build();
+      extrapolated->setAllowExtrapolation(true);
+      EXPECT_NE(first, collection.storeEventDial(std::move(extrapolated)));
+      points[1].y += 0.125;
+      EXPECT_NE(first, collection.storeEventDial(build()));
+      collection.clear();
+      EXPECT_EQ(0, collection.storeEventDial(build()));
+    }
+
+  private:
+    std::vector<ParameterSet> _parameterSets_{1};
+  };
 }
 
-TEST(DialLoading, SharesLightweightSplines){
+TEST_F(DialLoading, SharesLightweightSplines){
   checkSharedSpline<UniformSpline>();
   checkSharedSpline<GeneralSpline>();
   checkSharedSpline<CompactSpline>();
   checkSharedSpline<MonotonicSpline>();
 }
 
-TEST(DialLoading, ConcurrentDuplicates){
+TEST_F(DialLoading, ConcurrentDuplicates){
   auto collection = makeLoadingCollection();
   std::vector<std::future<size_t>> results;
   for( int i = 0; i < 4; ++i ){
@@ -320,7 +336,7 @@ TEST(DialLoading, ConcurrentDuplicates){
   EXPECT_EQ(1, collection.getDialInterfaceList().size());
 }
 
-TEST(DialLoading, ConcurrentDistinctSignaturesSurviveIndexGrowth){
+TEST_F(DialLoading, ConcurrentDistinctSignaturesSurviveIndexGrowth){
   auto collection = makeLoadingCollection();
   const size_t count = 4096;
   auto build = [](size_t value_){
@@ -353,7 +369,7 @@ TEST(DialLoading, ConcurrentDistinctSignaturesSurviveIndexGrowth){
   }
 }
 
-TEST(DialLoading, SignedZeroSignaturesShareAnInterface){
+TEST_F(DialLoading, SignedZeroSignaturesShareAnInterface){
   auto collection = makeLoadingCollection();
   auto build = [](double zero_){
     auto dial = std::make_unique<Graph>();
@@ -364,7 +380,7 @@ TEST(DialLoading, SignedZeroSignaturesShareAnInterface){
   EXPECT_EQ(1, collection.getDialInterfaceList().size());
 }
 
-TEST(DialLoading, SimplifiesAffineAndPreservesDomain){
+TEST_F(DialLoading, SimplifiesAffineAndPreservesDomain){
   TGraph graph;
   for( int i = 0; i < 5; ++i ){ graph.SetPoint(i, i, 2 * i + 1); }
   for( bool extrapolate : {false, true} ){
@@ -387,7 +403,7 @@ TEST(DialLoading, SimplifiesAffineAndPreservesDomain){
   EXPECT_NE(nullptr, dynamic_cast<Graph*>(bounded.get()));
 }
 
-TEST(DialLoading, KeepsCurvedSlopesAndRootSplines){
+TEST_F(DialLoading, KeepsCurvedSlopesAndRootSplines){
   double x[]{0, 1, 2, 3};
   double y[]{0, 1, 2, 3};
   TSpline3 curved("curved", x, y, 4, "b1e1", 0., 0.);
@@ -401,7 +417,7 @@ TEST(DialLoading, KeepsCurvedSlopesAndRootSplines){
   EXPECT_NE(index, collection.storeEventDial(collection.makeDial(&curved)));
 }
 
-TEST(DialLoading, PreservesExactSplineBounds){
+TEST_F(DialLoading, PreservesExactSplineBounds){
   struct BoundedSpline : UniformSpline {
     void setUpperBound(double upper_){ _splineBounds_.max = upper_; }
   };
@@ -415,9 +431,8 @@ TEST(DialLoading, PreservesExactSplineBounds){
   EXPECT_NE(index, collection.storeEventDial(std::move(other)));
 }
 
-TEST(DialLoading, SharesBinnedCurvesWithIndependentInputs){
-  DialCollection collection(nullptr);
-  collection.configure(ConfigReader(JsonType{{"dialType", "Norm"}}));
+TEST_F(DialLoading, SharesBinnedCurvesWithIndependentInputs){
+  auto collection = makeCollection({{"dialType", "Norm"}});
   auto& interfaces = collection.getDialInterfaceList();
   interfaces.clear();
   interfaces.resize(3);
@@ -459,9 +474,8 @@ TEST(DialLoading, SharesBinnedCurvesWithIndependentInputs){
   EXPECT_DOUBLE_EQ(2., copy.evalResponse());
 }
 
-TEST(DialLoading, LeavesBinnedRootSplinesUnique){
-  DialCollection collection(nullptr);
-  collection.configure(ConfigReader(JsonType{{"dialType", "Norm"}}));
+TEST_F(DialLoading, LeavesBinnedRootSplinesUnique){
+  auto collection = makeCollection({{"dialType", "Norm"}});
   collection.getDialBinSet().getBinList().resize(2);
   auto& interfaces = collection.getDialInterfaceList();
   interfaces.resize(2);
