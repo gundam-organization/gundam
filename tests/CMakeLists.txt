@@ -179,6 +179,7 @@ if( WITH_GOOGLE_TEST )
   set(unitDialsSources
     GTests/unitTest_DialUtils.cpp
     GTests/unitTest_DialDefinitions.cpp
+    GTests/unitTest_DialResponseSupervisor.cpp
     GTests/unitTest_FormulaEvaluator.cpp
   )
   set(unitDataLoadingSources
