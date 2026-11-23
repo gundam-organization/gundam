@@ -2,13 +2,29 @@
 // Created by Adrien Blanchet on 30/11/2022.
 //
 
+/// @file RootSpline.cpp
+/// @brief Implements RootSpline: builds and evaluates a ROOT TSpline3.
+/// @ingroup DialDictionary
+///
+/// The public contract of each method is documented in RootSpline.h. The
+/// comments here describe how each method does its job.
+
 #include "RootSpline.h"
 
+/// @par Implementation
+/// Delegates to DialUtils::buildTSpline3(), which copies the `x` and `y` of
+/// each point into arrays and calls the TSpline3 constructor without
+/// end-condition options. The returned spline is copied into `_spline_`.
 
 void RootSpline::buildDial(const std::vector<DialUtils::DialPoint>& splinePointList_){
   _spline_ = DialUtils::buildTSpline3(splinePointList_);
 }
 
+/// @par Implementation
+/// When extrapolation is not allowed and the input is at or beyond an end
+/// knot, returns TSpline3::Eval() at that end knot (TSpline3::GetXmin() or
+/// TSpline3::GetXmax()) instead of clamping the input variable. Otherwise
+/// evaluates the spline at the input.
 double RootSpline::evalResponse(const DialInputBuffer& input_) const {
   const double dialInput{input_.getInputBuffer()[0]};
 
@@ -54,6 +70,8 @@ double RootSpline::evalResponse(const DialInputBuffer& input_) const {
 // compile-command:"$(git rev-parse --show-toplevel)/cmake/gundam-build.sh"
 // End:
 
+/// @par Implementation
+/// Reads each knot with TSpline3::GetKnot() and keeps its `x`.
 std::vector<double> RootSpline::getSourceKnotPositions() const {
   std::vector<double> positions(_spline_.GetNp());
   for( size_t i = 0; i < positions.size(); ++i ){

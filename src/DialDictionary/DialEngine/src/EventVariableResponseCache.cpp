@@ -1,3 +1,11 @@
+/// @file EventVariableResponseCache.cpp
+/// @brief Implements EventVariableResponseCache.
+/// @ingroup DialDictionary
+///
+/// The public contract of each method is documented in
+/// EventVariableResponseCache.h. The comments here describe how each method
+/// does its job.
+
 #include "EventVariableResponseCache.h"
 #include "EventDialCache.h"
 #include "DialCollection.h"
@@ -8,11 +16,17 @@
 #include "GenericToolbox.Utils.h"
 #include "Logger.h"
 
+/// @par Implementation
+/// Clears the recorded buffers but keeps `_variableDialBinningSamples_`.
 void EventVariableResponseCache::invalidate(){
   _variableStateValid_ = false;
   _variableInputRevisions_.clear();
 }
 
+/// @par Implementation
+/// A sample is looked at through the variable names of its bin edges. Only
+/// samples that were not already dynamic are flagged, so a later call does
+/// not mark a sample that the configuration made dynamic.
 void EventVariableResponseCache::prepare(SampleSet& sampleSet_, const std::vector<DialCollection>& collections_){
   auto& samples = sampleSet_.getSampleList();
   _variableDialBinningSamples_.resize(samples.size(), false);
@@ -35,6 +49,9 @@ void EventVariableResponseCache::prepare(SampleSet& sampleSet_, const std::vecto
   }
 }
 
+/// @par Implementation
+/// invalidate() runs first, so the next update() applies the responses
+/// whatever the recorded revisions.
 void EventVariableResponseCache::build(std::vector<DialCollection>& collections_){
   invalidate();
   for( auto& collection : collections_ ){
@@ -45,6 +62,10 @@ void EventVariableResponseCache::build(std::vector<DialCollection>& collections_
   }
 }
 
+/// @par Implementation
+/// The recorded revisions are only updated after the variables and the
+/// binning of every sample are updated, so an exception in between leaves
+/// the state marked as changed.
 void EventVariableResponseCache::update(EventDialCache& eventDialCache_, SampleSet& sampleSet_,
                                         GenericToolbox::ParallelWorker& threadPool_){
   if( not eventDialCache_.hasVariableResponses() ){ return; }

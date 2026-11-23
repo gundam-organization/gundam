@@ -1,3 +1,11 @@
+/// @file TabulatedDialFactory.cpp
+/// @brief Implements TabulatedDialFactory: loads the user table library and
+///        creates one Tabulated dial per event.
+/// @ingroup DialDictionary
+///
+/// The public contract of each method is documented in TabulatedDialFactory.h.
+/// The comments here describe how each method does its job.
+
 #include "TabulatedDialFactory.h"
 
 #include <GundamGlobals.h>
@@ -11,6 +19,17 @@
 #include <dlfcn.h>
 
 
+/// @par Implementation
+/// The keys are declared with ConfigReader::defineFields() and checked by
+/// ConfigReader::checkConfiguration(), which ends the job when a mandatory key
+/// is missing. The library is opened with `RTLD_LAZY` and its handle is a
+/// local variable, so it is never closed. The global mutex is taken just
+/// before `dlopen()` and held to the end of the constructor, so the init
+/// function never runs at the same time as another call into a library.
+/// Every later error calls `std::exit(EXIT_FAILURE)` rather than throwing.
+/// The table is filled with NaN so that a use before the first updateTable()
+/// shows up (NaN weights on the CPU; Cache::Weight::Tabulated::Apply() throws
+/// on a non-finite entry).
 TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
 
     // mandatory
@@ -38,7 +57,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
     _binningVariableNames_ = tableConfig.fetchValue<std::vector<std::string>>("binningVariables");
 
     // optional
-    int bins =  tableConfig.fetchValue<int>("bins", -1);
+    int bins =  tableConfig.fetchValue<int>("bins", -1); // table size: -1 if not set, then replaced by the init function's result
 
     _binningVariableCache_.resize(_binningVariableNames_.size());
 
@@ -50,7 +69,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
     LogInfo << "  Update table function:   " << getUpdateFunction() << std::endl;
     LogInfo << "  Bin events function:     " << getBinningFunction() << std::endl;
     {
-        int i{0};
+        int i{0}; // variable number shown in the log
         for (const std::string& var: getBinningVariables()) {
             LogInfo << "      Variable[" << i++ << "]: " << var << std::endl;
         }
@@ -63,7 +82,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
     }
 
     std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
-    void* library = dlopen(expandedPath.c_str(), RTLD_LAZY );
+    void* library = dlopen(expandedPath.c_str(), RTLD_LAZY ); // library handle; never closed
     if( library == nullptr ){
         LogError << "Cannot load library: " << dlerror() << std::endl;
         std::exit(EXIT_FAILURE); // Exit, not throw!
@@ -78,17 +97,17 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
                      << std::endl;
             std::exit(EXIT_FAILURE); // Exit, not throw!
         }
-        std::vector<std::string> argv_buffer;
+        std::vector<std::string> argv_buffer; // expanded arguments; owns the strings argv points to
         for (std::string arg : getInitializationArguments()) {
             argv_buffer.push_back(GenericToolbox::expandEnvironmentVariables(arg));
         }
-        std::vector<const char*> argv;
+        std::vector<const char*> argv; // C-style argument array for the init function
         for (std::string& arg : argv_buffer) argv.push_back(arg.c_str());
         _initFunc_
             = reinterpret_cast<
                 int(*)(const char* name,int argc, const char* argv[], int bins)
             >(initFunc);
-        int result = _initFunc_(_name_.c_str(),(int) argv.size(), argv.data(), bins);
+        int result = _initFunc_(_name_.c_str(),(int) argv.size(), argv.data(), bins); // table size, or < 1 on failure
         if (result < 1) {
             LogError << "Error calling initialization function: "
                      << result
@@ -101,7 +120,7 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
 
     // Make sure things are going to fail badly if the table is used before
     // it is filled.
-    for (auto& t : _table_) t = std::nan("not-set");
+    for (auto& t : _table_) t = std::nan("not-set"); // one table entry
 
     // Get the update function
     void* updateFunc = dlsym(library, getUpdateFunction().c_str());
@@ -130,6 +149,10 @@ TabulatedDialFactory::TabulatedDialFactory(const ConfigReader& config_) {
                    int varc, double varv[], int bins)>(binningFunc);
 }
 
+/// @par Implementation
+/// Holds the global mutex while the library runs. The table and the parameter
+/// values are passed as pointers to the vectors' storage, so the library
+/// writes the table in place. The return value is discarded.
 void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
     std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
     _updateFunc_(_name_.c_str(),
@@ -139,14 +162,22 @@ void TabulatedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
                  (int) inputBuffer.getInputBuffer().size());
 }
 
+/// @par Implementation
+/// Holds the global mutex for the whole call, because `_binningVariableCache_`
+/// is shared between calls and the library is not assumed to be thread-safe.
+/// The upper clamp compares `iBin` with `_table_.size()-2` in unsigned
+/// arithmetic: for a table of fewer than two entries that value wraps around,
+/// so no clamping happens. The debug printout is compiled only when
+/// `TABULATED_DIAL_FACTORY_DUMP` is defined, which nothing in the repository
+/// does.
 DialBase* TabulatedDialFactory::makeDial(const Event& event) {
     std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
-    int i=0;
+    int i=0; // next slot of _binningVariableCache_
     for (const std::string& varName : getBinningVariables()) {
-        double v = event.getVariables().fetchVariable(varName).getVarAsDouble();
+        double v = event.getVariables().fetchVariable(varName).getVarAsDouble(); // value of this binning variable
         _binningVariableCache_[i++] = v;
     }
-    double bin = _binningFunc_(getName().c_str(),
+    double bin = _binningFunc_(getName().c_str(), // fractional table position; negative means no dial
                                (int) _binningVariableCache_.size(),
                                _binningVariableCache_.data(),
                                (int) _table_.size());
@@ -171,7 +202,7 @@ DialBase* TabulatedDialFactory::makeDial(const Event& event) {
         out << getName()
             << " " << iBin
             << " " << fracBin;
-        std::size_t j = 0;
+        std::size_t j = 0; // variable number shown in the printout
         for (const std::string& varName : getBinningVariables()) {
             out << " [" << j
                 << "] " << varName

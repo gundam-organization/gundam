@@ -1,3 +1,11 @@
+/// @file EventFormula.cpp
+/// @brief Implements EventFormula: reading the event variables and
+///        evaluating the formula.
+/// @ingroup DialDictionary
+///
+/// The public contract of each method is documented in EventFormula.h. The
+/// comments here describe how each method does its job.
+
 #include "EventFormula.h"
 #include "RootFormula.h"
 #include "Event.h"
@@ -8,6 +16,10 @@
 #include <sstream>
 #include <utility>
 
+/// @par Implementation
+/// Reads each event variable as a double and applies the same
+/// triangle-wave mirroring as DialInputBuffer::update() when a lower edge is
+/// set. The values are read once, here, and not updated afterwards.
 EventFormula::EventFormula(const DialBase* formula_, std::shared_ptr<const Definition> definition_,
                            const Event& event_, const DialInputBuffer::ParameterReference::MirrorEdges& mirrorEdges_)
     : _formula_(formula_), _definition_(std::move(definition_)) {
@@ -30,6 +42,10 @@ EventFormula::EventFormula(const DialBase* formula_, std::shared_ptr<const Defin
   }
 }
 
+/// @par Implementation
+/// Builds the formula inputs in a local DialInputBuffer
+/// (DialInputBuffer::setInputValues()), so several threads may evaluate the
+/// same EventFormula at once.
 double EventFormula::evalResponse(const DialInputBuffer& input_) const {
   std::vector<double> values;
   values.reserve(_definition_->inputs.size());
@@ -42,6 +58,8 @@ double EventFormula::evalResponse(const DialInputBuffer& input_) const {
   return _formula_->evalResponse(buffer);
 }
 
+/// @par Implementation
+/// Appends `name=value` for each event variable to the formula's summary.
 std::string EventFormula::getSummary() const {
   std::stringstream ss;
   ss << _formula_->getSummary() << ", loaded event inputs: ";

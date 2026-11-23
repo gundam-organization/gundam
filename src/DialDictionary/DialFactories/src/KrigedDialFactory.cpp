@@ -1,3 +1,11 @@
+/// @file KrigedDialFactory.cpp
+/// @brief Implements KrigedDialFactory: loads the user table library and
+///        creates one Kriged dial per event.
+/// @ingroup DialDictionary
+///
+/// The public contract of each method is documented in KrigedDialFactory.h.
+/// The comments here describe how each method does its job.
+
 #include "KrigedDialFactory.h"
 
 #include <GundamGlobals.h>
@@ -10,6 +18,19 @@
 
 #include <dlfcn.h>
 
+/// @par Implementation
+/// The keys are declared with ConfigReader::defineFields() and checked by
+/// ConfigReader::checkConfiguration(), which ends the job when a mandatory key
+/// is missing. Values are read with ConfigReader::fillValue(), which leaves a
+/// member at its default when the key is absent; that is how `maxWeights` and
+/// `weightNormalization` default to 10000 and 1. The library is opened with
+/// `RTLD_LAZY` and its handle is a local variable, so it is never closed.
+/// Unlike TabulatedDialFactory, the global mutex is held only around the init
+/// function lookup and call; `dlopen()` and the other `dlsym()` calls run
+/// without it. Every error after the configuration check calls
+/// `std::exit(EXIT_FAILURE)` rather than throwing. The table is filled with
+/// NaN so that a use before the first updateTable() shows up (NaN weights on
+/// the CPU; Cache::Weight::Kriged is fed the same table).
 KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
     LogThrowIf(not config_.hasField("tableConfig"), "tableConfig must be defined in:" << config_.toString(true));
 
@@ -37,7 +58,7 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
     tableConfig.fillValue(_weightVariableNames_, "weightVariables");
     tableConfig.fillValue(_minimumWeightSpace_, "maxWeights");
     tableConfig.fillValue(_weightNormalization_, "weightNormalization");
-    int bins =  tableConfig.fetchValue<int>("bins", -1);
+    int bins =  tableConfig.fetchValue<int>("bins", -1); // table size: -1 if not set, then replaced by the init function's result
 
     _weightVariableCache_.resize(_weightVariableNames_.size());
     if (_minimumWeightSpace_ < 10000) _minimumWeightSpace_ = 10000;
@@ -49,7 +70,7 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
     LogInfo << "  Update table function:   " << getUpdateFunction() << std::endl;
     LogInfo << "  Weight events function:     " << getWeightFunction() << std::endl;
     {
-        int i{0};
+        int i{0}; // variable number shown in the log
         for (const std::string& var: getWeightVariables()) {
             LogInfo << "      Variable[" << i++ << "]: " << var << std::endl;
         }
@@ -61,7 +82,7 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
         std::exit(EXIT_FAILURE); // Exit, not throw!
     }
 
-    void* library = dlopen(expandedPath.c_str(), RTLD_LAZY );
+    void* library = dlopen(expandedPath.c_str(), RTLD_LAZY ); // library handle; never closed
     if( library == nullptr ){
         LogError << "Cannot load library: " << dlerror() << std::endl;
         std::exit(EXIT_FAILURE); // Exit, not throw!
@@ -77,17 +98,17 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
                      << std::endl;
             std::exit(EXIT_FAILURE); // Exit, not throw!
         }
-        std::vector<std::string> argv_buffer;
+        std::vector<std::string> argv_buffer; // expanded arguments; owns the strings argv points to
         for (std::string arg : getInitializationArguments()) {
             argv_buffer.push_back(GenericToolbox::expandEnvironmentVariables(arg));
         }
-        std::vector<const char*> argv;
+        std::vector<const char*> argv; // C-style argument array for the init function
         for (std::string& arg : argv_buffer) argv.push_back(arg.c_str());
         _initFunc_
             = reinterpret_cast<
                 int(*)(const char* name,int argc, const char* argv[], int bins)
             >(initFunc);
-        int result = _initFunc_(_name_.c_str(),(int) argv.size(), argv.data(), bins);
+        int result = _initFunc_(_name_.c_str(),(int) argv.size(), argv.data(), bins); // table size, or < 1 on failure
         if (result < 1) {
             LogError << "Error calling initialization function: "
                      << result
@@ -100,7 +121,7 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
 
     // Make sure things are going to fail badly if the table is used before
     // it is filled.
-    for (auto& t : _table_) t = std::nan("not-set");
+    for (auto& t : _table_) t = std::nan("not-set"); // one table entry
 
     // Get the update function
     void* updateFunc = dlsym(library, getUpdateFunction().c_str());
@@ -132,6 +153,10 @@ KrigedDialFactory::KrigedDialFactory(const ConfigReader& config_){
 
 }
 
+/// @par Implementation
+/// Holds the global mutex while the library runs. The table and the parameter
+/// values are passed as pointers to the vectors' storage, so the library
+/// writes the table in place. The return value is discarded.
 void KrigedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
     std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
     _updateFunc_(_name_.c_str(),
@@ -141,11 +166,22 @@ void KrigedDialFactory::updateTable(DialInputBuffer& inputBuffer) {
                  (int) inputBuffer.getInputBuffer().size());
 }
 
+/// @par Implementation
+/// Holds the global mutex for the whole call, because the variable, index and
+/// weight caches are shared between calls and the library is not assumed to
+/// be thread-safe. The index and weight caches are allocated on the first
+/// call, with `_minimumWeightSpace_` entries each. The normalisation check
+/// only logs; it never rejects the dial.
+/// @note The Kriged constructor takes the index and weight vectors by value,
+///       so every call copies the whole caches (at least 10000 `int` and
+///       10000 `double`) before Kriged keeps only the first `entries` pairs.
+/// @note The debug printout can never be compiled: a `#undef` of
+///       `KRIGED_DIAL_FACTORY_DUMP` sits just before its `#ifdef`.
 DialBase* KrigedDialFactory::makeDial(const Event& event) {
     std::lock_guard<std::mutex> guard(GundamGlobals::getGlobalMutEx());
-    int i=0;
+    int i=0; // next slot of _weightVariableCache_
     for (const std::string& varName : getWeightVariables()) {
-        double v = event.getVariables().fetchVariable(varName).getVarAsDouble();
+        double v = event.getVariables().fetchVariable(varName).getVarAsDouble(); // value of this weight variable
         _weightVariableCache_[i++] = v;
     }
     if (_indexCache_.size() < _minimumWeightSpace_) {
@@ -154,13 +190,15 @@ DialBase* KrigedDialFactory::makeDial(const Event& event) {
     if (_weightCache_.size() != _indexCache_.size()) {
         _weightCache_.resize(_indexCache_.size());
     }
-    int entries = _weightFunc_(getName().c_str(), _table_.size(),
+    int entries = _weightFunc_(getName().c_str(), _table_.size(), // number of index/weight pairs filled
                                (int) _weightVariableCache_.size(),
                                _weightVariableCache_.data(),
                                (int) _indexCache_.size(),
                                _indexCache_.data(),
                                _weightCache_.data());
 
+    // This #undef disables the dump block below even when the macro is
+    // defined at compile time.
 #undef KRIGED_DIAL_FACTORY_DUMP
 #ifdef KRIGED_DIAL_FACTORY_DUMP
     // Summarize which table is being applied to the event.  This can be quite
@@ -171,7 +209,7 @@ DialBase* KrigedDialFactory::makeDial(const Event& event) {
         std::ostringstream out;
         out << getName()
             << " entries: " << entries;
-        std::size_t j = 0;
+        std::size_t j = 0; // variable number shown in the printout
         for (const std::string& varName : getWeightVariables()) {
             out << " [" << j
                 << "] " << varName
@@ -188,7 +226,7 @@ DialBase* KrigedDialFactory::makeDial(const Event& event) {
 
     if (_weightNormalization_ > 0.0) {
         double sum = 0.0;
-        for (int i = 0; i < entries; ++i) {
+        for (int i = 0; i < entries; ++i) { // shadows the outer i
             sum += _weightCache_[i];
         }
         if (std::abs(sum-_weightNormalization_) > 1E-6*_weightNormalization_) {

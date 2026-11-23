@@ -2,18 +2,35 @@
 // Created by Adrien Blanchet on 29/11/2022.
 //
 
+/// @file DialInputBuffer.cpp
+/// @brief Implements DialInputBuffer: filling, mirroring and invalidating the
+///        cached parameter values that dials read.
+/// @ingroup DialDictionary
+///
+/// The public contract of each method is documented in DialInputBuffer.h. The
+/// comments here describe how each method does its job.
+
 #include "DialInputBuffer.h"
 
 #include "Logger.h"
 #include "GundamBacktrace.h"
 
 
+/// @par Implementation
+/// NaN is used because it compares unequal to every value, itself included,
+/// so the `!=` test in update() sees every input as changed. The revision is
+/// increased too, for caches that check it rather than the values.
 void DialInputBuffer::invalidateBuffers(){
   ++_revision_;
   // invalidate buffer
   for( auto& buf : _inputBuffer_ ){ buf = std::nan("unset"); }
 }
 
+/// @par Implementation
+/// The reference list is shrunk to fit because no reference can be added
+/// after this call. resize() only fills new slots with NaN, so calling this
+/// again on a buffer of the same size keeps the cached values. The index
+/// checks run on every call.
 void DialInputBuffer::initialise(){
   LogThrowIf(_parSetListPtr_ == nullptr, "ParameterSet list pointer not set.");
 
@@ -42,12 +59,30 @@ void DialInputBuffer::initialise(){
   _isInitialized_ = true;
 }
 
+/// @par Implementation
+/// Mirroring, with lower edge `L` (MirrorEdges::minValue) and width `R`
+/// (MirrorEdges::range): `d = |fmod(x - L, 2R)|` is the distance from `L`
+/// within one period of length `2R`. A distance above `R` lies in the
+/// reflected half of the period and becomes `2R - d`. The result `L + d` is
+/// a triangle wave of `x` that equals `x` on [L, L+R] and always stays in
+/// that window.
+///
+/// The new value is compared with the cached one using exact `!=`, so any
+/// change, however small, triggers a re-evaluation, and a NaN parameter value
+/// always counts as a change. The revision is increased once, at the end,
+/// if any input changed.
+/// @note The first assignment `_isDialUpdateRequested_ = true` is overwritten
+///       by `false` two lines later; the flag only ends true if an input
+///       changed.
+/// @note In a `DEBUG_BUILD`, a NaN input is logged with a backtrace, but the
+///       update continues: unlike what the comment in that block says, the
+///       code does not exit.
 void DialInputBuffer::update(){
   // by default consider we have to update
   _isDialUpdateRequested_ = true;
 
   // look for the parameter values
-  double tempBuffer;
+  double tempBuffer; // current input: parameter value, then mirrored value
   _isDialUpdateRequested_ = false; // if ANY is different, request the update
   for( auto& inputRef : _inputParameterReferenceList_ ){
     // grab the value of the parameter
@@ -55,6 +90,7 @@ void DialInputBuffer::update(){
 
     // find the actual parameter value if mirroring is applied
     if( not std::isnan( inputRef.mirrorEdges.minValue ) ){
+      // distance from the lower edge, within one period of length 2*range
       tempBuffer = std::abs(std::fmod(
           tempBuffer - inputRef.mirrorEdges.minValue,
           2 * inputRef.mirrorEdges.range
@@ -74,6 +110,8 @@ void DialInputBuffer::update(){
         // LogThrowIf is broken, but OK for real error traps, but this is
         // checking user input it's critical that the error message is
         // properly formated so print an error, a backtrace, and then exit.
+        // Note: the code below only logs the error and the backtrace; it
+        // neither exits nor throws.
         LogError << "NaN while evaluating input buffer of "
                  << inputRef.getParameter(_parSetListPtr_).getTitle()
                  << std::endl;
@@ -89,6 +127,10 @@ void DialInputBuffer::update(){
   }
   if( _isDialUpdateRequested_ ){ ++_revision_; }
 }
+/// @par Implementation
+/// Takes `values_` by value and moves it into the cache, sets the input count
+/// from its size, and raises both the update flag and the revision, so the
+/// dial that reads this buffer is always evaluated again.
 void DialInputBuffer::setInputValues(std::vector<double> values_){
   LogThrowIf(not _inputParameterReferenceList_.empty(), "Cannot replace parameter-backed dial inputs");
   _inputBuffer_ = std::move(values_);
@@ -98,15 +140,23 @@ void DialInputBuffer::setInputValues(std::vector<double> values_){
   ++_revision_;
 }
 
+/// @par Implementation
+/// The reference is copied into the list, then the copy's `bufferIndex` is
+/// set to its position, so cache slot `i` always belongs to reference `i`.
+
 void DialInputBuffer::addParameterReference( const ParameterReference& parReference_){
   LogThrowIf(_isInitialized_, "Can't add parameter index while initialized.");
   auto& parRef = _inputParameterReferenceList_.emplace_back(parReference_);
   parRef.bufferIndex = int(_inputParameterReferenceList_.size())-1;
 }
+/// @par Implementation
+/// Formats the reference list on one line with GenericToolbox::toString()
+/// and a lambda that describes one reference. It prints the raw Parameter
+/// value, not the (possibly mirrored) value held in the cache.
 std::string DialInputBuffer::getSummary(bool shallow_) const{
   std::stringstream ss;
   ss << GenericToolbox::toString(_inputParameterReferenceList_, [&]( const ParameterReference& parRef_){
-    std::stringstream ss;
+    std::stringstream ss; // text for this one reference; shadows the outer ss
     if( _parSetListPtr_ != nullptr ){
       ss << parRef_.getParameter(_parSetListPtr_).getFullTitle() << "=";
       ss << parRef_.getParameter(_parSetListPtr_).getParameterValue();
