@@ -1,0 +1,32 @@
+/// @file groups.dox
+/// @brief Doxygen module groups, one per folder of src/.
+
+/// @defgroup Applications Applications
+/// @brief Executables: gundamFitter, gundamCalcXsec and the utility apps.
+
+/// @defgroup Fitter Fitter
+/// @brief FitterEngine and the minimizers (RootMinimizer, SimpleMcmc).
+
+/// @defgroup StatisticalInference Statistical inference
+/// @brief LikelihoodInterface, ParameterScanner and the joint-probability functions.
+
+/// @defgroup DatasetManager Dataset manager
+/// @brief Dataset definitions and the DataDispenser that loads events.
+
+/// @defgroup Propagator Propagator
+/// @brief Propagator, plot generation and event-tree output.
+
+/// @defgroup DialDictionary Dial dictionary
+/// @brief Dials: response functions of the fit parameters, their collections and the event-dial cache.
+
+/// @defgroup SamplesManager Samples manager
+/// @brief SampleSet, Sample, Event and Histogram.
+
+/// @defgroup ParametersManager Parameters manager
+/// @brief ParametersManager, ParameterSet and Parameter.
+
+/// @defgroup CacheManager Cache manager
+/// @brief Optional GPU (CUDA) mirror of the weight calculation.
+
+/// @defgroup Utils Utilities
+/// @brief Configuration reading, binning and shared helpers.
