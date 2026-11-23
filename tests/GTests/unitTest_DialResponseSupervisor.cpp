@@ -2,6 +2,7 @@
 #include "DialInterface.h"
 #include "Graph.h"
 #include "DialResponseSupervisor.h"
+#include "ParameterSet.h"
 
 #include <gtest/gtest.h>
 
@@ -104,13 +105,21 @@ TEST(DialResponseSupervisor, RejectsInvalidWidths){
   EXPECT_THROW(supervisor.setSmoothingWidths(0.75, 0.5), std::runtime_error);
 }
 
-TEST(DialResponseSmoothingConfig, ValidatesConfigurationBeforeLoading){
-  auto configure = [](const JsonType& options_){
-    JsonType config{{"dialType", "Graph"}, {"dialBranchData", "graph"}};
+namespace {
+  void configureSmoothingDial(const JsonType& options_){
+    std::vector<ParameterSet> parameterSets(1);
+    parameterSets.front().configure(ConfigReader(JsonType{
+        {"name", "testParameters"}, {"isEnabled", true}, {"numberOfParameters", 1}, {"nominalStepSize", 0.1}}));
+    JsonType config{{"dialType", "Graph"}, {"dialBranchData", "graph"},
+                    {"dialInputList", {{{"parameterSetName", "testParameters"}, {"parameterIndex", 0}}}}};
     config.update(options_);
-    DialCollection collection(nullptr);
+    DialCollection collection(&parameterSets);
     collection.configure(ConfigReader(config));
-  };
+  }
+}
+
+TEST(DialResponseSmoothingConfig, ValidatesConfigurationBeforeLoading){
+  const auto configure = configureSmoothingDial;
   const JsonType enabled{{"dialResponseLimits", {0., 2.}}, {"enableResponseSmoothing", true}};
   for( const JsonType& width : {JsonType(0.), JsonType(-0.1), JsonType("bad"), JsonType::array(),
                                JsonType{0.1}, JsonType{0.1, 0.}, JsonType{{"min", 0.1}},
@@ -133,11 +142,8 @@ TEST(DialResponseSmoothingConfig, ValidatesConfigurationBeforeLoading){
 
 TEST(DialResponseSmoothingConfig, LegacyLimitsWarnWithoutRejectingConfigurations){
   for( const std::string minKey : {"minDialResponse", "minimumSplineResponse"} ){
-    DialCollection collection(nullptr);
     testing::internal::CaptureStdout();
-    EXPECT_NO_THROW(collection.configure(ConfigReader(JsonType{
-        {"dialType", "Graph"}, {"dialBranchData", "graph"},
-        {minKey, 0.2}, {"maxDialResponse", 1.8}})));
+    EXPECT_NO_THROW(configureSmoothingDial(JsonType{{minKey, 0.2}, {"maxDialResponse", 1.8}}));
     const auto output = testing::internal::GetCapturedStdout();
     EXPECT_NE(std::string::npos, output.find("key \"" + minKey + "\" is deprecated"));
     EXPECT_NE(std::string::npos, output.find("key \"maxDialResponse\" is deprecated"));
