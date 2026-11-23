@@ -1147,7 +1147,7 @@ bool DialCollection::initializeBinnedDials(const ConfigReader& dialsDefinition) 
     }
 
       if( not excludedBins.empty() ){
-      LogWarning << "Removing " << excludedBins.size() << " null dials out of " << nBins << " / " << 100*double(excludedBins.size())/double(nBins) << "%... (--debug for more info)" << std::endl;
+      LogInfo << "Removing " << excludedBins.size() << " null dials out of " << nBins << " / " << 100*double(excludedBins.size())/double(nBins) << "%... (--debug for more info)" << std::endl;
       for( int iBin = nBins ; iBin >= 0 ; iBin-- ){
         if( GenericToolbox::doesElementIsInVector(iBin, excludedBins) ){
           _dialBinSet_.getBinList().erase(_dialBinSet_.getBinList().begin() + iBin);
