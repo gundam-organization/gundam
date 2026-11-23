@@ -2,6 +2,14 @@
 // Created by Adrien Blanchet on 01/12/2022.
 //
 
+/// @file EventDialCache.cpp
+/// @brief Implements EventDialCache: filling the indexed cache, turning it
+///        into the reference cache, and reweighting one event.
+/// @ingroup DialDictionary
+///
+/// The public contract of each method is documented in EventDialCache.h. The
+/// comments here describe how each method does its job.
+
 #include "EventDialCache.h"
 #include "EventFormula.h"
 #include "CompositeDial.h"
@@ -13,6 +21,9 @@
 
 
 
+/// @par Implementation
+/// Sums `capacity()` times the element size for the two cache vectors and
+/// for each entry's dial list.
 size_t EventDialCache::getCacheMemorySize() const{
   size_t bytes = _indexedCache_.capacity() * sizeof(IndexedCacheEntry)
       + _cache_.capacity() * sizeof(CacheEntry);
@@ -25,14 +36,43 @@ size_t EventDialCache::getCacheMemorySize() const{
   return bytes;
 }
 
+/// @par Implementation
+/// Works sample by sample so that each sample's events and entries can be
+/// reordered together. Entries are matched to events by position only: the
+/// event index written during loading is not used, and is overwritten with
+/// the new position after the sort. The reference cache and each entry's
+/// dial list are reserved to their final size before being filled, to avoid
+/// reallocations. An out-of-range interface index is reported together with
+/// the list of collections before the job stops.
+///
+/// Entries are moved out of the indexed cache, which is then released
+/// (swapped with an empty vector); each entry's dial index list is released
+/// as soon as it has been turned into references.
+///
+/// For each event, dials of composite-node collections are skipped. A
+/// CompositeDial is copied and bound to this event's node dials, nested
+/// composites included, and a collection with an event-formula definition
+/// gets an EventFormula that reads this event's variables. Each such
+/// event-specific interface is created once per collection and event and
+/// kept in CacheEntry::boundDialInterfaces. Dials of collections with
+/// `applyToVariable` are flagged and grouped per target variable
+/// (VariableResponseCache), whose reference value is read from the event
+/// here. Throws if a composite node has no dial for the event, or if a
+/// variable gets two `Override` dials.
+/// @warning The sort comparator compares `a.getIndices().dataset` with
+///          itself, so that test is always false and events are ordered by
+///          TChain entry number only. GenericToolbox::getSortPermutation()
+///          uses `std::sort`, which is not stable, so events of one sample
+///          with the same entry number (for example from different data
+///          sets) end up in an unspecified order.
 void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<DialCollection>& dialCollectionList_){
   LogInfo << "Building event dial cache..." << std::endl;
 
   LogInfo << "Indexed cache size: " << _indexedCache_.size() << std::endl;
   LogInfo << "Sorting events in sync with indexed cache..." << std::endl;
 
-  size_t nCacheSlots{0};
-  std::vector<std::vector<IndexedCacheEntry>> sampleIndexCacheList{sampleSet_.getSampleList().size()};
+  size_t nCacheSlots{0}; // total number of reference-cache entries to create (one per event)
+  std::vector<std::vector<IndexedCacheEntry>> sampleIndexCacheList{sampleSet_.getSampleList().size()}; // valid entries, per sample
 
   {
     LogScopeIndent;
@@ -44,23 +84,27 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
       if( entry.event.sampleIndex == size_t(-1) ){ continue; }
       if( entry.event.eventIndex == size_t(-1) ){ continue; }
 
+      // Move the entry, then keep only its dial slots that point at a dial.
       auto& sampleCache = sampleIndexCacheList[entry.event.sampleIndex];
       sampleCache.emplace_back(std::move(entry));
       auto& dials = sampleCache.back().dials;
       dials.erase(std::remove_if(dials.begin(), dials.end(), [](const DialIndexCacheEntry& dial_){
         return dial_.collectionIndex == size_t(-1) or dial_.interfaceIndex == size_t(-1);
       }), dials.end());
+
     }
 
     LogInfo << "Cleaning up the index cache..." << std::endl;
     std::vector<IndexedCacheEntry>().swap(_indexedCache_);
 
     LogInfo << "Performing per sample sorting..." << std::endl;
-    int iSample{-1};
+    int iSample{-1}; // index of the current sample; incremented at the top of each iteration
     for( auto& sample : sampleSet_.getSampleList() ){
       iSample++;
 
-      auto p = GenericToolbox::getSortPermutation(
+      // Note: the first test compares a with itself (always false), so only
+      // the entry number takes part in the ordering.
+      auto p = GenericToolbox::getSortPermutation( // sort permutation of the sample's events
           sample.getEventList(), []( const Event& a, const Event& b) {
             if( a.getIndices().dataset < a.getIndices().dataset ){ return true; }
             if( a.getIndices().entry < b.getIndices().entry ){ return true; }
@@ -75,6 +119,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
       );
       nCacheSlots += sampleIndexCacheList[iSample].size();
 
+      // Same permutation on both vectors: entry k keeps matching event k.
       GenericToolbox::applyPermutation( sample.getEventList(), p );
       GenericToolbox::applyPermutation( sampleIndexCacheList[iSample],     p );
 
@@ -86,6 +131,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
 
   }
 
+  // Counts the dial slots that point at a dial (both indices set).
   auto countValidDials = [](std::vector<DialIndexCacheEntry>& dialIndices_){
     return std::count_if(dialIndices_.begin(), dialIndices_.end(),
       []( DialIndexCacheEntry& dialIndex_){
@@ -215,6 +261,9 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
           << responseCount << " responses (" << sizeof(DialResponseCache)
           << " bytes/response), " << getCacheMemorySize() << " bytes in cache buffers." << std::endl;
 }
+/// @par Implementation
+/// A single resize() appends the new entries, each a copy of one prototype
+/// entry with unset indices and `nDialsMaxPerEvent_` unset dial slots.
 void EventDialCache::allocateCacheEntries( size_t nEvent_, size_t nDialsMaxPerEvent_) {
     _indexedCache_.resize(
         _indexedCache_.size() + nEvent_,
@@ -222,10 +271,18 @@ void EventDialCache::allocateCacheEntries( size_t nEvent_, size_t nDialsMaxPerEv
          std::vector<DialIndexCacheEntry>(nDialsMaxPerEvent_,
                                           {std::size_t(-1),std::size_t(-1)})} );
 }
+/// @par Implementation
+/// resize() drops the trailing entries; shrink_to_fit() then asks the vector
+/// to free the capacity they used.
 void EventDialCache::shrinkIndexedCache(){
   _indexedCache_.resize(_fillIndex_+1);
   _indexedCache_.shrink_to_fit();
 }
+/// @par Implementation
+/// Allocates one entry per event, with no dial slot, then claims them with
+/// fetchNextCacheEntry() sample by sample and event by event. The entries of
+/// each sample are therefore in the same order as its events, as
+/// buildReferenceCache() requires.
 void EventDialCache::fillCacheEntries(const SampleSet& sampleSet_){
   _fillIndex_ = 0;
   allocateCacheEntries( sampleSet_.getNbOfEvents(), 0 );
@@ -238,6 +295,9 @@ void EventDialCache::fillCacheEntries(const SampleSet& sampleSet_){
   }
 }
 
+/// @par Implementation
+/// Returns the address of the element at the fill index, then
+/// post-increments the index.
 EventDialCache::IndexedCacheEntry* EventDialCache::fetchNextCacheEntry(){
   // Warning warning Will Robinson!
   // This only works IFF the indexed cache is not resized.
@@ -246,6 +306,10 @@ EventDialCache::IndexedCacheEntry* EventDialCache::fetchNextCacheEntry(){
 }
 
 
+/// @par Implementation
+/// The product is accumulated in a local variable so that the cap applies to
+/// the whole product before the event is touched. The weight is reset to the
+/// base weight and then multiplied, so repeated calls do not compound.
 void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
   // storing the reweight factor in a temporary buffer
   // this allows to perform capping of the value
@@ -264,6 +328,10 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
   entry_.event->getWeights().current *= tempReweight; // apply the reweight factor
 }
 
+/// @par Implementation
+/// Reads every response through DialResponseCache::getResponse(), so each
+/// dial is evaluated again only if its inputs changed, and stores the result
+/// as a double whatever the variable's original type.
 void EventDialCache::applyVariableResponses(CacheEntry& entry_){
   for( auto& target : entry_.variableResponseCacheList ){
     double value = target.overrideDial == std::size_t(-1) ? target.referenceValue
