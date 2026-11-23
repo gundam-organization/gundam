@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <sstream>
 #include <typeinfo>
 
@@ -351,11 +352,22 @@ namespace {
   }
 
   size_t getDialSignatureHash(const DialBase& dial_, const std::vector<double>& signature_){
-    size_t hash = typeid(dial_).hash_code();
+    std::uint64_t hash = typeid(dial_).hash_code();
     auto combineHash = [&](size_t value_){ hash ^= value_ + 0x9e3779b9 + (hash << 6) + (hash >> 2); };
     combineHash(std::hash<bool>{}(dial_.getAllowExtrapolation()));
     for( double value : signature_ ){ combineHash(std::hash<double>{}(value)); }
-    return hash;
+    // combineHash can leave similar low bits, which alone select a table slot.
+    // MurmurHash3 fmix64 spreads changes across all bits to prevent clustering.
+    // Its fixed odd multipliers were selected for mixing quality, not primality.
+    // https://github.com/aappleby/smhasher/blob/master/src/MurmurHash3.cpp
+    hash ^= hash >> 33;
+    hash *= UINT64_C(0xff51afd7ed558ccd);
+    hash ^= hash >> 33;
+    hash *= UINT64_C(0xc4ceb9fe1a85ec53);
+    hash ^= hash >> 33;
+    // On a narrower size_t, fold the upper 32 bits before truncating the result.
+    if( sizeof(size_t) < sizeof(hash) ){ hash ^= hash >> 32; }
+    return static_cast<size_t>(hash);
   }
 
   bool matchesDialSignature(const DialBase& candidate_, const DialBase& dial_,
