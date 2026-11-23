@@ -1,9 +1,6 @@
----
-layout: default
-title: Introduction 
-next_page: "GettingStarted.html"
----
-# Overview of the software
+# Introduction
+
+## Overview of the software
 GUNDAM, standing for *Generalized and Unified Neutrino Data Analysis Methods*,
 is a suite of applications which aims at performing various statistical
 analysis with different purposes and setups.
@@ -20,5 +17,6 @@ As GUNDAM is designed for maximize flexibility to accommodate
 various physics works, it allows to share optimizations
 and debugging for every project at once.
 
-# Version information
+## Version information
+
 <div id="releases"></div>
