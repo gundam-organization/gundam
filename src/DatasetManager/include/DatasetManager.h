@@ -5,6 +5,7 @@
 #include "DatasetDefinitionTemplate.h"
 #include "ConfigUtils.h"
 
+#include <optional>
 #include <vector>
 
 class DatasetManager : public JsonBaseClass {
@@ -15,8 +16,10 @@ protected:
 public:
   [[nodiscard]] auto& getDatasetList() const { return _datasetList_; }
   auto& getDatasetList(){ return _datasetList_; }
+  void setDebugLoadDatasetFraction(double fraction_);
 
 private:
+  std::optional<double> _debugLoadDatasetFraction_{};
   std::vector<DatasetDefinitionTemplate> _datasetTemplateList_{};
   std::vector<DatasetDefinition> _datasetList_{};
 };

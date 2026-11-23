@@ -10,6 +10,11 @@ and measurement events.
 | name | string | Optional identifier for configuration overrides | |
 | datasetTemplateList | list | Named partial data dispenser configurations | Empty |
 | datasetList | list | Dataset definitions, with their existing `name`, `model` and optional `data` fields | Empty |
+| debugLoadDatasetFraction | number | Fraction of entries to read from each input tree, between 0 and 1 inclusive | 1 |
+
+`debugLoadDatasetFraction` applies to model and data inputs. Each tree contributes
+its first `floor(fraction × entry count)` entries before event selection.
+`gundamFitter --fraction-of-entries` overrides the configured fraction when supplied.
 
 ### Dataset templates
 

@@ -2,6 +2,7 @@
 
 #include "Logger.h"
 
+#include <cmath>
 #include <map>
 
 void DatasetManager::configureImpl(){
@@ -10,8 +11,14 @@ void DatasetManager::configureImpl(){
     {"name"},
     {"datasetList"},
     {"datasetTemplateList"},
+    {"debugLoadDatasetFraction"},
   });
   _config_.checkConfiguration();
+
+  _debugLoadDatasetFraction_.reset();
+  if( _config_.hasField("debugLoadDatasetFraction") ){
+    setDebugLoadDatasetFraction(_config_.fetchValue<double>("debugLoadDatasetFraction"));
+  }
 
   _datasetTemplateList_.clear();
   std::map<std::string, size_t> templateIndexDict;
@@ -51,5 +58,17 @@ void DatasetManager::configureImpl(){
 }
 
 void DatasetManager::initializeImpl(){
-  for( auto& dataset : _datasetList_ ){ dataset.initialize(); }
+  for( auto& dataset : _datasetList_ ){
+    if( _debugLoadDatasetFraction_.has_value() ){
+      dataset.setFractionOfEntriesToLoad(*_debugLoadDatasetFraction_);
+    }
+    dataset.initialize();
+  }
+}
+
+void DatasetManager::setDebugLoadDatasetFraction(double fraction_){
+  LogThrowIf(not std::isfinite(fraction_) or fraction_ < 0. or fraction_ > 1.,
+             "debugLoadDatasetFraction must be finite and between 0 and 1");
+  _debugLoadDatasetFraction_ = fraction_;
+  LogInfo << "Will read " << fraction_ * 100. << "% of the entries in each dataset input tree." << std::endl;
 }
