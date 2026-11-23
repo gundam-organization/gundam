@@ -1,3 +1,11 @@
+/// @file Bilinear.cpp
+/// @brief Implements Bilinear: packs a TH2 grid and evaluates it with the
+///        shared CalculateBilinearInterpolation() kernel.
+/// @ingroup DialDictionary
+///
+/// The public contract of each method is documented in Bilinear.h. The
+/// comments here describe how each method does its job.
+
 #include "Bilinear.h"
 #include "CalculateBilinearInterpolation.h"
 
@@ -5,6 +13,13 @@
 #include "Logger.h"
 
 
+/// @par Implementation
+/// Appends to `_splineData_` in layout order after reserving its final size:
+/// the two counts, the X bin centres, the Y bin centres, then the bin
+/// contents with the X index in the outer loop, which gives the X-major
+/// order `ix*ny + iy` that the kernel indexes. The bounds are the first and
+/// last bin centres of each axis. ROOT bin numbers start at 1, so the
+/// under- and overflow bins (0 and N+1) are skipped.
 void Bilinear::buildDial(const TH2& h2_){
     // Copy the spline data into local storage.  The local storage should be
     // easily packable for the GPU.
@@ -37,6 +52,20 @@ void Bilinear::buildDial(const TH2& h2_){
 
 }
 
+/// @par Implementation
+/// Clamps each input to its own axis range unless extrapolation is allowed,
+/// then unpacks `_splineData_` into the counts and the pointers to the X
+/// positions, Y positions and knot values, and calls
+/// CalculateBilinearInterpolation() with output bounds of -1E20 and 1E20 (no
+/// effective clamp). The position arrays are passed with the same counts as
+/// the grid (`nnx = nx`, `nny = ny`), the non-uniform form of the kernel
+/// call. The kernel finds the cell with a fixed four-step binary search; an
+/// input below the second knot (or above the next-to-last one) uses the edge
+/// cell, which gives the linear extrapolation.
+/// @note The kernel's search always reads element 8 of each position array,
+///       even when the axis has fewer knots (the value is then multiplied by
+///       zero). For very small grids, those with `ny*(nx+1) <= 8` such as
+///       2x2, this read falls past the end of `_splineData_`.
 double Bilinear::evalResponse(const DialInputBuffer& input_) const {
     double input0{input_.getInputBuffer()[0]};
     double input1{input_.getInputBuffer()[1]};
@@ -48,14 +77,14 @@ double Bilinear::evalResponse(const DialInputBuffer& input_) const {
         if (input1 > _splineBounds_[1].max) input1 = _splineBounds_[1].max;
     }
 
-    const double *data = _splineData_.data();
+    const double *data = _splineData_.data(); // read cursor over _splineData_, advanced past each section
     int nx = *(data++);
     int ny = *(data++);
-    const double* xx = data;
+    const double* xx = data; // X positions of the knots (bin centres)
     data += nx;
-    const double* yy = data;
+    const double* yy = data; // Y positions of the knots (bin centres)
     data += ny;
-    const double* knots = data;
+    const double* knots = data; // knot values, X-major (ix*ny + iy)
     return CalculateBilinearInterpolation(
         input0, input1, -1E20, 1E20,
         knots, nx, ny,

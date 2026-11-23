@@ -1,3 +1,11 @@
+/// @file CompositeDial.cpp
+/// @brief Implements CompositeDial: reading the node graph, binding it to an
+///        event, and evaluating it.
+/// @ingroup DialDictionary
+///
+/// The public contract of each method is documented in CompositeDial.h. The
+/// comments here describe how each method does its job.
+
 #include "CompositeDial.h"
 #include "DialCollection.h"
 #include "Bicubic.h"
@@ -11,6 +19,14 @@
 #include <map>
 #include <sstream>
 
+/// @par Implementation
+/// Two passes over the nodes: the first records each node name and its
+/// prepared definition, so that the second can resolve `dialResponse`
+/// inputs to node indices in any order. The evaluation order is then built
+/// by a depth-first visit from the output node, which adds a node after all
+/// the nodes it reads; `state` marks nodes as being visited (1) or done
+/// (2), so meeting a node in state 1 means a cycle. Nodes never visited do
+/// not contribute to the output and are rejected.
 CompositeDial::CompositeDial(ConfigReader config_, const std::vector<std::string>& parameterNames_): _inputCount_(int(parameterNames_.size())){
   config_.clearFields();
   config_.defineFields({{"nodes"}, {"output"}});
@@ -18,7 +34,7 @@ CompositeDial::CompositeDial(ConfigReader config_, const std::vector<std::string
   auto nodes = config_.fetchValue<ConfigReader>("nodes");
   LogThrowIf(not nodes.getConfig().is_array() or nodes.getConfig().empty(),
              "Composite: nodes must be a non-empty list");
-  std::map<std::string, int> nodeIndices;
+  std::map<std::string, int> nodeIndices; // node name -> position in _nodes_
   for( auto nodeConfig : nodes.loop() ){
     DialCollection::prepareConfig(nodeConfig);
     const auto name = nodeConfig.fetchValue<std::string>("name");
@@ -72,7 +88,7 @@ CompositeDial::CompositeDial(ConfigReader config_, const std::vector<std::string
       node.inputs.emplace_back(input);
     }
   }
-  std::vector<int> state(_nodes_.size(), 0);
+  std::vector<int> state(_nodes_.size(), 0); // per node: 0 not visited, 1 being visited, 2 done
   std::function<void(int)> visit = [&](int index_){
     LogThrowIf(state[index_] == 1, "Composite: dependency cycle at node " << _nodes_[index_].name);
     if( state[index_] == 2 ){ return; }
@@ -88,6 +104,11 @@ CompositeDial::CompositeDial(ConfigReader config_, const std::vector<std::string
   LogThrowIf(_evaluationOrder_.size() != _nodes_.size(), "Composite: every node must contribute to output");
 }
 
+/// @par Implementation
+/// The node dials are copied (clone()), so a bound composite does not
+/// depend on the child collections' interfaces afterwards. A nested
+/// composite that is not bound yet is copied and bound with the same
+/// lookup function, so the whole tree is bound for this event.
 void CompositeDial::bind(const std::function<const DialInterface*(int)>& findInterface_){
   for( auto& node : _nodes_ ){
     const auto* interface = findInterface_(node.collectionIndex);
@@ -125,6 +146,11 @@ void CompositeDial::bind(const std::function<const DialInterface*(int)>& findInt
   _isBound_ = true;
 }
 
+/// @par Implementation
+/// The node inputs are passed to each node dial through a local
+/// DialInputBuffer filled with DialInputBuffer::setInputValues(). The
+/// mirroring is the same triangle-wave folding as in
+/// DialInputBuffer::update().
 double CompositeDial::evalResponse(const DialInputBuffer& input_) const {
   LogThrowIf(not _isBound_, "Composite: graph has not been bound to an event");
   LogThrowIf(input_.getBufferSize() != _inputCount_, "Composite: input count mismatch");
@@ -136,7 +162,7 @@ double CompositeDial::evalResponse(const DialInputBuffer& input_) const {
     const auto& node = _nodes_[index];
     std::vector<double> values;
     values.reserve(node.inputs.size());
-    size_t iParameter = 0;
+    size_t iParameter = 0; // position among the node's non-event inputs, for its mirror edges
     for( const auto& source : node.inputs ){
       // EventFormula supplies its own event inputs; this buffer contains
       // only the parameter/response inputs, in their original relative order.
@@ -156,6 +182,8 @@ double CompositeDial::evalResponse(const DialInputBuffer& input_) const {
   return responses[_outputIndex_];
 }
 
+/// @par Implementation
+/// Streams the node count and the name of the output node.
 std::string CompositeDial::getSummary() const {
   std::stringstream ss;
   ss << "Composite: " << _nodes_.size() << " nodes, output=" << _nodes_[_outputIndex_].name;
