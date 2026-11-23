@@ -632,9 +632,9 @@ void DialCollection::readResponseSupervisorConfig(const ConfigReader& config_){
                << "Existing configurations remain supported." << std::endl;
   }
   GenericToolbox::Range limits;
-  // Intermediate responses and all variable responses may be negative.
-  limits.min = not _isCompositeNode_ and _applyToVariable_.empty()
-      ? 0. : std::nan("unset");
+  // Only final event weights are nonnegative by default. Variable responses
+  // and intermediate composite responses may be negative.
+  if( not _isCompositeNode_ and _applyToVariable_.empty() ){ limits.min = 0.; }
   if( config_.hasField("dialResponseLimits") ){
     limits = config_.fetchValue<GenericToolbox::Range>("dialResponseLimits");
     for( const auto& entry : {std::make_pair("minDialResponse", limits.min),
@@ -1887,7 +1887,9 @@ bool DialCollection::makeDialShortCircuit(const std::vector<DialUtils::DialPoint
   if( pointList_.size() == 1 or DialUtils::isFlat(pointList_) ){
     // it's flat, let's shortcut
 
-    if( not _isCompositeNode_ and std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon()
+    if( not _isCompositeNode_
+        and (_applyToVariable_.empty() or _variableResponseMode_ == VariableResponseMode::Multiply)
+        and std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon()
         and _responseSupervisor_.process(1.) == 1. ){
       // one! no need for a dial
       if(_verboseShortCircuit_){ _verboseShortCircuitStr_ = "No dial: response is always 1."; }

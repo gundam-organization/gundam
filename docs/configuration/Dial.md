@@ -24,9 +24,9 @@ external libraries to calculate weights.
 | applyOnDataSets        | list(string) | list (regex) of datasets the corresponding dials will apply to         | `["*"]` |
 | applyCondition         | string       | Only apply this dial with formula evaluates to non-zero                | empty   |
 | applyConditions        | list(json)   | Multiple condition formulas (only apply dial if all are true) formulas | n/a     |
-| minDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | -inf    |
+| minDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | see below |
 | maxDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | inf     |
-| dialResponseLimits     | range        | Response bounds as `[min, max]`, `{min: ...}`, or `{max: ...}`           | existing response defaults |
+| dialResponseLimits     | range        | Response bounds as `[min, max]`, `{min: ...}`, or `{max: ...}`           | see below |
 | enableResponseSmoothing | bool       | Apply centered C^2 transitions at finite response bounds in the original engine | false |
 | dialResponseSmoothingWidth | positive number or range | Transition half-width, shared or separate for each bound | unset |
 | binningFilePath        | string       | binning definition of a set of spline (along with `dialsFilePath`)     |         |
@@ -153,6 +153,9 @@ dialResponseLimits: [0.0, 2.0]
 enableResponseSmoothing: true
 dialResponseSmoothingWidth: 0.1
 ```
+
+By default, event weights have a lower bound of zero. Variable responses and
+intermediate composite responses are unbounded by default.
 
 Limits also accept `{min: ...}` or `{max: ...}`; omitted bounds are unbounded.
 Widths accept a scalar for both bounds, `[lowerWidth, upperWidth]`, or
@@ -557,8 +560,8 @@ rebuilds bin contributions, computes event weights, and fills histograms.
 Smoothing is enabled only through an explicit `binningResponse` configuration;
 its fractions are recomputed using the updated variables.
 
-`Add` and `Override` allow negative responses by default. Explicit
-`minDialResponse` and `maxDialResponse` limits still apply. Variable responses
+All variable response modes allow negative responses by default. Explicit
+`dialResponseLimits` still apply. Variable responses
 are excluded from the event weight and its global reweight cap. Sample selections
 and event-to-dial associations remain those established at loading; derived
 variables are not automatically recalculated after a target variable changes.

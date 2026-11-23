@@ -29,6 +29,33 @@ def check_configuration():
         assert len(likelihood.getDatasetManager().getDatasetList()) == expected
 
 
+def check_fraction(config_text, first_path):
+    second_path = first_path.with_name('835CompatibilityDatasetManager-second.root')
+    fixture.write_input_root_file(second_path)
+    config_text = config_text.replace('      datasetList:', '      debugLoadDatasetFraction: 0.15\n      datasetList:')
+    config_text = config_text.replace(f'              - "{first_path}"', f'''              - "{first_path}"
+              - "{second_path}"
+          data:
+            - name: measurement
+              fromModel: true
+          selectedDataEntry: measurement''')
+
+    builder = GUNDAM.ConfigUtils.ConfigBuilder()
+    builder.setConfigFromYamlString(config_text)
+    config = GUNDAM.ConfigUtils.ConfigReader(builder.getConfig())
+    config.defineField(GUNDAM.ConfigUtils.ConfigReader.FieldDefinition('fitterEngineConfig'))
+    for override, expected_events in ((None, 2), (0.5, 10)):
+        engine = GUNDAM.FitterEngine()
+        engine.configure(config.fetchValueConfigReader('fitterEngineConfig'))
+        likelihood = engine.getLikelihoodInterface()
+        if override is not None:
+            likelihood.getDatasetManager().setDebugLoadDatasetFraction(fraction=override)
+        likelihood.initialize()
+        for propagator in (likelihood.getModelPropagator(), likelihood.getDataPropagator()):
+            events = propagator.getSampleSet().getSampleList()[0].getEventList()
+            assert len(events) == expected_events, f'Expected {expected_events} events, got {len(events)}'
+
+
 def main():
     check_configuration()
     root_path = Path.cwd() / '835CompatibilityDatasetManager.root'
@@ -42,6 +69,7 @@ def main():
     old_value = fixture.evaluate_config(legacy, Path.cwd(), 'legacy')
     new_value = fixture.evaluate_config(modern, Path.cwd(), 'manager')
     assert math.isclose(old_value, new_value, rel_tol=1e-12, abs_tol=1e-12)
+    check_fraction(modern, root_path)
 
 
 if __name__ == '__main__':

@@ -37,6 +37,23 @@ This option is intended for analyses where the user-defined binning contains
 bins that are meant to stay empty, for example with square binning layouts
 that include unreachable phase-space regions.
 
+### `datasetManagerConfig`
+
+```yaml
+likelihoodInterfaceConfig:
+  datasetManagerConfig:
+    datasetList:
+      - name: input
+        model:
+          tree: events
+          filePathList: [input.root]
+```
+
+The former `datasetList` directly under `likelihoodInterfaceConfig` is still
+read with a relocation warning. If both lists are present, the list in
+`datasetManagerConfig` takes precedence, including an explicitly empty list.
+The older `propagatorConfig.dataSetList` location remains supported as a fallback.
+
 ### `externalConstraints`
 
 External measurements add independent contributions to the penalty likelihood.
@@ -87,20 +104,3 @@ constraint exposes its configuration getters, `evalFormula()`,
 Parameter references are resolved once during initialization. Evaluations read
 the current values through cached const pointers; parameter storage must remain
 alive and stable for the lifetime of the bound constraints.
-
-### `datasetManagerConfig`
-
-```yaml
-likelihoodInterfaceConfig:
-  datasetManagerConfig:
-    datasetList:
-      - name: input
-        model:
-          tree: events
-          filePathList: [input.root]
-```
-
-The former `datasetList` directly under `likelihoodInterfaceConfig` is still
-read with a relocation warning. If both lists are present, the list in
-`datasetManagerConfig` takes precedence, including an explicitly empty list.
-The older `propagatorConfig.dataSetList` location remains supported as a fallback.

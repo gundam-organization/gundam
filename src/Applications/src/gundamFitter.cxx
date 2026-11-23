@@ -18,6 +18,7 @@
 #include "CmdLineParser.h"
 #include "Logger.h"
 
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -387,15 +388,13 @@ int main(int argc, char** argv){
   }
 
   if( clParser.isOptionTriggered("debugFracOfEntries") ){
-    LogExitIf(clParser.getNbValueSet("debugFracOfEntries") != 1, "Nb of event not specified.");
-
-    auto fractionOfEntries{clParser.getOptionVal<double>("debugFracOfEntries")};
-    LogExitIf(fractionOfEntries > 1, "fractionOfEntries should be between 0 and 1");
-    LogExitIf(fractionOfEntries < 0, "fractionOfEntries should be between 0 and 1");
-
-    LogDebug << "Will load " << fractionOfEntries*100. << "% of the datasets." << std::endl;
-    for( auto& dataset : fitter.getLikelihoodInterface().getDatasetList() ){
-      dataset.setFractionOfEntriesToLoad(fractionOfEntries);
+    LogExitIf(clParser.getNbValueSet("debugFracOfEntries") != 1, "Dataset fraction not specified.");
+    const auto fraction = clParser.getOptionVal<double>("debugFracOfEntries");
+    try{
+      fitter.getLikelihoodInterface().getDatasetManager().setDebugLoadDatasetFraction(fraction);
+    }
+    catch( const std::runtime_error& ){
+      return EXIT_FAILURE;
     }
   }
 

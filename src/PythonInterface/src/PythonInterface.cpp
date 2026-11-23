@@ -521,6 +521,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::class_<DatasetManager>(module, "DatasetManager")
   .def(pybind11::init())
   .def("getDatasetList", pybind11::overload_cast<>(&DatasetManager::getDatasetList), pybind11::return_value_policy::reference_internal)
+  .def("setDebugLoadDatasetFraction", &DatasetManager::setDebugLoadDatasetFraction, pybind11::arg("fraction"))
   ;
 
   likelihoodInterfaceClass
