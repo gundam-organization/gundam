@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -18,7 +19,6 @@ public:
   struct Input {
     std::string name;
     int bufferIndex{-1};
-    std::string parameterName;
     int nodeIndex{-1};
     std::string eventVariable;
   };
@@ -28,7 +28,10 @@ public:
   };
   class NodeSettingsCache {
   public:
-    std::shared_ptr<const NodeSettings> get(const DialInterface& interface_);
+    std::shared_ptr<const NodeSettings> get(
+        const DialInterface& interface_,
+        const std::optional<DialInputBuffer::ParameterReference::MirrorEdges>& configuredMirrorEdges_,
+        size_t parameterInputCount_);
   private:
     std::mutex _mutex_;
     std::vector<std::shared_ptr<const NodeSettings>> _entries_;
@@ -38,6 +41,7 @@ public:
     std::shared_ptr<const ConfigReader> config;
     std::vector<Input> inputs;
     int collectionIndex{-1};
+    std::optional<DialInputBuffer::ParameterReference::MirrorEdges> configuredMirrorEdges;
     std::shared_ptr<NodeSettingsCache> settingsCache{std::make_shared<NodeSettingsCache>()};
   };
   struct NodeBinding {
@@ -46,6 +50,7 @@ public:
   };
 
   CompositeDial(ConfigReader config_, const std::vector<std::string>& parameterNames_);
+  CompositeDial(ConfigReader config_, int inputCount_, const std::function<int(const JsonType&)>& findInput_);
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<CompositeDial>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return "Composite"; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;

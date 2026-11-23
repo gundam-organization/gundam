@@ -79,6 +79,37 @@ void DialCollection::prepareConfig(ConfigReader &config_){
     });
   config_.checkConfiguration();
 }
+DialInputBuffer::ParameterReference DialCollection::resolveParameterInput(const JsonType& input_) const{
+  DialInputBuffer::ParameterReference reference;
+  reference.parSetIndex = _supervisedParameterSetIndex_;
+  if( input_.contains("parameterSetName") ){
+    const auto name = input_.at("parameterSetName").get<std::string>();
+    reference.parSetIndex = -1;
+    for( size_t iSet = 0; iSet < _parameterSetListPtr_->size(); ++iSet ){
+      if( _parameterSetListPtr_->at(iSet).getName() != name ){ continue; }
+      LogThrowIf(reference.parSetIndex >= 0, "Ambiguous dial input parameterSetName: " << name);
+      reference.parSetIndex = int(iSet);
+    }
+    LogThrowIf(reference.parSetIndex < 0, "Unknown dial input parameterSetName: " << name);
+  }
+  LogThrowIf(reference.parSetIndex < 0, "Dial input requires parameterSetName without an enclosing parameter set");
+  auto& set = _parameterSetListPtr_->at(reference.parSetIndex);
+  if( input_.contains("parameterIndex") ){
+    const auto& index = input_.at("parameterIndex");
+    LogThrowIf(not index.is_number_integer() or index < 0 or index >= set.getParameterList().size(),
+               "Dial input: parameterIndex outside parameter set " << set.getName());
+    reference.parIndex = index.get<int>();
+  }
+  else{
+    const auto key = input_.contains("parameterName") ? "parameterName" : "name";
+    const auto name = GenericToolbox::Json::fetchValue<std::string>(input_, key);
+    const auto* parameter = set.getParameterPtr(name);
+    LogThrowIf(parameter == nullptr, "Could not find parameter: " << name << " in " << set.getName());
+    reference.parIndex = parameter->getParameterIndex();
+  }
+  return reference;
+}
+
 void DialCollection::prepareCompositeInputs(ConfigReader& config_){
   prepareConfig(config_);
   LogThrowIf(config_.hasField("dialInputList"),
@@ -105,27 +136,19 @@ void DialCollection::prepareCompositeInputs(ConfigReader& config_){
                           + int(input.contains("dialResponse")) + int(input.contains("eventVariable"));
       LogThrowIf(sources != 1,
                  "Composite input: specify exactly one of parameterName, parameterIndex, dialResponse and eventVariable");
-      if( not input.contains("parameterName") and not input.contains("parameterIndex") ){ continue; }
-      auto* parameterSet = getSupervisedParameterSet();
-      std::string name;
-      if( input.contains("parameterIndex") ){
-        const auto& index = input.at("parameterIndex");
-        LogThrowIf(not index.is_number_integer() or index < 0 or index >= parameterSet->getParameterList().size(),
-                   "Composite: parameterIndex outside the supervised parameter set");
-        name = parameterSet->getParameterList().at(index.get<int>()).getName();
-        input.erase("parameterIndex");
+      if( input.contains("dialResponse") or input.contains("eventVariable") ){
+        LogThrowIf(input.contains("parameterSetName"), "parameterSetName requires a parameter input");
+        continue;
       }
-      else{
-        name = input.at("parameterName").get<std::string>();
-        LogThrowIf(parameterSet->getParameterPtr(name) == nullptr, "Could not find parameter: " << name);
+      const auto resolved = resolveParameterInput(input);
+      JsonType reference = {{"parameterIndex", resolved.parIndex}};
+      if( resolved.parSetIndex != _supervisedParameterSetIndex_ ){
+        reference["parameterSetName"] = _parameterSetListPtr_->at(resolved.parSetIndex).getName();
       }
-      input["parameterName"] = name;
-      const JsonType reference = {{"parameterName", name}};
       if( std::find(parameters.begin(), parameters.end(), reference) == parameters.end() ){
-        parameters.emplace_back(reference);
+        parameters.emplace_back(std::move(reference));
       }
     }
-    node.getConfig()["dialInputList"] = std::move(inputs);
     normalizedNodes.emplace_back(node.getConfig());
   }
   options.getConfig()["nodes"] = std::move(normalizedNodes);
@@ -144,6 +167,11 @@ void DialCollection::configureImpl() {
     prepareCompositeInputs(_config_);
   }
 
+  LogThrowIf(_supervisedParameterSetIndex_ < 0 and not _config_.hasField("dialInputList"),
+             "A manager-level dial requires explicit inputs in dialInputList");
+  LogThrowIf(_supervisedParameterSetIndex_ < 0 and _config_.hasField("parametersBinningPath"),
+             "parametersBinningPath requires an enclosing parameter set");
+
   readVariableResponseConfig(_config_);
 
   // Dials are directly defined with a binning file?
@@ -158,7 +186,7 @@ void DialCollection::configureImpl() {
   if( _config_.hasField("dialInputList") ){
     auto dialInputList = _config_.fetchValue<ConfigReader>("dialInputList");
 
-    LogThrowIf(_supervisedParameterSetIndex_ == -1, "Can't initialize dialInputList without setting _supervisedParameterSetIndex_");
+    LogThrowIf(not dialInputList.getConfig().is_array(), "dialInputList must be a list");
 
     _dialInputBufferList_.emplace_back();
     _dialInputBufferList_.back().setParSetRef( _parameterSetListPtr_ );
@@ -166,11 +194,16 @@ void DialCollection::configureImpl() {
     auto formulaDefinition = std::make_shared<EventFormula::Definition>();
 
     // add the ref of each selected parameter
-    for( auto& dialInput : dialInputList.getConfig() ){
+    int nextParameterSlot = 0;
+    for( const auto& dialInput : dialInputList.getConfig() ){
+      const bool responseInput = _isCompositeNode_ and dialInput.contains("dialResponse");
+      LogThrowIf(dialInput.contains("parameterSetName")
+                 and (responseInput or dialInput.contains("eventVariable")),
+                 "parameterSetName requires a parameter input");
       EventFormula::Input source;
       if( _dialType_ == DialType::Formula ){
         const int sourceCount = int(dialInput.contains("parameterName")) + int(dialInput.contains("parameterIndex"))
-                                + int(dialInput.contains("eventVariable"));
+                                + int(dialInput.contains("eventVariable")) + int(responseInput);
         LogThrowIf(sourceCount != 1,
                    "Formula input must specify exactly one of parameterName, parameterIndex and eventVariable");
       }
@@ -187,27 +220,12 @@ void DialCollection::configureImpl() {
         formulaDefinition->inputs.emplace_back(source);
         continue;
       }
-      source.parameterIndex = int(_dialInputBufferList_.back().getInputSize());
+      // Upstream responses occupy slots in the composite evaluation buffer.
+      source.parameterIndex = nextParameterSlot++;
       formulaDefinition->inputs.emplace_back(source);
-      DialInputBuffer::ParameterReference p;
-      p.parSetIndex = _supervisedParameterSetIndex_;
-
-      const std::string parameterKey = dialInput.contains("parameterName") ? "parameterName" : "name";
-      if( dialInput.contains("parameterIndex") ){
-        const auto& index = dialInput.at("parameterIndex");
-        LogThrowIf(not index.is_number_integer() or index < 0
-                   or index >= _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size(),
-                   "Dial input: parameterIndex outside the supervised parameter set");
-        p.parIndex = index.get<int>();
+      if( not responseInput ){
+        _dialInputBufferList_.back().addParameterReference(resolveParameterInput(dialInput));
       }
-      else if( GenericToolbox::Json::doKeyExist(dialInput, parameterKey) ){
-        auto parName = GenericToolbox::Json::fetchValue<std::string>(dialInput, parameterKey);
-        auto* parPtr{_parameterSetListPtr_->at( _supervisedParameterSetIndex_ ).getParameterPtr( parName )};
-        LogThrowIf(parPtr == nullptr, "Could not find parameter: " << parName);
-        p.parIndex = parPtr->getParameterIndex();
-      }
-
-      _dialInputBufferList_.back().addParameterReference( p );
     }
     if( not formulaDefinition->eventVariables.empty() ){ _eventFormulaDefinition_ = std::move(formulaDefinition); }
 
@@ -216,6 +234,7 @@ void DialCollection::configureImpl() {
 }
 void DialCollection::initializeImpl() {
   LogThrowIf(_index_==-1, "Index not set.");
+  if( not _isEnabled_ ){ return; }
 
   for( auto& collectionData : _dialCollectionData_ ){
     if( auto* externalWeight = dynamic_cast<ExternalWeightDialFactory*>(collectionData.get()) ){
@@ -246,7 +265,7 @@ std::string DialCollection::getTitle() const {
   auto* parSetPtr{this->getSupervisedParameterSet()};
   if( parSetPtr != nullptr ){ return parSetPtr->getName(); }
 
-  return {"UnsetParameterSuperVision"};
+  return _config_.fetchValue("name", std::string("UnsetParameterSuperVision"));
 }
 std::string DialCollection::getSummary(bool shallow_) const{
   std::stringstream ss;
@@ -286,7 +305,7 @@ Parameter* DialCollection::getSupervisedParameter() const {
 
 ParameterSet* DialCollection::getSupervisedParameterSet() const{
   if( _supervisedParameterSetIndex_ < 0 ) return nullptr;
-  if( _supervisedParameterSetIndex_ > _parameterSetListPtr_->size() ) return nullptr;
+  if( _supervisedParameterSetIndex_ >= _parameterSetListPtr_->size() ) return nullptr;
   return &_parameterSetListPtr_->at(_supervisedParameterSetIndex_);
 }
 
@@ -508,11 +527,9 @@ void DialCollection::updateInputBuffers(){
 }
 
 void DialCollection::setupDialInterfaceReferences(){
-  LogThrowIf(_supervisedParameterSetIndex_==-1, "par set index not set.");
-  LogThrowIf(_supervisedParameterSetIndex_>_parameterSetListPtr_->size(), "invalid selected parset index: " << _supervisedParameterSetIndex_);
-
-  // set it up is not already done
+  // Infer the historical one-input-per-parameter layout for implicit dials.
   if( _dialInputBufferList_.empty() ){
+    LogThrowIf(getSupervisedParameterSet() == nullptr, "Implicit dial inputs require an enclosing parameter set");
     if( _supervisedParameterIndex_ == -1 ){
       // one dial interface per parameter
       if (_dialInterfaceList_.size() != _parameterSetListPtr_->at(_supervisedParameterSetIndex_).getParameterList().size()) {
@@ -1395,14 +1412,20 @@ bool DialCollection::initializeDialsWithDefinition() {
   if( _dialType_ == DialType::Composite ){
     LogThrowIf(dialsDefinition.hasField("binning") or hasDialBranchData(),
                "Composite: put binning and dialBranchData on individual nodes");
-    std::vector<std::string> parameterNames;
+    std::vector<DialInputBuffer::ParameterReference> parameters;
     for( const auto& input : _config_.fetchValue<JsonType>("dialInputList") ){
-      parameterNames.emplace_back(input.at("parameterName").get<std::string>());
+      parameters.emplace_back(resolveParameterInput(input));
     }
     _isEventByEvent_ = false;
     _dialInterfaceList_.emplace_back();
     _dialInterfaceList_.back().setDial(DialBaseObject(std::make_unique<CompositeDial>(
-        dialsDefinition.fetchValue<ConfigReader>("options"), parameterNames)));
+        dialsDefinition.fetchValue<ConfigReader>("options"), int(parameters.size()), [&](const JsonType& input_){
+          const auto reference = resolveParameterInput(input_);
+          const auto position = std::find_if(parameters.begin(), parameters.end(), [&](const auto& parameter_){
+            return parameter_.parSetIndex == reference.parSetIndex and parameter_.parIndex == reference.parIndex;
+          });
+          return position == parameters.end() ? -1 : int(std::distance(parameters.begin(), position));
+        })));
   }
   else if( _dialType_ == DialType::Norm ) {
     // This dial collection is a normalization, so there is a single dial.

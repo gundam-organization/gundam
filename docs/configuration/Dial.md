@@ -43,6 +43,33 @@ external libraries to calculate weights.
 | binnedDialsPath        | string       | Binned dial source as `file:tree:branch`                                |         |
 | dialsBinningDefinition | list(object) | Explicit bin dimensions read from the dial TTree; exclusive with `binning` |       |
 
+### Inputs from multiple parameter sets
+
+Define dials in `dialSetDefinitions` under either a parameter set or
+`parametersManagerConfig`. A parameter input can use `parameterName` or
+`parameterIndex` (zero-based). Add `parameterSetName` to select its set.
+Each parameter input in a manager-level dial must specify its set. Within a
+parameter set, omitting `parameterSetName` selects the enclosing set.
+Parameters used by these inputs can be defined without local dials.
+
+```yaml
+parametersManagerConfig:
+  dialSetDefinitions:
+    - name: bindingEnergyShift
+      dialType: Formula
+      dialInputList:
+        - {name: delta, parameterName: EB_bin_C_nu, parameterSetName: "Binding energy parameters"}
+        - {name: alpha, parameterName: EB_alpha, parameterSetName: "Migration parameters"}
+        - {name: q3, eventVariable: q3}
+      options:
+        formulaStr: "1 + 0.001 * ([delta] + [alpha] * (0.056 * [q3] - 41.6))"
+```
+
+Composite nodes use the same parameter input syntax, including in nested
+composites. Specify `parameterSetName` only on parameter inputs. Event
+variables and upstream dial responses use `eventVariable` and `dialResponse`
+respectively.
+
 ### Binned dials stored in a ROOT tree
 
 Select the object branch explicitly using any of these equivalent forms:
@@ -212,7 +239,7 @@ dialSetDefinitions:
       output: combine
 ```
 
-`parameterName` references a fit parameter in the owning parameter set;
+`parameterName` references a fit parameter in the selected set.
 `parameterIndex` references its zero-based index in that set. `dialResponse`
 names another node in the same graph. Formula nodes also accept `eventVariable`,
 naming a loaded event variable. Exactly one of these four keys is required
