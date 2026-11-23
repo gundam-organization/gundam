@@ -61,12 +61,16 @@ def write_input(path, offset, variant="regular"):
     subprocess.run(["root", "-n", "-l", "-b", "-q", str(macro)], check=True)
 
 
-def evaluate(paths, branch_data, backend, dial_type="Spline", options="", knot_limits=None):
+def evaluate(paths, branch_data, backend, dial_type="Spline", options="", knot_limits=None, friend_paths=None):
     import json
     import GUNDAM
     print("Testing module:", GUNDAM.__file__, flush=True)
     GUNDAM.setLightOutputMode(True)
     GUNDAM.setNumberOfThreads(2)
+    input_files = [str(path) for path in paths]
+    if friend_paths is not None:
+        input_files = [dict(name=path.stem, path=str(path), friendList=[dict(name='dials', path=f'{friend}:events')])
+                       for path, friend in zip(paths, friend_paths)]
     builder = GUNDAM.ConfigUtils.ConfigBuilder()
     builder.setConfigFromYamlString(f"""
 likelihoodInterfaceConfig:
@@ -77,7 +81,7 @@ likelihoodInterfaceConfig:
     - name: arrays
       model:
         tree: events
-        filePathList: [{', '.join(repr(str(p)) for p in paths)}]
+        filePathList: {json.dumps(input_files)}
   backendManagerConfig:
     isEnabled: {str(backend).lower()}
     type: CPU
@@ -156,6 +160,25 @@ def main(full=False):
         raise RuntimeError(f"Unexpected prior sum: {reference}")
     if math.isclose(reference[2][0], reference[0][0]):
         raise RuntimeError("Spline response did not change")
+    # Three files with two readers force a reader to cross a file boundary.
+    # The arrays live in friends, so cached branch pointers must be refreshed.
+    import uproot
+    from array import array
+    friend_paths = paths + [Path.cwd() / '410DialsArrayBranchData-2.root']
+    write_input(friend_paths[-1], 6)
+    main_paths = [Path.cwd() / f'410DialsArrayBranchData-main-{i}.root' for i in range(3)]
+    for path in main_paths:
+        with uproot.recreate(path) as output:
+            tree = output.mktree('events', {'X': 'float64'})
+            tree.extend({'X': array('d', [.5, .5, .5])})
+    friend_reference = evaluate(friend_paths, 'dialBranchData: graph', False)
+    for backend in (False, True):
+        actual = evaluate(main_paths,
+                          'dialBranchData: {parameterValuesTArray: dials.parameters, weightValuesTArray: dials.responses}',
+                          backend, friend_paths=friend_paths)
+        for result, expected in zip(actual, friend_reference):
+            assert all(math.isclose(a, b, rel_tol=1e-7, abs_tol=1e-7)
+                       for a, b in zip(result, expected)), (actual, friend_reference)
     if not full:
         print('SUCCESS: TArray spline inputs match TGraph with legacy and CPU propagation.')
         return 0
