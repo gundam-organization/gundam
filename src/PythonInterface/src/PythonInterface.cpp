@@ -264,6 +264,7 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<DialInterface>(module, "DialInterface")
   .def("evalResponse", &DialInterface::evalResponse)
+  .def("getSourceKnotPositions", &DialInterface::getSourceKnotPositions)
   .def("getInputBuffer", &DialInterface::getInputBuffer, pybind11::return_value_policy::reference_internal)
   .def("getSummary", &DialInterface::getSummary, pybind11::arg("shallow") = true);
 
@@ -376,6 +377,16 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getSummary", &Bin::getSummary, pybind11::arg("shallow") = true)
   ;
 
+  pybind11::class_<BinningResponse::BinFraction>(module, "BinFraction")
+  .def_readonly("binIndex", &BinningResponse::BinFraction::binIndex)
+  .def_readonly("fraction", &BinningResponse::BinFraction::fraction)
+  ;
+
+  pybind11::class_<BinningResponse::EventResponse>(module, "EventBinningResponse")
+  .def_readonly("binFractions", &BinningResponse::EventResponse::binFractions)
+  .def_readonly("outsideFraction", &BinningResponse::EventResponse::outsideFraction)
+  ;
+
   pybind11::class_<Histogram::BinContent>(module, "HistogramBinContent")
   .def(pybind11::init())
   .def_readwrite("sumWeights", &Histogram::BinContent::sumWeights)
@@ -395,6 +406,11 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   pybind11::class_<Histogram>(module, "Histogram")
   .def("getNbBins", &Histogram::getNbBins)
+  .def("isBinningResponseEnabled", &Histogram::isBinningResponseEnabled)
+  .def("evaluateBinningResponse", &Histogram::evaluateBinningResponse)
+  .def("evaluateEventBinningResponse", &Histogram::evaluateEventBinningResponse)
+  .def("getOutsideBinContent", &Histogram::getOutsideBinContent, pybind11::return_value_policy::reference_internal)
+  .def("refillHistogram", &Histogram::refillHistogram, pybind11::arg("iThread") = -1)
   .def("getBinContentList", pybind11::overload_cast<>(&Histogram::getBinContentList),
        pybind11::return_value_policy::reference_internal)
   .def("getBinContextList", pybind11::overload_cast<>(&Histogram::getBinContextList),
@@ -477,12 +493,36 @@ PYBIND11_MODULE(GUNDAM, module) {
   dataTypeClass.attr("Toy") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::Toy));
   dataTypeClass.attr("RealData") = pybind11::cast(LikelihoodInterface::DataType(LikelihoodInterface::DataType::RealData));
 
+  pybind11::class_<GaussianConstraint>(module, "GaussianConstraint")
+  .def("getName", &GaussianConstraint::getName)
+  .def("isEnabled", &GaussianConstraint::isEnabled)
+  .def("getFormula", &GaussianConstraint::getFormula)
+  .def("getMean", &GaussianConstraint::getMean)
+  .def("getStdDev", &GaussianConstraint::getStdDev)
+  .def("evalFormula", &GaussianConstraint::evalFormula)
+  .def("evalResidual", &GaussianConstraint::evalResidual)
+  .def("eval", &GaussianConstraint::eval)
+  ;
+
+  pybind11::class_<ExternalConstraints>(module, "ExternalConstraints")
+  .def("isEnabled", &ExternalConstraints::isEnabled)
+  .def("getGaussianConstraintList", &ExternalConstraints::getGaussianConstraintList, pybind11::return_value_policy::reference_internal)
+  .def("eval", &ExternalConstraints::eval)
+  ;
+
+  pybind11::class_<DatasetManager>(module, "DatasetManager")
+  .def(pybind11::init())
+  .def("getDatasetList", pybind11::overload_cast<>(&DatasetManager::getDatasetList), pybind11::return_value_policy::reference_internal)
+  .def("setDebugLoadDatasetFraction", &DatasetManager::setDebugLoadDatasetFraction, pybind11::arg("fraction"))
+  ;
+
   likelihoodInterfaceClass
   .def(pybind11::init())
   .def("getSummary", &LikelihoodInterface::getSummary, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getSampleBreakdownTable", &LikelihoodInterface::getSampleBreakdownTable, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getLastLikelihood", &LikelihoodInterface::getLastLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getLastPenaltyLikelihood", &LikelihoodInterface::getLastPenaltyLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("getExternalConstraints", &LikelihoodInterface::getExternalConstraints, pybind11::return_value_policy::reference_internal)
   .def("getLastStatLikelihood", &LikelihoodInterface::getLastStatLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("propagateAndEvalLikelihood", &LikelihoodInterface::propagateAndEvalLikelihood, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("setForceAsimovData", &LikelihoodInterface::setForceAsimovData, pybind11::call_guard<pybind11::gil_scoped_release>())
@@ -490,6 +530,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("setDataType", &LikelihoodInterface::setDataType, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("getModelPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getModelPropagator), pybind11::return_value_policy::reference)
   .def("getDataPropagator", pybind11::overload_cast<>(&LikelihoodInterface::getDataPropagator), pybind11::return_value_policy::reference)
+  .def("getDatasetManager", pybind11::overload_cast<>(&LikelihoodInterface::getDatasetManager), pybind11::return_value_policy::reference_internal)
   .def("getDatasetList", pybind11::overload_cast<>(&LikelihoodInterface::getDatasetList), pybind11::return_value_policy::reference)
   .def("initialize", pybind11::overload_cast<>(&LikelihoodInterface::initialize), pybind11::return_value_policy::reference)
   ;

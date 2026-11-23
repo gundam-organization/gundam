@@ -4,6 +4,7 @@
 
 #include "DataDispenser.h"
 #include "DatasetDefinition.h"
+#include "DatasetTreeChain.h"
 #include "LoaderUtils.h"
 
 #include "Propagator.h"
@@ -31,10 +32,13 @@
 #include <TBranchElement.h>
 #include <TLeafObject.h>
 #include <TClass.h>
+#include <TDirectory.h>
 #include <TGraph.h>
 
+#include <algorithm>
 #include <array>
 #include <cstring>
+#include <cstdlib>
 #include <exception>
 #include <unordered_map>
 #include <map>
@@ -42,6 +46,12 @@
 #include <string>
 #include <vector>
 #include <sstream>
+
+#if defined(__unix__) || defined(__APPLE__)
+#include <dirent.h>
+#include <fcntl.h>
+#include <sys/resource.h>
+#endif
 
 namespace {
 
@@ -461,21 +471,8 @@ namespace {
       const std::string& formulaStr_,
       const std::vector<std::string>& eventVariableNameList_
   ){
-    eventFormula_.expr = FormulaUtils::convertBareVariablesToFormulaParameters(formulaStr_);
-    eventFormula_.formula = TFormula(eventFormula_.expr.c_str(), eventFormula_.expr.c_str());
-    LogExitIf(not eventFormula_.formula.IsValid(), "\"" << formulaStr_ << "\" -> \"" << eventFormula_.expr << "\": could not be parsed as event-buffer formula.");
-
-    eventFormula_.varIndexList.clear();
-    eventFormula_.varIndexList.reserve(eventFormula_.formula.GetNpar());
-    for( int iPar = 0 ; iPar < eventFormula_.formula.GetNpar() ; iPar++ ){
-      auto varIndex = GenericToolbox::findElementIndex(eventFormula_.formula.GetParName(iPar), eventVariableNameList_);
-      LogExitIf(
-          varIndex == -1,
-          "Formula \"" << formulaStr_ << "\" requires event variable \"" << eventFormula_.formula.GetParName(iPar)
-                       << "\", but it is not available in the event buffer."
-      );
-      eventFormula_.varIndexList.emplace_back(varIndex);
-    }
+    eventFormula_.evaluator.setFormulaStr(FormulaUtils::convertBareVariablesToFormulaParameters(formulaStr_));
+    eventFormula_.evaluator.setInputNames(eventVariableNameList_);
   }
 
   void compileRuntimeFormula(
@@ -530,6 +527,33 @@ namespace {
 
 }
 
+
+void DataDispenser::applyTemplates(ConfigReader& config_, const std::vector<DatasetDefinitionTemplate>& templates_){
+  config_.defineFields({{"useTemplates"}});
+  if( not config_.hasField("useTemplates") ){ return; }
+
+  ConfigUtils::ConfigBuilder configBuilder;
+  for( auto& reference : config_.loop("useTemplates") ){
+    reference.clearFields();
+    reference.defineFields({
+      {FieldFlag::MANDATORY, "name"},
+      {"isEnabled"},
+    });
+    reference.checkConfiguration();
+    if( not reference.fetchValue("isEnabled", true) ){ continue; }
+    const auto name = reference.fetchValue<std::string>("name");
+    auto templateIt = std::find_if(templates_.begin(), templates_.end(),
+                                  [&name](const DatasetDefinitionTemplate& template_){ return template_.getName() == name; });
+    LogThrowIf(templateIt == templates_.end(), "Unknown data dispenser template: " << name);
+    auto templateConfig = templateIt->getConfig().getConfig();
+    templateConfig.erase("name");
+    if( not templateConfig.empty() ){ configBuilder.override(templateConfig); }
+  }
+  auto ownConfig = config_.getConfig();
+  ownConfig.erase("useTemplates");
+  if( not ownConfig.empty() ){ configBuilder.override(ownConfig); }
+  config_.setConfig(configBuilder.getConfig());
+}
 
 void DataDispenser::prepareConfig(ConfigReader &config_){
   config_.clearFields();
@@ -806,6 +830,7 @@ void DataDispenser::load(Propagator& propagator_){
     }
   }
 
+  this->checkFileDescriptorLimit();
   this->parseStringParameters();
   this->fetchRequestedLeaves();
   this->doEventSelection();
@@ -968,6 +993,16 @@ void DataDispenser::fetchRequestedLeaves(){
     for( auto& dialCollection : _cache_.propagatorPtr->getDialCollectionList() ){
       if( not dialCollection.isEnabled() ){ continue; }
       if( not dialCollection.isDatasetValid( _owner_->getName() ) ){ continue; }
+      bool parentValid = true;
+      for( int parent = dialCollection.getCompositeParentIndex() ; parent >= 0 ; ){
+        const auto& parentCollection = _cache_.propagatorPtr->getDialCollectionList().at(parent);
+        if( not parentCollection.isEnabled() or not parentCollection.isDatasetValid(_owner_->getName()) ){
+          parentValid = false;
+          break;
+        }
+        parent = parentCollection.getCompositeParentIndex();
+      }
+      if( not parentValid ){ continue; }
       _cache_.dialCollectionsRefList.emplace_back( &dialCollection );
     }
   }
@@ -975,6 +1010,13 @@ void DataDispenser::fetchRequestedLeaves(){
   if( not _cache_.dialCollectionsRefList.empty() ) {
     std::vector<std::string> indexRequests;
     for( auto& dialCollection : _cache_.dialCollectionsRefList ) {
+      if( const auto& definition = dialCollection->getEventFormulaDefinition() ){
+        for( const auto& name : definition->eventVariables ){
+          std::set<std::string> variableDictStack;
+          addVariableDictRequestedByName(_cache_, name, _parameters_.variableDict, _parameters_.variableDictTransform, variableDictStack);
+          GenericToolbox::addIfNotInVector(name, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
+        }
+      }
       auto applyConditionFormulaStr = dialCollection->getApplyConditionStr();
       if( not applyConditionFormulaStr.empty() ) {
         addVariablesRequestedByFormula(_cache_, applyConditionFormulaStr, _parameters_.variableDict, _parameters_.variableDictTransform, false);
@@ -1000,6 +1042,12 @@ void DataDispenser::fetchRequestedLeaves(){
     }
   }
 
+  // Variable dial targets must be available even when they are not binning axes.
+  for( const auto& name : _cache_.propagatorPtr->getSampleSet().getEventVariableNameList() ){
+    std::set<std::string> variableDictStack;
+    addVariableDictRequestedByName(_cache_, name, _parameters_.variableDict, _parameters_.variableDictTransform, variableDictStack);
+  }
+
   // Sample binning variables are also stored when dynamic binning is enabled.
   {
     std::vector<std::string> varForIndexingListBuffer{};
@@ -1007,7 +1055,7 @@ void DataDispenser::fetchRequestedLeaves(){
       for (const auto& binContext : sample.getHistogram().getBinContextList()) {
         for (const auto& edges : binContext.bin.getEdgesList()) {
           GenericToolbox::addIfNotInVector(edges.varName, varForIndexingListBuffer);
-          if( sample.isUseDynamicBinning() ){
+          if( sample.isUseDynamicBinning() or sample.getHistogram().isBinningResponseEnabled() ){
             GenericToolbox::addIfNotInVector(edges.varName, _cache_.propagatorPtr->getSampleSet().getEventVariableNameList());
           }
         }
@@ -1313,6 +1361,14 @@ void DataDispenser::loadFromHistContent(){
     auto* histObj = fHist->Get( sampleHistDef->hist.c_str() );
     LogExitIf( histObj == nullptr, "Could not find TObject \"" << sampleHistDef->hist << "\" within " << fHist->GetPath() );
 
+    if( sample->getHistogram().isBinningResponseEnabled() ){
+      // Imported bin contents already define the data histogram. Dummy events
+      // retain their assigned bin; they must not undergo another binning response.
+      LogInfo << "Disabling binning response for sample \"" << sample->getName()
+              << "\" loaded from histogram content." << std::endl;
+      sample->getHistogram().configureBinningResponse(ConfigReader(JsonType{{"isEnabled", false}}));
+    }
+
     if( histObj->InheritsFrom("THnD") ){
       auto* hist = (THnD*) histObj;
       int nBins = 1;
@@ -1335,6 +1391,11 @@ void DataDispenser::loadFromHistContent(){
         }
         sample->getEventList()[iBin].getWeights().base = (hist->GetBinContent(histBinIndex));
         sample->getEventList()[iBin].getWeights().resetCurrentWeight();
+
+        // Every dummy event needs a cache entry, even without attached dials.
+        auto* eventDialCacheEntry = _cache_.propagatorPtr->getEventDialCache().fetchNextCacheEntry();
+        eventDialCacheEntry->event.sampleIndex = std::size_t(sample->getIndex());
+        eventDialCacheEntry->event.eventIndex = _cache_.sampleIndexOffsetList[sample->getIndex()]++;
       }
     }
     else if(histObj->InheritsFrom("TH1D")){
@@ -1369,6 +1430,53 @@ void DataDispenser::loadFromHistContent(){
   fHist->Close();
 }
 
+void DataDispenser::checkFileDescriptorLimit() const{
+#if defined(__unix__) || defined(__APPLE__)
+  struct rlimit fileLimit{};
+  if( getrlimit(RLIMIT_NOFILE, &fileLimit) != 0 or fileLimit.rlim_cur == RLIM_INFINITY ){ return; }
+
+  size_t nbFilesPerReader{0};
+  for( const auto& fileEntry : _parameters_.filePathList ){
+    if( not fileEntry.isEnabled ){ continue; }
+    std::set<std::string> files{resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath).filePath};
+    for( const auto& friendEntry : fileEntry.friendList ){
+      if( not friendEntry.isEnabled ){ continue; }
+      files.insert(resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath).filePath);
+    }
+    nbFilesPerReader = std::max(nbFilesPerReader, files.size());
+  }
+  const int nbReaders = (
+      _owner_->isDevSingleThreadEventSelection() and _owner_->isDevSingleThreadEventLoaderAndIndexer()
+  ) ? 1 : getNbParallelCpu();
+  const auto nbInputFiles = static_cast<rlim_t>(nbReaders) * nbFilesPerReader;
+
+  rlim_t nbOpenFiles{0};
+  if( auto* directory = opendir("/dev/fd") ){
+    const int directoryFd = dirfd(directory);
+    while( const auto* entry = readdir(directory) ){
+      if( entry->d_name[0] < '0' or entry->d_name[0] > '9' ){ continue; }
+      if( std::strtol(entry->d_name, nullptr, 10) != directoryFd ){ ++nbOpenFiles; }
+    }
+    closedir(directory);
+  }
+  else{
+    // Some POSIX systems do not expose /dev/fd.
+    for( rlim_t fd = 0; fd < fileLimit.rlim_cur; ++fd ){
+      if( fcntl(static_cast<int>(fd), F_GETFD) != -1 ){ ++nbOpenFiles; }
+    }
+  }
+
+  LogExitIf(
+      nbOpenFiles >= fileLimit.rlim_cur or nbInputFiles > fileLimit.rlim_cur - nbOpenFiles,
+      "Open-file limit is insufficient for dataset " << _owner_->getName()
+      << ": " << nbReaders << " reader(s) x up to " << nbFilesPerReader << " distinct input files require "
+      << nbInputFiles << " additional file descriptors; " << nbOpenFiles << " are already open, and the soft limit is "
+      << fileLimit.rlim_cur << ". Friend trees in the same file share one file descriptor per reader. "
+      << "Increase the open-file limit before launching GUNDAM (ulimit -n), or reduce nbMaxThreadsForLoad."
+  );
+#endif
+}
+
 int DataDispenser::getNbParallelCpu() const{
   return GundamGlobals::getNbCpuThreads(_owner_->getNbMaxThreadsForLoad());
 }
@@ -1378,93 +1486,48 @@ const std::string& DataDispenser::getVariableExpression(const std::string& varia
 std::shared_ptr<TChain> DataDispenser::openChain(bool verbose_) const{
   LogInfoIf(verbose_) << "Opening ROOT files containing events..." << std::endl;
 
-  // TFriendElement does not own a TChain supplied through AddFriend(TTree*, ...).
-  // Keep the friend chains alive through the lifetime of their master chain.
-  auto friendChainList = std::make_shared<std::vector<std::shared_ptr<TChain>>>();
-  std::shared_ptr<TChain> treeChain(new TChain(), [friendChainList](TChain* chain){ delete chain; });
-
+  auto treeChain = std::make_shared<DatasetTreeChain>();
   for( const auto& fileEntry : _parameters_.filePathList ){
     if( not fileEntry.isEnabled ){ continue; }
-    auto source = resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath);
-
+    const auto source = resolveRootFileAndTreePath(fileEntry.path, _parameters_.globalTreePath);
     if( verbose_ ){
       LogScopeIndent;
       LogInfo << source.filePath << ":" << source.treePath << std::endl;
     }
 
-    validateRootFileAndTreePath(source, "ROOT file");
-
-    Long64_t sourceNbEntries{-1};
-    std::unique_ptr<TFile> temp{};
-    bool hasEnabledFriend{false};
-    for( const auto& friendEntry : fileEntry.friendList ){
-      if( friendEntry.isEnabled ){ hasEnabledFriend = true; break; }
-    }
-    if( _parameters_.fractionOfEntries != 1. or hasEnabledFriend ){
-      temp.reset(TFile::Open(source.filePath.c_str()));
-      LogExitIf(temp == nullptr, "Error while opening TFile: " << source.filePath);
-
-      auto* tree = temp->Get<TTree>(source.treePath.c_str());
-      LogExitIf(tree == nullptr, "Error while opening TTree: " << source.treePath << " in " << source.filePath);
-      sourceNbEntries = tree->GetEntries();
-    }
-
-    Long64_t nMaxEntries{TTree::kMaxEntries};
-    if( _parameters_.fractionOfEntries != 1. ){
-      nMaxEntries = Long64_t( double(sourceNbEntries) * _parameters_.fractionOfEntries );
-      if( verbose_ ){
-        LogScopeIndent;
-        LogWarning << "Max entries: " << nMaxEntries << std::endl;
+    // Share metadata reads too: a file with many friend trees is opened once
+    // for this entry, instead of once per friend. These files close before
+    // the reader loads its first entry.
+    std::map<std::string, std::unique_ptr<TFile>> files;
+    auto fetchTree = [&](const RootFileAndTreePath& path_){
+      auto& file = files[path_.filePath];
+      if( file == nullptr ){
+        TDirectory::TContext context;
+        file.reset(TFile::Open(path_.filePath.c_str(), "READ"));
       }
-
-    }
-    treeChain->AddFile(source.filePath.c_str(), nMaxEntries, source.treePath.c_str());
-
+      LogThrowIf(file == nullptr or file->IsZombie(), "Could not open input file " << path_.filePath);
+      auto* tree = file->Get<TTree>(path_.treePath.c_str());
+      LogThrowIf(tree == nullptr, "Missing input tree " << path_.treePath << " in " << path_.filePath);
+      return tree;
+    };
+    const Long64_t sourceNbEntries = fetchTree(source)->GetEntries();
+    std::vector<DatasetTreeChain::FriendTree> friends;
     for( const auto& friendEntry : fileEntry.friendList ){
       if( not friendEntry.isEnabled ){ continue; }
-      auto friendSource = resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath);
-      validateRootFileAndTreePath(friendSource, "friend \"" + friendEntry.name + "\"");
-
-      std::unique_ptr<TFile> friendFile{TFile::Open(friendSource.filePath.c_str())};
-      LogExitIf(friendFile == nullptr, "Error while opening friend file: " << friendSource.filePath);
-      auto* friendTree = friendFile->Get<TTree>(friendSource.treePath.c_str());
-      LogExitIf(friendTree == nullptr, "Error while opening friend TTree: " << friendSource.treePath << " in " << friendSource.filePath);
-      LogExitIf(
-          friendTree->GetEntries() != sourceNbEntries,
-          "Friend \"" << friendEntry.name << "\" in " << friendSource.filePath << " has " << friendTree->GetEntries()
-          << " entries, while its main tree in " << source.filePath << " has " << sourceNbEntries << ". Friends must be entry-aligned."
-      );
-
-      std::shared_ptr<TChain> friendChain;
-      for( const auto& existingFriendChain : *friendChainList ){
-        if( existingFriendChain->GetName() == friendEntry.name ){ friendChain = existingFriendChain; break; }
-      }
-      if( friendChain == nullptr ){
-        friendChain = std::make_shared<TChain>(friendEntry.name.c_str());
-        friendChainList->emplace_back(friendChain);
-      }
-      friendChain->AddFile(friendSource.filePath.c_str(), nMaxEntries, friendSource.treePath.c_str());
+      const auto friendSource = resolveRootFileAndTreePath(friendEntry.path, _parameters_.globalTreePath);
+      const Long64_t friendNbEntries = fetchTree(friendSource)->GetEntries();
+      LogThrowIf(friendNbEntries != sourceNbEntries,
+                 "Friend \"" << friendEntry.name << "\" in " << friendSource.filePath << " has " << friendNbEntries
+                 << " entries, while its main tree in " << source.filePath << " has " << sourceNbEntries
+                 << ". Friends must be entry-aligned.");
+      friends.push_back({friendEntry.name, friendSource.filePath, friendSource.treePath});
     }
-
+    const Long64_t nbEntries = _parameters_.fractionOfEntries == 1. ? sourceNbEntries
+        : Long64_t(double(sourceNbEntries) * _parameters_.fractionOfEntries);
+    treeChain->addFile(source.filePath, source.treePath, sourceNbEntries, std::move(friends), nbEntries);
   }
-
-  for( const auto& friendChain : *friendChainList ){
-    LogExitIf(
-        friendChain->GetEntries() != treeChain->GetEntries(),
-        "Friend TChain \"" << friendChain->GetName() << "\" has " << friendChain->GetEntries()
-        << " entries while the main TChain has " << treeChain->GetEntries() << ". Friends must be entry-aligned."
-    );
-    LogExitIf(
-        treeChain->AddFriend(friendChain.get(), friendChain->GetName()) == nullptr,
-        "Could not attach friend TChain: " << friendChain->GetName()
-    );
-  }
-
-  // ROOT 6.24 connects the current trees of friend TChains lazily. Load the
-  // first entry now so qualified friend expressions are available when a
-  // TreeBuffer/TTreeFormula is initialized immediately after openChain().
-  if( not friendChainList->empty() and treeChain->GetEntries() > 0 ){
-    LogExitIf(treeChain->LoadTree(0) < 0, "Could not load the first entry of the main TChain with its friends.");
+  if( treeChain->GetEntries() > 0 ){
+    LogThrowIf(treeChain->LoadTree(0) < 0, "Could not load the first input tree and its friends.");
   }
 
   return treeChain;
@@ -1902,6 +1965,8 @@ void DataDispenser::loadEvent(int iThread_){
   auto& threadSharedData = threadSharedDataList[iThread_];
 
   // local
+  // Snapshot conditions while the reader still owns this entry's tree buffers.
+  std::vector<bool> dialApplyConditionList(_cache_.dialCollectionsRefList.size(), true);
   Event eventIndexingBuffer;
   eventIndexingBuffer.getIndices().dataset = _owner_->getDataSetIndex();
 
@@ -2086,15 +2151,33 @@ void DataDispenser::loadEvent(int iThread_){
   std::vector<int> sampleBinIdxList;
   std::vector<double> sampleWeightList;
 
-  // TArray does not inherit from TObject. Validate the ROOT class before casting.
-  auto readArray = [&threadSharedData](const std::string& branchName_) -> const TArray* {
-    auto* branch = threadSharedData.treeChain->GetBranch(branchName_.c_str());
-    LogThrowIf(branch == nullptr, "Missing dialBranchData branch: " << branchName_);
+  struct ArrayBranchBuffer{
+    TBranch* branch{nullptr};
     TClass* arrayClass{nullptr};
-    EDataType dataType{kOther_t};
-    branch->GetExpectedType(arrayClass, dataType);
-    LogThrowIf(arrayClass == nullptr or not arrayClass->InheritsFrom(TArray::Class()),
-               "dialBranchData branch '" << branchName_ << "' must contain a TArray");
+  };
+  std::unordered_map<std::string, ArrayBranchBuffer> arrayBranchBuffers;
+  int arrayBranchTreeNumber{-1};
+
+  // TArray does not inherit from TObject. Validate the ROOT class before casting.
+  auto readArray = [&threadSharedData, &arrayBranchBuffers, &arrayBranchTreeNumber](const std::string& branchName_) -> const TArray* {
+    // Friend lookup walks all trees. Resolve each branch once per input file,
+    // while the reader is waiting for this filler to release the current entry.
+    const int treeNumber = threadSharedData.treeChain->GetTreeNumber();
+    if( arrayBranchTreeNumber != treeNumber ){
+      arrayBranchBuffers.clear();
+      arrayBranchTreeNumber = treeNumber;
+    }
+    auto& buffer = arrayBranchBuffers[branchName_];
+    if( buffer.branch == nullptr ){
+      buffer.branch = threadSharedData.treeChain->GetBranch(branchName_.c_str());
+      LogThrowIf(buffer.branch == nullptr, "Missing dialBranchData branch: " << branchName_);
+      EDataType dataType{kOther_t};
+      buffer.branch->GetExpectedType(buffer.arrayClass, dataType);
+      LogThrowIf(buffer.arrayClass == nullptr or not buffer.arrayClass->InheritsFrom(TArray::Class()),
+                 "dialBranchData branch '" << branchName_ << "' must contain a TArray");
+    }
+    auto* branch = buffer.branch;
+    auto* arrayClass = buffer.arrayClass;
     branch->SetStatus(true);
     if( branch->GetAddress() == nullptr ){ branch->SetAddress(nullptr); }
     // Read on demand. ROOT owns the object buffer.
@@ -2190,7 +2273,7 @@ void DataDispenser::loadEvent(int iThread_){
         sampleBinIdxList.emplace_back(eventIndexingBuffer.getIndices().bin);
 
         // No bin found -> warning
-        if( sampleBinIdxList.back() == -1 and not eventSample.isUseDynamicBinning() ){
+        if( sampleBinIdxList.back() == -1 and not (eventSample.isUseDynamicBinning() or eventSample.getHistogram().isBinningResponseEnabled()) ){
           const int unbinnedEventThrottle = 5;
           if( this->_unbinnedEvents_++ < unbinnedEventThrottle ){
 
@@ -2226,7 +2309,7 @@ void DataDispenser::loadEvent(int iThread_){
         }
 
         hasSampleToFill = hasSampleToFill or (
-            (sampleBinIdxList.back() != -1 or eventSample.isUseDynamicBinning())
+            (sampleBinIdxList.back() != -1 or eventSample.isUseDynamicBinning() or eventSample.getHistogram().isBinningResponseEnabled())
             and sampleWeightList.back() != 0 );
       }
 
@@ -2240,6 +2323,11 @@ void DataDispenser::loadEvent(int iThread_){
         dialCloneArrayIndex = static_cast<int>(threadSharedData.buffer.dialIndexFormula.eval(eventIndexingBuffer));
       }
 
+      for( size_t iCollection = 0 ; iCollection < dialApplyConditionList.size() ; ++iCollection ){
+        auto& condition = threadSharedData.buffer.dialApplyConditionFormulaList[iCollection];
+        dialApplyConditionList[iCollection] = not condition.isEnabled() or condition.eval(eventIndexingBuffer) != 0;
+      }
+
       // only load event-by-event dials, binned dials etc. will be processed later
       for( size_t iDialCollection = 0 ; iDialCollection < _cache_.dialCollectionsRefList.size() ; iDialCollection++ ){
         auto *dialCollectionRef = _cache_.dialCollectionsRefList[iDialCollection];
@@ -2247,12 +2335,7 @@ void DataDispenser::loadEvent(int iThread_){
         // if not event-by-event dial -> leave
         if( not dialCollectionRef->hasDialBranchData() ){ continue; }
 
-        if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
-          if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
-            // next dialSet
-            continue;
-          }
-        }
+        if( not dialApplyConditionList[iDialCollection] ){ continue; }
 
         if( not dialCollectionRef->getDialParameterValuesBranch().empty() ){
           const auto* parameterValues = readArray(dialCollectionRef->getDialParameterValuesBranch());
@@ -2296,7 +2379,8 @@ void DataDispenser::loadEvent(int iThread_){
     for( int iSample = 0 ; iSample < int(sampleIdxList.size()) ; iSample++ ){
       if( sampleWeightList[iSample] == 0. ){ continue; }
       if( sampleBinIdxList[iSample] == -1
-          and not _cache_.samplesToFillList[sampleIdxList[iSample]]->isUseDynamicBinning() ){ continue; }
+          and not (_cache_.samplesToFillList[sampleIdxList[iSample]]->isUseDynamicBinning()
+                  or _cache_.samplesToFillList[sampleIdxList[iSample]]->getHistogram().isBinningResponseEnabled()) ){ continue; }
 
       // update for this specific sample
       eventIndexingBuffer.getIndices().sample = _cache_.samplesToFillList[sampleIdxList[iSample]]->getIndex();
@@ -2338,12 +2422,7 @@ void DataDispenser::loadEvent(int iThread_){
           continue; // skip the rest
         }
 
-        if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].isEnabled() ){
-          if( threadSharedData.buffer.dialApplyConditionFormulaList[iDialCollection].eval(eventIndexingBuffer) == 0 ){
-            // next dialSet
-            continue;
-          }
-        }
+        if( not dialApplyConditionList[iDialCollection] ){ continue; }
 
         int iCollection = dialCollectionRef->getIndex();
 

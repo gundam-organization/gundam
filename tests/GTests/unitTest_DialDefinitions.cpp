@@ -1,3 +1,4 @@
+#include "CompositeDial.h"
 #include <iostream>
 #include <string>
 #include <memory>
@@ -19,9 +20,11 @@
 #include "UniformSpline.h"
 #include "CalculateCompactSpline.h"
 #include "DialCollection.h"
+#include "ParameterSet.h"
 #include "Graph.h"
 #include "Norm.h"
 #include "RootSpline.h"
+#include "RootGraph.h"
 #include <future>
 
 TEST(DialDefinitions,CompactSplineTruncated) {
@@ -257,50 +260,65 @@ TEST(DialDefinitions,CatmullRomUniform) {
 // Loading optimizations must preserve the response and its domain.
 
 namespace {
-  DialCollection makeLoadingCollection(bool extrapolate_ = true, const std::string& options_ = ""){
-    DialCollection collection(nullptr);
-    collection.configure(ConfigReader(JsonType{
-        {"dialType", "Spline"}, {"dialBranchData", "graph"},
-        {"allowDialExtrapolation", extrapolate_}, {"options", options_}}));
-    collection.getDialInputBufferList().resize(1);
-    return collection;
-  }
-
-  template<typename T> void checkSharedSpline(){
-    auto collection = makeLoadingCollection();
-    std::vector<DialUtils::DialPoint> points{{-1, 2, -2}, {0, 1, 0}, {1, 2, 2}, {2, 5, 4}};
-    auto build = [&](){
-      auto dial = std::make_unique<T>();
-      dial->buildDial(points);
-      return dial;
-    };
-    const auto first = collection.storeEventDial(build());
-    EXPECT_EQ(first, collection.storeEventDial(build()));
-    // Equal knots with different Hermite slopes are different curves.
-    points[1].slope = 0.125;
-    auto changedSlope = build();
-    if( changedSlope->getDialData() != collection.getDialInterfaceList()[first].getDialBaseRef()->getDialData() ){
-      EXPECT_NE(first, collection.storeEventDial(std::move(changedSlope)));
+  class DialLoading : public ::testing::Test {
+  protected:
+    DialLoading(){
+      auto& set = _parameterSets_.front();
+      set.configure(ConfigReader(JsonType{
+          {"name", "testParameters"}, {"isEnabled", true}, {"numberOfParameters", 1}, {"nominalStepSize", 0.1}}));
     }
-    points[1].slope = 0;
-    auto extrapolated = build();
-    extrapolated->setAllowExtrapolation(true);
-    EXPECT_NE(first, collection.storeEventDial(std::move(extrapolated)));
-    points[1].y += 0.125;
-    EXPECT_NE(first, collection.storeEventDial(build()));
-    collection.clear();
-    EXPECT_EQ(0, collection.storeEventDial(build()));
-  }
+
+    DialCollection makeCollection(JsonType config_){
+      config_["dialInputList"] = {{{"parameterSetName", _parameterSets_.front().getName()}, {"parameterIndex", 0}}};
+      DialCollection collection(&_parameterSets_);
+      collection.configure(ConfigReader(config_));
+      return collection;
+    }
+
+    DialCollection makeLoadingCollection(bool extrapolate_ = true, const std::string& options_ = ""){
+      return makeCollection({{"dialType", "Spline"}, {"dialBranchData", "graph"},
+                             {"allowDialExtrapolation", extrapolate_}, {"options", options_}});
+    }
+
+    template<typename T> void checkSharedSpline(){
+      auto collection = makeLoadingCollection();
+      std::vector<DialUtils::DialPoint> points{{-1, 2, -2}, {0, 1, 0}, {1, 2, 2}, {2, 5, 4}};
+      auto build = [&](){
+        auto dial = std::make_unique<T>();
+        dial->buildDial(points);
+        return dial;
+      };
+      const auto first = collection.storeEventDial(build());
+      EXPECT_EQ(first, collection.storeEventDial(build()));
+      // Equal knots with different Hermite slopes are different curves.
+      points[1].slope = 0.125;
+      auto changedSlope = build();
+      if( changedSlope->getDialData() != collection.getDialInterfaceList()[first].getDialBaseRef()->getDialData() ){
+        EXPECT_NE(first, collection.storeEventDial(std::move(changedSlope)));
+      }
+      points[1].slope = 0;
+      auto extrapolated = build();
+      extrapolated->setAllowExtrapolation(true);
+      EXPECT_NE(first, collection.storeEventDial(std::move(extrapolated)));
+      points[1].y += 0.125;
+      EXPECT_NE(first, collection.storeEventDial(build()));
+      collection.clear();
+      EXPECT_EQ(0, collection.storeEventDial(build()));
+    }
+
+  private:
+    std::vector<ParameterSet> _parameterSets_{1};
+  };
 }
 
-TEST(DialLoading, SharesLightweightSplines){
+TEST_F(DialLoading, SharesLightweightSplines){
   checkSharedSpline<UniformSpline>();
   checkSharedSpline<GeneralSpline>();
   checkSharedSpline<CompactSpline>();
   checkSharedSpline<MonotonicSpline>();
 }
 
-TEST(DialLoading, ConcurrentDuplicates){
+TEST_F(DialLoading, ConcurrentDuplicates){
   auto collection = makeLoadingCollection();
   std::vector<std::future<size_t>> results;
   for( int i = 0; i < 4; ++i ){
@@ -318,7 +336,51 @@ TEST(DialLoading, ConcurrentDuplicates){
   EXPECT_EQ(1, collection.getDialInterfaceList().size());
 }
 
-TEST(DialLoading, SimplifiesAffineAndPreservesDomain){
+TEST_F(DialLoading, ConcurrentDistinctSignaturesSurviveIndexGrowth){
+  auto collection = makeLoadingCollection();
+  const size_t count = 4096;
+  auto build = [](size_t value_){
+    auto dial = std::make_unique<Graph>();
+    // Exactly representable values exercise aligned floating-point hashes.
+    dial->buildDial(std::vector<DialUtils::DialPoint>{{0, 1, 0}, {1, 1. + value_ / 4096., 0}});
+    return dial;
+  };
+  std::vector<std::future<std::vector<size_t>>> results;
+  for( size_t worker = 0; worker < 4; ++worker ){
+    results.emplace_back(std::async(std::launch::async, [&, worker](){
+      std::vector<size_t> indices(count);
+      for( size_t i = 0; i < count; ++i ){
+        const auto value = (i + worker * 997) % count;
+        indices[value] = collection.storeEventDial(build(value));
+      }
+      return indices;
+    }));
+  }
+  const auto reference = results.front().get();
+  for( size_t worker = 1; worker < results.size(); ++worker ){
+    EXPECT_EQ(reference, results[worker].get());
+  }
+  EXPECT_EQ(count, collection.getDialInterfaceList().size());
+  // Look up every signature again after all table growth and concurrent inserts.
+  for( size_t value = 0; value < count; ++value ){
+    EXPECT_EQ(reference[value], collection.storeEventDial(build(value)));
+    const auto* dial = collection.getDialInterfaceList()[reference[value]].getDialBaseRef();
+    EXPECT_EQ(build(value)->getDialData(), dial->getDialData());
+  }
+}
+
+TEST_F(DialLoading, SignedZeroSignaturesShareAnInterface){
+  auto collection = makeLoadingCollection();
+  auto build = [](double zero_){
+    auto dial = std::make_unique<Graph>();
+    dial->buildDial(std::vector<DialUtils::DialPoint>{{zero_, 1, 0}, {1, 2, 0}});
+    return dial;
+  };
+  EXPECT_EQ(collection.storeEventDial(build(-0.)), collection.storeEventDial(build(0.)));
+  EXPECT_EQ(1, collection.getDialInterfaceList().size());
+}
+
+TEST_F(DialLoading, SimplifiesAffineAndPreservesDomain){
   TGraph graph;
   for( int i = 0; i < 5; ++i ){ graph.SetPoint(i, i, 2 * i + 1); }
   for( bool extrapolate : {false, true} ){
@@ -341,7 +403,7 @@ TEST(DialLoading, SimplifiesAffineAndPreservesDomain){
   EXPECT_NE(nullptr, dynamic_cast<Graph*>(bounded.get()));
 }
 
-TEST(DialLoading, KeepsCurvedSlopesAndRootSplines){
+TEST_F(DialLoading, KeepsCurvedSlopesAndRootSplines){
   double x[]{0, 1, 2, 3};
   double y[]{0, 1, 2, 3};
   TSpline3 curved("curved", x, y, 4, "b1e1", 0., 0.);
@@ -355,7 +417,7 @@ TEST(DialLoading, KeepsCurvedSlopesAndRootSplines){
   EXPECT_NE(index, collection.storeEventDial(collection.makeDial(&curved)));
 }
 
-TEST(DialLoading, PreservesExactSplineBounds){
+TEST_F(DialLoading, PreservesExactSplineBounds){
   struct BoundedSpline : UniformSpline {
     void setUpperBound(double upper_){ _splineBounds_.max = upper_; }
   };
@@ -369,9 +431,8 @@ TEST(DialLoading, PreservesExactSplineBounds){
   EXPECT_NE(index, collection.storeEventDial(std::move(other)));
 }
 
-TEST(DialLoading, SharesBinnedCurvesWithIndependentInputs){
-  DialCollection collection(nullptr);
-  collection.configure(ConfigReader(JsonType{{"dialType", "Norm"}}));
+TEST_F(DialLoading, SharesBinnedCurvesWithIndependentInputs){
+  auto collection = makeCollection({{"dialType", "Norm"}});
   auto& interfaces = collection.getDialInterfaceList();
   interfaces.clear();
   interfaces.resize(3);
@@ -413,9 +474,8 @@ TEST(DialLoading, SharesBinnedCurvesWithIndependentInputs){
   EXPECT_DOUBLE_EQ(2., copy.evalResponse());
 }
 
-TEST(DialLoading, LeavesBinnedRootSplinesUnique){
-  DialCollection collection(nullptr);
-  collection.configure(ConfigReader(JsonType{{"dialType", "Norm"}}));
+TEST_F(DialLoading, LeavesBinnedRootSplinesUnique){
+  auto collection = makeCollection({{"dialType", "Norm"}});
   collection.getDialBinSet().getBinList().resize(2);
   auto& interfaces = collection.getDialInterfaceList();
   interfaces.resize(2);
@@ -426,4 +486,116 @@ TEST(DialLoading, LeavesBinnedRootSplinesUnique){
   }
   collection.deduplicateBinnedDials();
   EXPECT_NE(interfaces[0].getDialBaseRef(), interfaces[1].getDialBaseRef());
+}
+
+TEST(DialDefinitions, SourceKnotPositions) {
+    const std::vector<double> uniformPositions{-2.0, -0.5, 1.0, 2.5};
+    const std::vector<double> irregularPositions{-2.0, -0.25, 0.5, 2.5};
+    for( const auto& positions : {uniformPositions, irregularPositions} ){
+        TGraph graph;
+        for( size_t i = 0; i < positions.size(); ++i ){
+            graph.SetPoint(int(i), positions[i], 1.0 + i*i);
+        }
+        const auto points = DialUtils::getPointList(&graph);
+        auto check = [&](const DialBase& dial_){
+            EXPECT_EQ(dial_.getSourceKnotPositions(), positions);
+            EXPECT_EQ(dial_.clone()->getSourceKnotPositions(), positions);
+            DialInterface interface;
+            EXPECT_TRUE(interface.getSourceKnotPositions().empty());
+            interface.setDial(DialBaseObject(dial_));
+            EXPECT_EQ(interface.getSourceKnotPositions(), positions);
+        };
+        Graph graphDial;
+        EXPECT_TRUE(graphDial.getSourceKnotPositions().empty());
+        graphDial.buildDial(points);
+        check(graphDial);
+        GeneralSpline generalSpline;
+        EXPECT_TRUE(generalSpline.getSourceKnotPositions().empty());
+        generalSpline.buildDial(points);
+        check(generalSpline);
+        RootGraph rootGraph;
+        rootGraph.setGraph(graph);
+        check(rootGraph);
+        RootSpline rootSpline;
+        rootSpline.buildDial(points);
+        check(rootSpline);
+        if( positions == uniformPositions ){
+            UniformSpline uniformSpline;
+            CompactSpline compactSpline;
+            MonotonicSpline monotonicSpline;
+            EXPECT_TRUE(uniformSpline.getSourceKnotPositions().empty());
+            EXPECT_TRUE(compactSpline.getSourceKnotPositions().empty());
+            EXPECT_TRUE(monotonicSpline.getSourceKnotPositions().empty());
+            uniformSpline.buildDial(points);
+            compactSpline.buildDial(points);
+            monotonicSpline.buildDial(points);
+            check(uniformSpline);
+            check(compactSpline);
+            check(monotonicSpline);
+        }
+    }
+    EXPECT_TRUE(Norm().getSourceKnotPositions().empty());
+}
+
+// Copies share graph metadata, but binding one event must not replace another
+// event's curves. Editing a collection copy must also preserve its source.
+TEST(CompositeDial, CopiesShareDefinitionAndKeepEventBindingsIndependent) {
+  CompositeDial source(ConfigReader(JsonType{{"nodes", {
+      {{"name", "leaf"}, {"dialType", "Graph"},
+       {"dialInputList", {{{"parameterName", "p"}}}}}}}, {"output", "leaf"}}), {"p"});
+  source.getNodes()[0].collectionIndex = 0;
+  CompositeDial first(source), second(source);
+  const auto& sourceNodes = static_cast<const CompositeDial&>(source).getNodes();
+  EXPECT_EQ(&sourceNodes, &static_cast<const CompositeDial&>(first).getNodes());
+  EXPECT_EQ(&sourceNodes, &static_cast<const CompositeDial&>(second).getNodes());
+
+  std::vector<ParameterSet> parameters(1);
+  parameters[0].getParameterList().emplace_back(&parameters[0]);
+  DialInputBuffer buffer;
+  buffer.setParSetRef(&parameters);
+  DialInputBuffer::ParameterReference reference;
+  reference.parSetIndex = 0;
+  reference.parIndex = 0;
+  buffer.addParameterReference(reference);
+  buffer.initialise();
+  DialResponseSupervisor supervisor;
+  DialInterface interface;
+  interface.setInputBufferRef(&buffer);
+  interface.setResponseSupervisorRef(&supervisor);
+  Graph twice, threeTimes;
+  twice.buildDial(std::vector<DialUtils::DialPoint>{{0., 0., 0.}, {2., 4., 0.}});
+  threeTimes.buildDial(std::vector<DialUtils::DialPoint>{{0., 0., 0.}, {2., 6., 0.}});
+  interface.setDial(DialBaseObject(twice));
+  first.bind([&](int){ return &interface; });
+  interface.setDial(DialBaseObject(threeTimes));
+  second.bind([&](int){ return &interface; });
+  DialInputBuffer input;
+  input.setInputValues({1.});
+  EXPECT_DOUBLE_EQ(first.evalResponse(input), 2.);
+  EXPECT_DOUBLE_EQ(second.evalResponse(input), 3.);
+  auto cloned = first.clone();
+  EXPECT_DOUBLE_EQ(cloned->evalResponse(input), 2.);
+  EXPECT_EQ(&sourceNodes, &static_cast<const CompositeDial&>(first).getNodes());
+  EXPECT_EQ(&sourceNodes, &static_cast<const CompositeDial&>(second).getNodes());
+  EXPECT_FALSE(source.isBound());
+  // Equal configurations share immutable snapshots, even with unset limits.
+  ASSERT_EQ(first.getNodeBindings()[0].settings, second.getNodeBindings()[0].settings);
+  supervisor.setMaxResponse(1.);
+  second.bind([&](int){ return &interface; });
+  EXPECT_NE(first.getNodeBindings()[0].settings, second.getNodeBindings()[0].settings);
+  EXPECT_DOUBLE_EQ(first.evalResponse(input), 2.);
+  EXPECT_DOUBLE_EQ(second.evalResponse(input), 1.);
+  EXPECT_DOUBLE_EQ(cloned->evalResponse(input), 2.);
+  supervisor.setMaxResponse(std::nan("unset"));
+  second.bind([&](int){ return &interface; });
+  EXPECT_EQ(first.getNodeBindings()[0].settings, second.getNodeBindings()[0].settings);
+  buffer.getInputParameterIndicesList()[0].mirrorEdges = {0., .5};
+  second.bind([&](int){ return &interface; });
+  EXPECT_NE(first.getNodeBindings()[0].settings, second.getNodeBindings()[0].settings);
+  EXPECT_DOUBLE_EQ(first.evalResponse(input), 2.);
+  EXPECT_DOUBLE_EQ(second.evalResponse(input), 0.);
+  second.getNodes()[0].collectionIndex = 7;
+  EXPECT_EQ(sourceNodes[0].collectionIndex, 0);
+  EXPECT_EQ(static_cast<const CompositeDial&>(first).getNodes()[0].collectionIndex, 0);
+  EXPECT_EQ(static_cast<const CompositeDial&>(second).getNodes()[0].collectionIndex, 7);
 }

@@ -11,6 +11,11 @@ endif()
 set(pythonTarget "GUNDAM_python${pythonVersionTag}")
 Python3_add_library(${pythonTarget} MODULE WITH_SOABI ../src/PythonInterface.cpp)
 target_link_libraries(${pythonTarget} PRIVATE pybind11::headers GundamFitter)
+# pybind11 can expose a prefix containing another nlohmann/json.hpp.
+# Set the selected JSON first on this target as well as on GundamUtils;
+# transitive include ordering alone cannot outrank direct dependencies.
+target_include_directories(${pythonTarget} SYSTEM BEFORE PRIVATE
+    "$<TARGET_PROPERTY:nlohmann_json::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>")
 target_include_directories(${pythonTarget} BEFORE PRIVATE ../include)
 target_compile_definitions(${pythonTarget} PRIVATE VERSION_INFO=${GUNDAM_FULL_VERSION_STR})
 set_target_properties(${pythonTarget} PROPERTIES

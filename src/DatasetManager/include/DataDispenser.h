@@ -5,6 +5,7 @@
 #ifndef GUNDAM_DATA_DISPENSER_H
 #define GUNDAM_DATA_DISPENSER_H
 
+#include "DatasetDefinitionTemplate.h"
 #include "EventVarTransformLib.h"
 #include "DataDispenserUtils.h"
 
@@ -26,6 +27,7 @@ class DatasetDefinition; // owner
 class DataDispenser : public JsonBaseClass {
 
 public:
+  static void applyTemplates(ConfigReader& config_, const std::vector<DatasetDefinitionTemplate>& templates_);
   static void prepareConfig(ConfigReader &config_);
 
 protected:
@@ -63,6 +65,7 @@ protected:
   void loadFromHistContent();
 
   // utils
+  void checkFileDescriptorLimit() const;
   [[nodiscard]] int getNbParallelCpu() const;
   [[nodiscard]] const std::string& getVariableExpression(const std::string& variable_) const;
   [[nodiscard]] std::shared_ptr<TChain> openChain(bool verbose_ = false) const;

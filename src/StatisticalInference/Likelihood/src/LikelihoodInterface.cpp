@@ -20,7 +20,8 @@ void LikelihoodInterface::configureImpl(){
 
   _config_.defineFields({
     {"propagatorConfig"},
-    {"datasetList"},
+    {"datasetManagerConfig"},
+    {FieldFlag::RELOCATED, "datasetList", "datasetManagerConfig/datasetList"},
     {"jointProbabilityConfig"},
     {"plotGeneratorConfig"},
     {"eventTreeWriter"},
@@ -28,6 +29,7 @@ void LikelihoodInterface::configureImpl(){
     {FieldFlag::RELOCATED, "gaussStatThrowInToys", "propagatorConfig/gaussStatThrowInToys"},
     {FieldFlag::RELOCATED, "enableEventMcThrow", "propagatorConfig/enableEventMcThrow"},
     {"applyInfinitePenaltyOnOutOfBoundPar"},
+    {"externalConstraints"},
   });
   _config_.checkConfiguration();
 
@@ -56,10 +58,13 @@ void LikelihoodInterface::configureImpl(){
 
   // defining datasets:
   _config_.fillValue(datasetListConfig, "datasetList");
-  _datasetList_.reserve(datasetListConfig.getConfig().size() );
-  for( const auto& dataSetConfig : datasetListConfig.loop() ){
-    _datasetList_.emplace_back(dataSetConfig, int(_datasetList_.size()));
+  ConfigReader datasetManagerConfig{};
+  _config_.fillValue(datasetManagerConfig, "datasetManagerConfig");
+  datasetManagerConfig.defineFields({{"datasetList"}});
+  if( not datasetManagerConfig.hasField("datasetList") and not datasetListConfig.empty() ){
+    datasetManagerConfig.getConfig()["datasetList"] = datasetListConfig.getConfig();
   }
+  _datasetManager_.configure(datasetManagerConfig);
 
   // new config structure
   _config_.fillValue(jointProbabilityConfig, "jointProbabilityConfig");
@@ -76,6 +81,9 @@ void LikelihoodInterface::configureImpl(){
   _config_.fillValue(_eventTreeWriter_.getConfig(), "eventTreeWriter");
   _eventTreeWriter_.configure();
 
+  _config_.fillValue(_externalConstraints_.getConfig(), "externalConstraints");
+  _externalConstraints_.configure();
+
   // reading local parameters
   _config_.fillValue(_applyInfinitePenaltyOnOutOfBoundPar_, "applyInfinitePenaltyOnOutOfBoundPar");
 
@@ -84,13 +92,16 @@ void LikelihoodInterface::initializeImpl() {
 
   _config_.printUnusedKeys();
 
-  for( auto& dataSet : _datasetList_ ){ dataSet.initialize(); }
+  _datasetManager_.initialize();
 
   _dataPropagator_ = _modelPropagator_; // avoid tons of printouts
 
   _modelPropagator_.initialize();
   _dataPropagator_.initialize();
   _modelPropagator_.printConfiguration();
+
+  _externalConstraints_.initialize();
+  _externalConstraints_.bindParameters(_modelPropagator_.getParametersManager());
 
   _plotGenerator_.setModelSampleSetPtr( &_modelPropagator_.getSampleSet().getSampleList() );
   _plotGenerator_.setDataSampleSetPtr( &_dataPropagator_.getSampleSet().getSampleList() );
@@ -179,6 +190,7 @@ double LikelihoodInterface::evalPenaltyLikelihood() const {
   for( auto& parSet : _modelPropagator_.getParametersManager().getParameterSetsList() ){
     _buffer_.penaltyLikelihood += LikelihoodInterface::evalPenaltyLikelihood( parSet );
   }
+  _buffer_.penaltyLikelihood += _externalConstraints_.eval();
   return _buffer_.penaltyLikelihood;
 }
 double LikelihoodInterface::evalPenaltyLikelihood(const ParameterSet& parSet_) const{
@@ -241,6 +253,9 @@ std::string LikelihoodInterface::getSummary() const {
         return ssSub.str();
       }
   );
+  if( _externalConstraints_.isEnabled() ){
+    ss << "; external constraints: " << _externalConstraints_.eval();
+  }
   return ss.str();
 }
 
@@ -323,7 +338,7 @@ void LikelihoodInterface::loadModelPropagator(){
   _modelPropagator_.clearContent();
 
   LogInfo << "Loading datasets..." << std::endl;
-  for( auto& dataSet : _datasetList_ ){
+  for( auto& dataSet : _datasetManager_.getDatasetList() ){
     dataSet.getModelDispenser().setPlotGeneratorPtr( &_plotGenerator_ );
     dataSet.getModelDispenser().load( _modelPropagator_ );
   }
@@ -341,9 +356,12 @@ void LikelihoodInterface::loadModelPropagator(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
-      sample.indexEventInHistogramBin(iThread);
+      if( not sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(iThread); }
     }
   });
+  for( auto& sample : _modelPropagator_.getSampleSet().getSampleList() ){
+    if( sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(_threadPool_); }
+  }
 
   LogInfo << "Filling up model sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){
@@ -367,7 +385,7 @@ void LikelihoodInterface::loadDataPropagator(){
   _dataPropagator_.clearContent();
 
   bool isAsimov{_dataType_ == DataType::Asimov or _forceAsimovData_};
-  for( auto& dataSet : _datasetList_ ){
+  for( auto& dataSet : _datasetManager_.getDatasetList() ){
     if( _dataType_ == DataType::Toy ){
       if( dataSet.getSelectedToyEntry().empty() or dataSet.getSelectedToyEntry() == "Asimov" ){
         isAsimov = true;
@@ -400,7 +418,7 @@ void LikelihoodInterface::loadDataPropagator(){
   }
   else{
     LogInfo << "Loading datasets..." << std::endl;
-    for( auto& dataSet : _datasetList_ ){
+    for( auto& dataSet : _datasetManager_.getDatasetList() ){
       // let the llh interface choose witch data entry to load
       auto* dataDispenser{this->getDataDispenser( dataSet )};
 
@@ -459,9 +477,12 @@ void LikelihoodInterface::loadDataPropagator(){
   _threadPool_.runJob([this](int iThread){
     LogInfoIf(iThread <= 0) << "Updating sample per bin event lists..." << std::endl;
     for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
-      sample.indexEventInHistogramBin(iThread);
+      if( not sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(iThread); }
     }
   });
+  for( auto& sample : _dataPropagator_.getSampleSet().getSampleList() ){
+    if( sample.getHistogram().isBinningResponseEnabled() ){ sample.indexEventInHistogramBin(_threadPool_); }
+  }
 
   LogInfo << "Filling up data sample histograms..." << std::endl;
   _threadPool_.runJob([this](int iThread){
