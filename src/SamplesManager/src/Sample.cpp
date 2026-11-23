@@ -100,7 +100,7 @@ void Sample::reserveEventMemory(size_t dataSetIndex_, size_t nEvents, const Even
 void Sample::shrinkEventList(size_t newTotalSize_){
 
   if( _loadedDatasetList_.empty() and newTotalSize_ == 0 ){
-    LogAlert << "Empty dataset list. Nothing to shrink." << std::endl;
+    LogInfo << "Empty dataset list. Nothing to shrink." << std::endl;
     return;
   }
 
