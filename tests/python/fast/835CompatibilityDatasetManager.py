@@ -44,13 +44,16 @@ def check_fraction(config_text, first_path):
     builder.setConfigFromYamlString(config_text)
     config = GUNDAM.ConfigUtils.ConfigReader(builder.getConfig())
     config.defineField(GUNDAM.ConfigUtils.ConfigReader.FieldDefinition('fitterEngineConfig'))
-    engine = GUNDAM.FitterEngine()
-    engine.configure(config.fetchValueConfigReader('fitterEngineConfig'))
-    likelihood = engine.getLikelihoodInterface()
-    likelihood.initialize()
-    for propagator in (likelihood.getModelPropagator(), likelihood.getDataPropagator()):
-        events = propagator.getSampleSet().getSampleList()[0].getEventList()
-        assert len(events) == 2, 'Expected one of ten entries from each input file'
+    for override, expected_events in ((None, 2), (0.5, 10)):
+        engine = GUNDAM.FitterEngine()
+        engine.configure(config.fetchValueConfigReader('fitterEngineConfig'))
+        likelihood = engine.getLikelihoodInterface()
+        if override is not None:
+            likelihood.getDatasetManager().setDebugLoadDatasetFraction(fraction=override)
+        likelihood.initialize()
+        for propagator in (likelihood.getModelPropagator(), likelihood.getDataPropagator()):
+            events = propagator.getSampleSet().getSampleList()[0].getEventList()
+            assert len(events) == expected_events, f'Expected {expected_events} events, got {len(events)}'
 
 
 def main():
