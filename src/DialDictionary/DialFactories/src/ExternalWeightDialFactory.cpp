@@ -1,3 +1,12 @@
+/// @file ExternalWeightDialFactory.cpp
+/// @brief Implements the ExternalWeight factory, the shared-memory worker
+///        base and the Python worker.
+/// @ingroup DialDictionary
+///
+/// The public contract of each method is documented in
+/// ExternalWeightDialFactory.h. The comments here describe how each method
+/// does its job.
+
 #include "ExternalWeightDialFactory.h"
 
 #include "ExternalWeightDispatcher.h"
@@ -17,6 +26,9 @@
 #include <utility>
 #include <unistd.h>
 
+/// @par Implementation
+/// shm_open() with O_CREAT | O_EXCL, so an existing block of the same name
+/// is an error; then ftruncate() to the size and mmap() read-write, shared.
 ExternalWeightWorker::SharedMemoryBuffer::SharedMemoryBuffer(
     std::string name_,
     std::size_t nbDoubles_)
@@ -31,12 +43,17 @@ ExternalWeightWorker::SharedMemoryBuffer::SharedMemoryBuffer(
              "Could not map shared memory \"" << posixName << "\": " << std::strerror(errno));
 }
 
+/// @par Implementation
+/// Each step is skipped if the corresponding resource was never obtained.
 ExternalWeightWorker::SharedMemoryBuffer::~SharedMemoryBuffer(){
   if( ptr != nullptr and ptr != MAP_FAILED ){ munmap(ptr, nbBytes); }
   if( fd != -1 ){ close(fd); }
   if( not name.empty() ){ shm_unlink(("/" + name).c_str()); }
 }
 
+/// @par Implementation
+/// The dispatcher shares `_weightList_`, which configureImpl() sized to the
+/// number of bins.
 std::unique_ptr<DialBase> ExternalWeightWorker::makeBinnedDial(std::size_t binIndex_) {
   LogThrowIf(not _useBinnedWeights_,
              "Cannot create a binned ExternalWeight dial when useBinnedWeights is false.");
@@ -45,6 +62,8 @@ std::unique_ptr<DialBase> ExternalWeightWorker::makeBinnedDial(std::size_t binIn
   return std::make_unique<ExternalWeightDispatcher>(_weightList_, binIndex_);
 }
 
+/// @par Implementation
+/// Trims spaces, removes one pair of brackets, then trims again.
 std::string ExternalWeightWorker::normalizeInputName(const std::string& inputName_) {
   auto out = GenericToolbox::trimString(inputName_, " ");
   if( out.size() >= 2 and out.front() == '[' and out.back() == ']' ){
@@ -54,6 +73,9 @@ std::string ExternalWeightWorker::normalizeInputName(const std::string& inputNam
   return out;
 }
 
+/// @par Implementation
+/// In binned mode the binning variables are appended to the input list, so
+/// that each input buffer can hold the bin centres.
 void ExternalWeightWorker::configureImpl() {
 
   _config_.fillValue(_inputEventVarNameList_, "inputEventVarList");
@@ -85,6 +107,9 @@ void ExternalWeightWorker::configureImpl() {
 
 }
 
+/// @par Implementation
+/// The mutex serialises the loading threads, so the returned index is the
+/// order in which events were registered, not their order in the samples.
 std::size_t ExternalWeightWorker::registerEvent(const Event& event_) {
   std::lock_guard<std::mutex> lock(_eventRegistrationMutex_);
   LogThrowIf(_useBinnedWeights_,
@@ -101,6 +126,17 @@ std::size_t ExternalWeightWorker::registerEvent(const Event& event_) {
   return eventIndex;
 }
 
+/// @par Implementation
+/// The shared-memory blocks are named `gdmEW_PID_iK` (input K), `gdmEW_PID_w`
+/// (weights) and, created later by evaluate(), `gdmEW_PID_parameters`, where
+/// PID is the process id. In binned mode each input holds the centre of
+/// each bin for that variable; otherwise the recorded event values are
+/// copied and the in-memory copies are kept.
+/// @warning The names depend only on the process id and the input
+///          position, so two workers whose buffers exist at the same time in
+///          one process (for example two ExternalWeight collections) would
+///          ask for the same names, and the exclusive shm_open() of the
+///          second one would fail.
 void ExternalWeightWorker::finalizeEventLoading() {
   if( _areEventsLoaded_ ){ return; }
 
@@ -170,6 +206,9 @@ void ExternalWeightWorker::finalizeEventLoading() {
   }
 }
 
+/// @par Implementation
+/// The first call evaluates whatever the flag, because the weights are all
+/// 1 until then.
 void ExternalWeightWorker::updateWeights(DialInputBuffer& inputBuffer_) {
   if( not _areEventsLoaded_ ){
     this->finalizeEventLoading();
@@ -180,6 +219,13 @@ void ExternalWeightWorker::updateWeights(DialInputBuffer& inputBuffer_) {
   this->evaluate(inputBuffer_);
 }
 
+/// @par Implementation
+/// The parameter buffer is created on the first call, sized to the input
+/// buffer, and checked against it afterwards. After evaluateImpl() returns,
+/// the weights are copied from shared memory into `_weightList_`, which the
+/// dispatchers read.
+/// @note The size-mismatch message prints `_eventCount_` while the test
+///       compares `_weightCount_`; the two differ in binned mode.
 void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
   LogThrowIf(not this->isInitialized(), "ExternalWeight worker is not initialized.");
   LogThrowIf(_weightBuffer_ == nullptr, "ExternalWeight worker has no weight buffer.");
@@ -203,6 +249,8 @@ void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
   std::copy(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, _weightList_->begin());
 }
 
+/// @par Implementation
+/// The worker is configured with the same `options` block.
 void ExternalWeightDialFactory::configureImpl() {
   _config_.clearFields();
   _config_.defineFields({
@@ -226,16 +274,25 @@ void ExternalWeightDialFactory::configureImpl() {
   // The worker owns the event inputs and the calculated weights.
 }
 
+/// @par Implementation
+/// Delegates to the worker's initialize().
 void ExternalWeightDialFactory::initializeImpl() {
   LogThrowIf(_worker_ == nullptr, "ExternalWeight worker is not configured.");
   _worker_->initialize();
 }
 
+/// @par Implementation
+/// The dispatcher is returned as a raw pointer, as DialFactoryBase requires;
+/// DataDispenser wraps it in a std::unique_ptr.
 DialBase* ExternalWeightDialFactory::makeDial(const Event& event_) {
   const std::size_t eventIndex = _worker_->registerEvent(event_);
   return new ExternalWeightDispatcher(_worker_->getWeightList(), eventIndex);
 }
 
+/// @par Implementation
+/// @note The error messages here and in initializeImpl() mention a
+///       `pythonVenv` option ("pythonExecutable or pythonVenv"), which is
+///       not declared.
 void ExternalWeightPythonWorker::configureImpl() {
   ExternalWeightWorker::configureImpl();
 
@@ -257,10 +314,15 @@ void ExternalWeightPythonWorker::configureImpl() {
              "ExternalWeight PythonWorker requires either pythonExecutable.");
 }
 
+/// @par Implementation
+/// Delegates to stopWorkerProcess(), which does nothing if no child runs.
 ExternalWeightPythonWorker::~ExternalWeightPythonWorker(){
   this->stopWorkerProcess();
 }
 
+/// @par Implementation
+/// Uses access() for the executable (X_OK) and script (R_OK) checks; the
+/// child process itself is only started at the first evaluation.
 void ExternalWeightPythonWorker::initializeImpl() {
 
   LogThrowIf(_pythonExecutable_.empty(),
@@ -282,6 +344,10 @@ void ExternalWeightPythonWorker::initializeImpl() {
   this->validateEvalScript();
 }
 
+/// @par Implementation
+/// fork() and execl() the interpreter with `-m py_compile`, with its stdout
+/// and stderr redirected to a pipe that is read to the end; the exit status
+/// is then checked with waitpid().
 void ExternalWeightPythonWorker::validateEvalScript() {
   int stdoutPipe[2];
   LogThrowIf(pipe(stdoutPipe) == -1,
@@ -329,6 +395,9 @@ void ExternalWeightPythonWorker::validateEvalScript() {
   );
 }
 
+/// @par Implementation
+/// The parameter values are already in shared memory (evaluate()), so the
+/// command only says `evaluate`.
 void ExternalWeightPythonWorker::evaluateImpl(const DialInputBuffer& inputBuffer_) {
   if( not _isWorkerStarted_ ){
     this->startWorkerProcess(inputBuffer_);
@@ -341,6 +410,12 @@ void ExternalWeightPythonWorker::evaluateImpl(const DialInputBuffer& inputBuffer
              "ExternalWeight worker evaluation failed: " << response.dump());
 }
 
+/// @par Implementation
+/// The child runs `python -c BOOTSTRAP evalScript scriptArgs... --worker`
+/// with its stdin and stdout connected to two pipes. The `initialize`
+/// command gives the event and bin counts; the shared-memory name, type
+/// (float64) and shape of each input buffer, of the parameter buffer and of
+/// the weight buffer; and the name, title and position of each parameter.
 void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& inputBuffer_) {
   if( _isWorkerStarted_ ){ return; }
 
@@ -541,6 +616,8 @@ except Exception as error:
              "ExternalWeight worker initialization failed: " << response.dump());
 }
 
+/// @par Implementation
+/// Loops on write() until the whole line is sent.
 void ExternalWeightPythonWorker::sendWorkerCommand(const JsonType& command_) {
   LogThrowIf(_workerInputFd_ == -1, "ExternalWeight worker input pipe is not open.");
 
@@ -555,6 +632,8 @@ void ExternalWeightPythonWorker::sendWorkerCommand(const JsonType& command_) {
   }
 }
 
+/// @par Implementation
+/// Reads one byte at a time up to the newline, then parses the line.
 JsonType ExternalWeightPythonWorker::readWorkerResponse() {
   LogThrowIf(_workerOutputFd_ == -1, "ExternalWeight worker output pipe is not open.");
 
@@ -576,6 +655,9 @@ JsonType ExternalWeightPythonWorker::readWorkerResponse() {
   return {};
 }
 
+/// @par Implementation
+/// Errors during `shutdown` are swallowed, since this also runs from the
+/// destructor.
 void ExternalWeightPythonWorker::stopWorkerProcess() {
   if( _isWorkerStarted_ and _workerInputFd_ != -1 ){
     try{
