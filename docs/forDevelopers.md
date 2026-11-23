@@ -21,6 +21,26 @@ next_page: "faq.html"
 - Commit content must contain a few modifications to the code.
 
 
+# Logging
+
+> Note: existing log messages are still being updated to follow these guidelines
+> (see [#854](https://github.com/gundam-organization/gundam/issues/854)),
+> so you may find older code that doesn't match yet.
+
+GUNDAM prints messages through the [simple-cpp-logger](https://github.com/gundam-organization/simple-cpp-logger) macros
+(`LogError`, `LogAlert`, `LogWarning`, `LogInfo`, `LogDebug`, `LogTrace`).
+Pick the level based on what the message means:
+
+| Severity | Color      | Context                                                                                                                                                              | Implementation                                       |
+|----------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|
+| ERROR    | Red        | Something IS wrong.                                                                                                                                                  | Stop runtime and hint the user what should be changed |
+| ALERT    | Purple     | Something is wrong, but maybe the user knows what they're doing (e.g. using parameter limits with Eigen decomposition). User should know about it. Purple catches the eye. | Always printed out                                   |
+| WARNING  | Yellow     | Important message the user might need to check during the runtime                                                                                                     |                                                      |
+| INFO     | Green      | Generic info that indicates the state of the runtime                                                                                                                  |                                                      |
+| DEBUG    | Blue       | Info for devs                                                                                                                                                        | Only printed on DEBUG builds                         |
+| TRACE    | Light blue | Dev spamming printouts                                                                                                                                               | Never implemented on the main branch                 |
+
+
 # Merging to the official repository
 
 - First of all, create a dedicated entry on the [Issue tracking page](https://github.com/gundam-organization/gundam/issues).
