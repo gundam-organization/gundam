@@ -1889,6 +1889,7 @@ bool DialCollection::makeDialShortCircuit(const std::vector<DialUtils::DialPoint
     // it's flat, let's shortcut
 
     if( not _isCompositeNode_
+        and (_applyToVariable_.empty() or _variableResponseMode_ == VariableResponseMode::Multiply)
         and std::abs( pointList_[0].y - 1.0 ) < 2 * std::numeric_limits<float>::epsilon()
         and _responseSupervisor_.process(1.) == 1. ){
       // one! no need for a dial

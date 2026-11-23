@@ -24,9 +24,9 @@ external libraries to calculate weights.
 | applyOnDataSets        | list(string) | list (regex) of datasets the corresponding dials will apply to         | `["*"]` |
 | applyCondition         | string       | Only apply this dial with formula evaluates to non-zero                | empty   |
 | applyConditions        | list(json)   | Multiple condition formulas (only apply dial if all are true) formulas | n/a     |
-| minDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | -inf    |
+| minDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | see below |
 | maxDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | inf     |
-| dialResponseLimits     | range        | Response bounds as `[min, max]`, `{min: ...}`, or `{max: ...}`           | existing response defaults |
+| dialResponseLimits     | range        | Response bounds as `[min, max]`, `{min: ...}`, or `{max: ...}`           | see below |
 | enableResponseSmoothing | bool       | Apply centered C^2 transitions at finite response bounds | false |
 | dialResponseSmoothingWidth | positive number or range | Transition half-width, shared or separate for each bound | unset |
 | binningFilePath        | string       | binning definition of a set of spline (along with `dialsFilePath`)     |         |
@@ -152,41 +152,8 @@ enableResponseSmoothing: true
 dialResponseSmoothingWidth: 0.1
 ```
 
-Limits also accept `{min: ...}` or `{max: ...}`; omitted bounds are unbounded.
-Widths accept a scalar for both bounds, `[lowerWidth, upperWidth]`, or
-`{min: ..., max: ...}`. Widths keep their order and must be finite and strictly
-positive. Each finite bound needs a width; widths for unbounded sides are unused.
-With two finite bounds, require `lowerWidth + upperWidth <= max - min`.
-
-For a lower bound `L`, half-width `c`, and raw response `w`:
-
-```text
-t = (w - L + c) / (2 * c)
-F(w; L, c) = L                       if w <= L - c
-             L + c * t^3 * (2 - t)  if L - c < w < L + c
-             w                       if w >= L + c
-```
-
-An upper bound `U` uses `U - F(U - w; 0, c)`. The transitions are C^2, with slopes
-between 0 and 1. At `L = 0`, `F(0) = 3*c/16`; zero is reached at `w = -c`.
-Kinks in the input dial itself can remain.
-
-Smoothing is disabled by default; limits then use hard clamping.
-`minDialResponse` (also `minimumSplineResponse`) and `maxDialResponse` are
-deprecated but still read with a warning. If combined with `dialResponseLimits`,
-their values must agree with it. Set `enableResponseSmoothing: false` to disable
-smoothing rather than supplying zero widths.
-
-### Smooth response limits
-
-Smooth the evaluated response near its bounds using centered quartic transitions
-(original engine only):
-
-```yaml
-dialResponseLimits: [0.0, 2.0]
-enableResponseSmoothing: true
-dialResponseSmoothingWidth: 0.1
-```
+By default, event weights have a lower bound of zero. Variable responses and
+intermediate composite responses are unbounded by default.
 
 Limits also accept `{min: ...}` or `{max: ...}`; omitted bounds are unbounded.
 Widths accept a scalar for both bounds, `[lowerWidth, upperWidth]`, or
@@ -592,8 +559,8 @@ rebuilds bin contributions, computes event weights, and fills histograms.
 Smoothing is enabled only through an explicit `binningResponse` configuration;
 its fractions are recomputed using the updated variables.
 
-`Add` and `Override` allow negative responses by default. Explicit
-`minDialResponse` and `maxDialResponse` limits still apply. Variable responses
+All variable response modes allow negative responses by default. Explicit
+`dialResponseLimits` still apply. Variable responses
 are excluded from the event weight and its global reweight cap. Sample selections
 and event-to-dial associations remain those established at loading; derived
 variables are not automatically recalculated after a target variable changes.

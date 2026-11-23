@@ -55,6 +55,10 @@ if( WITH_GUNDAM_ROOT_APP AND WITH_ROOT_DICT_BUILD )
     install(TARGETS GundamRootDict DESTINATION lib)
 
     # Also need to install dict files
+    set(rootDictInstallDependencies)
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.5")
+        set(rootDictInstallDependencies BUILD_DEPENDS G__GundamRootDict)
+    endif()
     install(
         FILES
         ${CMAKE_CURRENT_BINARY_DIR}/libGundamRootDict_rdict.pcm
@@ -63,6 +67,7 @@ if( WITH_GUNDAM_ROOT_APP AND WITH_ROOT_DICT_BUILD )
         ${CMAKE_INSTALL_PREFIX}/lib
         COMPONENT
         libraries
+        ${rootDictInstallDependencies}
     )
 endif()
 
