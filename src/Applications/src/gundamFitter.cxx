@@ -119,7 +119,7 @@ int main(int argc, char** argv){
   // Is build compatible with GPU option?
   if( clParser.isOptionTriggered("usingGpu") ){
     LogExitIf(not hasGPU, "Option --gpu set, but no GPU is available");
-    LogWarning << "Using GPU parallelization." << std::endl;
+    LogInfo << "Using GPU parallelization." << std::endl;
     useCacheManager = true;
   }
 
@@ -155,7 +155,7 @@ int main(int argc, char** argv){
   // inject parameter config?
   std::string injectParameterPath{};
   if( clParser.isOptionTriggered("injectParameterConfig") ){
-    LogWarning << "Inject parameter config: " << clParser.getOptionVal<std::string>("injectParameterConfig") << std::endl;
+    LogInfo << "Inject parameter config: " << clParser.getOptionVal<std::string>("injectParameterConfig") << std::endl;
     injectParameterPath = clParser.getOptionVal<std::string>("injectParameterConfig");
   }
 
@@ -163,7 +163,7 @@ int main(int argc, char** argv){
   std::string toyParInjector{};
   if( clParser.isOptionTriggered("injectToyParameters") ){
     toyParInjector = clParser.getOptionVal<std::string>("injectToyParameters");
-    LogWarning << "Inject toy parameter: " << toyParInjector << std::endl;
+    LogInfo << "Inject toy parameter: " << toyParInjector << std::endl;
   }
 
   // PRNG seed?

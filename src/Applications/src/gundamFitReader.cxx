@@ -86,7 +86,7 @@ int main(int argc, char** argv){
     )};
 
     if( clParser.isOptionTriggered("extractDataToDisk") ){
-      LogWarning << "Output files will be writen under: " << outDir << std::endl;
+      LogInfo << "Output files will be writen under: " << outDir << std::endl;
     }
 
     auto f = std::make_shared<TFile>(file.c_str());
@@ -429,7 +429,7 @@ void readMatrix( const std::string& title_, TMatrixD* matrix_ ){
   LogInfo << GET_VAR_NAME_VALUE(matrix_->IsSymmetric()) << std::endl;
 
   if( clParser.isOptionTriggered("verbose") ){
-    LogWarning << "Decomposing matrix..." << std::endl;
+    LogInfo << "Decomposing matrix..." << std::endl;
     TMatrixDEigen decompMatrix(*matrix_);
 
     double minEigen{std::nan("")};

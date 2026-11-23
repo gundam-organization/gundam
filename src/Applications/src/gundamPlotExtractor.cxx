@@ -41,8 +41,8 @@ int main( int argc, char** argv ){
 
   clp.parseCmdLine();
 
-  LogWarning << "Command line options:" << std::endl;
-  LogWarning << clp.getValueSummary() << std::endl;
+  LogInfo << "Command line options:" << std::endl;
+  LogInfo << clp.getValueSummary() << std::endl;
 
   LogInfo << "Reading config..." << std::endl;
   auto rootFilePath = clp.getOptionVal<std::string>("root-file");
@@ -110,7 +110,7 @@ void walkAndUnfoldTDirectory(TDirectory* dir_, const std::string &saveFolderPath
               ext.c_str()
             );
 
-        LogWarning << outPath << std::endl;
+        LogInfo << outPath << std::endl;
         if( GenericToolbox::isFile(outPath) ){
           std::remove(outPath.c_str());
         }
