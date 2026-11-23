@@ -20,7 +20,7 @@ GundamApp::GundamApp(std::string  appName_) : _appName_(std::move(appName_)) {
 GundamApp::~GundamApp() {
   _greeting_.goodbye();
   if( _outFile_ != nullptr ){
-    LogWarning << "Closing output file \"" << _outFile_->GetName() << "\"..." << std::endl;
+    LogInfo << "Closing output file \"" << _outFile_->GetName() << "\"..." << std::endl;
     _outFile_->Close();
     LogInfo << "Output file closed." << std::endl;
   }
@@ -32,7 +32,7 @@ void GundamApp::setConfigString(const std::string &configString) {
 }
 
 void GundamApp::openOutputFile(const std::string& filePath_){
-  LogWarning << "Creating output file: \"" << filePath_ << "\"..." << std::endl;
+  LogInfo << "Creating output file: \"" << filePath_ << "\"..." << std::endl;
   GenericToolbox::mkdir( GenericToolbox::getFolderPath( filePath_ ) );
   _outFile_ = std::make_unique<TFile>( filePath_.c_str(), "RECREATE" );
 }

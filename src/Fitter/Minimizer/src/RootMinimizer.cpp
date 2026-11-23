@@ -550,7 +550,7 @@ void RootMinimizer::calcErrors(){
   else if( _errorAlgo_ == "Hesse" ){
 
     if( _restoreStepSizeBeforeHesse_ ){
-      LogWarning << "Restoring step size before HESSE..." << std::endl;
+      LogInfo << "Restoring step size before HESSE..." << std::endl;
       for( int iFitPar = 0 ; iFitPar < int(getMinimizerFitParameterPtr().size()) ; iFitPar++ ){
         auto& par = *getMinimizerFitParameterPtr()[iFitPar];
         if(not useNormalizedFitSpace()){ _rootMinimizer_->SetVariableStepSize(iFitPar, par.getStepSize() * _stepSizeScaling_); }
@@ -995,7 +995,7 @@ void RootMinimizer::writePostFitData( TDirectory* saveDir_) {
                                 nFitPars, -0.5, nFitPars - 0.5);
         std::vector<TH1D> eigenBreakdownAccum(decompCovMatrix.GetEigenValues().GetNrows(), eigenBreakdownHist);
         TH1D* lastAccumHist{nullptr};
-        std::string progressTitle = LogWarning.getPrefixString() + "Accumulating eigen components...";
+        std::string progressTitle = LogInfo.getPrefixString() + "Accumulating eigen components...";
         for (int iEigen = decompCovMatrix.GetEigenValues().GetNrows() - 1; iEigen >= 0; iEigen--) {
           GenericToolbox::displayProgressBar(decompCovMatrix.GetEigenValues().GetNrows() - iEigen, decompCovMatrix.GetEigenValues().GetNrows(), progressTitle);
           // iEigen = 0 -> largest error contribution
