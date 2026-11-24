@@ -316,7 +316,7 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("hasVariableResponses", [](const EventDialCache& this_){
     const auto& entries = this_.getCache();
     return std::any_of(entries.begin(), entries.end(), [](const EventDialCache::CacheEntry& entry_){
-      return not entry_.variableResponseCacheList.empty();
+      return entry_.variableResponses != nullptr;
     });
   })
   .def("getCacheMemorySize", &EventDialCache::getCacheMemorySize,

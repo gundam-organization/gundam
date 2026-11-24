@@ -16,6 +16,7 @@
 #include "GenericToolbox.Wrappers.h"
 #include "GenericToolbox.Thread.h"
 
+#include <algorithm>
 #include <memory>
 #include <cstdint>
 #include <vector>
@@ -50,7 +51,6 @@ public:
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.
-    bool appliesToVariable{false};
     double response{std::nan("unset")};
     // Last input revision consumed by this response.
     std::uint64_t inputRevision{std::uint64_t(-1)};
@@ -84,15 +84,33 @@ public:
     std::size_t overrideDial{std::size_t(-1)};
   };
 
+  struct EventVariableResponses {
+    // Indices in cache order so reweighting can skip variable dials without
+    // changing the multiplication order of weight dials.
+    std::vector<std::size_t> dialIndices;
+    std::vector<VariableResponseCache> targets;
+  };
+
   /// The cache element associating a Event to the appropriate
   /// DialInterface.
   struct CacheEntry {
     Event* event;
     std::vector<DialResponseCache> dialResponseCacheList{};
-    std::vector<VariableResponseCache> variableResponseCacheList{};
+    std::shared_ptr<const EventVariableResponses> variableResponses;
     // Stable ownership for event-specific formulas and composites. Ordinary interfaces
     // continue to belong to their DialCollection.
     std::vector<std::shared_ptr<DialInterface>> boundDialInterfaces{};
+
+    [[nodiscard]] const std::vector<VariableResponseCache>& getVariableResponseTargets() const {
+      static const std::vector<VariableResponseCache> empty;
+      return variableResponses != nullptr ? variableResponses->targets : empty;
+    }
+
+    [[nodiscard]] bool isVariableResponse(std::size_t dialIndex_) const {
+      if( variableResponses == nullptr ){ return false; }
+      const auto& indices = variableResponses->dialIndices;
+      return std::binary_search(indices.begin(), indices.end(), dialIndex_);
+    }
 
     [[nodiscard]] std::string getSummary(bool shallow_ = true) const {
       std::stringstream ss;

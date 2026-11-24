@@ -202,7 +202,7 @@ void LikelihoodInterface::validateWeightGradient(bool validateDials_) const {
   for( const auto& entry : _modelPropagator_.getEventDialCache().getCache() ){
     if( entry.event != nullptr ){
       const auto& histogram = samples.at(entry.event->getIndices().sample).getHistogram();
-      for( const auto& target : entry.variableResponseCacheList ){
+      for( const auto& target : entry.getVariableResponseTargets() ){
         const auto& name = entry.event->getVariables().getNameListPtr()->at(target.variableIndex);
         histogram.validateGradientVariable(name);
       }
@@ -347,7 +347,7 @@ void LikelihoodInterface::evalStatLikelihoodGradient(ParameterGradient& gradient
           observableScales[column] += scale * weight * binning.fractionGradients[row][column];
         }
       }
-      for( const auto& target : cacheEntry.variableResponseCacheList ){
+      for( const auto& target : cacheEntry.getVariableResponseTargets() ){
         for( size_t column = 0; column < observableScales.size(); ++column ){
           if( binning.variableIndices[column] == target.variableIndex ){
             cache.evalVariableResponseGradient(cacheEntry, target, gradient_, observableScales[column]);

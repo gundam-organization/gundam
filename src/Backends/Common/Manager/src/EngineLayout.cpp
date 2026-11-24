@@ -225,7 +225,7 @@ namespace {
     for( const auto& entry : eventDialCache.getCache() ){
       if( entry.event == nullptr ){ continue; }
       auto& sample = propagation.samples.at(samplePositionMap.at(entry.event->getIndices().sample));
-      for( const auto& response : entry.variableResponseCacheList ){
+      for( const auto& response : entry.getVariableResponseTargets() ){
         const auto& name = entry.event->getVariables().getNameListPtr()->at(response.variableIndex);
         if( std::find(sample.variableNames.begin(), sample.variableNames.end(), name) == sample.variableNames.end() ){
           sample.variableNames.emplace_back(name);
@@ -248,8 +248,9 @@ namespace {
     std::size_t eventDialCount{0};
     for( const auto& entry : eventDialCache.getCache() ){
       if( entry.event == nullptr ){ continue; }
+      eventDialCount += entry.dialResponseCacheList.size();
+      if( entry.variableResponses != nullptr ){ eventDialCount -= entry.variableResponses->dialIndices.size(); }
       for( const auto& response : entry.dialResponseCacheList ){
-        if( not response.appliesToVariable ){ ++eventDialCount; }
         const auto* interface = response.dialInterface;
         LogThrowIf(interface == nullptr, "Null DialInterface while building EngineView.");
         if( not dialIndexMap.emplace(interface, uncompiledDial).second ){ continue; }
@@ -300,7 +301,7 @@ namespace {
       for( const auto& dialResponse : cacheEntry.dialResponseCacheList ){
         const auto* interface = dialResponse.dialInterface;
         LogThrowIf(interface == nullptr, "Null DialInterface while building EngineView.");
-        if( dialResponse.appliesToVariable ){
+        if( cacheEntry.isVariableResponse(allDialIndices.size()) ){
           const auto* buffer = interface->getInputBufferRef();
           if( buffer != nullptr and variableInputBuffers.insert(buffer).second ){
             bindings_.variableInputBuffers.emplace_back(buffer);
@@ -465,7 +466,7 @@ namespace {
       }
 
       for( std::size_t i = 0; i < allDialIndices.size(); ++i ){
-        if( not cacheEntry.dialResponseCacheList[i].appliesToVariable ){
+        if( not cacheEntry.isVariableResponse(i) ){
           propagation.eventDialIndices.emplace_back(allDialIndices[i]);
         }
       }
@@ -473,15 +474,16 @@ namespace {
       eventRef.firstVariable = propagation.variableValues.size();
       eventRef.variableCount = sample.variableNames.size();
       const auto& variables = cacheEntry.event->getVariables();
+      const auto& targets = cacheEntry.getVariableResponseTargets();
       for( const auto& name : sample.variableNames ){
         int index = variables.findVarIndex(name);
-        bool isTarget = std::any_of(cacheEntry.variableResponseCacheList.begin(), cacheEntry.variableResponseCacheList.end(),
+        bool isTarget = std::any_of(targets.begin(), targets.end(),
                                     [&](const auto& target_){ return target_.variableIndex == index; });
         bindings_.variables.push_back({cacheEntry.event, index, propagation.variableValues.size(), isTarget});
         propagation.variableValues.emplace_back(variables.getVarList()[index].getVarAsDouble());
       }
       eventRef.firstVariableResponse = propagation.variableResponses.size();
-      for( const auto& target : cacheEntry.variableResponseCacheList ){
+      for( const auto& target : targets ){
         Backends::BackendVariableResponseDescriptor response;
         const auto& name = variables.getNameListPtr()->at(target.variableIndex);
         response.variableIndex = eventRef.firstVariable
