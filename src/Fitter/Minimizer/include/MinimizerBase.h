@@ -119,6 +119,7 @@ public:
   void setDisableCalcError(bool disableCalcError_){ _isEnabledCalcError_ = not disableCalcError_; }
 
   // const getters
+  [[nodiscard]] bool useNormalizedFitSpace() const { return _useNormalizedFitSpace_; }
   [[nodiscard]] bool isCheckFlatDirectionsBeforeMinimizeEnabled() const { return _checkFlatDirectionsBeforeMinimize_; }
   [[nodiscard]] bool disableCalcError() const{ return not _isEnabledCalcError_; }
 
@@ -180,8 +181,6 @@ protected:
   // validity without setting this to true.
   void setCheckParameterValidity(bool c) {_checkParameterValidity_ = c;}
 
-  // Query if a normalized fit space is being used.
-  bool useNormalizedFitSpace() const {return _useNormalizedFitSpace_;}
   int* getNbFreeParametersPtr() {return &_nbFreeParameters_;}
 
 protected:

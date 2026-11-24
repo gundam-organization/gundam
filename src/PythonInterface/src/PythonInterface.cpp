@@ -17,6 +17,11 @@
 #include "SampleSet.h"
 #include "ConfigUtils.h"
 #include "GundamApp.h"
+#include "GundamUtils.h"
+
+#ifdef GUNDAM_USING_CACHE_MANAGER
+#include "CacheManager.h"
+#endif
 
 #ifdef GUNDAM_USING_BACKENDS
 #include "CpuBackend.h"
@@ -43,6 +48,7 @@
 #include <pybind11/chrono.h>
 #include <pybind11/stl_bind.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cerrno>
 #include <cstring>
@@ -100,9 +106,15 @@ void flushOutput(){
 
 PYBIND11_MODULE(GUNDAM, module) {
   module.doc() = "GUNDAM engine interface for python";
+  module.attr("__version__") = GundamUtils::getVersionFullStr();
 
   // GundamGlobals namespace
   module.def("setNumberOfThreads", &GundamGlobals::setNumberOfThreads, "Set the number of threads for Gundam");
+  module.def("disableLegacyCacheManager", []{
+#ifdef GUNDAM_USING_CACHE_MANAGER
+    Cache::Manager::SetIsEnabled(false);
+#endif
+  }, "Disable the legacy accelerator cache before initializing the fitter.");
   module.def("setLightOutputMode", &GundamGlobals::setLightOutputMode, "Reduce the amount of outputs in the root files");
   module.def("setIsDebug", &GundamGlobals::setIsDebug, "Enables debug printouts");
   module.def("setRuntimeWorkingDirectory", &setRuntimeWorkingDirectory,
@@ -301,6 +313,12 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::bind_vector<std::vector<EventDialCache::CacheEntry>>(module, "EventDialCacheEntryList");
 
   pybind11::class_<EventDialCache>(module, "EventDialCache")
+  .def("hasVariableResponses", [](const EventDialCache& this_){
+    const auto& entries = this_.getCache();
+    return std::any_of(entries.begin(), entries.end(), [](const EventDialCache::CacheEntry& entry_){
+      return not entry_.variableResponseCacheList.empty();
+    });
+  })
   .def("getCacheMemorySize", &EventDialCache::getCacheMemorySize,
        "Allocated bytes in cache vector buffers; excludes events, dial objects and allocator overhead.")
   .def("getFillIndex", &EventDialCache::getFillIndex)
@@ -314,6 +332,10 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("isFixed", &Parameter::isFixed)
   .def("isPenaltyDisabled", &Parameter::isPenaltyDisabled)
   .def("isInDomain", &Parameter::isInDomain, pybind11::arg("value"), pybind11::arg("verbose") = false)
+  .def("isValidValue", &Parameter::isValidValue)
+  .def("toNormalizedValue", [](const Parameter& this_, double value_){
+    return ParameterSet::toNormalizedParValue(value_, this_);
+  })
   .def("isFree", &Parameter::isFree)
   .def("getStepSize", &Parameter::getStepSize)
   .def("getPriorValue", &Parameter::getPriorValue)
@@ -470,6 +492,13 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("getIThrow", &Propagator::getIThrow)
   .def(pybind11::init())
   .def("propagateParameters", &Propagator::propagateParameters)
+  .def("getCpuPropagationTimings", [](const Propagator& this_){
+    pybind11::dict timings;
+    timings["dialUpdateSeconds"] = this_.getDialManager().getUpdateTimer().eval().count();
+    timings["reweightSeconds"] = this_.reweightTimer.eval().count();
+    timings["histogramFillSeconds"] = this_.refillHistogramTimer.eval().count();
+    return timings;
+  }, "Return original CPU stage times in seconds, averaged over the last ten propagations.")
   .def("throwToyParameters", &Propagator::throwToyParameters, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("throwStatErrors", &Propagator::throwStatErrors, pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("updateEventSampleBinning", &Propagator::updateEventSampleBinning,
@@ -571,6 +600,7 @@ PYBIND11_MODULE(GUNDAM, module) {
 
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
+  .def("useNormalizedFitSpace", &MinimizerBase::useNormalizedFitSpace)
   .def("isRootMinimizer", [](const MinimizerBase& this_){
     return dynamic_cast<const RootMinimizer*>(&this_) != nullptr;
   })
