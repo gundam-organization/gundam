@@ -47,7 +47,6 @@ public:
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.
-    bool appliesToVariable{false};
     double response{std::nan("unset")};
     // Last input revision consumed by this response.
     std::uint64_t inputRevision{std::uint64_t(-1)};
@@ -81,12 +80,19 @@ public:
     std::size_t overrideDial{std::size_t(-1)};
   };
 
+  struct EventVariableResponses {
+    // Indices in cache order so reweighting can skip variable dials without
+    // changing the multiplication order of weight dials.
+    std::vector<std::size_t> dialIndices;
+    std::vector<VariableResponseCache> targets;
+  };
+
   /// The cache element associating a Event to the appropriate
   /// DialInterface.
   struct CacheEntry {
     Event* event;
     std::vector<DialResponseCache> dialResponseCacheList{};
-    std::vector<VariableResponseCache> variableResponseCacheList{};
+    std::shared_ptr<const EventVariableResponses> variableResponses;
     // Stable ownership for event-specific formulas and composites. Ordinary interfaces
     // continue to belong to their DialCollection.
     std::vector<std::shared_ptr<DialInterface>> boundDialInterfaces{};
