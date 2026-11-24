@@ -40,20 +40,21 @@ public:
   struct DialResponseCache {
     DialResponseCache() = delete; // prevent not setting up the interface ptr
     explicit DialResponseCache( DialInterface& interface_ )
-      : dialInterface(&interface_), inputRevisionPtr(interface_.getInputBufferRef()->getRevisionPtr()) {}
+      : dialInterface(&interface_) {
+      const auto* inputBuffer = interface_.getInputBufferRef();
+      if( inputBuffer != nullptr ){ _currentInputRevision_ = inputBuffer->getRevisionPtr(); }
+    }
     // The dial interface to be used with the Event.
     DialInterface* dialInterface{nullptr};
     // The cached result calculated by the dial.
     bool appliesToVariable{false};
     double response{std::nan("unset")};
-    // Cache the revision address to avoid following the interface and input
-    // buffer pointers for every response, including unchanged parameters.
-    const std::uint64_t* inputRevisionPtr{nullptr};
+    // Last input revision consumed by this response.
     std::uint64_t inputRevision{std::uint64_t(-1)};
     void update(){
       // Retain changes until this response consumes them, even when the
       // input buffer has been updated again in the meantime.
-      auto revision = *inputRevisionPtr;
+      const auto revision = *_currentInputRevision_;
       if( inputRevision != revision ) {
         response = dialInterface->evalResponse();
         inputRevision = revision;
@@ -63,6 +64,11 @@ public:
       this->update();
       return response;
     }
+
+  private:
+    // The input buffer is bound before event cache construction and lives
+    // for the lifetime of the cache entry.
+    const std::uint64_t* _currentInputRevision_{nullptr};
   };
 
   /// Per-event target, with responses indexed into dialResponseCacheList.
