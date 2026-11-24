@@ -17,6 +17,36 @@ wrapper uses the name of the Python profiler it launches. Existing directories
 are not overwritten. For compatibility, `743BackendsMpsBinningBenchmark.py` also
 accepts an explicit `.json` output file; directory outputs contain `summary.json`.
 
+## Original CPU reweight with OA2024 inputs
+
+Use a Release build with `WITH_PYTHON_INTERFACE=ON` and put the matching
+`GUNDAM` module on `PYTHONPATH`. Run on a compute node with eight CPUs allocated
+and with the same input environment as the fit, including `OA_INPUT_FOLDER`.
+
+```sh
+python /path/to/gundam/tests/python/benchmarks/OriginalReweightBenchmark.py \
+  --work-dir /path/to/GundamInputOA2024 \
+  -c configOA2024.yaml -of override/v13Prod.yaml -t 8 \
+  --output /path/to/oa2024-original-baseline
+```
+
+The benchmark uses the dataset's selected data entries as in a fitter run
+without `-a`. It disables the backend manager and the legacy accelerator cache
+and requires fixed event binning and weight-only dials. It initializes the
+fitter once, warms each scenario, then calls the same value callback as the
+minimizer without running minimization. The single-parameter scenario alternates
+between the initial point and a shift of one fit parameter. The multiple-parameter
+scenario varies the eligible coordinates together. Both reuse the same points
+in each block.
+
+`config.json` records the merged configuration. `summary.json` records the
+parameter coordinates, per-point LLH components, and timings in seconds per
+call. The callback time includes Python argument conversion. The three native
+timings cover dial updates, event reweight and histogram filling within that
+callback. Each native value is the mean of the ten calls in its block, and the
+reported median is over block means. Compare the per-point LLH components first
+when benchmarking an optimization with the same inputs, seed, and CPU allocation.
+
 ## CPU formulas and composites with Eb migration
 
 `727BackendsCpuFormulaCompositeBenchmark.py` replays the five physical Eb parameters on
