@@ -31,7 +31,7 @@ def check_profile_support(output, write_json):
     return status
 
 
-def record_profile(output, evaluate, calls, write_json, progress):
+def record_profile(output, evaluate, calls, write_json, progress, *, include_call_graph=False):
     status_path = output / 'perf-status.json'
     executable = shutil.which('perf') if sys.platform.startswith('linux') else None
     if executable is None:
@@ -82,13 +82,18 @@ def record_profile(output, evaluate, calls, write_json, progress):
             status['complete'] = (status['calls'] == calls and stopped_normally
                                   and data.exists() and data.stat().st_size > 0)
             write_json(status_path, status)
-    if status['complete'] and data.exists():
+    if status['complete']:
         report = [executable, 'report', '--stdio', '--no-children', '--sort', 'dso,symbol',
                   '--percent-limit', '0.5', '-g', 'none', '-i', str(data)]
         annotate = [executable, 'annotate', '--stdio', '--no-source', '--percent-limit', '1',
                     '-i', str(data)]
-        for name, path, arguments in [('report', 'perf-report.txt', report),
-                                      ('annotate', 'perf-annotate.txt', annotate)]:
+        reports = [('report', 'perf-report.txt', report),
+                   ('annotate', 'perf-annotate.txt', annotate)]
+        if include_call_graph:
+            call_graph = [executable, 'report', '--stdio', '--children', '--percent-limit', '0.5',
+                          '-i', str(data)]
+            reports.append(('callGraph', 'perf-call-graph.txt', call_graph))
+        for name, path, arguments in reports:
             with (output / path).open('w') as text:
                 try:
                     result = subprocess.run(arguments, stdout=text, stderr=subprocess.STDOUT, timeout=30)

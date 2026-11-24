@@ -47,6 +47,22 @@ callback. Each native value is the mean of the ten calls in its block, and the
 reported median is over block means. Compare the per-point LLH components first
 when benchmarking an optimization with the same inputs, seed, and CPU allocation.
 
+Add `--profile --profile-blocks 3` to record a separate Linux `perf` pass
+after writing the timing results. Each pass samples user-space CPU cycles
+across the fitter process and its worker threads while replaying 30 LLH
+evaluations. Use a Release build with debug symbols to resolve call stacks
+and identify inlined code. Each scenario has its own directory under
+`profiles/` with `perf-report.txt` for time attributed directly to each
+symbol, `perf-call-graph.txt` for time including callees, and
+`perf-annotate.txt` for instruction-level attribution. Compare the two
+profiles around `EventDialCache::reweightEntry` and the dial evaluation
+functions it calls. The sample percentages describe CPU cycles during the
+profile pass. The wall-clock measurements are in `summary.json`.
+
+If the node lacks `perf` or restricts its use, check
+`profiles/perf-status.json` and any per-scenario status and log files.
+The timing report is available independently of profiler support.
+
 ## CPU formulas and composites with Eb migration
 
 `727BackendsCpuFormulaCompositeBenchmark.py` replays the five physical Eb parameters on

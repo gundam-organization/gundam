@@ -3,6 +3,7 @@
 
 import argparse
 from datetime import datetime
+from itertools import cycle
 import json
 import math
 from pathlib import Path
@@ -14,6 +15,31 @@ import time
 
 # The original propagation timers retain the last ten calls.
 CALLS_PER_BLOCK = 10
+
+
+def write_json(path, report):
+    path.write_text(json.dumps(report, indent=2, allow_nan=False) + '\n')
+
+
+def profile_scenarios(output, points, evaluate, blocks):
+    from CpuSamplingProfile import check_profile_support, record_profile
+
+    profile_dir = output / 'profiles'
+    profile_dir.mkdir()
+    preflight = check_profile_support(profile_dir, write_json)
+    if not preflight['available']:
+        print(preflight['reason'], flush=True)
+        return
+
+    for name, sequence in points.items():
+        scenario_dir = profile_dir / name
+        scenario_dir.mkdir()
+        for point in sequence:
+            evaluate(point)
+        replay = cycle(sequence)
+        print(f'Profiling {name}', flush=True)
+        record_profile(scenario_dir, lambda: evaluate(next(replay)), blocks * CALLS_PER_BLOCK,
+                       write_json, lambda message: print(message, flush=True), include_call_graph=True)
 
 
 def make_points(parameters, normalized, amplitude, seed):
@@ -73,9 +99,11 @@ def main():
     parser.add_argument('--amplitude', type=float, default=0.01,
                         help='Maximum shift in units of prior sigma (or nominal step size for flat parameters)')
     parser.add_argument('--blocks', type=int, default=20, help='Measured blocks of ten calls per scenario')
+    parser.add_argument('--profile', action='store_true', help='Record a separate Linux perf pass per scenario')
+    parser.add_argument('--profile-blocks', type=int, default=3, help='Profiled blocks of ten calls per scenario')
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
-    if args.threads < 1 or args.blocks < 1 or not 1 <= args.seed < 2**32:
+    if min(args.threads, args.blocks, args.profile_blocks) < 1 or not 1 <= args.seed < 2**32:
         parser.error('Threads and blocks must be positive, and seed must be in [1, 2**32).')
     if not math.isfinite(args.amplitude) or args.amplitude <= 0:
         parser.error('Amplitude must be positive and finite.')
@@ -184,8 +212,10 @@ def main():
               flush=True)
 
     path = output / 'summary.json'
-    path.write_text(json.dumps(report, indent=2, allow_nan=False) + '\n')
+    write_json(path, report)
     print(path, flush=True)
+    if args.profile:
+        profile_scenarios(output, points, evaluate, args.profile_blocks)
 
 
 if __name__ == '__main__':
