@@ -33,8 +33,8 @@ int main( int argc, char** argv ){
 
   clp.parseCmdLine();
 
-  LogWarning << "Command line options:" << std::endl;
-  LogWarning << clp.getValueSummary() << std::endl;
+  LogInfo << "Command line options:" << std::endl;
+  LogInfo << clp.getValueSummary() << std::endl;
 
   LogInfo << "Reading config..." << std::endl;
 
@@ -64,7 +64,7 @@ int main( int argc, char** argv ){
   }
   else{
     std::cout << configHandler.toString() << std::endl;
-    LogWarning << ">> To dump config in file, use -o option." << std::endl;
+    LogInfo << ">> To dump config in file, use -o option." << std::endl;
   }
 
   g.goodbye();

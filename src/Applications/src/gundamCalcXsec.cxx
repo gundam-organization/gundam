@@ -85,7 +85,7 @@ int main(int argc, char** argv){
   ConfigReader fitterConfig; // will be used to load the propagator
 
   if( GenericToolbox::hasExtension(fitterFile, "root") ){
-    LogWarning << "Opening fitter output file: " << fitterFile << std::endl;
+    LogInfo << "Opening fitter output file: " << fitterFile << std::endl;
     fitterRootFile = std::unique_ptr<TFile>( TFile::Open( fitterFile.c_str() ) );
     LogThrowIf( fitterRootFile == nullptr or fitterRootFile->IsZombie(), "Could not open fitter output file." );
 
@@ -101,7 +101,7 @@ int main(int argc, char** argv){
     });
   }
   else{
-    LogWarning << "Reading fitter config file: " << fitterFile << std::endl;
+    LogInfo << "Reading fitter config file: " << fitterFile << std::endl;
     fitterConfig = ConfigReader(GenericToolbox::Json::readConfigFile( fitterFile ));
 
     clParser.getOptionPtr("usePreFit")->setIsTriggered( true );
@@ -225,7 +225,7 @@ int main(int argc, char** argv){
   if( clParser.isOptionTriggered("dryRun") ){
     std::cout << engineConfig.toString() << std::endl;
 
-    LogAlert << "Exiting as dry-run is set." << std::endl;
+    LogInfo << "Exiting as dry-run is set." << std::endl;
     return EXIT_SUCCESS;
   }
 
@@ -233,7 +233,7 @@ int main(int argc, char** argv){
   if( not clParser.isOptionTriggered("usePreFit") and fitterRootFile != nullptr ){
 
     // Load post-fit parameters as "prior" so we can reset the weight to this point when throwing toys
-    LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit parameters...") << std::endl;
+    LogInfo << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit parameters...") << std::endl;
     RootUtils::ObjectReader::readObject<TNamed>( fitterRootFile.get(), "FitterEngine/postFit/parState_TNamed", [&](TNamed* parState_){
       propagator.getParametersManager().injectParameterValues( GenericToolbox::Json::readConfigJsonStr( parState_->GetTitle() ) );
       for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){
@@ -251,7 +251,7 @@ int main(int argc, char** argv){
     });
 
     // Load the post-fit covariance matrix
-    LogWarning << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit covariance matrix...") << std::endl;
+    LogInfo << std::endl << GenericToolbox::addUpDownBars("Injecting post-fit covariance matrix...") << std::endl;
     RootUtils::ObjectReader::readObject<TH2D>(
         fitterRootFile.get(), "FitterEngine/postFit/Hesse/hessian/postfitCovarianceOriginal_TH2D",
         [&](TH2D* hCovPostFit_){
@@ -680,7 +680,7 @@ int main(int argc, char** argv){
   };
 
   {
-    LogWarning << "Calculating weight at best-fit" << std::endl;
+    LogInfo << "Calculating weight at best-fit" << std::endl;
     for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveParametersToPrior(); }
     propagator.propagateParameters();
     writeBinDataFct(false);
@@ -692,7 +692,7 @@ int main(int argc, char** argv){
   //////////////////////////////////////
   // THROWS LOOP
   /////////////////////////////////////
-  LogWarning << std::endl << GenericToolbox::addUpDownBars( "Generating toys..." ) << std::endl;
+  LogInfo << std::endl << GenericToolbox::addUpDownBars( "Generating toys..." ) << std::endl;
   propagator.getParametersManager().initializeStrippedGlobalCov();
 
   // stats printing
@@ -703,7 +703,7 @@ int main(int argc, char** argv){
   GenericToolbox::Time::AveragedTimer<1> writeTimer{};
   GenericToolbox::TablePrinter t{};
   std::stringstream progressSs;
-  std::stringstream ss; ss << LogWarning.getPrefixString() << "Generating " << nToys << " toys...";
+  std::stringstream ss; ss << LogInfo.getPrefixString() << "Generating " << nToys << " toys...";
   for( int iToy = 0 ; iToy < nToys ; iToy++ ){
 
     t.reset();

@@ -95,11 +95,11 @@ int main( int argc, char** argv ){
     if( clp.isOptionTriggered("use-prefit-2") ){ appendixDict.emplace_back("use-prefit-2", "PreFit"); }
 
     outPath = "gundamFitCompare_" + GundamUtils::generateFileName(clp, appendixDict) + ".root";
-    LogWarning << "Output file: " << outPath << std::endl;
+    LogInfo << "Output file: " << outPath << std::endl;
   }
   outFile = TFile::Open(outPath.c_str(), "RECREATE");
 
-  LogAlert << std::endl << "Starting comparison..." << std::endl;
+  LogInfo << std::endl << "Starting comparison..." << std::endl;
 
   if( clp.isOptionTriggered("compare-event-trees") ){
 
@@ -124,7 +124,7 @@ int main( int argc, char** argv ){
   LogInfo << "Comparing postFit (normalized) errors..." << std::endl;
   makeErrorComparePlots(false, true);
 
-  LogAlert << std::endl << "Closing: " << outPath << std::endl;
+  LogInfo << std::endl << "Closing: " << outPath << std::endl;
   outFile->Close();
 
   g.goodbye();
