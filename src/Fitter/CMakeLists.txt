@@ -6,6 +6,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/MinimizerBase.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/SimpleMcmc.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/RootMinimizer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Minimizer/src/IterativeSearch.cpp
   )
 
 if( USE_STATIC_LINKS )
