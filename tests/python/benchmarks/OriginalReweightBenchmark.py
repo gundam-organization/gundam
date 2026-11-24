@@ -21,25 +21,33 @@ def write_json(path, report):
     path.write_text(json.dumps(report, indent=2, allow_nan=False) + '\n')
 
 
-def profile_scenarios(output, points, evaluate, blocks):
-    from CpuSamplingProfile import check_profile_support, record_profile
+def profile_scenarios(output, points, evaluate, blocks, *, sample, counters):
+    from CpuSamplingProfile import check_profile_support, record_counters, record_profile
 
     profile_dir = output / 'profiles'
     profile_dir.mkdir()
-    preflight = check_profile_support(profile_dir, write_json)
-    if not preflight['available']:
-        print(preflight['reason'], flush=True)
+    if sample:
+        preflight = check_profile_support(profile_dir, write_json)
+        sample = preflight['available']
+        if not sample:
+            print(preflight['reason'], flush=True)
+    if not (sample or counters):
         return
 
+    calls = blocks * CALLS_PER_BLOCK
     for name, sequence in points.items():
         scenario_dir = profile_dir / name
         scenario_dir.mkdir()
         for point in sequence:
             evaluate(point)
         replay = cycle(sequence)
-        print(f'Profiling {name}', flush=True)
-        record_profile(scenario_dir, lambda: evaluate(next(replay)), blocks * CALLS_PER_BLOCK,
-                       write_json, lambda message: print(message, flush=True), include_call_graph=True)
+        if sample:
+            print(f'Profiling {name}', flush=True)
+            record_profile(scenario_dir, lambda: evaluate(next(replay)), calls,
+                           write_json, lambda message: print(message, flush=True), include_call_graph=True)
+        if counters:
+            print(f'Counting hardware events for {name}', flush=True)
+            record_counters(scenario_dir, lambda: evaluate(next(replay)), calls, write_json)
 
 
 def make_points(parameters, normalized, amplitude, seed):
@@ -100,6 +108,7 @@ def main():
                         help='Maximum shift in units of prior sigma (or nominal step size for flat parameters)')
     parser.add_argument('--blocks', type=int, default=20, help='Measured blocks of ten calls per scenario')
     parser.add_argument('--profile', action='store_true', help='Record a separate Linux perf pass per scenario')
+    parser.add_argument('--perf-stat', action='store_true', help='Count hardware events in a separate perf pass')
     parser.add_argument('--profile-blocks', type=int, default=3, help='Profiled blocks of ten calls per scenario')
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
@@ -214,8 +223,9 @@ def main():
     path = output / 'summary.json'
     write_json(path, report)
     print(path, flush=True)
-    if args.profile:
-        profile_scenarios(output, points, evaluate, args.profile_blocks)
+    if args.profile or args.perf_stat:
+        profile_scenarios(output, points, evaluate, args.profile_blocks,
+                          sample=args.profile, counters=args.perf_stat)
 
 
 if __name__ == '__main__':

@@ -7,6 +7,53 @@ import sys
 import time
 
 
+def record_counters(output, evaluate, calls, write_json):
+    """Count hardware events while replaying resident evaluations."""
+    executable = shutil.which('perf') if sys.platform.startswith('linux') else None
+    status_path = output / 'perf-stat-status.json'
+    if executable is None:
+        write_json(status_path, {'complete': False, 'reason': 'Linux perf unavailable'})
+        return
+
+    # Limit the event list to common PMU events. Linux perf reports the
+    # enabled/running ratio and marks events unsupported by the node's PMU.
+    events = 'cycles:u,instructions:u,cache-references:u,cache-misses:u,branches:u,branch-misses:u'
+    path = output / 'perf-stat.csv'
+    command = [executable, 'stat', '-x', ';', '-e', events, '-p', str(os.getpid()), '-o', str(path)]
+    status = {'command': command, 'requestedCalls': calls, 'calls': 0, 'complete': False}
+    with (output / 'perf-stat.log').open('w') as log:
+        try:
+            child = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+        except OSError as error:
+            status['reason'] = str(error)
+            write_json(status_path, status)
+            return
+        try:
+            time.sleep(.25)
+            if child.poll() is None:
+                started = time.monotonic()
+                for _ in range(calls):
+                    evaluate()
+                    status['calls'] += 1
+                status['evaluationWallSeconds'] = time.monotonic() - started
+        finally:
+            stop_requested = child.poll() is None
+            if stop_requested:
+                child.send_signal(signal.SIGINT)
+            try:
+                child.wait(timeout=15)
+            except subprocess.TimeoutExpired:
+                child.kill()
+                child.wait()
+                status['reason'] = 'perf stat did not stop promptly'
+            status['exitCode'] = child.returncode
+            stopped_normally = child.returncode == 0 or (
+                stop_requested and child.returncode == -signal.SIGINT)
+            status['complete'] = (status['calls'] == calls and stopped_normally
+                                  and path.exists() and path.stat().st_size > 0)
+            write_json(status_path, status)
+
+
 def check_profile_support(output, write_json):
     executable = shutil.which('perf') if sys.platform.startswith('linux') else None
     status = {'available': False, 'phase': 'preflight'}

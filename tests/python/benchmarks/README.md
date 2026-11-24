@@ -63,6 +63,14 @@ If the node lacks `perf` or restricts its use, check
 `profiles/perf-status.json` and any per-scenario status and log files.
 The timing report is available independently of profiler support.
 
+Add `--perf-stat` to collect hardware counters in a separate replay. It can
+run with or without `--profile` and uses the same `--profile-blocks` setting.
+Each scenario writes `perf-stat.csv` and `perf-stat-status.json`. Compare
+cycles, instructions, cache misses and branch misses per evaluated point using
+the actual call count in the status file. Check for unsupported or multiplexed
+events in the CSV. Generic cache events depend on the node's CPU and do not
+identify the cache level responsible for a stall.
+
 ## CPU formulas and composites with Eb migration
 
 `727BackendsCpuFormulaCompositeBenchmark.py` replays the five physical Eb parameters on
