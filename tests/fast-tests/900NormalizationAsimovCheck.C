@@ -12,7 +12,9 @@ root -b -n <<EOF
 
 #include <TFile.h>
 #include <TH1.h>
-#include <TObjString.h>
+#include <TKey.h>
+#include <TTreeReader.h>
+#include <TTreeReaderValue.h>
 
 std::string args{"$*"};
 int status{0};
@@ -65,13 +67,28 @@ int main() {
     EXPECT("File must be open", file->IsOpen());
     if (not file->IsOpen()) return status;
 
-    auto* log = file->Get<TObjString>("gundam/runtime/logger");
-    EXPECT("Logger output includes the start of the fit",
-           (log && log->GetString().Contains("Running the fitter...")));
-    EXPECT("Logger output includes the output file creation",
-           (log && log->GetString().Contains("Creating output file:")));
-    EXPECT("Logger output includes the end of the run",
-           (log && log->GetString().Contains("Closing output file")));
+    auto* runtimeDir = file->GetDirectory("gundam/runtime");
+    EXPECT("Runtime directory exists", runtimeDir);
+    if (runtimeDir == nullptr) return status;
+    int loggerKeys = 0;
+    for (auto* key : *runtimeDir->GetListOfKeys()) {
+        if (std::string(key->GetName()) == "logger") ++loggerKeys;
+    }
+    EXPECT("Logger tree has one key", (loggerKeys == 1));
+
+    TTreeReader logReader("gundam/runtime/logger", file.get());
+    TTreeReaderValue<std::string> line(logReader, "text");
+    bool createdOutput = false;
+    bool startedFit = false;
+    bool closedOutput = false;
+    while (logReader.Next()) {
+        createdOutput |= line->find("Creating output file:") != std::string::npos;
+        startedFit |= line->find("Running the fitter...") != std::string::npos;
+        closedOutput |= line->find("Closing output file") != std::string::npos;
+    }
+    EXPECT("Logger output includes the output file creation", createdOutput);
+    EXPECT("Logger output includes the start of the fit", startedFit);
+    EXPECT("Logger output includes the end of the run", closedOutput);
 
     TH1* postFitErrorsMigrad
         = dynamic_cast<TH1*>(file->Get(
