@@ -3,6 +3,7 @@
 //
 
 #include "GundamApp.h"
+#include "ShowLogsSource.h"
 
 #include "GenericToolbox.Root.h"
 #include "GenericToolbox.Time.h"
@@ -14,6 +15,7 @@
 
 #include <iostream>
 #include <memory>
+#include <sstream>
 
 
 GundamApp::GundamApp(std::string  appName_)
@@ -82,24 +84,10 @@ void GundamApp::openOutputFile(const std::string& filePath_){
       _logTree_->SetAutoSave(-256*1024);
 
       TMacro showLogs("showLogs", "Display the GUNDAM run log");
-      const char* source[] = {
-        "#include <TDirectory.h>",
-        "#include <TTreeReader.h>",
-        "#include <TTreeReaderValue.h>",
-        "#include <iostream>",
-        "#include <string>",
-        "void showLogs() {",
-        "  auto* file = gDirectory ? gDirectory->GetFile() : nullptr;",
-        "  if (!file) {",
-        "    std::cerr << \"Select a GUNDAM ROOT file before running showLogs.\\n\";",
-        "    return;",
-        "  }",
-        "  TTreeReader reader(\"gundam/runtime/logger\", file);",
-        "  TTreeReaderValue<std::string> line(reader, \"text\");",
-        "  while (reader.Next()) std::cout << *line << '\\n';",
-        "}"
-      };
-      for( const auto* line : source ) showLogs.AddLine(line);
+      std::istringstream source(showLogsSource);
+      for( std::string line; std::getline(source, line); ){
+        showLogs.AddLine(line.c_str());
+      }
       runtimeDir->WriteObject(&showLogs, "showLogs", "Overwrite");
       _logExitHandler_ = std::make_unique<LoggerDetail::ScopedExitHandler>([this]{ closeOutputFile(); });
     }
