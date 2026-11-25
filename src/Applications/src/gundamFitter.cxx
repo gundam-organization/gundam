@@ -274,6 +274,7 @@ int main(int argc, char** argv){
   // Ok, we should run. Create the out file.
   app.openOutputFile(outFileName);
   app.writeAppInfo();
+  app.flushRecordedLogs();
 
   if( clParser.isOptionTriggered("hyper-dry-run") ) {
     LogInfo << "Hyper-dry-run enabled. Stopping here." << std::endl;
@@ -286,6 +287,9 @@ int main(int argc, char** argv){
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter(GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine"));
+  if( clParser.isOptionTriggered("recordLogs") ){
+    fitter.setBeforeLikelihoodEvaluation([&app]{ app.flushRecordedLogs(); });
+  }
 
   gundamFitterConfig.fillValue(fitter.getConfig(), "fitterEngineConfig");
 
@@ -296,6 +300,7 @@ int main(int argc, char** argv){
   LogInfo << "Reading fitter configuration..." << std::endl;
   LogInfo << "──────────────────────────────────" << std::endl;
   fitter.configure();
+  app.flushRecordedLogs();
 
   // -a
   if( clParser.isOptionTriggered("asimov") ){
@@ -419,6 +424,7 @@ int main(int argc, char** argv){
   LogInfo << "Initializing fitter..." << std::endl;
   LogInfo << "──────────────────────────────────" << std::endl;
   fitter.initialize();
+  app.flushRecordedLogs();
 
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {

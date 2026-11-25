@@ -16,8 +16,10 @@
 #include <string>
 #include <memory>
 #include <utility>
+#include <vector>
 
 namespace LoggerUtils { class StreamCapture; }
+class TTree;
 
 
 class GundamApp {
@@ -29,6 +31,7 @@ public:
   void setCmdLinePtr(const CmdLineParser *cmdLinePtr);
   void setConfigString(const std::string &configString);
   void startLogCapture();
+  void flushRecordedLogs();
 
   TFile* getOutfilePtr(){ return _outFile_.get(); }
 
@@ -36,6 +39,8 @@ public:
   void writeAppInfo();
 
 private:
+  void writeLogLines(std::vector<std::string> lines_);
+
   // parameters
   std::string _appName_{};
   std::string _configString_{};
@@ -43,7 +48,9 @@ private:
 
   // internals
   std::unique_ptr<LoggerUtils::StreamCapture> _logCapture_;
+  std::string _logLine_;
   std::unique_ptr<TFile> _outFile_{nullptr};
+  std::unique_ptr<TTree> _logTree_;
   GundamGreetings _greeting_{};
 
 };

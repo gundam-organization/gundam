@@ -299,7 +299,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
         );
       }
 
-      // Keep this ROOT terminal workaround with the console-only monitor refreshes.
+      // Work around inconsistent cursor positioning in some ROOT versions.
       std::cout << "\033[1F" << std::endl;
 
     }

@@ -344,6 +344,7 @@ void FitterEngine::initializeImpl(){
 }
 
 void FitterEngine::evaluateLikelihood(){
+  if( _beforeLikelihoodEvaluation_ ){ _beforeLikelihoodEvaluation_(); }
 #ifdef GUNDAM_USING_BACKENDS
   if( _backendsManager_.hasBackend() ){
     auto backendResult = _backendsManager_.propagate();
