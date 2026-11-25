@@ -15,7 +15,8 @@
 #include <memory>
 
 
-GundamApp::GundamApp(std::string  appName_) : _appName_(std::move(appName_)) {
+GundamApp::GundamApp(std::string  appName_)
+  : _appName_(std::move(appName_)), _logCapture_(std::make_unique<LoggerUtils::StreamCapture>()) {
   _greeting_.setAppName( _appName_ );
   _greeting_.hello();
 }
@@ -39,12 +40,6 @@ void GundamApp::setCmdLinePtr(const CmdLineParser *cmdLinePtr) { _cmdLinePtr_ = 
 void GundamApp::setConfigString(const std::string &configString) {
   _configString_ = configString;
 }
-void GundamApp::startLogCapture(){
-  if( _logCapture_ == nullptr ){
-    _logCapture_ = std::make_unique<LoggerUtils::StreamCapture>();
-  }
-}
-
 void GundamApp::writeLogLines(std::vector<std::string> lines_){
   for( auto& line : lines_ ){
     _logLine_ = std::move(line);
