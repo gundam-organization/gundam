@@ -65,7 +65,6 @@ int main(int argc, char** argv){
   clParser.addDummyOption("Output options");
   clParser.addOption("outputFilePath", {"-o", "--out-file"}, "Specify the output file");
   clParser.addOption("outputDir", {"--out-dir"}, "Specify the output directory");
-  clParser.addTriggerOption("recordLogs", {"--record-logs"}, "Save Logger output to gundam/runtime/logger in the output ROOT file");
   clParser.addOption("appendix", {"--appendix"}, "Add appendix to the output file name");
   clParser.addOption("scanParameters", {"--scan"}, "Enable parameter scan before and after the fit (can provide nSteps)", 1, true);
   clParser.addOption("scanLine", {"--scan-line"}, "Provide par injector files: start and end point or only end point (start will be prefit)", 2, true);
@@ -101,9 +100,6 @@ int main(int argc, char** argv){
   LogInfo << clParser.getConfigSummary() << std::endl << std::endl;
 
   clParser.parseCmdLine(argc, argv);
-  if( clParser.isOptionTriggered("recordLogs") ){
-    app.startLogCapture();
-  }
 
   LogExitIf(clParser.isNoOptionTriggered(), "No option was provided.");
 
@@ -227,7 +223,6 @@ int main(int argc, char** argv){
         {"disableParLimits", "NoLimits"},
         {"kickMc", "KickMc"},
         {"lightOutputMode", "Light"},
-        {"recordLogs", "WithLogs"},
         {"toyFit", "ToyFit"},
         {"injectToyParameters", "InjToyPar"},
 
@@ -287,9 +282,7 @@ int main(int argc, char** argv){
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
   FitterEngine fitter(GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine"));
-  if( clParser.isOptionTriggered("recordLogs") ){
-    fitter.setBeforeLikelihoodEvaluation([&app]{ app.flushRecordedLogs(); });
-  }
+  fitter.setBeforeLikelihoodEvaluation([&app]{ app.flushRecordedLogs(); });
 
   gundamFitterConfig.fillValue(fitter.getConfig(), "fitterEngineConfig");
 

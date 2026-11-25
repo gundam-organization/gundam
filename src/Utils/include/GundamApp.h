@@ -30,7 +30,6 @@ public:
 
   void setCmdLinePtr(const CmdLineParser *cmdLinePtr);
   void setConfigString(const std::string &configString);
-  void startLogCapture();
   void flushRecordedLogs();
 
   TFile* getOutfilePtr(){ return _outFile_.get(); }
