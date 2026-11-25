@@ -17,6 +17,8 @@
 #include <memory>
 #include <utility>
 
+namespace LoggerUtils { class StreamCapture; }
+
 
 class GundamApp {
 
@@ -26,6 +28,7 @@ public:
 
   void setCmdLinePtr(const CmdLineParser *cmdLinePtr);
   void setConfigString(const std::string &configString);
+  void startLogCapture();
 
   TFile* getOutfilePtr(){ return _outFile_.get(); }
 
@@ -39,6 +42,7 @@ private:
   const CmdLineParser* _cmdLinePtr_{nullptr};
 
   // internals
+  std::unique_ptr<LoggerUtils::StreamCapture> _logCapture_;
   std::unique_ptr<TFile> _outFile_{nullptr};
   GundamGreetings _greeting_{};
 
