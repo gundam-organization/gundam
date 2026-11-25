@@ -19,6 +19,7 @@
 #include <vector>
 
 namespace LoggerUtils { class StreamCapture; }
+namespace LoggerDetail { class ScopedExitHandler; }
 class TTree;
 
 
@@ -38,6 +39,7 @@ public:
   void writeAppInfo();
 
 private:
+  void closeOutputFile();
   void writeLogLines(std::vector<std::string> lines_);
 
   // parameters
@@ -51,6 +53,7 @@ private:
   std::unique_ptr<TFile> _outFile_{nullptr};
   std::unique_ptr<TTree> _logTree_;
   GundamGreetings _greeting_{};
+  std::unique_ptr<LoggerDetail::ScopedExitHandler> _logExitHandler_;
 
 };
 

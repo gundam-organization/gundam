@@ -12,6 +12,7 @@
 #include <TMacro.h>
 #include <TTree.h>
 
+#include <iostream>
 #include <memory>
 
 
@@ -24,16 +25,21 @@ GundamApp::~GundamApp() {
   _greeting_.goodbye();
   if( _outFile_ != nullptr and _outFile_->IsOpen() and not _outFile_->IsZombie() ){
     LogWarning << "Closing output file \"" << _outFile_->GetName() << "\"..." << std::endl;
-    if( _logTree_ != nullptr ){
-      if( _logCapture_ != nullptr ) writeLogLines(_logCapture_->finishLines());
-      if( _logTree_->AutoSave("FlushBaskets") <= 0 ){
-        LogError << "Failed to save the recorded log tree." << std::endl;
-      }
-      _logTree_.reset();
-    }
-    _outFile_->Close();
+    closeOutputFile();
     LogInfo << "Output file closed." << std::endl;
   }
+}
+
+void GundamApp::closeOutputFile(){
+  if( _outFile_ == nullptr or not _outFile_->IsOpen() or _outFile_->IsZombie() ) return;
+  if( _logTree_ != nullptr ){
+    if( _logCapture_ != nullptr ) writeLogLines(_logCapture_->finishLines());
+    if( _logTree_->AutoSave("FlushBaskets") <= 0 ){
+      std::cerr << "Failed to save the recorded log tree." << std::endl;
+    }
+    _logTree_.reset();
+  }
+  _outFile_->Close();
 }
 
 void GundamApp::setCmdLinePtr(const CmdLineParser *cmdLinePtr) { _cmdLinePtr_ = cmdLinePtr; }
@@ -45,7 +51,7 @@ void GundamApp::writeLogLines(std::vector<std::string> lines_){
     _logLine_ = std::move(line);
     if( _logTree_->Fill() < 0 ){
       _logCapture_.reset();
-      LogError << "Failed to write recorded logs to the ROOT output file." << std::endl;
+      std::cerr << "Failed to write recorded logs to the ROOT output file." << std::endl;
       break;
     }
   }
@@ -95,6 +101,7 @@ void GundamApp::openOutputFile(const std::string& filePath_){
       };
       for( const auto* line : source ) showLogs.AddLine(line);
       runtimeDir->WriteObject(&showLogs, "showLogs", "Overwrite");
+      _logExitHandler_ = std::make_unique<LoggerDetail::ScopedExitHandler>([this]{ closeOutputFile(); });
     }
     flushRecordedLogs();
   }
