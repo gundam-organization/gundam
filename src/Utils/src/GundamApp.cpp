@@ -9,6 +9,7 @@
 #include "Logger.h"
 
 #include <TFile.h>
+#include <TObjString.h>
 
 #include <memory>
 
@@ -19,8 +20,12 @@ GundamApp::GundamApp(std::string  appName_) : _appName_(std::move(appName_)) {
 }
 GundamApp::~GundamApp() {
   _greeting_.goodbye();
-  if( _outFile_ != nullptr ){
+  if( _outFile_ != nullptr and _outFile_->IsOpen() and not _outFile_->IsZombie() ){
     LogWarning << "Closing output file \"" << _outFile_->GetName() << "\"..." << std::endl;
+    if( _logCapture_ != nullptr and _outFile_->IsWritable() ){
+      const auto log = _logCapture_->finish();
+      GenericToolbox::writeInTFile(_outFile_.get(), TObjString(log.c_str()), "gundam/runtime/logger");
+    }
     _outFile_->Close();
     LogInfo << "Output file closed." << std::endl;
   }
@@ -29,6 +34,11 @@ GundamApp::~GundamApp() {
 void GundamApp::setCmdLinePtr(const CmdLineParser *cmdLinePtr) { _cmdLinePtr_ = cmdLinePtr; }
 void GundamApp::setConfigString(const std::string &configString) {
   _configString_ = configString;
+}
+void GundamApp::startLogCapture(){
+  if( _logCapture_ == nullptr ){
+    _logCapture_ = std::make_unique<LoggerUtils::StreamCapture>();
+  }
 }
 
 void GundamApp::openOutputFile(const std::string& filePath_){

@@ -299,9 +299,8 @@ double MinimizerBase::evalFit( const double* parArray_ ){
         );
       }
 
-      // in some ROOT versions the trail back does not work properly. This seems to fix the issue
-      Logger::moveTerminalCursorBack(1);
-      std::cout << std::endl;
+      // Keep this ROOT terminal workaround with the console-only monitor refreshes.
+      std::cout << "\033[1F" << std::endl;
 
     }
   }

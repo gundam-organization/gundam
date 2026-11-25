@@ -12,6 +12,7 @@ root -b -n <<EOF
 
 #include <TFile.h>
 #include <TH1.h>
+#include <TObjString.h>
 
 std::string args{"$*"};
 int status{0};
@@ -63,6 +64,14 @@ int main() {
 
     EXPECT("File must be open", file->IsOpen());
     if (not file->IsOpen()) return status;
+
+    auto* log = file->Get<TObjString>("gundam/runtime/logger");
+    EXPECT("Logger output includes the start of the fit",
+           (log && log->GetString().Contains("Running the fitter...")));
+    EXPECT("Logger output includes the output file creation",
+           (log && log->GetString().Contains("Creating output file:")));
+    EXPECT("Logger output includes the end of the run",
+           (log && log->GetString().Contains("Closing output file")));
 
     TH1* postFitErrorsMigrad
         = dynamic_cast<TH1*>(file->Get(
