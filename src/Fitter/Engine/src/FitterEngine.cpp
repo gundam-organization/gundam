@@ -24,6 +24,11 @@
 #include <memory>
 
 
+void FitterEngine::evaluateLikelihood(){
+  if( _beforeLikelihoodEvaluation_ ){ _beforeLikelihoodEvaluation_(); }
+  getLikelihoodInterface().propagateAndEvalLikelihood();
+}
+
 void FitterEngine::setSaveDir(GundamApp& app_, const std::string& subFolder_){
   _saveDir_ = GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_);
 }
@@ -179,7 +184,7 @@ void FitterEngine::initializeImpl(){
   _minimizer_->initialize();
 
   // Make sure parameters are fully propagated
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
   if( _saveDir_ != nullptr ) {
     // Write data
@@ -428,7 +433,7 @@ void FitterEngine::fit(){
 
 
     LogInfo << "Current LLH state:" << std::endl;
-    getLikelihoodInterface().propagateAndEvalLikelihood();
+    this->evaluateLikelihood();
 
     LogInfo << getLikelihoodInterface().getSummary() << std::endl;
   }
@@ -458,7 +463,7 @@ void FitterEngine::fit(){
 
   // re-evaluating since the minimizer might not have triggered an eval of the
   // LLH.  And guarantee that the weights were copied if that was enabled.
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsBuilt() ){
@@ -545,7 +550,7 @@ void FitterEngine::fit(){
 // protected
 void FitterEngine::runPcaCheck(){
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
   LogAlert << "Using PCA method: " << _pcaMethod_.toString() << " / threshold = " << _pcaThreshold_ << std::endl;
 
@@ -599,7 +604,7 @@ void FitterEngine::runPcaCheck(){
         ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
 
-        getLikelihoodInterface().propagateAndEvalLikelihood();
+        this->evaluateLikelihood();
 
         double criteria{0};
 
@@ -658,12 +663,12 @@ void FitterEngine::runPcaCheck(){
   }
 
   // comeback to old values
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 }
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
   double baseLlhPull = getLikelihoodInterface().getLastPenaltyLikelihood();
   double baseLlh = getLikelihoodInterface().getLastLikelihood();
 
@@ -677,7 +682,7 @@ void FitterEngine::rescaleParametersStepSize(){
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + ParameterSet::toRealParRange(1., par) );
 
-      getLikelihoodInterface().propagateAndEvalLikelihood();
+      this->evaluateLikelihood();
 
       double deltaChi2 = getLikelihoodInterface().getLastLikelihood() - baseLlh;
       double deltaChi2Pulls = getLikelihoodInterface().getLastPenaltyLikelihood() - baseLlhPull;
@@ -697,14 +702,14 @@ void FitterEngine::rescaleParametersStepSize(){
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );
-      getLikelihoodInterface().propagateAndEvalLikelihood();
+      this->evaluateLikelihood();
       LogInfo << " -> Δχ²(step) = " << getLikelihoodInterface().getLastLikelihood() - baseLlh << std::endl;
       par.setParameterValue( currentParValue );
     }
 
   }
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 }
 bool FitterEngine::checkNumericalAccuracy(){
   LogAlert << __METHOD_NAME__ << std::endl;

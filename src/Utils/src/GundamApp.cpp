@@ -9,7 +9,7 @@
 #include "Logger.h"
 
 #include <TFile.h>
-#include <TObjString.h>
+#include <TTree.h>
 
 #include <memory>
 
@@ -22,9 +22,12 @@ GundamApp::~GundamApp() {
   _greeting_.goodbye();
   if( _outFile_ != nullptr and _outFile_->IsOpen() and not _outFile_->IsZombie() ){
     LogWarning << "Closing output file \"" << _outFile_->GetName() << "\"..." << std::endl;
-    if( _logCapture_ != nullptr and _outFile_->IsWritable() ){
-      const auto log = _logCapture_->finish();
-      GenericToolbox::writeInTFile(_outFile_.get(), TObjString(log.c_str()), "gundam/runtime/logger");
+    if( _logTree_ != nullptr ){
+      if( _logCapture_ != nullptr ) writeLogLines(_logCapture_->finishLines());
+      if( _logTree_->AutoSave("FlushBaskets") <= 0 ){
+        LogError << "Failed to save the recorded log tree." << std::endl;
+      }
+      _logTree_.reset();
     }
     _outFile_->Close();
     LogInfo << "Output file closed." << std::endl;
@@ -41,10 +44,43 @@ void GundamApp::startLogCapture(){
   }
 }
 
+void GundamApp::writeLogLines(std::vector<std::string> lines_){
+  for( auto& line : lines_ ){
+    _logLine_ = std::move(line);
+    if( _logTree_->Fill() < 0 ){
+      _logCapture_.reset();
+      LogError << "Failed to write recorded logs to the ROOT output file." << std::endl;
+      break;
+    }
+  }
+  _logLine_.clear();
+}
+
+void GundamApp::flushRecordedLogs(){
+  if( _logTree_ == nullptr or _logCapture_ == nullptr ) return;
+  constexpr std::size_t retainedLines{64};
+  constexpr std::size_t minBatchSize{64};
+  writeLogLines(_logCapture_->drain(retainedLines, minBatchSize));
+}
+
 void GundamApp::openOutputFile(const std::string& filePath_){
   LogWarning << "Creating output file: \"" << filePath_ << "\"..." << std::endl;
   GenericToolbox::mkdir( GenericToolbox::getFolderPath( filePath_ ) );
+  _logTree_.reset();
   _outFile_ = std::make_unique<TFile>( filePath_.c_str(), "RECREATE" );
+  if( _logCapture_ != nullptr and _outFile_->IsOpen() and not _outFile_->IsZombie() and _outFile_->IsWritable() ){
+    auto* gundamDir = GenericToolbox::mkdirTFile(_outFile_.get(), "gundam");
+    auto* runtimeDir = GenericToolbox::mkdirTFile(gundamDir, "runtime");
+    if( runtimeDir != nullptr ){
+      TDirectory::TContext context(runtimeDir);
+      _logTree_ = std::make_unique<TTree>("logger", "Recorded console output");
+      // Keep the file backing the baskets, but let only AutoSave write the tree header.
+      runtimeDir->Remove(_logTree_.get());
+      _logTree_->Branch("text", &_logLine_, 32000, 0);
+      _logTree_->SetAutoSave(-256*1024);
+    }
+    flushRecordedLogs();
+  }
 }
 void GundamApp::writeAppInfo(){
   if( _outFile_ == nullptr ){

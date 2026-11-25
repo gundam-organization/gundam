@@ -112,7 +112,7 @@ void MinimizerBase::minimize(){
 
   this->printParameters();
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  getOwner().evaluateLikelihood();
   LogInfo << "Initial likelihood state:" << std::endl;
   LogInfo << getLikelihoodInterface().getSummary() << std::endl;
 
@@ -198,7 +198,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   // Propagate the parameters
   {
     auto propagationTime = _monitor_.propagationTimer.scopeTime();
-    getLikelihoodInterface().propagateAndEvalLikelihood();
+    getOwner().evaluateLikelihood();
   }
   _monitor_.evalLlhTimer.stop();
 
@@ -294,7 +294,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
         );
       }
 
-      // Keep this ROOT terminal workaround with the console-only monitor refreshes.
+      // Work around inconsistent cursor positioning in some ROOT versions.
       std::cout << "\033[1F" << std::endl;
 
     }
