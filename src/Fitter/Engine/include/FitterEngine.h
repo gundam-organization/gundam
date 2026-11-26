@@ -21,7 +21,6 @@
 #include <vector>
 #include <memory>
 #include <utility>
-#include <functional>
 
 
 class GundamApp;
@@ -49,6 +48,7 @@ protected:
 public:
   FitterEngine() = default;
   explicit FitterEngine(TDirectory *saveDir_) : _saveDir_(saveDir_) {};
+  FitterEngine(GundamApp& app_, const std::string& subFolder_);
 
   // static
   static void setRandomSeed(int seed_){ gRandom->SetSeed(seed_); }
@@ -70,7 +70,6 @@ public:
   void setPcaThreshold(double pcaThreshold_){ _pcaThreshold_ = pcaThreshold_; }
   void setPcaMethod(PcaMethod pcaMethod_){ _pcaMethod_ = pcaMethod_; }
   void setDisableParLimits(bool disableParLimits_){ _disableParLimits_ = disableParLimits_; }
-  void setBeforeLikelihoodEvaluation(std::function<void()> callback_){ _beforeLikelihoodEvaluation_ = std::move(callback_); }
 
   // const-getters
   [[nodiscard]] auto& getPreFitParState() const{ return _preFitParState_; }
@@ -85,6 +84,7 @@ public:
   LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
   TDirectory* getSaveDir(){ return _saveDir_; }
+  GundamApp* getApp() const{ return _app_; }
   GenericToolbox::TFilePath getTFilePath(){ return GenericToolbox::TFilePath(_saveDir_); }
   bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
   bool& getDoAllParamVariations(){ return _doAllParamVariations_; }
@@ -125,7 +125,7 @@ private:
   PcaMethod _pcaMethod_{PcaMethod::DeltaChi2Threshold};
 
   // Internals
-  std::function<void()> _beforeLikelihoodEvaluation_{};
+  GundamApp* _app_{nullptr};
   TDirectory* _saveDir_{nullptr};
   LikelihoodInterface _likelihoodInterface_{};
   ParameterScanner _parameterScanner_{};

@@ -3,6 +3,7 @@
 //
 
 #include "GundamUtils.h"
+#include "GundamApp.h"
 #include "VersionConfig.h" // the only place it is included
 #include "SourceConfig.h" // the only place it is included
 
@@ -22,6 +23,11 @@
 
 
 namespace GundamUtils {
+
+  void writeOutput(const std::function<void()>& write_, GundamApp* app_){
+    if( app_ != nullptr ) app_->writeOutput(write_);
+    else write_();
+  }
 
   void releaseUnusedMemory(){
 #if defined(__APPLE__) && defined(__MACH__)
