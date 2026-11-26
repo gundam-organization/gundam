@@ -8,6 +8,7 @@
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
 #include "GundamApp.h"
+#include "CliConfigOverride.h"
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
 #endif
@@ -18,7 +19,6 @@
 #include "CmdLineParser.h"
 #include "Logger.h"
 
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -77,7 +77,7 @@ int main(int argc, char** argv){
   clParser.addTriggerOption("super-dry-run", {"-dd", "--super-dry-run"},"Only reads the config files.");
   clParser.addTriggerOption("hyper-dry-run", {"-ddd", "--hyper-dry-run"},"Only unfolds the config files.");
   clParser.addOption("debugVerbose", {"--debug"}, "Enable debug verbose (can provide verbose level arg)", 1, true);
-  clParser.addOption("kickMc", {"--kick-mc"}, "Amount to push the starting parameters away from their prior values (default: 0)", 1, true);
+  clParser.addOption("kickMc", {"--kick-mc"}, "Amount to push the starting parameters away from their prior values (default when specified without a value: 0.1)", 1, true);
   clParser.addTriggerOption("ignoreVersionCheck", {"--ignore-version"}, "Don't check GUNDAM version with config request");
   clParser.addOption("debugMaxNbEventToLoad", {"-me", "--max-events"}, "Set the maximum number of events to load per dataset", 1);
   clParser.addOption("debugFracOfEntries", {"-fe", "--fraction-of-entries"}, "Set the fraction of the total entries of each TTree that will be read", 1);
@@ -153,13 +153,6 @@ int main(int argc, char** argv){
   Cache::Manager::SetEnableDebugPrintouts( clParser.isOptionTriggered("debugVerbose") );
 #endif
 
-  // inject parameter config?
-  std::string injectParameterPath{};
-  if( clParser.isOptionTriggered("injectParameterConfig") ){
-    LogWarning << "Inject parameter config: " << clParser.getOptionVal<std::string>("injectParameterConfig") << std::endl;
-    injectParameterPath = clParser.getOptionVal<std::string>("injectParameterConfig");
-  }
-
   // toy par injector
   std::string toyParInjector{};
   if( clParser.isOptionTriggered("injectToyParameters") ){
@@ -185,6 +178,8 @@ int main(int argc, char** argv){
   ConfigUtils::ConfigBuilder configHandler(configFilePath);
   configHandler.override( clParser.getOptionValList<std::string>("overrideFiles") );
   configHandler.flatOverride( clParser.getOptionValList<std::string>("overrides") );
+
+  CliConfigOverride::applyConfigOverride(clParser, configHandler.getConfig());
 
   ConfigReader gundamFitterConfig(configHandler.getConfig());
   gundamFitterConfig.defineFields({
@@ -302,30 +297,6 @@ int main(int argc, char** argv){
     fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::RealData );
   }
 
-  // --skip-hesse
-  fitter.getMinimizer().setDisableCalcError( clParser.isOptionTriggered("skipHesse") );
-
-  // --scan <N>
-  if( clParser.isOptionTriggered("scanParameters") ) {
-    fitter.setEnablePreFitScan( true );
-    fitter.setEnablePostFitScan( true );
-    fitter.getParameterScanner().setNbPoints(
-        clParser.getOptionVal("scanParameters", fitter.getParameterScanner().getNbPoints())
-    );
-  }
-
-  // --enable-pca
-  if( clParser.isOptionTriggered("enablePca") ){
-    fitter.setEnablePca( true );
-    if( clParser.getNbValueSet("enablePca") == 1 ){
-      fitter.setPcaThreshold( clParser.getOptionVal<double>("enablePca") );
-    }
-    if( clParser.getNbValueSet("enablePca") == 2 ){
-      fitter.setPcaThreshold( clParser.getOptionVal<double>("enablePca", 0) );
-      fitter.setPcaMethod( FitterEngine::PcaMethod::toEnum(clParser.getOptionVal<std::string>("enablePca", 1), true) );
-    }
-  }
-
   // --toy <iToy>
   if( clParser.isOptionTriggered("toyFit") ){
     fitter.getLikelihoodInterface().setDataType( LikelihoodInterface::DataType::Toy );
@@ -335,17 +306,8 @@ int main(int argc, char** argv){
   // -d
   fitter.setIsDryRun( clParser.isOptionTriggered("dry-run") );
 
-  // --one-sigma
-  fitter.setGenerateOneSigmaPlots( clParser.isOptionTriggered("generateOneSigmaPlots") );
-
   // --light-mode
   GundamGlobals::setLightOutputMode(clParser.isOptionTriggered("lightOutputMode") );
-
-  // injectParameterPath
-  if( not injectParameterPath.empty() ){
-    auto injectConfig = ConfigUtils::readConfigFile( injectParameterPath );
-    fitter.getLikelihoodInterface().getModelPropagator().setParameterInjectorConfig(injectConfig);
-  }
 
   // toyParInjector
   if( not toyParInjector.empty() ){
@@ -360,41 +322,11 @@ int main(int argc, char** argv){
   gundamFitterConfig.fillValue(fitter.getGenerateSamplePlots(), "generateSamplePlots");
   gundamFitterConfig.fillValue(fitter.getDoAllParamVariations(), "allParamVariations");
 
-  // Check if the first point of the fit should be moved before the
-  // minimization.  This is not changing the prior value, only the starting
-  // point of the fit.  The kick is in units of prior standard deviations
-  // about the prior point.
-  if (clParser.isOptionTriggered("kickMc")) {
-
-    double kickMc = 0.1;
-    if( clParser.getNbValueSet("kickMc") == 1 ){
-      kickMc = clParser.getOptionVal<double>("kickMc");
-    }
-
-    LogAlert << "Fit starting point randomized by " << kickMc << " sigma"
-             << " around prior values."
-             << std::endl;
-    fitter.setThrowMcBeforeFit( true );
-    fitter.setThrowGain( kickMc );
-
-  }
-
   if( clParser.isOptionTriggered("debugMaxNbEventToLoad") ){
     LogExitIf(clParser.getNbValueSet("debugMaxNbEventToLoad") != 1, "Nb of event not specified.");
     LogAlert << "Will load " << clParser.getOptionVal<size_t>("debugMaxNbEventToLoad") << " events per dataset." << std::endl;
     for( auto& dataset : fitter.getLikelihoodInterface().getDatasetList() ){
       dataset.setNbMaxEventToLoad(clParser.getOptionVal<size_t>("debugMaxNbEventToLoad"));
-    }
-  }
-
-  if( clParser.isOptionTriggered("debugFracOfEntries") ){
-    LogExitIf(clParser.getNbValueSet("debugFracOfEntries") != 1, "Dataset fraction not specified.");
-    const auto fraction = clParser.getOptionVal<double>("debugFracOfEntries");
-    try{
-      fitter.getLikelihoodInterface().getDatasetManager().setDebugLoadDatasetFraction(fraction);
-    }
-    catch( const std::runtime_error& ){
-      return EXIT_FAILURE;
     }
   }
 

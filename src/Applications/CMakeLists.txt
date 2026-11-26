@@ -84,7 +84,11 @@ foreach( app ${APPLICATION_LIST} )
 endforeach()
 
 # Dependencies
-target_link_libraries( gundamFitter GundamFitter )
+add_library( GundamCliOverride STATIC src/CliConfigOverride.cpp)
+target_include_directories( GundamCliOverride PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include )
+target_link_libraries( GundamCliOverride PUBLIC GundamUtils )
+
+target_link_libraries( gundamFitter GundamFitter GundamCliOverride )
 target_link_libraries( gundamCalcXsec GundamFitter ) # using the fitter engine to parse back the config file
 target_link_libraries( gundamFitReader GundamUtils )
 target_link_libraries( gundamInputZipper GundamUtils )
