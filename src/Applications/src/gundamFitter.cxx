@@ -19,6 +19,7 @@
 #include "Logger.h"
 
 #include <csignal>
+#include <cstdlib>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -271,8 +272,10 @@ int runFitter(GundamApp& app, int argc, char** argv){
   app.setConfigString( gundamFitterConfig.toString() );
 
   // Ok, we should run. Create the out file.
-  app.openThreadedOutputFile(outFileName);
-  app.writeOutput([&app]{ app.writeAppInfo(); });
+  auto& output = app.getOutputManager();
+  output.setInterruptHandler(GundamGlobals::isInterruptRequested, []{ std::_Exit(128 + SIGINT); });
+  output.open(outFileName, GundamOutputManager::Mode::Threaded);
+  app.writeAppInfo();
 
   if( clParser.isOptionTriggered("hyper-dry-run") ) {
     LogInfo << "Hyper-dry-run enabled. Stopping here." << std::endl;
@@ -284,7 +287,8 @@ int runFitter(GundamApp& app, int argc, char** argv){
   // Configure:
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
-  FitterEngine fitter(app, "FitterEngine");
+  FitterEngine fitter;
+  fitter.setOutput(output.directory("FitterEngine"));
 
   gundamFitterConfig.fillValue(fitter.getConfig(), "fitterEngineConfig");
 
@@ -426,8 +430,8 @@ int runFitter(GundamApp& app, int argc, char** argv){
   }
 
   if( clParser.isOptionTriggered("scanLine") ){
-    app.writeOutput([&]{
-      auto* outDir = GenericToolbox::mkdirTFile(fitter.getSaveDir(), GenericToolbox::joinPath("preFit", "cmdScanLine"));
+    fitter.getOutputDirectory().write([&](TDirectory* saveDir){
+      auto* outDir = GenericToolbox::mkdirTFile(saveDir, GenericToolbox::joinPath("preFit", "cmdScanLine"));
       LogExitIf( clParser.getNbValueSet("scanLine") == 0, "No injector file provided.");
       if( clParser.getNbValueSet("scanLine") == 1 ){
         LogAlert << "Will scan the line toward the point set in: " << clParser.getOptionVal<std::string>("scanLine", 0) << std::endl;

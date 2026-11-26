@@ -3,7 +3,6 @@
 //
 
 #include "FitterEngine.h"
-#include "GundamApp.h"
 #include "GundamGlobals.h"
 #include "GundamUtils.h"
 #include "RootMinimizer.h"
@@ -25,18 +24,8 @@
 
 
 void FitterEngine::evaluateLikelihood(){
-  if( _app_ != nullptr ) GundamGlobals::checkInterrupt();
+  GundamGlobals::checkInterrupt();
   getLikelihoodInterface().propagateAndEvalLikelihood();
-}
-
-FitterEngine::FitterEngine(GundamApp& app_, const std::string& subFolder_) : _app_(&app_){
-  setSaveDir(app_, subFolder_);
-}
-
-void FitterEngine::setSaveDir(GundamApp& app_, const std::string& subFolder_){
-  GundamUtils::writeOutput([&]{
-    _saveDir_ = GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_);
-  }, &app_);
 }
 
 void FitterEngine::configureImpl(){
@@ -192,148 +181,146 @@ void FitterEngine::initializeImpl(){
   // Make sure parameters are fully propagated
   this->evaluateLikelihood();
 
-  if( _saveDir_ != nullptr ) {
-    GundamUtils::writeOutput([&]{
-      // Write data
+  _outputDirectory_.write([&](TDirectory* saveDir){
+    // Write data
 
-      if( _likelihoodInterface_.getDataType() == LikelihoodInterface::DataType::Toy ){
-        LogInfo << "Writing throws in TTree..." << std::endl;
-        auto* throwsTree = new TTree("throws", "throws");
+    if( _likelihoodInterface_.getDataType() == LikelihoodInterface::DataType::Toy ){
+      LogInfo << "Writing throws in TTree..." << std::endl;
+      auto* throwsTree = new TTree("throws", "throws");
 
-        std::vector<GenericToolbox::RawDataArray> thrownParameterValues{};
-        thrownParameterValues.reserve(getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList().size());
-        for( auto& parSet : getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList() ){
-          if( not parSet.isEnabled() ) continue;
-
-          std::vector<std::string> leavesList;
-          thrownParameterValues.emplace_back();
-
-          for( auto& par : parSet.getParameterList() ){
-            if( not par.isEnabled() or par.isPenaltyDisabled() or par.isFree() ) continue;
-            leavesList.emplace_back(GenericToolbox::generateCleanBranchName(par.getTitle()) + "/D");
-            thrownParameterValues.back().writeRawData(par.getThrowValue());
-          }
-
-          thrownParameterValues.back().lock();
-          throwsTree->Branch(
-              GenericToolbox::generateCleanBranchName(parSet.getName()).c_str(),
-              &thrownParameterValues.back().getRawDataArray()[0],
-              GenericToolbox::joinVectorString(leavesList, ":").c_str()
-          );
-        }
-
-        throwsTree->Fill();
-        GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(_saveDir_, "preFit/parameters"), throwsTree);
-      }
-
-      LogInfo << "Writing propagator objects..." << std::endl;
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-          TNamed("initialParameterState", GenericToolbox::Json::toReadableString(getLikelihoodInterface().getModelPropagator().getParametersManager().exportParameterInjectorConfig()).c_str())
-      );
-
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-          getLikelihoodInterface().getModelPropagator().getParametersManager().getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
-      );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
-          getLikelihoodInterface().getModelPropagator().getParametersManager().getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
-      );
-
+      std::vector<GenericToolbox::RawDataArray> thrownParameterValues{};
+      thrownParameterValues.reserve(getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList().size());
       for( auto& parSet : getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList() ){
-        if(not parSet.isEnabled()) continue;
+        if( not parSet.isEnabled() ) continue;
 
-      auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-          parSet.generatePriorCovarianceMatrix().get(), "priorCovarianceMatrix"
-      );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
-          parSet.getPriorCorrelationMatrix().get(),
-          "priorCorrelationMatrix"
-      );
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
-          parSet.getInversePriorCorrelationMatrix().get(), "priorCorrelationMatrixInv"
-      );
+        std::vector<std::string> leavesList;
+        thrownParameterValues.emplace_back();
 
-        auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
         for( auto& par : parSet.getParameterList() ){
-          auto parSaveFolder = GenericToolbox::joinPath(parsSaveFolder, GenericToolbox::generateCleanBranchName(par.getTitle()));
-          auto outDir = GenericToolbox::mkdirTFile(_saveDir_, parSaveFolder );
-
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "title", par.getTitle().c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "fullTitle", par.getFullTitle().c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "name", par.getName().c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "isEnabled", std::to_string( par.isEnabled() ).c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "index", std::to_string( par.getParameterIndex() ).c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( par.getPriorValue() ).c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( par.getStdDevValue() ).c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( par.isFree() ? 1 : 0 ).c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( par.getParameterLimits().min ).c_str() ) );
-          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( par.getParameterLimits().max ).c_str() ) );
+          if( not par.isEnabled() or par.isPenaltyDisabled() or par.isFree() ) continue;
+          leavesList.emplace_back(GenericToolbox::generateCleanBranchName(par.getTitle()) + "/D");
+          thrownParameterValues.back().writeRawData(par.getThrowValue());
         }
 
-        if( parSet.isEnableEigenDecomp() ){
-          auto eigenSaveFolder = GenericToolbox::joinPath( saveFolder, "eigen" );
-          for( auto& eigen : parSet.getEigenParameterList() ){
-            auto eigenFolder = GenericToolbox::joinPath(eigenSaveFolder, GenericToolbox::generateCleanBranchName(eigen.getTitle()));
-            auto outDir = GenericToolbox::mkdirTFile( _saveDir_, eigenFolder );
-
-            GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "title", eigen.getTitle().c_str() ) );
-            GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "fullTitle", eigen.getFullTitle().c_str() ) );
-            GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "name", eigen.getName().c_str() ) );
-            GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "isEnabled", std::to_string( eigen.isEnabled() ).c_str() ) );
-            GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "index", std::to_string( eigen.getParameterIndex() ).c_str() ) );
-            GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( eigen.getPriorValue() ).c_str() ) );
-            GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( eigen.getStdDevValue() ).c_str() ) );
-            GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( eigen.isFree() ? 1 : 0 ).c_str() ) );
-            GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( eigen.getParameterLimits().min ).c_str() ) );
-            GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( eigen.getParameterLimits().max ).c_str() ) );
-          }
-        }
-      }
-
-      if( _minimizerType_ == MinimizerType::RootMinimizer ){
-        dynamic_cast<const RootMinimizer*>( &this->getMinimizer() )->saveMinimizerSettings( GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
-      }
-
-      LogInfo << "Writing sample histograms..." << std::endl;
-      auto writeSampleHistFct = [&](const Sample* samplePtr_, const std::string& tag_){
-        auto hist = std::make_unique<TH1D>(
-              "histogram",
-              Form("%s sample \"%s\"", tag_.c_str(), samplePtr_->getName().c_str()),
-              samplePtr_->getHistogram().getNbBins(),
-              0, samplePtr_->getHistogram().getNbBins()
-            );
-        for( int iBin = 1 ; iBin < hist->GetNbinsX()+1 ; iBin++ ){
-          hist->SetBinContent( iBin, samplePtr_->getHistogram().getBinContentList()[iBin-1].sumWeights );
-          hist->SetBinError( iBin, samplePtr_->getHistogram().getBinContentList()[iBin-1].sqrtSumSqWeights );
-        }
-        hist->GetXaxis()->SetTitle("Bin index");
-        hist->GetYaxis()->SetTitle("Rate");
-        hist->SetLineWidth(3);
-        GenericToolbox::writeInTFile(
-          GenericToolbox::TFilePath(_saveDir_, "preFit").getSubDir(tag_).getSubDir(samplePtr_->getName()).getDir(),
-          hist.get()
+        thrownParameterValues.back().lock();
+        throwsTree->Branch(
+            GenericToolbox::generateCleanBranchName(parSet.getName()).c_str(),
+            &thrownParameterValues.back().getRawDataArray()[0],
+            GenericToolbox::joinVectorString(leavesList, ":").c_str()
         );
-      };
-      for( auto& samplePair : getLikelihoodInterface().getSamplePairList() ){
-        writeSampleHistFct(samplePair.model, "model");
-        writeSampleHistFct(samplePair.data, "data");
       }
 
-      if( not GundamGlobals::isLightOutputMode() ){
-        getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(_saveDir_, "preFit") );
-        getLikelihoodInterface().writeEventRates( GenericToolbox::TFilePath(_saveDir_, "preFit") );
+      throwsTree->Fill();
+      GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveDir, "preFit/parameters"), throwsTree);
+    }
+
+    LogInfo << "Writing propagator objects..." << std::endl;
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile(saveDir, "propagator"),
+        TNamed("initialParameterState", GenericToolbox::Json::toReadableString(getLikelihoodInterface().getModelPropagator().getParametersManager().exportParameterInjectorConfig()).c_str())
+    );
+
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile(saveDir, "propagator"),
+        getLikelihoodInterface().getModelPropagator().getParametersManager().getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile(saveDir, "propagator"),
+        getLikelihoodInterface().getModelPropagator().getParametersManager().getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
+    );
+
+    for( auto& parSet : getLikelihoodInterface().getModelPropagator().getParametersManager().getParameterSetsList() ){
+      if(not parSet.isEnabled()) continue;
+
+    auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( saveDir, saveFolder ),
+        parSet.generatePriorCovarianceMatrix().get(), "priorCovarianceMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile(saveDir, saveFolder ),
+        parSet.getPriorCorrelationMatrix().get(),
+        "priorCorrelationMatrix"
+    );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( saveDir, saveFolder ),
+        parSet.getInversePriorCorrelationMatrix().get(), "priorCorrelationMatrixInv"
+    );
+
+      auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
+      for( auto& par : parSet.getParameterList() ){
+        auto parSaveFolder = GenericToolbox::joinPath(parsSaveFolder, GenericToolbox::generateCleanBranchName(par.getTitle()));
+        auto outDir = GenericToolbox::mkdirTFile(saveDir, parSaveFolder );
+
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "title", par.getTitle().c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "fullTitle", par.getFullTitle().c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "name", par.getName().c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "isEnabled", std::to_string( par.isEnabled() ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "index", std::to_string( par.getParameterIndex() ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( par.getPriorValue() ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( par.getStdDevValue() ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( par.isFree() ? 1 : 0 ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( par.getParameterLimits().min ).c_str() ) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( par.getParameterLimits().max ).c_str() ) );
       }
 
-      LogInfo << "Saving all objects to disk..." << std::endl;
-      GenericToolbox::triggerTFileWrite(_saveDir_);
-    }, _app_);
-  }
+      if( parSet.isEnableEigenDecomp() ){
+        auto eigenSaveFolder = GenericToolbox::joinPath( saveFolder, "eigen" );
+        for( auto& eigen : parSet.getEigenParameterList() ){
+          auto eigenFolder = GenericToolbox::joinPath(eigenSaveFolder, GenericToolbox::generateCleanBranchName(eigen.getTitle()));
+          auto outDir = GenericToolbox::mkdirTFile( saveDir, eigenFolder );
+
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "title", eigen.getTitle().c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "fullTitle", eigen.getFullTitle().c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "name", eigen.getName().c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "isEnabled", std::to_string( eigen.isEnabled() ).c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "index", std::to_string( eigen.getParameterIndex() ).c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "prior", std::to_string( eigen.getPriorValue() ).c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "stdDev", std::to_string( eigen.getStdDevValue() ).c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "priorType", std::to_string( eigen.isFree() ? 1 : 0 ).c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "min", std::to_string( eigen.getParameterLimits().min ).c_str() ) );
+          GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "max", std::to_string( eigen.getParameterLimits().max ).c_str() ) );
+        }
+      }
+    }
+
+    if( _minimizerType_ == MinimizerType::RootMinimizer ){
+      dynamic_cast<const RootMinimizer*>( &this->getMinimizer() )->saveMinimizerSettings( GenericToolbox::mkdirTFile(saveDir, "fit/minimizer" ) );
+    }
+
+    LogInfo << "Writing sample histograms..." << std::endl;
+    auto writeSampleHistFct = [&](const Sample* samplePtr_, const std::string& tag_){
+      auto hist = std::make_unique<TH1D>(
+            "histogram",
+            Form("%s sample \"%s\"", tag_.c_str(), samplePtr_->getName().c_str()),
+            samplePtr_->getHistogram().getNbBins(),
+            0, samplePtr_->getHistogram().getNbBins()
+          );
+      for( int iBin = 1 ; iBin < hist->GetNbinsX()+1 ; iBin++ ){
+        hist->SetBinContent( iBin, samplePtr_->getHistogram().getBinContentList()[iBin-1].sumWeights );
+        hist->SetBinError( iBin, samplePtr_->getHistogram().getBinContentList()[iBin-1].sqrtSumSqWeights );
+      }
+      hist->GetXaxis()->SetTitle("Bin index");
+      hist->GetYaxis()->SetTitle("Rate");
+      hist->SetLineWidth(3);
+      GenericToolbox::writeInTFile(
+        GenericToolbox::TFilePath(saveDir, "preFit").getSubDir(tag_).getSubDir(samplePtr_->getName()).getDir(),
+        hist.get()
+      );
+    };
+    for( auto& samplePair : getLikelihoodInterface().getSamplePairList() ){
+      writeSampleHistFct(samplePair.model, "model");
+      writeSampleHistFct(samplePair.data, "data");
+    }
+
+    if( not GundamGlobals::isLightOutputMode() ){
+      getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(saveDir, "preFit") );
+      getLikelihoodInterface().writeEventRates( GenericToolbox::TFilePath(saveDir, "preFit") );
+    }
+
+    LogInfo << "Saving all objects to disk..." << std::endl;
+    GenericToolbox::triggerTFileWrite(saveDir);
+  });
 
   // Loading, PCA and output serialization can leave large freed allocations
   // resident. Return unused allocator pages once, before scans/minimization.
@@ -365,42 +352,40 @@ void FitterEngine::fit(){
 
   _preFitParState_ = getLikelihoodInterface().getModelPropagator().getParametersManager().exportParameterInjectorConfig();
 
-  if( _saveDir_ != nullptr ) {
-    GundamUtils::writeOutput([&]{
-      auto preFitDir(GenericToolbox::mkdirTFile( _saveDir_, "preFit" ));
-      GenericToolbox::writeInTFileWithObjTypeExt(preFitDir, llhState, "llhState");
-      GenericToolbox::writeInTFileWithObjTypeExt(preFitDir, GenericToolbox::Json::toReadableString(_preFitParState_), "parState");
+  _outputDirectory_.write([&](TDirectory* saveDir){
+    auto preFitDir(GenericToolbox::mkdirTFile( saveDir, "preFit" ));
+    GenericToolbox::writeInTFileWithObjTypeExt(preFitDir, llhState, "llhState");
+    GenericToolbox::writeInTFileWithObjTypeExt(preFitDir, GenericToolbox::Json::toReadableString(_preFitParState_), "parState");
 
-      // Not moving parameters
-      if( _generateSamplePlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
-        LogInfo << "Generating pre-fit sample plots..." << std::endl;
-        getLikelihoodInterface().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/plots"));
-        GenericToolbox::triggerTFileWrite(_saveDir_);
-      }
+    // Not moving parameters
+    if( _generateSamplePlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
+      LogInfo << "Generating pre-fit sample plots..." << std::endl;
+      getLikelihoodInterface().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(saveDir, "preFit/plots"));
+      GenericToolbox::triggerTFileWrite(saveDir);
+    }
 
-      // Moving parameters
-      if( _generateOneSigmaPlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
-        LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
-        _parameterScanner_.generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
-        GenericToolbox::triggerTFileWrite(_saveDir_);
-      }
+    // Moving parameters
+    if( _generateOneSigmaPlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
+      LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
+      _parameterScanner_.generateOneSigmaPlots(GenericToolbox::mkdirTFile(saveDir, "preFit/oneSigma"));
+      GenericToolbox::triggerTFileWrite(saveDir);
+    }
 
-      if( _doAllParamVariations_ ){
-        LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
-        _parameterScanner_.varyEvenRates(
-            _allParamVariationsSigmas_,
-            GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates")
-        );
-        GenericToolbox::triggerTFileWrite(_saveDir_);
-      }
+    if( _doAllParamVariations_ ){
+      LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
+      _parameterScanner_.varyEvenRates(
+          _allParamVariationsSigmas_,
+          GenericToolbox::mkdirTFile(saveDir, "preFit/varyEventRates")
+      );
+      GenericToolbox::triggerTFileWrite(saveDir);
+    }
 
-      if( _enablePreFitScan_ ){
-        LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-        _minimizer_->scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan") );
-        GenericToolbox::triggerTFileWrite(_saveDir_);
-      }
-    }, _app_);
-  }
+    if( _enablePreFitScan_ ){
+      LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
+      _minimizer_->scanParameters( GenericToolbox::mkdirTFile(saveDir, "preFit/scan") );
+      GenericToolbox::triggerTFileWrite(saveDir);
+    }
+  });
 
   if( _throwMcBeforeFit_ ){
     LogAlert << "Throwing correlated parameters of MC away from their prior..." << std::endl;
@@ -448,13 +433,11 @@ void FitterEngine::fit(){
     LogInfo << getLikelihoodInterface().getSummary() << std::endl;
   }
 
-  if( _saveDir_ != nullptr ){
-    GundamUtils::writeOutput([&]{
-      _likelihoodInterface_.getModelPropagator().writeParameterStateTree(
-        GenericToolbox::TFilePath(_saveDir_, "preFit")
-      );
-    }, _app_);
-  }
+  _outputDirectory_.write([&](TDirectory* saveDir){
+    _likelihoodInterface_.getModelPropagator().writeParameterStateTree(
+      GenericToolbox::TFilePath(saveDir, "preFit")
+    );
+  });
 
   // Leaving now?
   if( _isDryRun_ ){
@@ -491,46 +474,44 @@ void FitterEngine::fit(){
   LogInfo << "Post-fit likelihood state:" << std::endl;
   LogInfo << llhState << std::endl;
 
-  if( _saveDir_ != nullptr ) {
-    GundamUtils::writeOutput([&]{
-      LogInfo << "Saving post-fit par state..." << std::endl;
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
-          TNamed("parState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
-      );
+  _outputDirectory_.write([&](TDirectory* saveDir){
+    LogInfo << "Saving post-fit par state..." << std::endl;
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( saveDir, "postFit" ),
+        TNamed("parState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
+    );
 
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
-          TNamed("llhState", llhState.c_str())
-      );
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( saveDir, "postFit" ),
+        TNamed("llhState", llhState.c_str())
+    );
 
-      if (_savePostfitEventTrees_){
-        if( not GundamGlobals::isLightOutputMode() ){
-          LogInfo << "Saving PostFit event Trees" << std::endl;
-          getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(_saveDir_, "postFit") );
-        }
+    if (_savePostfitEventTrees_){
+      if( not GundamGlobals::isLightOutputMode() ){
+        LogInfo << "Saving PostFit event Trees" << std::endl;
+        getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(saveDir, "postFit") );
       }
-      if( _generateSamplePlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
-        LogInfo << "Generating post-fit sample plots..." << std::endl;
-        getLikelihoodInterface().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
-        GenericToolbox::triggerTFileWrite(_saveDir_);
+    }
+    if( _generateSamplePlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
+      LogInfo << "Generating post-fit sample plots..." << std::endl;
+      getLikelihoodInterface().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(saveDir, "postFit/samples"));
+      GenericToolbox::triggerTFileWrite(saveDir);
+    }
+    if( _enablePostFitScan_ ){
+      LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
+      _minimizer_->scanParameters( GenericToolbox::mkdirTFile(saveDir, "postFit/scan") );
+      GenericToolbox::triggerTFileWrite(saveDir);
+    }
+    if( _enablePreFitToPostFitLineScan_ ){
+      if( not GundamGlobals::isLightOutputMode() ){
+        LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
+        _parameterScanner_.scanSegment(GenericToolbox::mkdirTFile(saveDir, "postFit/converge"),
+                                       _postFitParState_, _preFitParState_);
+        GenericToolbox::triggerTFileWrite(saveDir);
       }
-      if( _enablePostFitScan_ ){
-        LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
-        _minimizer_->scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan") );
-        GenericToolbox::triggerTFileWrite(_saveDir_);
-      }
-      if( _enablePreFitToPostFitLineScan_ ){
-        if( not GundamGlobals::isLightOutputMode() ){
-          LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
-          _parameterScanner_.scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/converge"),
-                                         _postFitParState_, _preFitParState_);
-          GenericToolbox::triggerTFileWrite(_saveDir_);
-        }
-      }
+    }
 
-    }, _app_);
-  }
+  });
 
   if( _minimizer_->getMinimizerStatus() != 0 ){
     LogError << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;

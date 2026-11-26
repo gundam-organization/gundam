@@ -26,11 +26,7 @@
 #endif
 
 
-class GundamApp;
-
 namespace GundamUtils {
-
-  void writeOutput(const std::function<void()>& write_, GundamApp* app_ = nullptr);
 
   // Current RSS, plus allocator bytes in use and physical footprint where
   // supported. Alloc counts the system allocator's blocks, not arbitrary
