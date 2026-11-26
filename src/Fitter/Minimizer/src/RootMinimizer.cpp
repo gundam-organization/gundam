@@ -369,15 +369,13 @@ void RootMinimizer::minimize(){
     updateCacheToBestfitPoint();
 
     // export bf point with SIMPLEX
-    if( getOwner().getSaveDir() != nullptr ) {
-      GundamUtils::writeOutput([&]{
-        LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
-        GenericToolbox::writeInTFileWithObjTypeExt(
-            GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
-            TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
-        );
-      }, getOwner().getApp());
-    }
+    getOwner().getOutputDirectory().write([&](TDirectory* saveDir){
+      LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
+      GenericToolbox::writeInTFileWithObjTypeExt(
+          GenericToolbox::mkdirTFile( saveDir, GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
+          TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
+      );
+    });
 
     // Transfer the best point only. Simplex errors are not a Migrad covariance
     // or suitable replacements for the configured parameter step sizes.
@@ -458,22 +456,20 @@ void RootMinimizer::minimize(){
   }
 
   // export bf point
-  if( getOwner().getSaveDir() != nullptr ) {
-    GundamUtils::writeOutput([&]{
-      LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
-      GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
-          TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
-      );
+  getOwner().getOutputDirectory().write([&](TDirectory* saveDir){
+    LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
+    GenericToolbox::writeInTFileWithObjTypeExt(
+        GenericToolbox::mkdirTFile( saveDir, GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
+        TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
+    );
 
-      if( getMonitor().historyTree != nullptr ){
-        LogInfo << "Saving LLH history..." << std::endl;
-        GenericToolbox::writeInTFileWithObjTypeExt(getOwner().getSaveDir(), getMonitor().historyTree.get());
-      }
+    if( getMonitor().historyTree != nullptr ){
+      LogInfo << "Saving LLH history..." << std::endl;
+      GenericToolbox::writeInTFileWithObjTypeExt(saveDir, getMonitor().historyTree.get());
+    }
 
-      if( gradientDescentMonitor.isEnabled ){ saveGradientSteps(); }
-    }, getOwner().getApp());
-  }
+    if( gradientDescentMonitor.isEnabled ){ saveGradientSteps(saveDir); }
+  });
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
@@ -481,100 +477,98 @@ void RootMinimizer::minimize(){
   LogInfo << "Post-fit event-rates:" << std::endl;
   LogInfo << getLikelihoodInterface().getSampleBreakdownTable() << std::endl;
 
-  if( getOwner().getSaveDir() != nullptr ) {
-    GundamUtils::writeOutput([&]{
-      LogInfo << "Writing convergence stats..." << std::endl;
-      int toyIndex = getModelPropagator().getIThrow();
-      int nIterations = postfitCache.nIterations;
-      int nFitPars = postfitCache.nFree;
-      double edmBestFit = postfitCache.edm;
-      double fitStatus = postfitCache.status;
-      double covStatus = postfitCache.covarianceStatus;
-      double chi2MinFitter = postfitCache.minValue;
-      double minimizationTimeInSec = minimizationStopWatch.eval().count();
+  getOwner().getOutputDirectory().write([&](TDirectory* saveDir){
+    LogInfo << "Writing convergence stats..." << std::endl;
+    int toyIndex = getModelPropagator().getIThrow();
+    int nIterations = postfitCache.nIterations;
+    int nFitPars = postfitCache.nFree;
+    double edmBestFit = postfitCache.edm;
+    double fitStatus = postfitCache.status;
+    double covStatus = postfitCache.covarianceStatus;
+    double chi2MinFitter = postfitCache.minValue;
+    double minimizationTimeInSec = minimizationStopWatch.eval().count();
 
-      int nDof = fetchNbDegreeOfFreedom();
-      int nbFitBins = getLikelihoodInterface().getNbSampleBins();
+    int nDof = fetchNbDegreeOfFreedom();
+    int nbFitBins = getLikelihoodInterface().getNbSampleBins();
 
-      auto bestFitStats = std::make_unique<TTree>("bestFitStats", "bestFitStats");
-      bestFitStats->SetDirectory( nullptr );
-      bestFitStats->Branch("fitConverged", &_fitHasConverged_);
-      bestFitStats->Branch("fitStatusCode", &fitStatus);
-      bestFitStats->Branch("covStatusCode", &covStatus);
-      bestFitStats->Branch("edmBestFit", &edmBestFit);
-      bestFitStats->Branch("nIterations", &nIterations);
-      bestFitStats->Branch("chi2MinFitter", &chi2MinFitter);
-      bestFitStats->Branch("toyIndex", &toyIndex);
-      bestFitStats->Branch("nFitBins", &nbFitBins);
-      bestFitStats->Branch("nbFreeParameters", getNbFreeParametersPtr());
-      bestFitStats->Branch("nFitPars", &nFitPars);
-      bestFitStats->Branch("nbDegreeOfFreedom", &nDof);
+    auto bestFitStats = std::make_unique<TTree>("bestFitStats", "bestFitStats");
+    bestFitStats->SetDirectory( nullptr );
+    bestFitStats->Branch("fitConverged", &_fitHasConverged_);
+    bestFitStats->Branch("fitStatusCode", &fitStatus);
+    bestFitStats->Branch("covStatusCode", &covStatus);
+    bestFitStats->Branch("edmBestFit", &edmBestFit);
+    bestFitStats->Branch("nIterations", &nIterations);
+    bestFitStats->Branch("chi2MinFitter", &chi2MinFitter);
+    bestFitStats->Branch("toyIndex", &toyIndex);
+    bestFitStats->Branch("nFitBins", &nbFitBins);
+    bestFitStats->Branch("nbFreeParameters", getNbFreeParametersPtr());
+    bestFitStats->Branch("nFitPars", &nFitPars);
+    bestFitStats->Branch("nbDegreeOfFreedom", &nDof);
 
-      bestFitStats->Branch("minimizationTimeInSec", &minimizationTimeInSec);
-      bestFitStats->Branch("nCallsAtBestFit", &getMonitor().nbEvalLikelihoodCalls);
-      bestFitStats->Branch("totalLikelihoodAtBestFit", &getLikelihoodInterface().getBuffer().totalLikelihood );
-      bestFitStats->Branch("statLikelihoodAtBestFit",  &getLikelihoodInterface().getBuffer().statLikelihood );
-      bestFitStats->Branch("penaltyLikelihoodAtBestFit",  &getLikelihoodInterface().getBuffer().penaltyLikelihood );
+    bestFitStats->Branch("minimizationTimeInSec", &minimizationTimeInSec);
+    bestFitStats->Branch("nCallsAtBestFit", &getMonitor().nbEvalLikelihoodCalls);
+    bestFitStats->Branch("totalLikelihoodAtBestFit", &getLikelihoodInterface().getBuffer().totalLikelihood );
+    bestFitStats->Branch("statLikelihoodAtBestFit",  &getLikelihoodInterface().getBuffer().statLikelihood );
+    bestFitStats->Branch("penaltyLikelihoodAtBestFit",  &getLikelihoodInterface().getBuffer().penaltyLikelihood );
 
-      std::vector<GenericToolbox::RawDataArray> samplesArrList(getModelPropagator().getSampleSet().getSampleList().size());
-      int iSample{-1};
-      for( auto& samplePair : getLikelihoodInterface().getSamplePairList() ){
-        if( not samplePair.model->isEnabled() ) continue;
+    std::vector<GenericToolbox::RawDataArray> samplesArrList(getModelPropagator().getSampleSet().getSampleList().size());
+    int iSample{-1};
+    for( auto& samplePair : getLikelihoodInterface().getSamplePairList() ){
+      if( not samplePair.model->isEnabled() ) continue;
 
-        std::vector<std::string> leavesDict;
-        iSample++;
+      std::vector<std::string> leavesDict;
+      iSample++;
 
-        leavesDict.emplace_back("llhSample/D");
-        samplesArrList[iSample].writeRawData( getLikelihoodInterface().evalStatLikelihood( samplePair ) );
+      leavesDict.emplace_back("llhSample/D");
+      samplesArrList[iSample].writeRawData( getLikelihoodInterface().evalStatLikelihood( samplePair ) );
 
-        int nBins = samplePair.model->getHistogram().getNbBins();
-        for( int iBin = 0 ; iBin < nBins ; iBin++ ){
-          leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
-          samplesArrList[iSample].writeRawData( getLikelihoodInterface().getJointProbabilityPtr()->eval(samplePair, iBin) );
-        }
-
-        samplesArrList[iSample].lock();
-        bestFitStats->Branch(
-            GenericToolbox::generateCleanBranchName(samplePair.model->getName()).c_str(),
-            &samplesArrList[iSample].getRawDataArray()[0],
-            GenericToolbox::joinVectorString(leavesDict, ":").c_str()
-        );
+      int nBins = samplePair.model->getHistogram().getNbBins();
+      for( int iBin = 0 ; iBin < nBins ; iBin++ ){
+        leavesDict.emplace_back("llhSample_bin" + std::to_string(iBin) + "/D");
+        samplesArrList[iSample].writeRawData( getLikelihoodInterface().getJointProbabilityPtr()->eval(samplePair, iBin) );
       }
 
-      std::vector<GenericToolbox::RawDataArray> parameterSetArrList(getModelPropagator().getParametersManager().getParameterSetsList().size());
-      int iParSet{-1};
-      for( auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
-        if( not parSet.isEnabled() ) continue;
+      samplesArrList[iSample].lock();
+      bestFitStats->Branch(
+          GenericToolbox::generateCleanBranchName(samplePair.model->getName()).c_str(),
+          &samplesArrList[iSample].getRawDataArray()[0],
+          GenericToolbox::joinVectorString(leavesDict, ":").c_str()
+      );
+    }
 
-        std::vector<std::string> leavesDict;
-        iParSet++;
+    std::vector<GenericToolbox::RawDataArray> parameterSetArrList(getModelPropagator().getParametersManager().getParameterSetsList().size());
+    int iParSet{-1};
+    for( auto& parSet : getModelPropagator().getParametersManager().getParameterSetsList() ){
+      if( not parSet.isEnabled() ) continue;
 
-        leavesDict.emplace_back("llhPenalty/D");
-        parameterSetArrList[iParSet].writeRawData( getLikelihoodInterface().evalPenaltyLikelihood( parSet ) );
+      std::vector<std::string> leavesDict;
+      iParSet++;
 
-        for( auto& par : parSet.getParameterList() ){
-          if( not par.isEnabled() ){ continue; }
-          leavesDict.emplace_back(GenericToolbox::replaceSubstringInString(par.getTitle(), " ", "_") + "/D");
-          parameterSetArrList[iParSet].writeRawData(par.getParameterValue());
-        }
+      leavesDict.emplace_back("llhPenalty/D");
+      parameterSetArrList[iParSet].writeRawData( getLikelihoodInterface().evalPenaltyLikelihood( parSet ) );
 
-        if( leavesDict.empty() ){ continue; }
-        bestFitStats->Branch(
-            GenericToolbox::generateCleanBranchName(parSet.getName()).c_str(),
-            &parameterSetArrList[iParSet].getRawDataArray()[0],
-            GenericToolbox::joinVectorString(leavesDict, ":").c_str()
-        );
+      for( auto& par : parSet.getParameterList() ){
+        if( not par.isEnabled() ){ continue; }
+        leavesDict.emplace_back(GenericToolbox::replaceSubstringInString(par.getTitle(), " ", "_") + "/D");
+        parameterSetArrList[iParSet].writeRawData(par.getParameterValue());
       }
 
-      bestFitStats->Fill();
-      GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit")->WriteObject(bestFitStats.get(), bestFitStats->GetName());
+      if( leavesDict.empty() ){ continue; }
+      bestFitStats->Branch(
+          GenericToolbox::generateCleanBranchName(parSet.getName()).c_str(),
+          &parameterSetArrList[iParSet].getRawDataArray()[0],
+          GenericToolbox::joinVectorString(leavesDict, ":").c_str()
+      );
+    }
 
-      LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
-      this->writePostFitData(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
-      GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
+    bestFitStats->Fill();
+    GenericToolbox::mkdirTFile(saveDir, "postFit")->WriteObject(bestFitStats.get(), bestFitStats->GetName());
 
-    }, getOwner().getApp());
-  }
+    LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
+    this->writePostFitData(GenericToolbox::mkdirTFile(saveDir, GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
+    GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(saveDir, GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
+
+  });
 
   if( _fitHasConverged_ ){ setMinimizerStatus(0); }
   else{ setMinimizerStatus(postfitCache.status); }
@@ -678,27 +672,25 @@ void RootMinimizer::calcErrors(){
       LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
     }
 
-    if( getOwner().getSaveDir() != nullptr ) {
-      GundamUtils::writeOutput([&]{
-        int covStatus = postfitCache.covarianceStatus;
-        int hesseStatusCode = postfitCache.status;
+    getOwner().getOutputDirectory().write([&](TDirectory* saveDir){
+      int covStatus = postfitCache.covarianceStatus;
+      int hesseStatusCode = postfitCache.status;
 
-        auto hesseStats = std::make_unique<TTree>("hesseStats", "hesseStats");
-        hesseStats->SetDirectory(nullptr);
-        hesseStats->Branch("hesseStatusCode", &hesseStatusCode);
-        hesseStats->Branch("covStatusCode", &covStatus);
+      auto hesseStats = std::make_unique<TTree>("hesseStats", "hesseStats");
+      hesseStats->SetDirectory(nullptr);
+      hesseStats->Branch("hesseStatusCode", &hesseStatusCode);
+      hesseStats->Branch("covStatusCode", &covStatus);
 
-        double errorTimeInSec = errorStopWatch.eval().count();
-        hesseStats->Branch("errorTimeInSec", &errorTimeInSec);
+      double errorTimeInSec = errorStopWatch.eval().count();
+      hesseStats->Branch("errorTimeInSec", &errorTimeInSec);
 
-        hesseStats->Fill();
-        GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse")->WriteObject(hesseStats.get(), hesseStats->GetName());
+      hesseStats->Fill();
+      GenericToolbox::mkdirTFile(saveDir, "postFit/Hesse")->WriteObject(hesseStats.get(), hesseStats->GetName());
 
-        LogInfo << "Writing HESSE post-fit errors" << std::endl;
-        this->writePostFitData(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
-        GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
-      }, getOwner().getApp());
-    }
+      LogInfo << "Writing HESSE post-fit errors" << std::endl;
+      this->writePostFitData(GenericToolbox::mkdirTFile(saveDir, "postFit/Hesse"));
+      GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(saveDir, "postFit/Hesse"));
+    });
   }
   else{
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
@@ -1756,7 +1748,7 @@ void RootMinimizer::updateBestfitCovCache(){
       << postfitCache.covarianceStatus
   );
 }
-void RootMinimizer::saveGradientSteps(){
+void RootMinimizer::saveGradientSteps(TDirectory* saveDir){
 
   if( GundamGlobals::isLightOutputMode() ){
     LogAlert << "Skipping saveGradientSteps as light output mode is fired." << std::endl;
@@ -1792,7 +1784,7 @@ void RootMinimizer::saveGradientSteps(){
     getOwner().evaluateLikelihood();
 
     if( not GundamGlobals::isLightOutputMode() and gradientDescentMonitor.writeGradientSteps ) {
-      auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/steps/step_%i", int(iGradStep)));
+      auto outDir = GenericToolbox::mkdirTFile(saveDir, Form("fit/gradient/steps/step_%i", int(iGradStep)));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("llhState", getLikelihoodInterface().getSummary().c_str()));
     }
@@ -1822,12 +1814,12 @@ void RootMinimizer::saveGradientSteps(){
     for( auto& gEntry : globalGraphList ){
       gEntry.scanDataPtr->title = "Minimizer path to minimum";
       if( gradientDescentMonitor.writeDescentPaths ) {
-        ParameterScanner::writeGraphEntry(gEntry, GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/global") );
+        ParameterScanner::writeGraphEntry(gEntry, GenericToolbox::mkdirTFile(saveDir, "fit/gradient/global") );
       }
     }
 
     if( gradientDescentMonitor.writeDescentPathsRelative ) {
-      auto* outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/globalRelative");
+      auto* outDir = GenericToolbox::mkdirTFile(saveDir, "fit/gradient/globalRelative");
       for( auto& gEntry : globalGraphList ){
         if( gEntry.graph.GetN() == 0 ){ continue; }
 

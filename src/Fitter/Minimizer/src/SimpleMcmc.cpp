@@ -1018,8 +1018,9 @@ void SimpleMcmc::minimize() {
 
   _point_.resize(parameterName.size());
   LogInfo << "Parameters in likelihood: " << _point_.size() << std::endl;
-  GundamUtils::writeOutput([&]{
-    GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit")->cd();
+  const auto& outputDirectory = getOwner().getOutputDirectory();
+  outputDirectory.write([&](TDirectory* saveDir){
+    GenericToolbox::mkdirTFile(saveDir, "fit")->cd();
     LogInfo << "Adding MCMC information to file " << gFile->GetName() << std::endl;
     parameterSetsTree = new TTree("parameterSets", "Tree of MCMC Model Information");
     parameterSetsTree->Branch("parameterSetNames", &parameterSetNames);
@@ -1046,9 +1047,9 @@ void SimpleMcmc::minimize() {
     outputTree->Branch("LLHStatistical", &_llhStatistical_);
     outputTree->Branch("Models", &_saveModel_);
     outputTree->Branch("ModelUncertainty", &_saveUncertainty_);
-  }, getOwner().getApp());
-  const auto fillOutputTree = [this](TTree& tree){
-    GundamUtils::writeOutput([&]{ tree.Fill(); }, getOwner().getApp());
+  });
+  const auto fillOutputTree = [&outputDirectory](TTree& tree){
+    outputDirectory.runOnOutputThread([&]{ tree.Fill(); });
   };
 
   getMonitor().stateTitleMonitor = "Running MCMC chain";
@@ -1061,16 +1062,16 @@ void SimpleMcmc::minimize() {
   // Create the TSimpleMCMC object and call the specific runner.
   if (_proposalName_ == "adaptive") {
     std::unique_ptr<sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep>> mcmc;
-    GundamUtils::writeOutput([&]{
+    outputDirectory.runOnOutputThread([&]{
       mcmc = std::make_unique<sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep>>(outputTree, false, fillOutputTree);
-    }, getOwner().getApp());
+    });
     adaptiveSetupAndRun(*mcmc);
   }
   else if (_proposalName_ == "fixed") {
     std::unique_ptr<sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep>> mcmc;
-    GundamUtils::writeOutput([&]{
+    outputDirectory.runOnOutputThread([&]{
       mcmc = std::make_unique<sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep>>(outputTree, false, fillOutputTree);
-    }, getOwner().getApp());
+    });
     fixedSetupAndRun(*mcmc);
   }
   else {
@@ -1084,11 +1085,11 @@ void SimpleMcmc::minimize() {
   LogInfo << "MCMC ended after " << nbMCMCCalls << " calls." << std::endl;
 
   // Save the sampled points to the outputfile
-  GundamUtils::writeOutput([&]{
+  outputDirectory.write([&](TDirectory*){
     TDirectory::TContext context(outputTree->GetDirectory());
     outputTree->Write();
     delete outputTree;
-  }, getOwner().getApp());
+  });
 
   // success
   setMinimizerStatus(0);

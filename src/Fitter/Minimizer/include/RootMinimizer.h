@@ -69,7 +69,7 @@ protected:
   void updateCacheToBestfitPoint();
   void updateBestfitPointCache();
   void updateBestfitCovCache();
-  void saveGradientSteps();
+  void saveGradientSteps(TDirectory* saveDir_);
 
 private:
   void updateFitParameterFixedStates();
