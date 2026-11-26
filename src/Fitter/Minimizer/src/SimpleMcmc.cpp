@@ -320,7 +320,7 @@ bool SimpleMcmc::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
   }
 
   // Open the file with the state.
-  TFile* saveFile = gFile;
+  TDirectory::TContext restoreContext;
   std::unique_ptr<TFile> restoreFile
       (new TFile(fileName.c_str(), "old"));
   if (!restoreFile || !restoreFile->IsOpen()) {
@@ -347,10 +347,6 @@ bool SimpleMcmc::adaptiveRestoreState( AdaptiveStepMCMC& mcmc,
 
   // Set the deweighting to zero so set covariance is directly used.
   mcmc.GetProposeStep().SetCovarianceUpdateDeweighting(0.0);
-
-  // Restore the original file status.
-  gFile = saveFile;
-  gFile->cd((std::string(getOwner().getSaveDir()->GetName())+"/fit").c_str());
 
   return true;
 }
@@ -496,7 +492,7 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
     if (tmp == "none") return false;
   }
 
-  TFile* saveFile = gFile;
+  TDirectory::TContext restoreContext;
   std::unique_ptr<TFile> restoreFile
       (new TFile(fileName.c_str(), "old"));
   if (!restoreFile || !restoreFile->IsOpen()) {
@@ -506,9 +502,6 @@ bool SimpleMcmc::adaptiveLoadProposalCovariance( AdaptiveStepMCMC& mcmc,
   }
   LogInfo << "Restore the covariance from external file: "
           << restoreFile->GetName() << std::endl;
-
-  gFile = saveFile;
-  gFile->cd((std::string(getOwner().getSaveDir()->GetName())+"/fit").c_str());
 
   LogInfo << "Set the value of the proposal covariance" << std::endl;
   TH2D* proposalCov = dynamic_cast<TH2D*>(
@@ -961,21 +954,12 @@ void SimpleMcmc::fixedSetupAndRun( FixedStepMCMC& mcmc) {
 void SimpleMcmc::minimize() {
   this->MinimizerBase::minimize();
 
-  GenericToolbox::mkdirTFile( getOwner().getSaveDir(), "fit" )->cd();
+  TTree* parameterSetsTree{nullptr};
+  TTree* outputTree{nullptr};
 
-  // Create output tree in the existing file
-  LogInfo << "Adding MCMC information to file " << gFile->GetName() << std::endl;
-
-  // Store parameter names as a tree in the currentdirectory
-  TTree *parameterSetsTree = new TTree("parameterSets",
-                                       "Tree of MCMC Model Information");
   std::vector<std::string> parameterSetNames;
   std::vector<int> parameterSetOffsets;
   std::vector<int> parameterSetCounts;
-
-  parameterSetsTree->Branch("parameterSetNames", &parameterSetNames);
-  parameterSetsTree->Branch("parameterSetOffsets", &parameterSetOffsets);
-  parameterSetsTree->Branch("parameterSetCounts", &parameterSetCounts);
 
   std::vector<int> parameterIndex;
   std::vector<bool> parameterFixed;
@@ -985,23 +969,9 @@ void SimpleMcmc::minimize() {
   std::vector<double> parameterSigma;
   std::vector<double> parameterMin;
   std::vector<double> parameterMax;
-
-  parameterSetsTree->Branch("parameterIndex", &parameterIndex);
-  parameterSetsTree->Branch("parameterFixed", &parameterFixed);
-  parameterSetsTree->Branch("parameterEnabled", &parameterEnabled);
-  parameterSetsTree->Branch("parameterName", &parameterName);
-  parameterSetsTree->Branch("parameterPrior", &parameterPrior);
-  parameterSetsTree->Branch("parameterSigma", &parameterSigma);
-  parameterSetsTree->Branch("parameterMin", &parameterMin);
-  parameterSetsTree->Branch("parameterMax", &parameterMax);
-
   std::vector<std::string> parameterSampleNames;
   std::vector<int> parameterSampleOffsets;
   std::vector<double> parameterSampleData;
-
-  parameterSetsTree->Branch("parameterSampleName", &parameterSampleNames);
-  parameterSetsTree->Branch("parameterSampleOffsets", &parameterSampleOffsets);
-  parameterSetsTree->Branch("parameterSampleData", &parameterSampleData);
 
   // Pull all of the parameters out of the parameter sets and save the
   // names, index, priors, and sigmas to the output.  The order in these
@@ -1046,22 +1016,40 @@ void SimpleMcmc::minimize() {
             << std::endl;
   }
 
-  parameterSetsTree->Fill();
-  parameterSetsTree->Write();
-
-  // End of saving model information
-
   _point_.resize(parameterName.size());
   LogInfo << "Parameters in likelihood: " << _point_.size() << std::endl;
+  GundamUtils::writeOutput([&]{
+    GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit")->cd();
+    LogInfo << "Adding MCMC information to file " << gFile->GetName() << std::endl;
+    parameterSetsTree = new TTree("parameterSets", "Tree of MCMC Model Information");
+    parameterSetsTree->Branch("parameterSetNames", &parameterSetNames);
+    parameterSetsTree->Branch("parameterSetOffsets", &parameterSetOffsets);
+    parameterSetsTree->Branch("parameterSetCounts", &parameterSetCounts);
+    parameterSetsTree->Branch("parameterIndex", &parameterIndex);
+    parameterSetsTree->Branch("parameterFixed", &parameterFixed);
+    parameterSetsTree->Branch("parameterEnabled", &parameterEnabled);
+    parameterSetsTree->Branch("parameterName", &parameterName);
+    parameterSetsTree->Branch("parameterPrior", &parameterPrior);
+    parameterSetsTree->Branch("parameterSigma", &parameterSigma);
+    parameterSetsTree->Branch("parameterMin", &parameterMin);
+    parameterSetsTree->Branch("parameterMax", &parameterMax);
+    parameterSetsTree->Branch("parameterSampleName", &parameterSampleNames);
+    parameterSetsTree->Branch("parameterSampleOffsets", &parameterSampleOffsets);
+    parameterSetsTree->Branch("parameterSampleData", &parameterSampleData);
+    parameterSetsTree->Fill();
+    parameterSetsTree->Write();
+    delete parameterSetsTree;
 
-  // Create the output tree for the accepted points.
-  auto *outputTree = new TTree(_outTreeName_.c_str(),
-                               "Tree of accepted points");
-  outputTree->Branch("Points",&_point_);
-  outputTree->Branch("LLHPenalty",&_llhPenalty_);
-  outputTree->Branch("LLHStatistical",&_llhStatistical_);
-  outputTree->Branch("Models",&_saveModel_);
-  outputTree->Branch("ModelUncertainty",&_saveUncertainty_);
+    outputTree = new TTree(_outTreeName_.c_str(), "Tree of accepted points");
+    outputTree->Branch("Points", &_point_);
+    outputTree->Branch("LLHPenalty", &_llhPenalty_);
+    outputTree->Branch("LLHStatistical", &_llhStatistical_);
+    outputTree->Branch("Models", &_saveModel_);
+    outputTree->Branch("ModelUncertainty", &_saveUncertainty_);
+  }, getOwner().getApp());
+  const auto fillOutputTree = [this](TTree& tree){
+    GundamUtils::writeOutput([&]{ tree.Fill(); }, getOwner().getApp());
+  };
 
   getMonitor().stateTitleMonitor = "Running MCMC chain";
   getMonitor().minimizerTitle = _algorithmName_ + "/" + _proposalName_;
@@ -1072,12 +1060,18 @@ void SimpleMcmc::minimize() {
 
   // Create the TSimpleMCMC object and call the specific runner.
   if (_proposalName_ == "adaptive") {
-    sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep> mcmc(outputTree);
-    adaptiveSetupAndRun(mcmc);
+    std::unique_ptr<sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep>> mcmc;
+    GundamUtils::writeOutput([&]{
+      mcmc = std::make_unique<sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeAdaptiveStep>>(outputTree, false, fillOutputTree);
+    }, getOwner().getApp());
+    adaptiveSetupAndRun(*mcmc);
   }
   else if (_proposalName_ == "fixed") {
-    sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep> mcmc(outputTree);
-    fixedSetupAndRun(mcmc);
+    std::unique_ptr<sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep>> mcmc;
+    GundamUtils::writeOutput([&]{
+      mcmc = std::make_unique<sMCMC::TSimpleMCMC<PrivateProxyLikelihood,sMCMC::TProposeSimpleStep>>(outputTree, false, fillOutputTree);
+    }, getOwner().getApp());
+    fixedSetupAndRun(*mcmc);
   }
   else {
     LogExit("Invalid proposal type for MCMC: " << _proposalName_)
@@ -1090,7 +1084,11 @@ void SimpleMcmc::minimize() {
   LogInfo << "MCMC ended after " << nbMCMCCalls << " calls." << std::endl;
 
   // Save the sampled points to the outputfile
-  outputTree->Write();
+  GundamUtils::writeOutput([&]{
+    TDirectory::TContext context(outputTree->GetDirectory());
+    outputTree->Write();
+    delete outputTree;
+  }, getOwner().getApp());
 
   // success
   setMinimizerStatus(0);

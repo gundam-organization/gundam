@@ -14,6 +14,7 @@
 #include "TFile.h"
 
 #include <string>
+#include <functional>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -31,7 +32,8 @@ public:
 
   void setCmdLinePtr(const CmdLineParser *cmdLinePtr);
   void setConfigString(const std::string &configString);
-  void flushRecordedLogs();
+  void writeOutput(const std::function<void()>& write_);
+  void openThreadedOutputFile(const std::string& filePath_);
 
   TFile* getOutfilePtr(){ return _outFile_.get(); }
 
@@ -39,7 +41,9 @@ public:
   void writeAppInfo();
 
 private:
-  void closeOutputFile();
+  class OutputWorker;
+  void flushRecordedLogs();
+  void closeOutputFile(bool interrupted_ = false);
   void writeLogLines(std::vector<std::string> lines_);
 
   // parameters
@@ -52,8 +56,10 @@ private:
   std::string _logLine_;
   std::unique_ptr<TFile> _outFile_{nullptr};
   std::unique_ptr<TTree> _logTree_;
+  bool _logWriteFailed_{false};
   GundamGreetings _greeting_{};
   std::unique_ptr<LoggerDetail::ScopedExitHandler> _logExitHandler_;
+  std::unique_ptr<OutputWorker> _outputWorker_;
 
 };
 

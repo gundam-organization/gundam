@@ -18,15 +18,19 @@
 #include "CmdLineParser.h"
 #include "Logger.h"
 
+#include <csignal>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 
-int main(int argc, char** argv){
+namespace {
 
-  GundamApp app{"main fitter"};
+void requestInterrupt(int){
+  GundamGlobals::requestInterrupt();
+}
 
+int runFitter(GundamApp& app, int argc, char** argv){
   // --------------------------
   // Read Command Line Args:
   // --------------------------
@@ -267,9 +271,8 @@ int main(int argc, char** argv){
   app.setConfigString( gundamFitterConfig.toString() );
 
   // Ok, we should run. Create the out file.
-  app.openOutputFile(outFileName);
-  app.writeAppInfo();
-  app.flushRecordedLogs();
+  app.openThreadedOutputFile(outFileName);
+  app.writeOutput([&app]{ app.writeAppInfo(); });
 
   if( clParser.isOptionTriggered("hyper-dry-run") ) {
     LogInfo << "Hyper-dry-run enabled. Stopping here." << std::endl;
@@ -281,8 +284,7 @@ int main(int argc, char** argv){
   // Configure:
   // --------------------------
   LogInfo << "FitterEngine setup..." << std::endl;
-  FitterEngine fitter(GenericToolbox::mkdirTFile(app.getOutfilePtr(), "FitterEngine"));
-  fitter.setBeforeLikelihoodEvaluation([&app]{ app.flushRecordedLogs(); });
+  FitterEngine fitter(app, "FitterEngine");
 
   gundamFitterConfig.fillValue(fitter.getConfig(), "fitterEngineConfig");
 
@@ -293,7 +295,6 @@ int main(int argc, char** argv){
   LogInfo << "Reading fitter configuration..." << std::endl;
   LogInfo << "──────────────────────────────────" << std::endl;
   fitter.configure();
-  app.flushRecordedLogs();
 
   // -a
   if( clParser.isOptionTriggered("asimov") ){
@@ -417,7 +418,6 @@ int main(int argc, char** argv){
   LogInfo << "Initializing fitter..." << std::endl;
   LogInfo << "──────────────────────────────────" << std::endl;
   fitter.initialize();
-  app.flushRecordedLogs();
 
   // show initial conditions
   if( clParser.isOptionTriggered("injectParameterConfig") ) {
@@ -426,32 +426,34 @@ int main(int argc, char** argv){
   }
 
   if( clParser.isOptionTriggered("scanLine") ){
-    auto* outDir = GenericToolbox::mkdirTFile(fitter.getSaveDir(), GenericToolbox::joinPath("preFit", "cmdScanLine"));
-    LogExitIf( clParser.getNbValueSet("scanLine") == 0, "No injector file provided.");
-    if( clParser.getNbValueSet("scanLine") == 1 ){
-      LogAlert << "Will scan the line toward the point set in: " << clParser.getOptionVal<std::string>("scanLine", 0) << std::endl;
+    app.writeOutput([&]{
+      auto* outDir = GenericToolbox::mkdirTFile(fitter.getSaveDir(), GenericToolbox::joinPath("preFit", "cmdScanLine"));
+      LogExitIf( clParser.getNbValueSet("scanLine") == 0, "No injector file provided.");
+      if( clParser.getNbValueSet("scanLine") == 1 ){
+        LogAlert << "Will scan the line toward the point set in: " << clParser.getOptionVal<std::string>("scanLine", 0) << std::endl;
 
-      auto endPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 0));
+        auto endPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 0));
 
-      GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
-      fitter.getParameterScanner().scanSegment( outDir, endPoint );
-    }
-    else if( clParser.getNbValueSet("scanLine") == 2 ) {
-      LogAlert << "Will scan the line from point A (" << clParser.getOptionVal<std::string>("scanLine", 0)
-          << ") to point B (" << clParser.getOptionVal<std::string>("scanLine", 1) << ")" << std::endl;
+        fitter.getParameterScanner().scanSegment( outDir, endPoint );
+      }
+      else if( clParser.getNbValueSet("scanLine") == 2 ) {
+        LogAlert << "Will scan the line from point A (" << clParser.getOptionVal<std::string>("scanLine", 0)
+            << ") to point B (" << clParser.getOptionVal<std::string>("scanLine", 1) << ")" << std::endl;
 
-      auto startPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 0));
-      auto endPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 1));
+        auto startPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 0));
+        auto endPoint = ConfigUtils::readConfigFile(clParser.getOptionVal<std::string>("scanLine", 1));
 
-      GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed("startPoint", GenericToolbox::Json::toReadableString(startPoint).c_str()) );
-      GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed("startPoint", GenericToolbox::Json::toReadableString(startPoint).c_str()) );
+        GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed("endPoint", GenericToolbox::Json::toReadableString(endPoint).c_str()) );
 
-      fitter.getParameterScanner().scanSegment( outDir, endPoint, startPoint );
-    }
-    else{
-      LogExitIf("Invalid --scan-line arguments");
-    }
+        fitter.getParameterScanner().scanSegment( outDir, endPoint, startPoint );
+      }
+      else{
+        LogExitIf("Invalid --scan-line arguments");
+      }
+    });
   }
 
   LogInfo << std::endl;
@@ -459,5 +461,22 @@ int main(int argc, char** argv){
   LogInfo << "Running the fitter..." << std::endl;
   LogInfo << "──────────────────────────────────" << std::endl;
   fitter.fit();
+  return EXIT_SUCCESS;
+}
+}
 
+int main(int argc, char** argv){
+  GundamApp app{"main fitter"};
+  if( std::signal(SIGINT, requestInterrupt) == SIG_ERR ){
+    LogWarning << "Could not install the SIGINT handler." << std::endl;
+  }
+  try{
+    const int status = runFitter(app, argc, argv);
+    GundamGlobals::checkInterrupt();
+    return status;
+  }
+  catch( const GundamGlobals::Interrupted& ){
+    LogWarning << "Interrupt requested (SIGINT). Stopping the fitter." << std::endl;
+    return 128 + SIGINT;
+  }
 }

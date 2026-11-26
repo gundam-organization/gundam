@@ -2,6 +2,8 @@
 #define TSimpleMCMC_H_SEEN
 
 #include <iostream>
+#include <functional>
+#include <utility>
 #include <vector>
 #include <algorithm>
 #include <limits>
@@ -200,7 +202,9 @@ public:
     /// log likelihood and the parameters at the accepted step.  If the second
     /// optional parameter is true, then the proposed steps will also be added
     /// to the tree.
-    TSimpleMCMC(TTree* tree = NULL, bool saveStep = false) : fTree(tree) {
+    TSimpleMCMC(TTree* tree = NULL, bool saveStep = false,
+                std::function<void(TTree&)> fillTree = {})
+        : fTree(tree), fFillTree(std::move(fillTree)) {
         if (fTree) {
             MCMC_DEBUG(0) << "TSimpleMCMC: Adding branches to "
                           << fTree->GetName()
@@ -527,7 +531,10 @@ public:
     /// SaveStep(false), and users should (usually) use SaveStep().
     void SaveStep(bool forceSave=true) {
         fProposeStep.SaveState(forceSave);
-        if (fTree) fTree->Fill();
+        if (fTree) {
+            if (fFillTree) fFillTree(*fTree);
+            else fTree->Fill();
+        }
         fProposeStep.StateSaved();
     }
 
@@ -548,6 +555,7 @@ protected:
 
     /// A TTree to save the accepted points.
     TTree* fTree;
+    std::function<void(TTree&)> fFillTree;
 
     // The total number of steps that have been tried for any reason.  This
     // includes both successes and failures.
