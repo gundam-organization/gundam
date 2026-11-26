@@ -68,6 +68,7 @@ int runFitter(GundamApp& app, int argc, char** argv){
 
   clParser.addDummyOption("Fit options");
   clParser.addTriggerOption("asimov", {"-a", "--asimov"}, "Use MC dataset to fill the data histograms");
+  clParser.addTriggerOption("useAnalyticGradient", {"--enable-gradient"}, "Use the analytic gradient with Minuit2");
   clParser.addTriggerOption("skipHesse", {"--skip-hesse"}, "Don't perform postfit error evaluation");
   clParser.addTriggerOption("disableParLimits", {"--disable-limits"}, "Don't use limits during the fit");
   clParser.addOption("toyFit", {"--toy"}, "Run a toy fit (optional arg to provide toy index)", 1, true);
@@ -224,6 +225,7 @@ int runFitter(GundamApp& app, int argc, char** argv){
         {"injectParameterConfig", "Inj"},
         {"scanLine", "LineSc"},
         {"asimov", "Asimov"},
+        {"useAnalyticGradient", "AnalyticGradient"},
         {"scanParameters", "Scan"},
         {"generateOneSigmaPlots", "OneSigma"},
         {"enablePca", "PCA"},
@@ -233,6 +235,9 @@ int runFitter(GundamApp& app, int argc, char** argv){
         {"lightOutputMode", "Light"},
         {"toyFit", "ToyFit"},
         {"injectToyParameters", "InjToyPar"},
+#ifdef GUNDAM_USING_BACKENDS
+        {"backend", "Backend"},
+#endif
 
         // debug options
         {"debugMaxNbEventToLoad", "debugNbEventMax"},

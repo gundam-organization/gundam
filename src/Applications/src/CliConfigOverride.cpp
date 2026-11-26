@@ -108,6 +108,11 @@ namespace CliConfigOverride {
       config_["fitterEngineConfig"]["generateOneSigmaPlots"] = true;
     }
 
+    if( isTriggered("useAnalyticGradient") ){
+      auto& minimizerConfig = getAliasedConfig(config_["fitterEngineConfig"], "minimizerConfig", "mcmcConfig");
+      minimizerConfig["useAnalyticGradient"] = true;
+    }
+
     if( isTriggered("skipHesse") ){
       auto& minimizerConfig = getAliasedConfig(config_["fitterEngineConfig"], "minimizerConfig", "mcmcConfig");
       minimizerConfig["enablePostFitErrorFit"] = false;
