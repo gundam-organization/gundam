@@ -8,6 +8,9 @@
 #include "ConfigUtils.h"
 #include "GundamUtils.h"
 #include "GundamApp.h"
+#ifdef GUNDAM_USING_BACKENDS
+#include "BackendFactory.h"
+#endif
 #ifdef GUNDAM_USING_CACHE_MANAGER
 #include "CacheManager.h"
 #endif
@@ -15,9 +18,11 @@
 #include "GenericToolbox.Root.h"
 
 #include "GenericToolbox.Map.h"
+#include "GenericToolbox.String.h"
 #include "CmdLineParser.h"
 #include "Logger.h"
 
+#include <algorithm>
 #include <csignal>
 #include <cstdlib>
 #include <stdexcept>
@@ -54,6 +59,11 @@ int runFitter(GundamApp& app, int argc, char** argv){
 
   clParser.addDummyOption("Runtime options");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
+#ifdef GUNDAM_USING_BACKENDS
+  const auto backendNames = Backends::getCompiledBackendNames();
+  const auto backendChoices = GenericToolbox::joinVectorString(backendNames, "/");
+  clParser.addOption("backend", {"--backend"}, "Enable and select the computation backend (" + backendChoices + ")");
+#endif
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
   clParser.addOption("enablePca", {"--pca", "--enable-pca"}, "Enable principle component analysis for eigen decomposed parameter sets", 2, true);
   clParser.addDummyOption();
@@ -190,6 +200,22 @@ int runFitter(GundamApp& app, int argc, char** argv){
   ConfigUtils::ConfigBuilder configHandler(configFilePath);
   configHandler.override( clParser.getOptionValList<std::string>("overrideFiles") );
   configHandler.flatOverride( clParser.getOptionValList<std::string>("overrides") );
+
+#ifdef GUNDAM_USING_BACKENDS
+  if( clParser.isOptionTriggered("backend") ){
+    const auto requestedBackend = clParser.getOptionVal<std::string>("backend");
+    const auto backendName = std::find_if(backendNames.begin(), backendNames.end(), [&](const std::string& name_){
+      return requestedBackend == name_ or requestedBackend == GenericToolbox::toLowerCase(name_);
+    });
+    LogExitIf(backendName == backendNames.end(),
+              "Unavailable backend '" << requestedBackend << "'. Compiled backends: " << backendChoices);
+
+    auto& backendConfig = configHandler.getConfig()["fitterEngineConfig"]["likelihoodInterfaceConfig"]["backendManagerConfig"];
+    backendConfig["isEnabled"] = true;
+    backendConfig["useBackend"] = *backendName;
+    backendConfig.erase("type");
+  }
+#endif
 
   ConfigReader gundamFitterConfig(configHandler.getConfig());
   gundamFitterConfig.defineFields({
