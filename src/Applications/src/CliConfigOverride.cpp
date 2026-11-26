@@ -1,8 +1,16 @@
 #include "CliConfigOverride.h"
 
+#ifdef GUNDAM_USING_BACKENDS
+#include "BackendFactory.h"
+#endif
+
 #include "CmdLineParser.h"
 #include "Logger.h"
 
+#ifdef GUNDAM_USING_BACKENDS
+#include "GenericToolbox.String.h"
+#include <algorithm>
+#endif
 #include <cmath>
 
 namespace {
@@ -28,6 +36,24 @@ namespace CliConfigOverride {
     const auto isTriggered = [&](const char* option_){
       return parser_.isOptionDefined(option_) and parser_.isOptionTriggered(option_);
     };
+
+#ifdef GUNDAM_USING_BACKENDS
+    if( isTriggered("backend") ){
+      const auto requestedBackend = parser_.getOptionVal<std::string>("backend");
+      const auto backendNames = Backends::getCompiledBackendNames();
+      const auto backendName = std::find_if(backendNames.begin(), backendNames.end(), [&](const std::string& name_){
+        return requestedBackend == name_ or requestedBackend == GenericToolbox::toLowerCase(name_);
+      });
+      LogExitIf(backendName == backendNames.end(),
+                "Unavailable backend '" << requestedBackend << "'. Compiled backends: "
+                << GenericToolbox::joinVectorString(backendNames, "/"));
+
+      auto& backendConfig = config_["fitterEngineConfig"]["likelihoodInterfaceConfig"]["backendManagerConfig"];
+      backendConfig["isEnabled"] = true;
+      backendConfig["useBackend"] = *backendName;
+      backendConfig.erase("type");
+    }
+#endif
 
     if( isTriggered("enablePca") ){
       auto& fitterConfig = config_["fitterEngineConfig"];

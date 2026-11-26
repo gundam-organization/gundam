@@ -23,7 +23,6 @@
 #include "CmdLineParser.h"
 #include "Logger.h"
 
-#include <algorithm>
 #include <csignal>
 #include <cstdlib>
 #include <string>
@@ -60,8 +59,7 @@ int runFitter(GundamApp& app, int argc, char** argv){
   clParser.addDummyOption("Runtime options");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
 #ifdef GUNDAM_USING_BACKENDS
-  const auto backendNames = Backends::getCompiledBackendNames();
-  const auto backendChoices = GenericToolbox::joinVectorString(backendNames, "/");
+  const auto backendChoices = GenericToolbox::joinVectorString(Backends::getCompiledBackendNames(), "/");
   clParser.addOption("backend", {"--backend"}, "Enable and select the computation backend (" + backendChoices + ")");
 #endif
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
@@ -193,22 +191,6 @@ int runFitter(GundamApp& app, int argc, char** argv){
   ConfigUtils::ConfigBuilder configHandler(configFilePath);
   configHandler.override( clParser.getOptionValList<std::string>("overrideFiles") );
   configHandler.flatOverride( clParser.getOptionValList<std::string>("overrides") );
-
-#ifdef GUNDAM_USING_BACKENDS
-  if( clParser.isOptionTriggered("backend") ){
-    const auto requestedBackend = clParser.getOptionVal<std::string>("backend");
-    const auto backendName = std::find_if(backendNames.begin(), backendNames.end(), [&](const std::string& name_){
-      return requestedBackend == name_ or requestedBackend == GenericToolbox::toLowerCase(name_);
-    });
-    LogExitIf(backendName == backendNames.end(),
-              "Unavailable backend '" << requestedBackend << "'. Compiled backends: " << backendChoices);
-
-    auto& backendConfig = configHandler.getConfig()["fitterEngineConfig"]["likelihoodInterfaceConfig"]["backendManagerConfig"];
-    backendConfig["isEnabled"] = true;
-    backendConfig["useBackend"] = *backendName;
-    backendConfig.erase("type");
-  }
-#endif
 
   CliConfigOverride::applyConfigOverride(clParser, configHandler.getConfig());
 
