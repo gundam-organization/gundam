@@ -9,6 +9,7 @@ set(SRCFILES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/RootUtils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamApp.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/GundamOutputManager.cpp
     )
 
 set(HEADERS
@@ -26,6 +27,7 @@ set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/FormulaEvaluator.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamUtils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamApp.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamOutputManager.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/GundamBacktrace.h
     )
 
@@ -50,6 +52,16 @@ endif()
 
 add_dependencies( GundamUtils preBuildVersionCheck )
 include_directories( ${CMAKE_BINARY_DIR}/generated/ ) # version header
+
+set(showLogsMacro "${CMAKE_CURRENT_SOURCE_DIR}/macros/showLogs.C")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${showLogsMacro}")
+file(READ "${showLogsMacro}" SHOW_LOGS_SOURCE)
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/macros/ShowLogsSource.h.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/ShowLogsSource.h"
+  @ONLY
+)
+target_include_directories(GundamUtils PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Make sure the current directories are available for the later
 # compilation.

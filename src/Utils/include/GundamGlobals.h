@@ -6,11 +6,17 @@
 #define GUNDAM_GUNDAM_GLOBALS_H
 
 #include <algorithm>
+#include <atomic>
 #include <mutex>
 
 class GundamGlobals{
 
 public:
+  struct Interrupted {};
+  static void requestInterrupt() noexcept { _interruptRequested_.store(true, std::memory_order_relaxed); }
+  static bool isInterruptRequested() noexcept { return _interruptRequested_.load(std::memory_order_relaxed); }
+  static void checkInterrupt(){ if( isInterruptRequested() ) throw Interrupted{}; }
+
   // setters
   static void setIsDebug(bool enable_){ _parameters_.isDebug = enable_; }
   static void setLightOutputMode(bool enable_){ _parameters_.lightOutputModeEnabled = enable_; }
@@ -35,6 +41,8 @@ public:
   }
 
 private:
+  static_assert(std::atomic<bool>::is_always_lock_free);
+  static inline std::atomic<bool> _interruptRequested_{false};
 
   struct Parameters{
     // Debug mode is set to enable extra printouts during runtime.

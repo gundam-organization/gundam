@@ -44,11 +44,16 @@ def fit():
     engine.setConfig(GUNDAM.ConfigUtils.ConfigReader(GUNDAM.JsonType(json.dumps(config))))
     engine.configure()
     engine.getLikelihoodInterface().setDataType(GUNDAM.LikelihoodInterface.DataType.Asimov)
-    app = GUNDAM.GundamApp('Modular fit monitor regression')
-    app.openOutputFile(str(Path.cwd() / '230ApiModularFitMonitor-output.root'))
-    engine.setSaveDir(app, 'FitterEngine')
-    engine.initialize()
-    engine.fit()
+    output_path = str(Path.cwd() / '230ApiModularFitMonitor-output.root')
+    with GUNDAM.GundamOutputManager(output_path) as output:
+        engine.setOutput(output.directory('FitterEngine'))
+        engine.initialize()
+        engine.fit()
+    assert not output.isOpen()
+    with uproot.open(output_path) as saved:
+        assert saved['gundam/runtime/logger'].num_entries > 0
+        assert 'gundam/runtime/showLogs' in saved
+        assert 'FitterEngine/postFit' in saved
     assert math.isclose(engine.getLikelihoodInterface().getLastLikelihood(), 0., abs_tol=1e-6)
 
 

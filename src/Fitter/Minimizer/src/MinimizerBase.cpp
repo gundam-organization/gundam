@@ -112,7 +112,7 @@ void MinimizerBase::minimize(){
 
   this->printParameters();
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  getOwner().evaluateLikelihood();
   LogInfo << "Initial likelihood state:" << std::endl;
   LogInfo << getLikelihoodInterface().getSummary() << std::endl;
 
@@ -198,7 +198,7 @@ double MinimizerBase::evalFit( const double* parArray_ ){
   // Propagate the parameters
   {
     auto propagationTime = _monitor_.propagationTimer.scopeTime();
-    getLikelihoodInterface().propagateAndEvalLikelihood();
+    getOwner().evaluateLikelihood();
   }
   _monitor_.evalLlhTimer.stop();
 
@@ -294,9 +294,8 @@ double MinimizerBase::evalFit( const double* parArray_ ){
         );
       }
 
-      // in some ROOT versions the trail back does not work properly. This seems to fix the issue
-      Logger::moveTerminalCursorBack(1);
-      std::cout << std::endl;
+      // Work around inconsistent cursor positioning in some ROOT versions.
+      std::cout << "\033[1F" << std::endl;
 
     }
   }

@@ -3,7 +3,6 @@
 //
 
 #include "FitterEngine.h"
-#include "GundamApp.h"
 #include "GundamGlobals.h"
 #include "GundamUtils.h"
 #include "RootMinimizer.h"
@@ -24,8 +23,9 @@
 #include <memory>
 
 
-void FitterEngine::setSaveDir(GundamApp& app_, const std::string& subFolder_){
-  _saveDir_ = GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_);
+void FitterEngine::evaluateLikelihood(){
+  GundamGlobals::checkInterrupt();
+  getLikelihoodInterface().propagateAndEvalLikelihood();
 }
 
 void FitterEngine::configureImpl(){
@@ -179,9 +179,9 @@ void FitterEngine::initializeImpl(){
   _minimizer_->initialize();
 
   // Make sure parameters are fully propagated
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
-  if( _saveDir_ != nullptr ) {
+  _outputDirectory_.write([&](TDirectory* saveDir){
     // Write data
 
     if( _likelihoodInterface_.getDataType() == LikelihoodInterface::DataType::Toy ){
@@ -211,21 +211,21 @@ void FitterEngine::initializeImpl(){
       }
 
       throwsTree->Fill();
-      GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(_saveDir_, "preFit/parameters"), throwsTree);
+      GenericToolbox::writeInTFileWithObjTypeExt(GenericToolbox::mkdirTFile(saveDir, "preFit/parameters"), throwsTree);
     }
 
     LogInfo << "Writing propagator objects..." << std::endl;
     GenericToolbox::writeInTFileWithObjTypeExt(
-        GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+        GenericToolbox::mkdirTFile(saveDir, "propagator"),
         TNamed("initialParameterState", GenericToolbox::Json::toReadableString(getLikelihoodInterface().getModelPropagator().getParametersManager().exportParameterInjectorConfig()).c_str())
     );
 
     GenericToolbox::writeInTFileWithObjTypeExt(
-        GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+        GenericToolbox::mkdirTFile(saveDir, "propagator"),
         getLikelihoodInterface().getModelPropagator().getParametersManager().getGlobalCovarianceMatrix().get(), "globalCovarianceMatrix"
     );
     GenericToolbox::writeInTFileWithObjTypeExt(
-        GenericToolbox::mkdirTFile(_saveDir_, "propagator"),
+        GenericToolbox::mkdirTFile(saveDir, "propagator"),
         getLikelihoodInterface().getModelPropagator().getParametersManager().getStrippedCovarianceMatrix().get(), "strippedCovarianceMatrix"
     );
 
@@ -234,23 +234,23 @@ void FitterEngine::initializeImpl(){
 
     auto saveFolder = GenericToolbox::joinPath( "propagator", parSet.getName() );
     GenericToolbox::writeInTFileWithObjTypeExt(
-        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        GenericToolbox::mkdirTFile( saveDir, saveFolder ),
         parSet.generatePriorCovarianceMatrix().get(), "priorCovarianceMatrix"
     );
     GenericToolbox::writeInTFileWithObjTypeExt(
-        GenericToolbox::mkdirTFile(_saveDir_, saveFolder ),
+        GenericToolbox::mkdirTFile(saveDir, saveFolder ),
         parSet.getPriorCorrelationMatrix().get(),
         "priorCorrelationMatrix"
     );
     GenericToolbox::writeInTFileWithObjTypeExt(
-        GenericToolbox::mkdirTFile( _saveDir_, saveFolder ),
+        GenericToolbox::mkdirTFile( saveDir, saveFolder ),
         parSet.getInversePriorCorrelationMatrix().get(), "priorCorrelationMatrixInv"
     );
 
       auto parsSaveFolder = GenericToolbox::joinPath( saveFolder, "parameters" );
       for( auto& par : parSet.getParameterList() ){
         auto parSaveFolder = GenericToolbox::joinPath(parsSaveFolder, GenericToolbox::generateCleanBranchName(par.getTitle()));
-        auto outDir = GenericToolbox::mkdirTFile(_saveDir_, parSaveFolder );
+        auto outDir = GenericToolbox::mkdirTFile(saveDir, parSaveFolder );
 
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "title", par.getTitle().c_str() ) );
         GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "fullTitle", par.getFullTitle().c_str() ) );
@@ -268,7 +268,7 @@ void FitterEngine::initializeImpl(){
         auto eigenSaveFolder = GenericToolbox::joinPath( saveFolder, "eigen" );
         for( auto& eigen : parSet.getEigenParameterList() ){
           auto eigenFolder = GenericToolbox::joinPath(eigenSaveFolder, GenericToolbox::generateCleanBranchName(eigen.getTitle()));
-          auto outDir = GenericToolbox::mkdirTFile( _saveDir_, eigenFolder );
+          auto outDir = GenericToolbox::mkdirTFile( saveDir, eigenFolder );
 
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "title", eigen.getTitle().c_str() ) );
           GenericToolbox::writeInTFileWithObjTypeExt( outDir, TNamed( "fullTitle", eigen.getFullTitle().c_str() ) );
@@ -285,7 +285,7 @@ void FitterEngine::initializeImpl(){
     }
 
     if( _minimizerType_ == MinimizerType::RootMinimizer ){
-      dynamic_cast<const RootMinimizer*>( &this->getMinimizer() )->saveMinimizerSettings( GenericToolbox::mkdirTFile(_saveDir_, "fit/minimizer" ) );
+      dynamic_cast<const RootMinimizer*>( &this->getMinimizer() )->saveMinimizerSettings( GenericToolbox::mkdirTFile(saveDir, "fit/minimizer" ) );
     }
 
     LogInfo << "Writing sample histograms..." << std::endl;
@@ -304,7 +304,7 @@ void FitterEngine::initializeImpl(){
       hist->GetYaxis()->SetTitle("Rate");
       hist->SetLineWidth(3);
       GenericToolbox::writeInTFile(
-        GenericToolbox::TFilePath(_saveDir_, "preFit").getSubDir(tag_).getSubDir(samplePtr_->getName()).getDir(),
+        GenericToolbox::TFilePath(saveDir, "preFit").getSubDir(tag_).getSubDir(samplePtr_->getName()).getDir(),
         hist.get()
       );
     };
@@ -314,13 +314,13 @@ void FitterEngine::initializeImpl(){
     }
 
     if( not GundamGlobals::isLightOutputMode() ){
-      getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(_saveDir_, "preFit") );
-      getLikelihoodInterface().writeEventRates( GenericToolbox::TFilePath(_saveDir_, "preFit") );
+      getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(saveDir, "preFit") );
+      getLikelihoodInterface().writeEventRates( GenericToolbox::TFilePath(saveDir, "preFit") );
     }
 
     LogInfo << "Saving all objects to disk..." << std::endl;
-    GenericToolbox::triggerTFileWrite(_saveDir_);
-  }
+    GenericToolbox::triggerTFileWrite(saveDir);
+  });
 
   // Loading, PCA and output serialization can leave large freed allocations
   // resident. Return unused allocator pages once, before scans/minimization.
@@ -352,40 +352,40 @@ void FitterEngine::fit(){
 
   _preFitParState_ = getLikelihoodInterface().getModelPropagator().getParametersManager().exportParameterInjectorConfig();
 
-  if( _saveDir_ != nullptr ) {
-    auto preFitDir(GenericToolbox::mkdirTFile( _saveDir_, "preFit" ));
+  _outputDirectory_.write([&](TDirectory* saveDir){
+    auto preFitDir(GenericToolbox::mkdirTFile( saveDir, "preFit" ));
     GenericToolbox::writeInTFileWithObjTypeExt(preFitDir, llhState, "llhState");
     GenericToolbox::writeInTFileWithObjTypeExt(preFitDir, GenericToolbox::Json::toReadableString(_preFitParState_), "parState");
 
     // Not moving parameters
     if( _generateSamplePlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
       LogInfo << "Generating pre-fit sample plots..." << std::endl;
-      getLikelihoodInterface().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/plots"));
-      GenericToolbox::triggerTFileWrite(_saveDir_);
+      getLikelihoodInterface().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(saveDir, "preFit/plots"));
+      GenericToolbox::triggerTFileWrite(saveDir);
     }
 
     // Moving parameters
     if( _generateOneSigmaPlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
       LogInfo << "Generating pre-fit one-sigma variation plots..." << std::endl;
-      _parameterScanner_.generateOneSigmaPlots(GenericToolbox::mkdirTFile(_saveDir_, "preFit/oneSigma"));
-      GenericToolbox::triggerTFileWrite(_saveDir_);
+      _parameterScanner_.generateOneSigmaPlots(GenericToolbox::mkdirTFile(saveDir, "preFit/oneSigma"));
+      GenericToolbox::triggerTFileWrite(saveDir);
     }
 
     if( _doAllParamVariations_ ){
       LogInfo << "Running all parameter variation on pre-fit samples..." << std::endl;
       _parameterScanner_.varyEvenRates(
           _allParamVariationsSigmas_,
-          GenericToolbox::mkdirTFile(_saveDir_, "preFit/varyEventRates")
+          GenericToolbox::mkdirTFile(saveDir, "preFit/varyEventRates")
       );
-      GenericToolbox::triggerTFileWrite(_saveDir_);
+      GenericToolbox::triggerTFileWrite(saveDir);
     }
 
     if( _enablePreFitScan_ ){
       LogInfo << "Scanning fit parameters before minimizing..." << std::endl;
-      _minimizer_->scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "preFit/scan") );
-      GenericToolbox::triggerTFileWrite(_saveDir_);
+      _minimizer_->scanParameters( GenericToolbox::mkdirTFile(saveDir, "preFit/scan") );
+      GenericToolbox::triggerTFileWrite(saveDir);
     }
-  }
+  });
 
   if( _throwMcBeforeFit_ ){
     LogAlert << "Throwing correlated parameters of MC away from their prior..." << std::endl;
@@ -428,16 +428,16 @@ void FitterEngine::fit(){
 
 
     LogInfo << "Current LLH state:" << std::endl;
-    getLikelihoodInterface().propagateAndEvalLikelihood();
+    this->evaluateLikelihood();
 
     LogInfo << getLikelihoodInterface().getSummary() << std::endl;
   }
 
-  if( _saveDir_ != nullptr ){
+  _outputDirectory_.write([&](TDirectory* saveDir){
     _likelihoodInterface_.getModelPropagator().writeParameterStateTree(
-      GenericToolbox::TFilePath(_saveDir_, "preFit")
+      GenericToolbox::TFilePath(saveDir, "preFit")
     );
-  }
+  });
 
   // Leaving now?
   if( _isDryRun_ ){
@@ -454,11 +454,11 @@ void FitterEngine::fit(){
 #endif
 
   LogInfo << "Minimizing LLH..." << std::endl;
-  this->_minimizer_->minimize();
+  _minimizer_->minimize();
 
   // re-evaluating since the minimizer might not have triggered an eval of the
   // LLH.  And guarantee that the weights were copied if that was enabled.
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
   if( Cache::Manager::IsBuilt() ){
@@ -474,44 +474,44 @@ void FitterEngine::fit(){
   LogInfo << "Post-fit likelihood state:" << std::endl;
   LogInfo << llhState << std::endl;
 
-  if( _saveDir_ != nullptr ) {
+  _outputDirectory_.write([&](TDirectory* saveDir){
     LogInfo << "Saving post-fit par state..." << std::endl;
     GenericToolbox::writeInTFileWithObjTypeExt(
-        GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
+        GenericToolbox::mkdirTFile( saveDir, "postFit" ),
         TNamed("parState", GenericToolbox::Json::toReadableString(_postFitParState_).c_str())
     );
 
     GenericToolbox::writeInTFileWithObjTypeExt(
-        GenericToolbox::mkdirTFile( _saveDir_, "postFit" ),
+        GenericToolbox::mkdirTFile( saveDir, "postFit" ),
         TNamed("llhState", llhState.c_str())
     );
 
     if (_savePostfitEventTrees_){
       if( not GundamGlobals::isLightOutputMode() ){
         LogInfo << "Saving PostFit event Trees" << std::endl;
-        getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(_saveDir_, "postFit") );
+        getLikelihoodInterface().writeEvents( GenericToolbox::TFilePath(saveDir, "postFit") );
       }
     }
     if( _generateSamplePlots_ and not getLikelihoodInterface().getPlotGenerator().getConfig().empty() ){
       LogInfo << "Generating post-fit sample plots..." << std::endl;
-      getLikelihoodInterface().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(_saveDir_, "postFit/samples"));
-      GenericToolbox::triggerTFileWrite(_saveDir_);
+      getLikelihoodInterface().getPlotGenerator().generateSamplePlots(GenericToolbox::mkdirTFile(saveDir, "postFit/samples"));
+      GenericToolbox::triggerTFileWrite(saveDir);
     }
     if( _enablePostFitScan_ ){
       LogInfo << "Scanning fit parameters around the minimum point..." << std::endl;
-      _minimizer_->scanParameters( GenericToolbox::mkdirTFile(_saveDir_, "postFit/scan") );
-      GenericToolbox::triggerTFileWrite(_saveDir_);
+      _minimizer_->scanParameters( GenericToolbox::mkdirTFile(saveDir, "postFit/scan") );
+      GenericToolbox::triggerTFileWrite(saveDir);
     }
     if( _enablePreFitToPostFitLineScan_ ){
       if( not GundamGlobals::isLightOutputMode() ){
         LogInfo << "Scanning along the line from pre-fit to post-fit points..." << std::endl;
-        _parameterScanner_.scanSegment(GenericToolbox::mkdirTFile(_saveDir_, "postFit/converge"),
+        _parameterScanner_.scanSegment(GenericToolbox::mkdirTFile(saveDir, "postFit/converge"),
                                        _postFitParState_, _preFitParState_);
-        GenericToolbox::triggerTFileWrite(_saveDir_);
+        GenericToolbox::triggerTFileWrite(saveDir);
       }
     }
 
-  }
+  });
 
   if( _minimizer_->getMinimizerStatus() != 0 ){
     LogError << "Skipping post-fit error calculation since the minimizer did not converge." << std::endl;
@@ -545,7 +545,7 @@ void FitterEngine::fit(){
 // protected
 void FitterEngine::runPcaCheck(){
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 
   LogAlert << "Using PCA method: " << _pcaMethod_.toString() << " / threshold = " << _pcaThreshold_ << std::endl;
 
@@ -599,7 +599,7 @@ void FitterEngine::runPcaCheck(){
         ssPrint << " " << currentParValue << " -> " << par.getParameterValue();
         LogInfo << ssPrint.str() << "..." << std::endl;
 
-        getLikelihoodInterface().propagateAndEvalLikelihood();
+        this->evaluateLikelihood();
 
         double criteria{0};
 
@@ -658,12 +658,12 @@ void FitterEngine::runPcaCheck(){
   }
 
   // comeback to old values
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 }
 void FitterEngine::rescaleParametersStepSize(){
   LogInfo << __METHOD_NAME__ << std::endl;
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
   double baseLlhPull = getLikelihoodInterface().getLastPenaltyLikelihood();
   double baseLlh = getLikelihoodInterface().getLastLikelihood();
 
@@ -677,7 +677,7 @@ void FitterEngine::rescaleParametersStepSize(){
       double currentParValue = par.getParameterValue();
       par.setParameterValue( currentParValue + ParameterSet::toRealParRange(1., par) );
 
-      getLikelihoodInterface().propagateAndEvalLikelihood();
+      this->evaluateLikelihood();
 
       double deltaChi2 = getLikelihoodInterface().getLastLikelihood() - baseLlh;
       double deltaChi2Pulls = getLikelihoodInterface().getLastPenaltyLikelihood() - baseLlhPull;
@@ -697,14 +697,14 @@ void FitterEngine::rescaleParametersStepSize(){
 
       par.setStepSize( stepSize );
       par.setParameterValue( currentParValue + stepSize );
-      getLikelihoodInterface().propagateAndEvalLikelihood();
+      this->evaluateLikelihood();
       LogInfo << " -> Δχ²(step) = " << getLikelihoodInterface().getLastLikelihood() - baseLlh << std::endl;
       par.setParameterValue( currentParValue );
     }
 
   }
 
-  getLikelihoodInterface().propagateAndEvalLikelihood();
+  this->evaluateLikelihood();
 }
 bool FitterEngine::checkNumericalAccuracy(){
   LogAlert << __METHOD_NAME__ << std::endl;

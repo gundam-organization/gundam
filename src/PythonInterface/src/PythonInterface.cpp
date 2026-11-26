@@ -16,6 +16,8 @@
 #include "SampleSet.h"
 #include "ConfigUtils.h"
 #include "GundamApp.h"
+#include "GundamOutputManager.h"
+#include "GundamUtils.h"
 
 #include "GenericToolbox.Fs.h"
 #include "GenericToolbox.Os.h"
@@ -155,10 +157,34 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def(pybind11::init<std::string, std::vector<std::string>, std::string>(), pybind11::arg("name"), pybind11::arg("path") = std::vector<std::string>{}, pybind11::arg("defaultValue") = "")
   ;
 
+  pybind11::class_<GundamOutputTDirectory>(module, "GundamOutputTDirectory");
+  auto outputManagerClass = pybind11::class_<GundamOutputManager>(module, "GundamOutputManager");
+  pybind11::enum_<GundamOutputManager::Mode>(outputManagerClass, "Mode")
+  .value("Direct", GundamOutputManager::Mode::Direct)
+  .value("Threaded", GundamOutputManager::Mode::Threaded)
+  ;
+  outputManagerClass
+  .def(pybind11::init())
+  .def(pybind11::init<const std::string&, GundamOutputManager::Mode>(),
+       pybind11::arg("path"), pybind11::arg("mode") = GundamOutputManager::Mode::Direct)
+  .def("open", &GundamOutputManager::open, pybind11::arg("path"),
+       pybind11::arg("mode") = GundamOutputManager::Mode::Direct)
+  .def("isOpen", &GundamOutputManager::isOpen)
+  .def("close", &GundamOutputManager::close)
+  .def("directory", &GundamOutputManager::directory, pybind11::arg("path") = "",
+       pybind11::keep_alive<0, 1>())
+  .def("__enter__", [](GundamOutputManager& output_) -> GundamOutputManager& { return output_; },
+       pybind11::return_value_policy::reference_internal)
+  .def("__exit__", [](GundamOutputManager& output_, pybind11::object, pybind11::object, pybind11::object){
+    output_.close();
+  })
+  ;
+
   pybind11::class_<GundamApp>(module, "GundamApp")
   .def(pybind11::init<std::string>())
   .def("openOutputFile", &GundamApp::openOutputFile)
   .def("writeAppInfo", &GundamApp::writeAppInfo)
+  .def("getOutputManager", &GundamApp::getOutputManager, pybind11::return_value_policy::reference_internal)
   // .def("getOutfilePtr", &GundamApp::getOutfilePtr) // CAN'T EXPOSE ROOT PTRs
   ;
 
@@ -540,16 +566,22 @@ PYBIND11_MODULE(GUNDAM, module) {
   .def("initialize", pybind11::overload_cast<>(&ParameterScanner::initialize), pybind11::return_value_policy::reference)
   ;
 
+  const auto scanWithOutput = [](MinimizerBase& minimizer_, GundamOutputManager& output_, const std::string& subFolder_){
+    if( not output_.isOpen() ){
+      throw pybind11::value_error("Open the ROOT output file before scanning parameters.");
+    }
+    output_.directory(subFolder_).write([&](TDirectory* directory){ minimizer_.scanParameters(directory); });
+  };
+
   // no CTOR here
   pybind11::class_<MinimizerBase>(module, "MinimizerBase")
   .def("isRootMinimizer", [](const MinimizerBase& this_){
     return dynamic_cast<const RootMinimizer*>(&this_) != nullptr;
   })
-  .def("scanParameters", [](MinimizerBase& this_, GundamApp& app_, const std::string& subFolder_){
-    if( app_.getOutfilePtr() == nullptr or not app_.getOutfilePtr()->IsOpen() ){
-      throw pybind11::value_error("Open the GundamApp output file before scanning parameters.");
-    }
-    this_.scanParameters(GenericToolbox::mkdirTFile(app_.getOutfilePtr(), subFolder_));
+  .def("scanParameters", scanWithOutput, pybind11::arg("output"), pybind11::arg("subFolder") = "scan",
+     pybind11::call_guard<pybind11::gil_scoped_release>())
+  .def("scanParameters", [scanWithOutput](MinimizerBase& this_, GundamApp& app_, const std::string& subFolder_){
+    scanWithOutput(this_, app_.getOutputManager(), subFolder_);
   }, pybind11::arg("app"), pybind11::arg("subFolder") = "scan",
      pybind11::call_guard<pybind11::gil_scoped_release>())
   .def("minimize", &MinimizerBase::minimize)
@@ -572,7 +604,14 @@ PYBIND11_MODULE(GUNDAM, module) {
   pybind11::class_<FitterEngine>(module, "FitterEngine")
   .def(pybind11::init())
   // .def("setSaveDir", pybind11::overload_cast<TDirectory*>(&FitterEngine::setSaveDir)) // CAN'T EXPOSE ROOT PTRs
-  .def("setSaveDir", pybind11::overload_cast<GundamApp&, const std::string&>(&FitterEngine::setSaveDir))
+  .def("setOutput", &FitterEngine::setOutput, pybind11::arg("directory"), pybind11::keep_alive<1, 2>())
+  .def("setOutput", [](FitterEngine& fitter_, GundamOutputManager& output_, const std::string& subFolder_){
+    fitter_.setOutput(output_.directory(subFolder_));
+  }, pybind11::arg("output"),
+       pybind11::arg("subFolder") = "FitterEngine", pybind11::keep_alive<1, 2>())
+  .def("setSaveDir", [](FitterEngine& fitter_, GundamApp& app_, const std::string& subFolder_){
+    fitter_.setOutput(app_.getOutputManager().directory(subFolder_));
+  }, pybind11::keep_alive<1, 2>())
   .def("setConfig", pybind11::overload_cast<const ConfigReader&>(&FitterEngine::setConfig))
   .def("setDoAllParamVariations", &FitterEngine::setDoAllParamVariations)
   .def("setIsDryRun", &FitterEngine::setIsDryRun)
