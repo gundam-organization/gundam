@@ -1,5 +1,6 @@
 #include "EngineLayout.h"
 #include "BinningGeometryBuilder.h"
+#include "EventCacheProgress.h"
 #include "FormulaCompiler.h"
 
 #include "Bilinear.h"
@@ -25,6 +26,8 @@
 #include "SampleSet.h"
 #include "Shift.h"
 #include "UniformSpline.h"
+
+#include "Logger.h"
 
 #include <algorithm>
 #include <cmath>
@@ -195,7 +198,9 @@ namespace {
 
     auto& sampleSet = const_cast<Propagator&>(likelihoodInterface_.getModelPropagator()).getSampleSet();
     const auto& eventDialCache = likelihoodInterface_.getModelPropagator().getEventDialCache();
+    const auto& cache = eventDialCache.getCache();
 
+    LogInfo << "Preparing sample binning and observable layout..." << std::endl;
     propagation.samples.reserve(sampleSet.getSampleList().size());
 
     std::map<int, std::size_t> samplePositionMap;
@@ -222,7 +227,7 @@ namespace {
     propagation.maxReweight = eventDialCache.getGlobalEventReweightCap().maxReweight;
     // Every event in a sample uses the same compact variable schema. Binning
     // coordinates come first; auxiliary dial targets follow.
-    for( const auto& entry : eventDialCache.getCache() ){
+    for( const auto& entry : cache ){
       if( entry.event == nullptr ){ continue; }
       auto& sample = propagation.samples.at(samplePositionMap.at(entry.event->getIndices().sample));
       for( const auto& response : entry.getVariableResponseTargets() ){
@@ -233,8 +238,8 @@ namespace {
       }
     }
 
-    propagation.events.reserve(eventDialCache.getCache().size());
-    propagation.eventWeights.reserve(eventDialCache.getCache().size());
+    propagation.events.reserve(cache.size());
+    propagation.eventWeights.reserve(cache.size());
     std::unordered_map<const Parameter*, std::size_t> parameterIndexMap{};
     for( std::size_t i = 0; i < bindings_.parameters.size(); ++i ){
       parameterIndexMap.emplace(bindings_.parameters[i].parameter, i);
@@ -246,7 +251,10 @@ namespace {
     constexpr auto uncompiledDial = std::numeric_limits<std::uint32_t>::max();
     std::size_t payloadCount{0};
     std::size_t eventDialCount{0};
-    for( const auto& entry : eventDialCache.getCache() ){
+    LogInfo << "Counting unique dials and sizing model buffers across " << cache.size() << " event cache entries..." << std::endl;
+    Backends::EventCacheProgress countProgress("Counting dials", cache.size());
+    for( const auto& entry : cache ){
+      countProgress.advance();
       if( entry.event == nullptr ){ continue; }
       eventDialCount += entry.dialResponseCacheList.size();
       if( entry.variableResponses != nullptr ){ eventDialCount -= entry.variableResponses->dialIndices.size(); }
@@ -268,6 +276,9 @@ namespace {
         }
       }
     }
+    LogInfo << "Counted " << dialIndexMap.size() << " unique dials and " << eventDialCount
+            << " weight dial references (" << countProgress.elapsedSeconds()
+            << " s)." << std::endl;
     LogThrowIf(dialIndexMap.size() >= uncompiledDial, "Too many dials for EngineView indices.");
     propagation.dials.reserve(dialIndexMap.size());
     propagation.dialPayloads.reserve(payloadCount);
@@ -282,7 +293,10 @@ namespace {
     std::size_t externalWeightCount{0};
     std::unordered_set<const DialInputBuffer*> variableInputBuffers;
 
-    for( const auto& cacheEntry : eventDialCache.getCache() ){
+    LogInfo << "Packing events, dial descriptors and payloads into CPU buffers..." << std::endl;
+    Backends::EventCacheProgress packProgress("Packing events and dials", cache.size());
+    for( const auto& cacheEntry : cache ){
+      packProgress.advance();
       if( cacheEntry.event == nullptr ){ continue; }
 
       Backends::EventView eventRef;
@@ -502,10 +516,15 @@ namespace {
       propagation.events.emplace_back(eventRef);
       propagation.eventWeights.emplace_back(weightRef);
     }
+    LogInfo << "Packed " << propagation.events.size() << " events and "
+            << propagation.dialPayloads.size() * sizeof(double) / (1024. * 1024.) << " MiB of dial payloads ("
+            << packProgress.elapsedSeconds() << " s)." << std::endl;
 
     propagation.parameterCount = parameterIndexMap.size();
     propagation.variableInputBufferCount = bindings_.variableInputBuffers.size();
 
+    LogInfo << "Preparing likelihood data for " << likelihoodInterface_.getSamplePairList().size()
+            << " samples and " << propagation.totalBins << " bins..." << std::endl;
     likelihood.samples.reserve(likelihoodInterface_.getSamplePairList().size());
     binOffset = 0;
     for( const auto& samplePair : likelihoodInterface_.getSamplePairList() ){

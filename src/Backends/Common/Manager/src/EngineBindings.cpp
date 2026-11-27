@@ -1,4 +1,5 @@
 #include "EngineBindings.h"
+#include "EventCacheProgress.h"
 
 #include "DialInterface.h"
 #include "EventDialCache.h"
@@ -33,6 +34,9 @@ void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) 
 
   auto& sampleSet = const_cast<Propagator&>(likelihoodInterface_.getModelPropagator()).getSampleSet();
   const auto& eventDialCache = likelihoodInterface_.getModelPropagator().getEventDialCache();
+  const auto& cache = eventDialCache.getCache();
+  LogInfo << "Preparing host bindings for parameters, samples and events..." << std::endl;
+  EventCacheProgress progress("Preparing host bindings", cache.size());
 
   samples.reserve(sampleSet.getSampleList().size());
   for( auto& sample : sampleSet.getSampleList() ){
@@ -43,9 +47,10 @@ void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) 
     samples.emplace_back(sampleBinding);
   }
 
-  events.reserve(eventDialCache.getCache().size());
+  events.reserve(cache.size());
 
-  for( const auto& cacheEntry : eventDialCache.getCache() ){
+  for( const auto& cacheEntry : cache ){
+    progress.advance();
     if( cacheEntry.event == nullptr ){ continue; }
 
     EventBinding eventBinding;
@@ -64,4 +69,6 @@ void Backends::EngineBindings::build(LikelihoodInterface& likelihoodInterface_) 
       }
     }
   }
+  LogInfo << "Bound " << events.size() << " events and " << parameters.size()
+          << " parameters (" << progress.elapsedSeconds() << " s)." << std::endl;
 }
