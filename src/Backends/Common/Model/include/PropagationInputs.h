@@ -37,17 +37,24 @@ namespace Backends {
     std::vector<std::uint64_t> variableInputRevisions{};
 
     void validate(const PropagationView& model_) const {
+      validate(model_, model_.dials.size(), [&](std::size_t index_){
+        const auto type = model_.dials[index_].type;
+        return type == BackendDialType::ExternalWeight or isTableDial(type);
+      });
+    }
+
+    template<typename IsProducer>
+    void validate(const PropagationView& model_, std::size_t dialCount_, IsProducer isProducer_) const {
       if( not externalDialGradientIndices.empty() ){
         if( externalDialGradientIndices.size() != externalDialGradients.size() ){
           throw std::runtime_error("Backend sparse gradient row count mismatch.");
         }
         for( std::size_t i = 0; i < externalDialGradientIndices.size(); ++i ){
           const auto index = externalDialGradientIndices[i];
-          if( index >= model_.dials.size() or (i > 0 and index <= externalDialGradientIndices[i-1]) ){
+          if( index >= dialCount_ or (i > 0 and index <= externalDialGradientIndices[i-1]) ){
             throw std::runtime_error("Backend sparse gradient indices must be valid and strictly increasing.");
           }
-          const auto type = model_.dials[index].type;
-          if( type != BackendDialType::ExternalWeight and not isTableDial(type) ){
+          if( not isProducer_(index) ){
             throw std::runtime_error("Backend sparse gradients require external/table dials.");
           }
         }

@@ -111,6 +111,8 @@ namespace Backends {
     std::string deviceModelFallbackReason{};
     std::uint64_t nextTokenId{1};
     bool isBuilt{false};
+    bool hostDialDescriptorsReleased{false};
+    std::array<std::size_t, std::size_t(BackendDialType::Formula) + 1> dialTypeCounts{};
     mutable bool gradientValidated{false};
     uint32_t cachedDialCount{0};
     uint32_t compactCachedDialCount{0};

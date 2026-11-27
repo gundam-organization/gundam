@@ -6,6 +6,8 @@
 #include "LikelihoodModel.h"
 #include "Semantics/BackendHostPropagation.h"
 
+#include <numeric>
+
 Backends::MpsBackend::MpsBackend() : _impl_(std::make_unique<MpsBackendImpl>()) {}
 Backends::MpsBackend::~MpsBackend() = default;
 
@@ -61,6 +63,8 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
 void Backends::MpsBackend::buildShared(std::shared_ptr<const EngineView> engineView_) {
   LogThrowIf(engineView_ == nullptr, "MPS requires a model.");
   _impl_->isBuilt = false;
+  _impl_->hostDialDescriptorsReleased = false;
+  _impl_->dialTypeCounts.fill(0);
   _impl_->gradientValidated = false;
   if( _impl_->eventPropagation ){ _impl_->eventPropagation->clear(); }
   _impl_->ownedEngineView.reset();
@@ -73,6 +77,7 @@ void Backends::MpsBackend::buildShared(std::shared_ptr<const EngineView> engineV
       or hasPortableLikelihood(likelihoodModel)
       or model.requiresEventBinning() or model.hasReweightCap;
   for( const auto& dial : model.dials ){
+    ++_impl_->dialTypeCounts.at(std::size_t(dial.type));
     if( dial.type == BackendDialType::Formula or dial.type == BackendDialType::Composite ){ _impl_->useEventPropagation = true; }
     if( isTableDial(dial.type) ){ _impl_->useEventPropagation = true; Semantics::validateTableDial(model, dial); }
     Semantics::validateSurfaceDial(model, dial);
@@ -103,6 +108,22 @@ void Backends::MpsBackend::buildShared(std::shared_ptr<const EngineView> engineV
   _impl_->isBuilt = true;
 }
 
+bool Backends::MpsBackend::releaseHostDialDescriptors(EngineView& view_, bool prepareGradient_) {
+  if( not _impl_->isBuilt or not _impl_->useEventPropagation or &view_ != _impl_->engineView.get()
+      or view_.propagation.dials.empty() ){ return false; }
+  if( prepareGradient_ ){
+    LogInfo << "Preparing MPS gradient buffers before releasing host dial descriptors..." << std::endl;
+    _impl_->eventPropagation->prepareGradient(view_);
+    _impl_->gradientValidated = true;
+  }
+  auto& dials = view_.propagation.dials;
+  const auto bytes = dials.capacity() * sizeof(BackendDialDescriptor);
+  std::vector<BackendDialDescriptor>{}.swap(dials);
+  _impl_->hostDialDescriptorsReleased = true;
+  LogInfo << "Released " << bytes << " bytes of host dial descriptors after Metal upload." << std::endl;
+  return true;
+}
+
 void Backends::MpsBackend::updateDataHistograms(std::shared_ptr<const EngineView> engineView_) {
   LogThrowIf(not _impl_->isBuilt or engineView_ == nullptr, "MPS data updates require a built backend.");
   LogThrowIf(not _impl_->ownedEngineView and engineView_.get() != _impl_->engineView.get(),
@@ -118,7 +139,7 @@ void Backends::MpsBackend::updateDataHistograms(std::shared_ptr<const EngineView
 
 Backends::PropagationToken Backends::MpsBackend::requestPropagation(const PropagationInputs& inputs_) {
   LogThrowIf(not _impl_->isBuilt, "MpsBackend has not been built.");
-  inputs_.validate(_impl_->model());
+  if( not _impl_->useEventPropagation ){ inputs_.validate(_impl_->model()); }
 
   _impl_->resetResult();
   const auto propagationStart = std::chrono::steady_clock::now();
@@ -327,7 +348,7 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["events"] = impl.model().events.size();
   out["bins"] = impl.model().totalBins;
   out["parameters"] = impl.model().parameterCount;
-  out["uniqueDials"] = impl.model().dials.size();
+  out["uniqueDials"] = std::accumulate(impl.dialTypeCounts.begin(), impl.dialTypeCounts.end(), std::size_t{0});
   out["weightDialReferences"] = impl.model().eventDialIndices.size();
   out["variableDialReferences"] = impl.model().variableDialIndices.size();
   out["cachedDials"] = impl.cachedDialCount;
@@ -341,7 +362,9 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   for( const auto& event : impl.model().eventWeights ){ ++dialCounts[std::to_string(event.dialCount)]; }
   const char* dialTypeNames[]{"Norm", "Shift", "CompactSpline", "UniformSpline", "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight", "Bilinear", "Bicubic", "Tabulated", "Kriged", "Composite", "Formula"};
   static_assert(sizeof(dialTypeNames) / sizeof(*dialTypeNames) == std::size_t(BackendDialType::Formula) + 1);
-  for( const auto& dial : impl.model().dials ){ ++types[dialTypeNames[std::size_t(dial.type)]]; }
+  for( std::size_t i = 0; i < impl.dialTypeCounts.size(); ++i ){
+    if( impl.dialTypeCounts[i] != 0 ){ types[dialTypeNames[i]] = impl.dialTypeCounts[i]; }
+  }
   out["eventsByWeightDialCount"] = dialCounts;
   out["uniqueDialsByType"] = types;
   if( impl.useEventPropagation ){
@@ -444,10 +467,14 @@ Backends::BackendResourceUsage Backends::MpsBackend::getResourceUsage() const {
 
 void Backends::MpsBackend::validateLikelihoodGradient() const {
   LogThrowIf(not _impl_->isBuilt or not _impl_->useEventPropagation, "MPS gradient requires a built resident likelihood model.");
-  if( not _impl_->gradientValidated ){
-    validateMpsGradient(getEngineView());
-    _impl_->gradientValidated = true;
+  if( _impl_->gradientValidated ){ return; }
+  if( _impl_->hostDialDescriptorsReleased ){
+    LogThrowIf(not _impl_->eventPropagation->hasGradientBuffers(),
+               "MPS analytic gradients require rebuilding the backend model.");
+    validateGradientLikelihood(_impl_->likelihoodModel());
   }
+  else{ validateMpsGradient(getEngineView()); }
+  _impl_->gradientValidated = true;
 }
 std::vector<double> Backends::MpsBackend::getLikelihoodGradient(const PropagationToken& token_) {
   LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MPS gradient propagation token.");

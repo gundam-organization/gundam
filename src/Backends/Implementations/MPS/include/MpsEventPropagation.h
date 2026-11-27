@@ -28,6 +28,8 @@ namespace Backends {
     [[nodiscard]] const std::map<std::string, double>& getDiagnosticStageGpuSeconds() const { return _diagnosticStageGpuSeconds_; }
     void build(const PropagationView& model_, const LikelihoodView& likelihood_ = {});
     void updateDataHistograms(const LikelihoodView& likelihood_);
+    void prepareGradient(const EngineView& view_);
+    [[nodiscard]] bool hasGradientBuffers() const;
     std::vector<double> getLikelihoodGradient(const EngineView& view_);
     void materializeHistograms(PropagationResult& result_, BackendTimingSummary& timing_);
     void clear();
@@ -62,6 +64,7 @@ namespace Backends {
     std::array<id<MTLBuffer>, std::size_t(Buffer::Count)> _buffers_{};
     std::array<id<MTLComputePipelineState>, std::size_t(Kernel::Count)> _pipelines_{};
     const PropagationView* _model_{nullptr};
+    std::size_t _dialCount_{0};
     DevicePropagationModel _packed_{};
     EventStateCache _cache_{};
     EventState _state_{};
@@ -72,6 +75,7 @@ namespace Backends {
     LikelihoodWorkLayout _likelihoodWork_{};
     GradientWork<ObservableScalar> _gradientWork_{};
     std::vector<std::size_t> _producerDials_{};
+    std::vector<std::size_t> _producerInputCounts_{};
     std::vector<std::vector<double>> _producerGradients_{};
     bool _producerGradientsValid_{false};
     bool _lastUpdatedPrediction_{true};

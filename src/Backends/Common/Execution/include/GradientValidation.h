@@ -8,6 +8,13 @@
 #include <stdexcept>
 
 namespace Backends {
+  inline void validateGradientLikelihood(const LikelihoodView& likelihood_) {
+    if( likelihood_.empty() ) throw std::runtime_error("Backend gradient requires a statistical likelihood.");
+    for( const auto& sample : likelihood_.samples )
+      if( not LikelihoodSemantics::hasAnalyticGradient(sample.portableOptions.kind) )
+        throw std::runtime_error("Backend analytic gradient is unsupported for this likelihood.");
+  }
+
   // Structural physics rules shared by CPU, MPS and CUDA. Executors retain
   // lifecycle checks, producer-publication checks and device storage limits.
   inline void validateGradientModel(const EngineView& view_) {
@@ -32,10 +39,7 @@ namespace Backends {
         }
       }
     }
-    if( view_.likelihood.empty() ) throw std::runtime_error("Backend gradient requires a statistical likelihood.");
-    for( const auto& sample : view_.likelihood.samples )
-      if( not LikelihoodSemantics::hasAnalyticGradient(sample.portableOptions.kind) )
-        throw std::runtime_error("Backend analytic gradient is unsupported for this likelihood.");
+    validateGradientLikelihood(view_.likelihood);
     validateCompositePrograms(m);
     for( const auto& program : m.formulaPrograms ) program.validate();
     for( const auto& dial : m.dials ){

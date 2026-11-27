@@ -35,6 +35,8 @@ namespace Backends {
 
     virtual void build(const EngineView& engineView_) = 0;
     virtual void buildShared(std::shared_ptr<const EngineView> engineView_) { build(*engineView_); }
+    // A manager owning the mutable view may release build-time data after build.
+    virtual bool releaseHostDialDescriptors(EngineView&, bool) { return false; }
     virtual void updateDataHistograms(std::shared_ptr<const EngineView>) {
       throw std::runtime_error(getName() + " does not support data histogram updates.");
     }

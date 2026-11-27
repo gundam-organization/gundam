@@ -77,7 +77,7 @@ namespace {
     void TearDown() override { std::remove(_path_.c_str()); }
 
     void initializeEngine(FitterEngine& engine_, const std::string& likelihood_ = "LeastSquares",
-                          const std::string& formula_ = "", bool eventInputs_ = false) {
+                          const std::string& formula_ = "", bool eventInputs_ = false, bool analyticGradient_ = false) {
       auto config = JsonType::parse(R"({
         "enablePca": false, "scaleParStepWithChi2Response": false,
         "generateSamplePlots": false, "generateOneSigmaPlots": false,
@@ -100,6 +100,7 @@ namespace {
               ]}]} }
         }
       })");
+      config["minimizerConfig"]["useAnalyticGradient"] = analyticGradient_;
       config["likelihoodInterfaceConfig"]["jointProbabilityConfig"]["type"] = likelihood_;
       auto& definitions = config["likelihoodInterfaceConfig"]["propagatorConfig"]
                                ["parametersManagerConfig"]["parameterSetList"][0]["parameterDefinitions"];
@@ -230,6 +231,43 @@ TEST_F(RootMinimizerSimplex, SampleRatesUseHistogramContentsRatherThanEventWeigh
 }
 
 #ifdef GUNDAM_USING_BACKENDS
+#ifdef GUNDAM_TEST_MPS_AVAILABLE
+TEST_F(RootMinimizerSimplex, MpsReleasesHostDialsAndHandlesGradientAfterDataUpdates) {
+  for( bool prebuildGradient : {false, true} ){
+    SCOPED_TRACE(prebuildGradient);
+    FitterEngine engine;
+    initializeEngine(engine, "LeastSquares", "", false, prebuildGradient);
+    auto& manager = engine.getBackendsManager();
+    auto& likelihood = engine.getLikelihoodInterface();
+    manager.activate("MPS");
+    const auto* backend = manager.getBackend();
+    EXPECT_EQ(manager.getEngineView().propagation.dials.capacity(), 0u);
+
+    auto& dataBins = likelihood.getDataPropagator().getSampleSet().getSampleList().front().getHistogram().getBinContentList();
+    dataBins.front().sumWeights = 14.;
+    manager.updateDataHistograms();
+    likelihood.propagateAndEvalLikelihood();
+    const double expected = likelihood.getLastLikelihood();
+    engine.evaluateLikelihood();
+    EXPECT_NEAR(likelihood.getLastLikelihood(), expected, 1.e-10);
+    EXPECT_EQ(manager.getEngineView().propagation.dials.capacity(), 0u);
+
+    const auto& parameter = likelihood.getModelPropagator().getParametersManager()
+                                .getParameterSetsList().front().getParameterList().front();
+    ParameterGradient expectedGradient;
+    expectedGradient.resetValue(&parameter);
+    likelihood.propagateAndEvalGradient(expectedGradient);
+    ParameterGradient actualGradient;
+    actualGradient.resetValue(&parameter);
+    manager.evalGradient(actualGradient);
+    EXPECT_EQ(manager.getEngineView().propagation.dials.empty(), prebuildGradient);
+    if( prebuildGradient ){ EXPECT_EQ(manager.getBackend(), backend); }
+    EXPECT_NEAR(likelihood.getLastLikelihood(), expected, 1.e-10);
+    EXPECT_NEAR(actualGradient.getValue(&parameter), expectedGradient.getValue(&parameter), 1.e-10);
+  }
+}
+#endif
+
 TEST_F(RootMinimizerSimplex, BackendDataUpdatesPreserveModelAndInvalidateDeferredResults) {
   FitterEngine engine;
   initializeEngine(engine);

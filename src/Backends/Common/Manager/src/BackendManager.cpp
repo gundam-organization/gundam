@@ -379,6 +379,7 @@ void Backends::BackendManager::deactivateBackend() {
   _lastMaterializedSampleRevisions_.clear();
   _binningUpdateListeners_.clear();
   _hostBinningChanged_.reset();
+  _rebuildForGradient_ = false;
   _backendEngineLayout_ = std::make_shared<EngineLayout>(); // Release the old flattened host model as well.
 }
 
@@ -402,6 +403,11 @@ void Backends::BackendManager::activateImpl(const std::string& name_, const Conf
   buildEngineLayout(); // Rebuild from in-memory host state, including observable and binning changes.
   // Publish only after a successful build; failures release partially allocated buffers.
   replacement->buildShared(std::shared_ptr<const EngineView>(_backendEngineLayout_, &_backendEngineLayout_->view));
+  if( _releaseHostDialDescriptors_ ){
+    const bool released = replacement->releaseHostDialDescriptors(
+        _backendEngineLayout_->view, _prepareGradientBeforeRelease_);
+    _rebuildForGradient_ = released and not _prepareGradientBeforeRelease_;
+  }
   found->config = config;
   found->backend = std::move(replacement);
   _activeBackendPtr_ = found->backend.get();
@@ -420,6 +426,7 @@ void Backends::BackendManager::replaceBackend(const std::string& type_, const Co
 
 std::future<Backends::BackendPropagationResult> Backends::BackendManager::propagate(bool withGradients_) {
   LogThrowIf(not hasBackend(), "No backend initialized.");
+  if( withGradients_ ){ restoreHostDialDescriptors(); }
 
   LogThrowIf(_likelihoodInterfacePtr_ == nullptr, "No likelihood interface for backend propagation.");
   auto prepareStart = std::chrono::steady_clock::now();
@@ -522,8 +529,17 @@ std::future<Backends::BackendPropagationResult> Backends::BackendManager::propag
   });
 }
 
-void Backends::BackendManager::validateLikelihoodGradient() const {
+void Backends::BackendManager::restoreHostDialDescriptors() {
+  if( not _rebuildForGradient_ ){ return; }
+  LogInfo << "Rebuilding backend model for analytic gradients..." << std::endl;
+  _releaseHostDialDescriptors_ = false;
+  const auto name = _activeBackendName_;
+  activate(name);
+}
+
+void Backends::BackendManager::validateLikelihoodGradient() {
   LogThrowIf(not hasBackend(), "No active backend for likelihood gradients.");
+  restoreHostDialDescriptors();
   LogThrowIf(not _activeBackendPtr_->getCapabilities().supportsLikelihoodGradient,
              _activeBackendName_ << " does not support analytic likelihood gradients.");
   _activeBackendPtr_->validateLikelihoodGradient();

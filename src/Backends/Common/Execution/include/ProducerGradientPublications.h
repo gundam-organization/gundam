@@ -12,11 +12,12 @@ namespace Backends {
   // an empty but published row is valid for a zero-input producer.
   // Value-only propagation is permitted without valid Jacobians. Callers copy
   // valid/invalid publication state on every request and reject on gradient use.
-  template<typename Consumer>
-  void visitProducerGradientPublications(const PropagationView& model_, const PropagationInputs& inputs_,
-      const std::vector<std::size_t>& producerDials_, Consumer consume_) {
+  template<typename InputCount, typename Consumer>
+  void visitProducerGradientPublications(std::size_t dialCount_, const PropagationInputs& inputs_,
+      const std::vector<std::size_t>& producerDials_, InputCount inputCount_, Consumer consume_) {
     const bool sparse = not inputs_.externalDialGradientIndices.empty();
-    const bool dense = inputs_.externalDialGradients.size() == model_.dials.size();
+    const bool dense = not inputs_.externalDialGradients.empty()
+        and inputs_.externalDialGradients.size() == dialCount_;
     std::size_t position = 0;
     for( std::size_t i = 0; i < producerDials_.size(); ++i ){
       const auto index = producerDials_[i];
@@ -25,10 +26,17 @@ namespace Backends {
       const bool published = sparse ? (position < inputs_.externalDialGradientIndices.size()
           and inputs_.externalDialGradientIndices[position] == index) : dense;
       const auto* row = published ? &inputs_.externalDialGradients[sparse ? position : index] : nullptr;
-      const bool valid = row and row->size() == model_.dials[index].inputCount
+      const bool valid = row and row->size() == inputCount_(i, index)
           and std::all_of(row->begin(), row->end(), [](double value_){ return std::isfinite(value_); });
       consume_(i, index, row, valid);
     }
+  }
+
+  template<typename Consumer>
+  void visitProducerGradientPublications(const PropagationView& model_, const PropagationInputs& inputs_,
+      const std::vector<std::size_t>& producerDials_, Consumer consume_) {
+    visitProducerGradientPublications(model_.dials.size(), inputs_, producerDials_,
+        [&](std::size_t, std::size_t index_){ return model_.dials[index_].inputCount; }, consume_);
   }
 }
 #endif

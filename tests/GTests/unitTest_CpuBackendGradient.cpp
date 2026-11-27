@@ -882,7 +882,7 @@ TEST(MpsBackendGradient, ObservableFormulaCompositeAndProducerJacobians) {
 #endif
 
 namespace {
-  void checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(Backend& backend_) {
+  void checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(Backend& backend_, bool compact_ = false) {
     auto view = gradientModel(1., 8);
     auto& model = view.propagation;
     model.dials.resize(6, model.dials[0]);
@@ -895,7 +895,13 @@ namespace {
     model.dials[4].tableTermCount = 2;
     model.tableTerms = {{1, .25}, {2, .75}};
     for( auto& index : model.eventDialIndices ){ index = index == 0 ? 1 : 4; }
-    backend_.build(view);
+    if( compact_ ){
+      auto sharedView = std::make_shared<EngineView>(view);
+      backend_.buildShared(sharedView);
+      ASSERT_TRUE(backend_.releaseHostDialDescriptors(*sharedView, true));
+      EXPECT_EQ(sharedView->propagation.dials.capacity(), 0u);
+    }
+    else{ backend_.build(view); }
     PropagationInputs inputs;
     std::uint64_t generation = 0;
     std::vector<double> table(3);
@@ -958,7 +964,7 @@ TEST(CpuBackendGradient, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows
 TEST(MpsBackendGradient, SparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows) {
   MpsBackend backend;
   if( !backend.getCapabilities().supportsGpu ) GTEST_SKIP() << "Metal unavailable";
-  checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(backend);
+  checkSparseProducerRowsMatchDenseSnapshotsAndRejectStaleRows(backend, true);
 }
 #endif
 

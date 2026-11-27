@@ -24,15 +24,21 @@ namespace Backends {
     std::vector<MpsGradientEvent> events;
     std::vector<DeviceIndex> inputOffsets, indices, parameterOffsets, parameterOccurrences;
     std::size_t scratchSize{0}, contributionCount{0}, externalCount{0};
+    static std::vector<LikelihoodBin<ObservableScalar>> packBins(
+        const std::vector<LikelihoodBin<ObservableScalar>>& packedBins_, int totalBins_) {
+      std::vector<LikelihoodBin<ObservableScalar>> bins(totalBins_);
+      for( auto& bin : bins ){ bin.ignored = 1; }
+      for( const auto& bin : packedBins_ ){ bins.at(bin.globalBin) = bin; }
+      return bins;
+    }
+
     void build(const EngineView& view_) {
       *this = MpsGradientModel();
       validateMpsGradient(view_);
       const auto& m = view_.propagation;
       work = {gradientIndex(m.events.size()), 0, gradientIndex(m.totalBins), gradientIndex(m.parameterCount),
         m.hasReweightCap ? ObservableScalar(m.maxReweight) : ObservableScalar(0), DeviceIndex(m.hasReweightCap), 0};
-      bins.assign(m.totalBins, {});
-      for( auto& bin : bins ) bin.ignored = 1;
-      for( const auto& bin : packLikelihood<ObservableScalar>(view_.likelihood, m.totalBins) ) bins.at(bin.globalBin) = bin;
+      bins = packBins(packLikelihood<ObservableScalar>(view_.likelihood, m.totalBins), m.totalBins);
       for( std::size_t i = 0; i < m.dials.size(); ++i ){
         const auto& dial = m.dials[i];
         ranges.push_back({gradientIndex(bindings.size()), gradientIndex(dial.inputCount)});

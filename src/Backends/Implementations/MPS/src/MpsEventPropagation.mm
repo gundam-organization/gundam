@@ -39,11 +39,12 @@ void Backends::MpsEventPropagation::clearBuffers() {
 void Backends::MpsEventPropagation::clear() {
   clearBuffers();
   _model_ = nullptr;
+  _dialCount_ = 0;
   _packed_ = DevicePropagationModel();
   _state_ = EventState();
   _cache_ = EventStateCache();
   _valid_ = false;
-  _producerDials_.clear(); _producerGradients_.clear(); _producerGradientsValid_ = false;
+  _producerDials_.clear(); _producerInputCounts_.clear(); _producerGradients_.clear(); _producerGradientsValid_ = false;
 }
 
 void Backends::MpsEventPropagation::updateDataHistograms(const LikelihoodView& likelihood_) {
@@ -52,16 +53,23 @@ void Backends::MpsEventPropagation::updateDataHistograms(const LikelihoodView& l
   LogThrowIf(bins.size() != _likelihoodWork_.binCount
              or hasPortableLikelihood(likelihood_) != _deviceLikelihood_,
              "Cannot change the Metal likelihood layout during a data update.");
-  if( not bins.empty() ){
-    auto updated = makePrivateBuffer(_device_, _queue_, bins);
-    LogThrowIf(updated == nil, "Metal data histogram upload failed.");
+  const bool updateGradientBins = hasGradientBuffers() and _gradientWork_.bins != 0;
+  const auto gradientBins = updateGradientBins
+      ? MpsGradientModel::packBins(bins, _model_->totalBins) : decltype(bins){};
+  auto updated = bins.empty() ? nil : makePrivateBuffer(_device_, _queue_, bins);
+  LogThrowIf(not bins.empty() and updated == nil, "Metal data histogram upload failed.");
+  auto updatedGradient = updateGradientBins ? makePrivateBuffer(_device_, _queue_, gradientBins) : nil;
+  if( updateGradientBins and updatedGradient == nil ){
+    [updated release];
+    throw std::runtime_error("Metal gradient data histogram upload failed.");
+  }
+  if( updated != nil ){
     releaseBuffer(_buffers_[std::size_t(Buffer::LikelihoodBins)]);
     _buffers_[std::size_t(Buffer::LikelihoodBins)] = updated;
   }
-  // Gradient bins also contain data counts. Recreate gradient-only buffers on
-  // demand; retain event, dial, geometry and histogram allocations.
-  for( std::size_t i = std::size_t(Buffer::GradientDials); i <= std::size_t(Buffer::GradientWork); ++i ){
-    releaseBuffer(_buffers_[i]);
+  if( updatedGradient != nil ){
+    releaseBuffer(_buffers_[std::size_t(Buffer::GradientBins)]);
+    _buffers_[std::size_t(Buffer::GradientBins)] = updatedGradient;
   }
   _valid_ = false; // Force a fresh likelihood even for identical MC parameters.
 }
@@ -69,11 +77,17 @@ void Backends::MpsEventPropagation::updateDataHistograms(const LikelihoodView& l
 void Backends::MpsEventPropagation::build(const PropagationView& model_, const LikelihoodView& likelihood_) {
   clearBuffers();
   _model_ = &model_;
+  _dialCount_ = model_.dials.size();
   LogInfo << "Packing MPS event model and preparing host caches..." << std::endl;
   _packed_.build(model_);
   _producerDials_.clear();
+  _producerInputCounts_.clear();
   for( std::size_t i = 0; i < model_.dials.size(); ++i ){
-    if( model_.dials[i].type == BackendDialType::ExternalWeight or isTableDial(model_.dials[i].type) ) _producerDials_.push_back(i);
+    const auto& dial = model_.dials[i];
+    if( dial.type == BackendDialType::ExternalWeight or isTableDial(dial.type) ){
+      _producerDials_.push_back(i);
+      _producerInputCounts_.push_back(dial.inputCount);
+    }
   }
   _producerGradients_.assign(_producerDials_.size(), {});
   _producerGradientsValid_ = false;
@@ -238,7 +252,7 @@ void Backends::MpsEventPropagation::buildDialCache() {
 
 std::size_t Backends::MpsEventPropagation::prepareDialCache(const PropagationInputs& inputs_, bool& updateWeights_) {
   auto& control = *static_cast<DevicePropagationControl*>(buffer(Buffer::Control).contents);
-  const auto dialCount = _model_->dials.size();
+  const auto dialCount = _dialCount_;
   control.dialRangeCount = 0;
   updateWeights_ = true;
   if( not _valid_ or not _enableDialCache_ ){ return dialCount; }
@@ -305,12 +319,15 @@ void Backends::MpsEventPropagation::copy(id<MTLBlitCommandEncoder> encoder_, Buf
 void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, PropagationResult& result_, BackendTimingSummary& timing_) {
   _diagnosticStageGpuSeconds_.clear();
   const auto& model = *_model_;
-  inputs_.validate(model);
+  inputs_.validate(model, _dialCount_, [&](std::size_t index_){
+    return std::binary_search(_producerDials_.begin(), _producerDials_.end(), index_);
+  });
   // Publications are borrowed. Snapshot even when values/generations did not
   // change, and reject missing rows on the next gradient rather than reusing
   // an older token's Jacobian. Value-only propagation needs no Jacobian.
   _producerGradientsValid_ = true;
-  visitProducerGradientPublications(model,inputs_,_producerDials_,
+  visitProducerGradientPublications(_dialCount_, inputs_, _producerDials_,
+      [&](std::size_t i_, std::size_t){ return _producerInputCounts_[i_]; },
       [&](std::size_t i_, std::size_t, const std::vector<double>* row_, bool valid_){
     _producerGradientsValid_ = _producerGradientsValid_ and valid_;
     if( row_ ) _producerGradients_[i_] = *row_;
@@ -424,7 +441,7 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   timing_.rebinnedEventCount = control.rebinnedEvents;
   timing_.binCandidateCount = control.candidates;
   timing_.binContributionCount = control.contributionCount;
-  timing_.uniqueDialCount = model.dials.size();
+  timing_.uniqueDialCount = _dialCount_;
   timing_.eventDialIndexCount = model.eventDialIndices.size() + model.variableDialIndices.size();
   timing_.contributionBufferBytes = std::size_t(_packed_.contributionCapacity) * sizeof(DeviceBinContribution);
   std::vector<std::uint8_t> changed(model.samples.size());
@@ -578,48 +595,55 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   return out.dump();
 }
 
+bool Backends::MpsEventPropagation::hasGradientBuffers() const {
+  return buffer(Buffer::GradientWork) != nil;
+}
+
+void Backends::MpsEventPropagation::prepareGradient(const EngineView& view_) {
+  if( hasGradientBuffers() ){ return; }
+  MpsGradientModel model;
+  model.build(view_);
+  _gradientWork_ = model.work;
+  auto upload = [&](Buffer slot_, const auto& data_){
+    LogThrowIf(data_.size() > _device_.maxBufferLength / sizeof(typename std::decay_t<decltype(data_)>::value_type),
+               "MPS gradient upload exceeds Metal maxBufferLength.");
+    _buffers_[std::size_t(slot_)] = data_.empty() ? makePrivateEmptyBuffer(_device_, 8)
+        : makePrivateBuffer(_device_, _queue_, data_);
+    LogThrowIf(buffer(slot_) == nil, "MPS gradient upload failed.");
+  };
+  auto allocate = [&](Buffer slot_, std::size_t bytes_, bool shared_ = false){
+    bytes_ = std::max(std::size_t(8), bytes_);
+    LogThrowIf(bytes_ > _device_.maxBufferLength, "MPS gradient allocation exceeds Metal maxBufferLength.");
+    _buffers_[std::size_t(slot_)] = shared_ ? makeSharedEmptyBuffer(_device_, bytes_) : makePrivateEmptyBuffer(_device_, bytes_);
+    LogThrowIf(buffer(slot_) == nil, "MPS gradient allocation failed.");
+  };
+  try{
+    upload(Buffer::GradientDials, model.inputs); upload(Buffer::GradientEvents, model.events);
+    upload(Buffer::GradientBins, model.bins);
+    upload(Buffer::GradientIndices, model.indices); upload(Buffer::GradientOffsets, model.parameterOffsets);
+    upload(Buffer::GradientOccurrences, model.parameterOccurrences);
+    upload(Buffer::GradientBindings, model.bindings); upload(Buffer::GradientRanges, model.ranges);
+    upload(Buffer::GradientInputOffsets, model.inputOffsets);
+    allocate(Buffer::GradientScratch, model.scratchSize*2*sizeof(ObservableScalar));
+    allocate(Buffer::GradientExternal, model.externalCount*sizeof(ObservableScalar), true);
+    allocate(Buffer::GradientResponses, model.inputs.size()*sizeof(ObservableScalar));
+    allocate(Buffer::GradientScales, model.bins.size()*2*sizeof(ObservableScalar));
+    allocate(Buffer::GradientContributions, model.contributionCount*sizeof(ObservableScalar));
+    allocate(Buffer::GradientTotal, model.work.parameters*sizeof(ObservableScalar));
+    allocate(Buffer::GradientReadback, model.work.parameters*sizeof(ObservableScalar), true);
+    // Publish the completed layout only after all other allocations succeeded.
+    upload(Buffer::GradientWork, std::vector<GradientWork<ObservableScalar>>{model.work});
+  }
+  catch(...){
+    for( std::size_t i = std::size_t(Buffer::GradientDials); i < std::size_t(Buffer::Count); ++i ) releaseBuffer(_buffers_[i]);
+    throw;
+  }
+}
+
 std::vector<double> Backends::MpsEventPropagation::getLikelihoodGradient(const EngineView& view_) {
   LogThrowIf(not _valid_, "MPS gradient has no valid propagation.");
   LogThrowIf(not _producerGradientsValid_, "MPS gradient requires current, finite external/table Jacobians with matching input dimensions.");
-  if( buffer(Buffer::GradientWork) == nil ){
-    MpsGradientModel model;
-    model.build(view_);
-    _gradientWork_ = model.work;
-    auto upload = [&](Buffer slot_, const auto& data_){
-      LogThrowIf(data_.size() > _device_.maxBufferLength / sizeof(typename std::decay_t<decltype(data_)>::value_type),
-                 "MPS gradient upload exceeds Metal maxBufferLength.");
-      _buffers_[std::size_t(slot_)] = data_.empty() ? makePrivateEmptyBuffer(_device_, 8)
-          : makePrivateBuffer(_device_, _queue_, data_);
-      LogThrowIf(buffer(slot_) == nil, "MPS gradient upload failed.");
-    };
-    auto allocate = [&](Buffer slot_, std::size_t bytes_, bool shared_ = false){
-      bytes_ = std::max(std::size_t(8), bytes_);
-      LogThrowIf(bytes_ > _device_.maxBufferLength, "MPS gradient allocation exceeds Metal maxBufferLength.");
-      _buffers_[std::size_t(slot_)] = shared_ ? makeSharedEmptyBuffer(_device_, bytes_) : makePrivateEmptyBuffer(_device_, bytes_);
-      LogThrowIf(buffer(slot_) == nil, "MPS gradient allocation failed.");
-    };
-    try{
-      upload(Buffer::GradientDials, model.inputs); upload(Buffer::GradientEvents, model.events);
-      upload(Buffer::GradientBins, model.bins);
-      upload(Buffer::GradientIndices, model.indices); upload(Buffer::GradientOffsets, model.parameterOffsets);
-      upload(Buffer::GradientOccurrences, model.parameterOccurrences);
-      upload(Buffer::GradientBindings, model.bindings); upload(Buffer::GradientRanges, model.ranges);
-      upload(Buffer::GradientInputOffsets, model.inputOffsets);
-      allocate(Buffer::GradientScratch, model.scratchSize*2*sizeof(ObservableScalar));
-      allocate(Buffer::GradientExternal, model.externalCount*sizeof(ObservableScalar), true);
-      allocate(Buffer::GradientResponses, model.inputs.size()*sizeof(ObservableScalar));
-      allocate(Buffer::GradientScales, model.bins.size()*2*sizeof(ObservableScalar));
-      allocate(Buffer::GradientContributions, model.contributionCount*sizeof(ObservableScalar));
-      allocate(Buffer::GradientTotal, model.work.parameters*sizeof(ObservableScalar));
-      allocate(Buffer::GradientReadback, model.work.parameters*sizeof(ObservableScalar), true);
-      // Publish the completed layout only after all other allocations succeeded.
-      upload(Buffer::GradientWork, std::vector<GradientWork<ObservableScalar>>{model.work});
-    }
-    catch(...){
-      for( std::size_t i = std::size_t(Buffer::GradientDials); i < std::size_t(Buffer::Count); ++i ) releaseBuffer(_buffers_[i]);
-      throw;
-    }
-  }
+  prepareGradient(view_);
   auto* external = static_cast<ObservableScalar*>(buffer(Buffer::GradientExternal).contents);
   std::size_t externalPosition = 0;
   for( const auto& row : _producerGradients_ ) for( auto slope : row ) external[externalPosition++] = ObservableScalar(slope);

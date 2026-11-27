@@ -43,6 +43,7 @@ ENUM_FIELD( recomputeResponses )
     [[nodiscard]] std::vector<double> getLikelihoodGradient(const PropagationToken& token_) override;
     void build(const EngineView& engineView_) override;
     void buildShared(std::shared_ptr<const EngineView> engineView_) override;
+    bool releaseHostDialDescriptors(EngineView& view_, bool prepareGradient_) override;
     void updateDataHistograms(std::shared_ptr<const EngineView> engineView_) override;
     PropagationToken requestPropagation(const PropagationInputs& inputs_) override;
 
