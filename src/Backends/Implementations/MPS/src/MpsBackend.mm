@@ -20,15 +20,18 @@ void Backends::MpsBackend::configureImpl() {
   _config_.clearFields();
   _config_.defineFields({
       {"propagationMode"},
+      {"enableBinFactorization"},
   });
   _config_.checkConfiguration();
   _config_.fillEnum(_impl_->propagationMode, "propagationMode");
+  _config_.fillValue(_impl_->enableBinFactorization, "enableBinFactorization");
   LogThrowIf(_impl_->propagationMode != MpsPropagationMode::cachedResponses
              and _impl_->propagationMode != MpsPropagationMode::recomputeResponses,
              "Unknown MPS propagationMode. Expected cachedResponses or recomputeResponses.");
   if( _impl_->eventPropagation ){
     _impl_->eventPropagation->setEnableDialCache(
         _impl_->propagationMode == MpsPropagationMode::cachedResponses);
+    _impl_->eventPropagation->setEnableBinFactorization(_impl_->enableBinFactorization);
   }
   _config_.printUnusedKeys();
 }

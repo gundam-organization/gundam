@@ -124,6 +124,7 @@ namespace Backends {
     DeviceIndex eventCount, histogramBins, dialCount, sampleCount;
     DeviceIndex hasReweightCap;
     ObservableScalar maxReweight;
+    DeviceIndex factorEventWeights;
   };
 }
 #endif

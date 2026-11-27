@@ -376,6 +376,60 @@ TEST(BackendLikelihood, MetalReusesPredictionAndInvalidatesForExternalWeights) {
   EXPECT_TRUE(JsonType::parse(gpu.getDiagnosticEventPropagationState()).at("updatedPrediction"));
 }
 
+TEST(BackendLikelihood, MetalReusesFixedBinSumsAndMaterializesCurrentWeights) {
+  EngineView view;
+  auto& model = view.propagation;
+  model.totalBins = 1;
+  model.parameterCount = 2;
+  model.dialInputs = {{0}, {1}};
+  model.dials.resize(2);
+  model.dials[0].inputCount = model.dials[1].inputCount = 1;
+  model.dials[1].firstInput = 1;
+  model.events.resize(2);
+  model.events[0].globalBinIndex = model.events[1].globalBinIndex = 0;
+  model.events[1].resultIndex = 1;
+  model.eventWeights = {{2., 0, 2}, {3., 2, 1}};
+  model.eventDialIndices = {0, 1, 0};
+  LikelihoodSampleView sample;
+  sample.dataSums = {7.};
+  sample.portableOptions.kind = LikelihoodKind::BarlowBeestonLiteGaussian;
+  view.likelihood.samples = {sample};
+  MpsBackend gpu, reference;
+  reference.configure(ConfigReader(JsonType{{"enableBinFactorization", false}}));
+  gpu.build(view);
+  reference.build(view);
+  gpu.setDiagnosticStageProfiling(true);
+  PropagationInputs inputs;
+  auto compare = [&](double factor_, double residual_, bool reuse_){
+    inputs.parameters.values = {factor_, residual_};
+    const auto token = gpu.requestPropagation(inputs);
+    const auto expected = reference.requestPropagation(inputs);
+    const auto state = JsonType::parse(gpu.getDiagnosticEventPropagationState());
+    EXPECT_EQ(state.at("reusedResidualHistograms"), reuse_);
+    EXPECT_EQ(state.at("updatedEventWeights"), not reuse_);
+    const auto stages = JsonType::parse(gpu.getDiagnosticStageGpuSeconds());
+    EXPECT_EQ(stages.contains("propagate_event_state"), not reuse_);
+    EXPECT_NEAR(gpu.getLikelihood(token), reference.getLikelihood(expected), 1.e-12);
+    for( auto output : {OutputRequest::Histograms, OutputRequest::EventWeights} ){
+      gpu.materialize(token, output);
+      reference.materialize(expected, output);
+    }
+    EXPECT_EQ(gpu.getHistogramSumsHostView(token), reference.getHistogramSumsHostView(expected));
+    EXPECT_EQ(gpu.getHistogramSumSquaresHostView(token), reference.getHistogramSumSquaresHostView(expected));
+    EXPECT_EQ(gpu.getEventWeightsHostView(token), reference.getEventWeightsHostView(expected));
+  };
+  compare(.5, 1.25, false);
+  compare(1.5, 1.25, true);
+  compare(1.5, .75, false);
+  compare(2., .75, true);
+  inputs.forceBinningUpdate = true;
+  // The output buffer now holds full products. A forced rebuild must recreate residuals.
+  const auto rebuilt = gpu.requestPropagation(inputs);
+  gpu.materialize(rebuilt, OutputRequest::Histograms);
+  EXPECT_EQ(gpu.getHistogramSumsHostView(rebuilt), (std::vector<double>{9.}));
+  EXPECT_EQ(gpu.getHistogramSumSquaresHostView(rebuilt), (std::vector<double>{45.}));
+}
+
 TEST(BackendLikelihood, MetalBarlowResolvesLowRatesNearTheMinimum) {
   using namespace Backends;
   auto ref = reference("BarlowLLH_BANFF_OA2021");

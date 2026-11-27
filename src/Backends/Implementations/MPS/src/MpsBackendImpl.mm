@@ -58,6 +58,7 @@ void Backends::MpsBackendImpl::prepareDevice() {
   eventPropagation = std::make_unique<MpsEventPropagation>(device, commandQueue, library);
   [library release];
   eventPropagation->setEnableDialCache(propagationMode == MpsPropagationMode::cachedResponses);
+  eventPropagation->setEnableBinFactorization(enableBinFactorization);
 
   isAvailable = true;
 }

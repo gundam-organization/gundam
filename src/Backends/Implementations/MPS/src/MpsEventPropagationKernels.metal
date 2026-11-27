@@ -87,6 +87,7 @@ kernel void propagate_event_state(
     device uint* dirty [[buffer(9)]],
     device ObservableScalar* eventWeights [[buffer(10)]],
     constant DevicePropagationControl& control [[buffer(11)]],
+    device const uint* binFactors [[buffer(12)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= control.eventCount ){ return; }
   auto event = events[gid];
@@ -113,10 +114,38 @@ kernel void propagate_event_state(
     // Keep response residuals through the product: float32 rounding here
     // contaminates the finite differences of a nonzero likelihood.
     ObservableScalar weight(1.f);
-    for( uint i = event.firstDial; i < event.firstDial + event.dialCount; ++i ){ weight *= responses[weightDialIndices[i]]; }
+    uint factor = UINT_MAX;
+    if( control.factorEventWeights && event.fixedBin >= 0 ){ factor = binFactors[sample.binOffset + event.fixedBin]; }
+    if( factor == UINT_MAX ){
+      for( uint i = event.firstDial; i < event.firstDial + event.dialCount; ++i ){ weight *= responses[weightDialIndices[i]]; }
+    }
+    else{
+      for( uint i = event.firstDial; i < event.firstDial + event.dialCount; ++i ){
+        uint dial = weightDialIndices[i];
+        if( dial != factor ){ weight *= responses[dial]; }
+      }
+    }
     if( control.hasReweightCap && weight > control.maxReweight ){ weight = control.maxReweight; }
     eventWeights[gid] = event.baseWeight * weight;
   }
+}
+
+kernel void apply_bin_factors(
+    device const uint* binFactors [[buffer(0)]], device const ObservableScalar* responses [[buffer(1)]],
+    device const ObservableScalar* residualSums [[buffer(2)]], device const ObservableScalar* residualSquares [[buffer(3)]],
+    device ObservableScalar* sums [[buffer(4)]], device ObservableScalar* squares [[buffer(5)]],
+    constant DevicePropagationControl& control [[buffer(6)]], uint gid [[thread_position_in_grid]]) {
+  if( gid >= control.histogramBins || control.error ){ return; }
+  uint dial = binFactors[gid];
+  auto sum = residualSums[gid];
+  auto square = residualSquares[gid];
+  if( dial != UINT_MAX ){
+    auto factor = responses[dial];
+    sum *= factor;
+    square *= factor * factor;
+  }
+  sums[gid] = sum;
+  squares[gid] = square;
 }
 
 struct RebinOutcome { uint rebinned, candidates, sample, rebuild; };

@@ -49,6 +49,7 @@ namespace Backends {
     std::unique_ptr<MpsEventPropagation> eventPropagation{};
     bool useEventPropagation{false};
     MpsPropagationMode propagationMode{MpsPropagationMode::cachedResponses};
+    bool enableBinFactorization{true};
     bool isAvailable{false};
     bool hasPreparedDevice{false};
     bool enableDiagnosticStageProfiling{false};
