@@ -78,8 +78,6 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
   clearBuffers();
   _model_ = &model_;
   _dialCount_ = model_.dials.size();
-  LogInfo << "Packing MPS event model and preparing host caches..." << std::endl;
-  _packed_.build(model_);
   _producerDials_.clear();
   _producerInputCounts_.clear();
   for( std::size_t i = 0; i < model_.dials.size(); ++i ){
@@ -103,24 +101,61 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
     LogThrowIf(value == nil, "Metal event propagation buffer allocation failed: " << bytes_);
     _buffers_[std::size_t(slot_)] = value;
   };
-  auto upload = [&](Buffer slot_, const auto& values_){
+  auto upload = [&](Buffer slot_, const char* name_, const auto& values_){
     using Value = typename std::decay_t<decltype(values_)>::value_type;
     if( values_.empty() ){ allocate(slot_, sizeof(Value)); return; }
     LogThrowIf(values_.size() > _device_.maxBufferLength / sizeof(Value), "Event propagation upload exceeds Metal maxBufferLength.");
+    LogInfo << "Uploading " << name_ << " to Metal (" << values_.size() * sizeof(Value) / (1024. * 1024.)
+            << " MiB, " << values_.size() << " entries)..." << std::endl;
     _buffers_[std::size_t(slot_)] = makePrivateBuffer(_device_, _queue_, values_);
-    LogThrowIf(buffer(slot_) == nil, "Metal event propagation upload failed.");
+    LogThrowIf(buffer(slot_) == nil, "Metal event propagation upload failed for " << name_);
   };
-  LogInfo << "Allocating MPS buffers and uploading events, dials, binning and likelihood to GPU..." << std::endl;
-  upload(Buffer::Events, _packed_.events);
-  upload(Buffer::Samples, _packed_.samples);
-  upload(Buffer::Dials, _packed_.dials);
-  std::vector<DevicePropagationDial>{}.swap(_packed_.dials);
-  upload(Buffer::DialInputs, _packed_.dialInputs);
-  upload(Buffer::DialInputRanges, _packed_.dialInputRanges);
-  upload(Buffer::Targets, _packed_.variableResponses);
-  upload(Buffer::Intervals, _packed_.intervals);
-  upload(Buffer::Bins, _packed_.bins);
-  upload(Buffer::Nodes, _packed_.nodes);
+  auto uploadAndRelease = [&](Buffer slot_, const char* name_, auto& values_){
+    upload(slot_, name_, values_);
+    std::decay_t<decltype(values_)>().swap(values_);
+  };
+  LogInfo << "Packing and uploading the MPS event model by section..." << std::endl;
+  using Section = DevicePropagationModel::Section;
+  _packed_.build(model_, [&](Section section_){
+    switch( section_ ){
+      case Section::Dials:
+        uploadAndRelease(Buffer::Dials, "dial descriptors", _packed_.dials);
+        uploadAndRelease(Buffer::DialInputs, "dial inputs", _packed_.dialInputs);
+        uploadAndRelease(Buffer::DialInputRanges, "dial input ranges", _packed_.dialInputRanges);
+        uploadAndRelease(Buffer::FormulaPrograms, "formula programs", _packed_.formulaPrograms);
+        uploadAndRelease(Buffer::FormulaInstructions, "formula instructions", _packed_.formulaInstructions);
+        uploadAndRelease(Buffer::FormulaConstants, "formula constants", _packed_.formulaConstants);
+        uploadAndRelease(Buffer::ProgramInputs, "program inputs", _packed_.programInputs);
+        uploadAndRelease(Buffer::CompositePrograms, "composite programs", _packed_.compositePrograms);
+        uploadAndRelease(Buffer::CompositeInstructions, "composite instructions", _packed_.compositeInstructions);
+        break;
+      case Section::Payloads:
+        uploadAndRelease(Buffer::Payloads, "dial payloads", _packed_.payloads);
+        break;
+      case Section::Variables:
+        uploadAndRelease(Buffer::Variables, "event variables", _packed_.variables);
+        break;
+      case Section::DialIndices:
+        uploadAndRelease(Buffer::WeightDialIndices, "weight dial indices", _packed_.weightDialIndices);
+        uploadAndRelease(Buffer::VariableDialIndices, "variable dial indices", _packed_.variableDialIndices);
+        break;
+      case Section::Targets:
+        uploadAndRelease(Buffer::Targets, "variable responses", _packed_.variableResponses);
+        break;
+      case Section::Binning:
+        upload(Buffer::Samples, "sample binning", _packed_.samples);
+        uploadAndRelease(Buffer::Intervals, "binning intervals", _packed_.intervals);
+        uploadAndRelease(Buffer::Bins, "bins", _packed_.bins);
+        uploadAndRelease(Buffer::Nodes, "bin search nodes", _packed_.nodes);
+        uploadAndRelease(Buffer::Bounds, "bin search bounds", _packed_.bounds);
+        uploadAndRelease(Buffer::NodeBins, "bin search indices", _packed_.nodeBins);
+        upload(Buffer::ReusableBins, "reusable bin indices", _packed_.reusableBins);
+        break;
+      case Section::Events:
+        upload(Buffer::Events, "events", _packed_.events);
+        break;
+    }
+  });
   _deviceLikelihood_ = hasPortableLikelihood(likelihood_);
   const auto likelihoodBins = packLikelihood<ObservableScalar>(likelihood_, model_.totalBins);
   LogThrowIf(likelihoodBins.size() > std::numeric_limits<DeviceIndex>::max(), "Metal likelihood bin count exceeds index range.");
@@ -131,32 +166,19 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
   _likelihoodWork_.partialCount = DeviceIndex((likelihoodBins.size() + _likelihoodWork_.binsPerThread - 1)
       / _likelihoodWork_.binsPerThread);
   _lastUpdatedPrediction_ = true;
-  upload(Buffer::LikelihoodBins, likelihoodBins);
-  upload(Buffer::LikelihoodCount, std::vector<LikelihoodWorkLayout>{_likelihoodWork_});
+  upload(Buffer::LikelihoodBins, "likelihood bins", likelihoodBins);
+  upload(Buffer::LikelihoodCount, "likelihood work layout", std::vector<LikelihoodWorkLayout>{_likelihoodWork_});
   allocate(Buffer::LikelihoodPartials, _likelihoodWork_.partialCount * sizeof(ObservableScalar));
   allocate(Buffer::LikelihoodTotal, sizeof(ObservableScalar));
   allocate(Buffer::LikelihoodReadback, sizeof(ObservableScalar), true);
-  upload(Buffer::Bounds, _packed_.bounds);
-  upload(Buffer::NodeBins, _packed_.nodeBins);
-  upload(Buffer::ReusableBins, _packed_.reusableBins);
-  upload(Buffer::WeightDialIndices, _packed_.weightDialIndices);
-  upload(Buffer::VariableDialIndices, _packed_.variableDialIndices);
-  upload(Buffer::Payloads, _packed_.payloads);
-  upload(Buffer::Variables, _packed_.variables);
-  upload(Buffer::FormulaPrograms, _packed_.formulaPrograms);
-  upload(Buffer::FormulaInstructions, _packed_.formulaInstructions);
-  upload(Buffer::FormulaConstants, _packed_.formulaConstants);
-  upload(Buffer::ProgramInputs, _packed_.programInputs);
-  upload(Buffer::CompositePrograms, _packed_.compositePrograms);
-  upload(Buffer::CompositeInstructions, _packed_.compositeInstructions);
   allocate(Buffer::ProgramScratch, _packed_.programScratchSize * sizeof(ObservableScalar));
   allocate(Buffer::Parameters, std::max(std::size_t(1), model_.parameterCount) * sizeof(ObservableScalar), true);
   std::size_t externalCount{0};
   for( const auto& block : model_.externalWeightBlocks ){ externalCount = std::max(externalCount, block.offset + block.count); }
   allocate(Buffer::ExternalWeights, std::max(std::size_t(1), externalCount) * sizeof(ObservableScalar), true);
   allocate(Buffer::Responses, std::max(std::size_t(1), model_.dials.size()) * sizeof(ObservableScalar));
-  allocate(Buffer::HostValues, std::max(std::size_t(1), _packed_.variables.size()) * sizeof(ObservableScalar), true);
-  allocate(Buffer::HostEdits, _packed_.variables.size() * sizeof(DeviceIndex), true);
+  allocate(Buffer::HostValues, std::max(std::size_t(1), model_.variableValues.size()) * sizeof(ObservableScalar), true);
+  allocate(Buffer::HostEdits, model_.variableValues.size() * sizeof(DeviceIndex), true);
   allocate(Buffer::ChangedSamples, model_.samples.size() * sizeof(DeviceIndex), true);
   allocate(Buffer::Control, sizeof(DevicePropagationControl), true);
   for( auto slot : {Buffer::DirtyEvents, Buffer::HardBins, Buffer::EventCounts} ){ allocate(slot, model_.events.size() * sizeof(DeviceIndex)); }
@@ -177,25 +199,6 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
   // usually leave resident. Histogram readback is allocated lazily for diagnostics.
   std::memset(buffer(Buffer::Control).contents, 0, sizeof(DevicePropagationControl));
   buildDialCache();
-  // Uploads have completed. Retain only the host metadata used at runtime.
-  auto releaseHostStorage = [](auto& values_){ std::decay_t<decltype(values_)>().swap(values_); };
-  releaseHostStorage(_packed_.dialInputs);
-  releaseHostStorage(_packed_.dialInputRanges);
-  releaseHostStorage(_packed_.variableResponses);
-  releaseHostStorage(_packed_.intervals);
-  releaseHostStorage(_packed_.bins);
-  releaseHostStorage(_packed_.nodes);
-  releaseHostStorage(_packed_.bounds);
-  releaseHostStorage(_packed_.nodeBins);
-  releaseHostStorage(_packed_.weightDialIndices);
-  releaseHostStorage(_packed_.variableDialIndices);
-  releaseHostStorage(_packed_.variables);
-  releaseHostStorage(_packed_.payloads);
-  releaseHostStorage(_packed_.formulaInstructions);
-  releaseHostStorage(_packed_.formulaConstants);
-  releaseHostStorage(_packed_.programInputs);
-  releaseHostStorage(_packed_.compositePrograms);
-  releaseHostStorage(_packed_.compositeInstructions);
   std::size_t bufferBytes{0};
   for( auto value : _buffers_ ){ if( value != nil ){ bufferBytes += value.length; } }
   LogInfo << "MPS buffers ready: " << model_.events.size() << " events, "
@@ -226,6 +229,10 @@ void Backends::MpsEventPropagation::buildDialCache() {
   for( const auto& group : groups.multiParameterDials ){
     _multiDialGroups_.push_back({group.first, indices.size(), group.second.size()});
     indices.insert(indices.end(), group.second.begin(), group.second.end());
+  }
+  if( not indices.empty() ){
+    LogInfo << "Uploading dial cache indices to Metal (" << indices.size() * sizeof(DeviceIndex) / (1024. * 1024.)
+            << " MiB, " << indices.size() << " entries)..." << std::endl;
   }
   _buffers_[std::size_t(Buffer::DialIndices)] = indices.empty() ? makePrivateEmptyBuffer(_device_, 4)
       : makePrivateBuffer(_device_, _queue_, indices);

@@ -51,12 +51,11 @@ namespace {
   }
 }
 
-void Backends::DevicePropagationModel::build(const PropagationView& model_) {
+void Backends::DevicePropagationModel::build(
+    const PropagationView& model_, const std::function<void(Section)>& emit_) {
   *this = DevicePropagationModel();
   histogramBins = index(std::size_t(model_.totalBins) + model_.samples.size());
-  reusableBins.assign(histogramBins, DeviceIndex(-1));
-  for( double value : model_.variableValues ){ variables.push_back(scalar(value)); }
-  for( double value : model_.dialPayloads ){ payloads.push_back(scalar(value)); }
+  const auto emit = [&](Section section_){ if( emit_ ){ emit_(section_); } };
   validateCompositePrograms(model_);
   for( const auto& program : model_.formulaPrograms ){
     program.validate();
@@ -114,8 +113,7 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
     }
     compositeStackSizes.push_back(stackSize);
   }
-  weightDialIndices = model_.eventDialIndices;
-  variableDialIndices = model_.variableDialIndices;
+  std::size_t payloadCount = model_.dialPayloads.size();
   const bool hasInputRanges = std::any_of(model_.dials.begin(), model_.dials.end(), [](const auto& dial_){
     return dial_.type == BackendDialType::Bilinear or dial_.type == BackendDialType::Bicubic
         or dial_.type == BackendDialType::Composite;
@@ -160,13 +158,9 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
     else if( isTableDial(dial.type) ){
       Semantics::validateTableDial(model_, dial);
       packed.externalIndex = index(model_.externalWeightBlocks.at(dial.externalBlockIndex).offset);
-      packed.payloadOffset = index(payloads.size());
+      packed.payloadOffset = index(payloadCount);
       packed.payloadSize = index(2*dial.tableTermCount);
-      for( std::size_t j = 0; j < dial.tableTermCount; ++j ){
-        const auto& term = model_.tableTerms.at(dial.firstTableTerm+j);
-        payloads.push_back(scalar(double(index(term.index))));
-        payloads.push_back(scalar(term.coefficient));
-      }
+      payloadCount += packed.payloadSize;
     }
     else if( dial.type == BackendDialType::ExternalWeight ){
       const auto& block = model_.externalWeightBlocks.at(dial.externalBlockIndex);
@@ -183,11 +177,40 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
     }
     dials.push_back(packed);
   }
+  emit(Section::Dials);
+
+  // Table terms are appended in dial order. Descriptor offsets are computed
+  // above so the large descriptor and payload arrays can be packed separately.
+  payloads.reserve(payloadCount);
+  for( double value : model_.dialPayloads ){ payloads.push_back(scalar(value)); }
+  if( payloadCount != payloads.size() ){
+    for( const auto& dial : model_.dials ){
+      if( not isTableDial(dial.type) ){ continue; }
+      for( std::size_t j = 0; j < dial.tableTermCount; ++j ){
+        const auto& term = model_.tableTerms.at(dial.firstTableTerm+j);
+        payloads.push_back(scalar(double(index(term.index))));
+        payloads.push_back(scalar(term.coefficient));
+      }
+    }
+  }
+  emit(Section::Payloads);
+
+  variables.reserve(model_.variableValues.size());
+  for( double value : model_.variableValues ){ variables.push_back(scalar(value)); }
+  emit(Section::Variables);
+
+  weightDialIndices = model_.eventDialIndices;
+  variableDialIndices = model_.variableDialIndices;
+  emit(Section::DialIndices);
+
   for( const auto& response : model_.variableResponses ){
     variableResponses.push_back({index(response.variableIndex), scalar(response.referenceValue),
       response.overrideDial == std::size_t(-1) ? DeviceIndex(-1) : index(response.overrideDial),
       index(response.firstMultiplyDial), index(response.multiplyDialCount), index(response.firstAddDial), index(response.addDialCount)});
   }
+  emit(Section::Targets);
+
+  reusableBins.assign(histogramBins, DeviceIndex(-1));
   std::vector<std::size_t> capacities;
   for( const auto& sample : model_.samples ){
     const auto& layout = sample.binning;
@@ -243,6 +266,9 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
   }
   // Fixed-bin standalone views need not carry SampleView bindings.
   samples.push_back({0, index(model_.totalBins), 0, 0, 0, 0, 0, 0, 0});
+  emit(Section::Binning);
+
+  events.reserve(model_.events.size());
   for( const auto& event : model_.events ){
     std::size_t sample = event.samplePosition < model_.samples.size() ? event.samplePosition : model_.samples.size();
     std::size_t capacity = sample < capacities.size() ? capacities[sample] : 1;
@@ -256,4 +282,5 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
     events.push_back(packed);
   }
   histogramChunkCapacity = index(std::size_t(contributionCapacity) / 256 + histogramBins + 1);
+  emit(Section::Events);
 }

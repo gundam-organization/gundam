@@ -2,6 +2,8 @@
 #define GUNDAM_DEVICE_PROPAGATION_MODEL_H
 #include "DevicePropagationTypes.h"
 #include "EngineView.h"
+
+#include <functional>
 namespace Backends {
   // Device-independent packing of observables and sparse histogram geometry.
   // Metal/CUDA executors own allocations, queues and execution, not this model.
@@ -28,7 +30,10 @@ namespace Backends {
     DeviceIndex contributionCapacity{0};
     DeviceIndex histogramBins{0};
     DeviceIndex histogramChunkCapacity{0};
-    void build(const PropagationView& model_);
+    enum class Section { Dials, Payloads, Variables, DialIndices, Targets, Binning, Events };
+    // Each callback may consume its completed section. Subsequent sections
+    // use source data and offsets, never the contents of emitted vectors.
+    void build(const PropagationView& model_, const std::function<void(Section)>& emit_ = {});
   };
 }
 #endif
