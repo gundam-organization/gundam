@@ -10,7 +10,7 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   deviceModelFallbackReason.clear();
   if( not isAvailable ){ deviceModelFallbackReason = "Metal is not available."; return false; }
   DeviceWeightModel packed;
-  if( not packDeviceWeightModel(model, packed, buildTiming,
+  if( not packDeviceWeightModel(model(), packed, buildTiming,
                                   deviceModelFallbackReason, "MPS backend") ){ return false; }
   MpsSplinePayloadLayout(packed).apply(packed);
   auto lastStageStart = std::chrono::steady_clock::now();
@@ -47,14 +47,14 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   maxHistogramChunksPerBin = packed.maxHistogramChunksPerBin;
   if( externalDialOccurrences.empty() ){ externalDialOccurrences.emplace_back(); }
   auto totalDynamicDialOccurrences = packed.totalDynamicDialOccurrences;
-  uint32_t nEvents = uint32_t(model.events.size());
-  uint32_t totalBins = uint32_t(model.totalBins);
+  uint32_t nEvents = uint32_t(model().events.size());
+  uint32_t totalBins = uint32_t(model().totalBins);
   uint32_t chunkSize = histogramChunkSize;
   uint32_t totalPartials = totalBins * maxHistogramChunksPerBin;
 
   LogInfo << "MPS backend: allocating/uploading Metal buffers."
-          << " Event weights bytes=" << model.events.size() * sizeof(float)
-          << ", histogram bytes=" << std::size_t(model.totalBins) * sizeof(float)
+          << " Event weights bytes=" << model().events.size() * sizeof(float)
+          << ", histogram bytes=" << std::size_t(model().totalBins) * sizeof(float)
           << ", partial histogram bytes=" << std::size_t(totalPartials) * sizeof(float)
           << ", unique packed dial count="
           << (compactDialDescriptorCount + uniformDialDescriptorCount
@@ -145,21 +145,21 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
   monotonicCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(monotonicDialDescriptors.size()));
   generalCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(generalDialDescriptors.size()));
   graphCachedResponsesBuffer = makePrivateEmptyBuffer(device, cachedResponseBufferBytes(graphDialDescriptors.size()));
-  eventWeightsBuffer = makePrivateEmptyBuffer(device, model.events.size() * sizeof(float));
-  eventWeightsReadbackBuffer = makeSharedEmptyBuffer(device, model.events.size() * sizeof(float));
+  eventWeightsBuffer = makePrivateEmptyBuffer(device, model().events.size() * sizeof(float));
+  eventWeightsReadbackBuffer = makeSharedEmptyBuffer(device, model().events.size() * sizeof(float));
   std::size_t externalWeightCount{0};
-  for( const auto& block : model.externalWeightBlocks ){
+  for( const auto& block : model().externalWeightBlocks ){
     externalWeightCount = std::max(externalWeightCount, block.offset + block.count);
   }
   externalWeightsBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, externalWeightCount) * sizeof(float));
-  externalWeightGenerations.assign(model.externalWeightBlocks.size(), 0);
-  parametersBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, model.parameterCount) * sizeof(float));
+  externalWeightGenerations.assign(model().externalWeightBlocks.size(), 0);
+  parametersBuffer = makeSharedEmptyBuffer(device, std::max<std::size_t>(1, model().parameterCount) * sizeof(float));
   partialHistSumsBuffer = makePrivateEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
   partialHistSumSquaresBuffer = makePrivateEmptyBuffer(device, std::size_t(totalPartials) * sizeof(float));
-  histSumsBuffer = makePrivateEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
-  histSumSquaresBuffer = makePrivateEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
-  histSumsReadbackBuffer = makeSharedEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
-  histSumSquaresReadbackBuffer = makeSharedEmptyBuffer(device, std::size_t(model.totalBins) * sizeof(float));
+  histSumsBuffer = makePrivateEmptyBuffer(device, std::size_t(model().totalBins) * sizeof(float));
+  histSumSquaresBuffer = makePrivateEmptyBuffer(device, std::size_t(model().totalBins) * sizeof(float));
+  histSumsReadbackBuffer = makeSharedEmptyBuffer(device, std::size_t(model().totalBins) * sizeof(float));
+  histSumSquaresReadbackBuffer = makeSharedEmptyBuffer(device, std::size_t(model().totalBins) * sizeof(float));
   nEventsBuffer = [device newBufferWithBytes:&nEvents length:sizeof(nEvents) options:MTLResourceStorageModeShared];
   totalBinsBuffer = [device newBufferWithBytes:&totalBins length:sizeof(totalBins) options:MTLResourceStorageModeShared];
   maxHistogramChunksPerBinBuffer = [device newBufferWithBytes:&maxHistogramChunksPerBin
@@ -188,7 +188,7 @@ bool Backends::MpsBackendImpl::buildWeightModel() {
       or totalBinsBuffer == nil or maxHistogramChunksPerBinBuffer == nil
       or histogramChunkSizeBuffer == nil ){
     releaseDeviceBuffers();
-    return fail("Metal buffer allocation failed while building the MPS backend model.");
+    return fail("Metal buffer allocation failed while building the MPS backend model().");
   }
   LogInfo << "MPS backend: Metal buffers ready in "
           << secondsSince(lastStageStart) << " s."

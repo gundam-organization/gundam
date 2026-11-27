@@ -229,6 +229,7 @@ namespace {
     using namespace Backends;
     auto view = std::make_shared<EngineView>(likelihoodView(LikelihoodKind::BarlowBeestonLiteGaussian));
     backend_.buildShared(view);
+    EXPECT_EQ(&backend_.getEngineView(), view.get());
     PropagationInputs inputs;
     inputs.parameters.values = {1.};
     auto token = backend_.requestPropagation(inputs);

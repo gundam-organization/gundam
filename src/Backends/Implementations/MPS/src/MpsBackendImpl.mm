@@ -1,6 +1,6 @@
 #include "MpsBackendInternal.h"
 
-Backends::MpsBackendImpl::MpsBackendImpl() : model(engineView.propagation), likelihoodModel(engineView.likelihood) {
+Backends::MpsBackendImpl::MpsBackendImpl() {
   device = MTLCreateSystemDefaultDevice();
 }
 

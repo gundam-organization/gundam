@@ -1,7 +1,6 @@
 #ifndef GUNDAM_MPS_GRADIENT_MODEL_H
 #define GUNDAM_MPS_GRADIENT_MODEL_H
 #include "MpsGradientTypes.h"
-#include "DevicePropagationModel.h"
 #include "GradientModel.h"
 #include "GradientValidation.h"
 
@@ -25,7 +24,7 @@ namespace Backends {
     std::vector<MpsGradientEvent> events;
     std::vector<DeviceIndex> inputOffsets, indices, parameterOffsets, parameterOccurrences;
     std::size_t scratchSize{0}, contributionCount{0}, externalCount{0};
-    void build(const EngineView& view_, const DevicePropagationModel& packed_) {
+    void build(const EngineView& view_) {
       *this = MpsGradientModel();
       validateMpsGradient(view_);
       const auto& m = view_.propagation;
@@ -36,7 +35,6 @@ namespace Backends {
       for( const auto& bin : packLikelihood<ObservableScalar>(view_.likelihood, m.totalBins) ) bins.at(bin.globalBin) = bin;
       for( std::size_t i = 0; i < m.dials.size(); ++i ){
         const auto& dial = m.dials[i];
-        const auto& device = packed_.dials.at(i);
         ranges.push_back({gradientIndex(bindings.size()), gradientIndex(dial.inputCount)});
         for( std::size_t j = 0; j < dial.inputCount; ++j ){
           const auto& input = m.dialInputs.at(dial.firstInput+j);
@@ -47,11 +45,12 @@ namespace Backends {
         std::size_t scratch = 0;
         if( dial.type == BackendDialType::Composite ){
           const auto& program = m.compositePrograms.at(dial.compositeProgram);
-          scratch = device.stackOffset;
+          const auto stackOffset = program.scratchSize();
+          scratch = stackOffset;
           for( std::size_t j = 0; j < program.instructionCount; ++j ){
             const auto& node = m.compositeInstructions.at(program.firstInstruction+j).dial;
             if( node.type == BackendDialType::Formula )
-              scratch = std::max(scratch, std::size_t(device.stackOffset)+m.formulaPrograms.at(node.formulaProgramIndex).stackSize);
+              scratch = std::max(scratch, stackOffset+m.formulaPrograms.at(node.formulaProgramIndex).stackSize);
           }
         }
         if( dial.type == BackendDialType::Formula ) scratch = m.formulaPrograms.at(dial.formulaProgramIndex).stackSize;

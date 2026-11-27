@@ -121,6 +121,7 @@ void Backends::DevicePropagationModel::build(const PropagationView& model_) {
         or dial_.type == BackendDialType::Composite;
   });
   if( hasInputRanges ){ dialInputRanges.reserve(model_.dials.size()); }
+  dials.reserve(model_.dials.size());
   for( const auto& dial : model_.dials ){
     Semantics::validateSurfaceDial(model_, dial);
     validateFormulaDial(model_, dial);

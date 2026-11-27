@@ -53,22 +53,33 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
 }
 
 void Backends::MpsBackend::build(const EngineView& engineView_) {
+  auto ownedView = std::make_shared<EngineView>(engineView_);
+  buildShared(ownedView);
+  _impl_->ownedEngineView = std::move(ownedView);
+}
+
+void Backends::MpsBackend::buildShared(std::shared_ptr<const EngineView> engineView_) {
+  LogThrowIf(engineView_ == nullptr, "MPS requires a model.");
   _impl_->isBuilt = false;
   _impl_->gradientValidated = false;
-  _impl_->engineView = engineView_;
+  if( _impl_->eventPropagation ){ _impl_->eventPropagation->clear(); }
+  _impl_->ownedEngineView.reset();
+  _impl_->engineView = std::move(engineView_);
   _impl_->lastResult = MpsBackendImpl::Result();
   _impl_->buildTiming = BackendTimingSummary();
+  const auto& model = _impl_->model();
+  const auto& likelihoodModel = _impl_->likelihoodModel();
   _impl_->useEventPropagation = _impl_->propagationMode == MpsPropagationMode::cachedResponses
-      or hasPortableLikelihood(engineView_.likelihood)
-      or engineView_.propagation.requiresEventBinning() or engineView_.propagation.hasReweightCap;
-  for( const auto& dial : engineView_.propagation.dials ){
+      or hasPortableLikelihood(likelihoodModel)
+      or model.requiresEventBinning() or model.hasReweightCap;
+  for( const auto& dial : model.dials ){
     if( dial.type == BackendDialType::Formula or dial.type == BackendDialType::Composite ){ _impl_->useEventPropagation = true; }
-    if( isTableDial(dial.type) ){ _impl_->useEventPropagation = true; Semantics::validateTableDial(engineView_.propagation, dial); }
-    Semantics::validateSurfaceDial(engineView_.propagation, dial);
+    if( isTableDial(dial.type) ){ _impl_->useEventPropagation = true; Semantics::validateTableDial(model, dial); }
+    Semantics::validateSurfaceDial(model, dial);
     if( dial.type == BackendDialType::ExternalWeight ){ continue; }
     if( dial.inputCount > 1 ){ _impl_->useEventPropagation = true; }
-    for( std::size_t i = 0; i < dial.inputCount and dial.firstInput + i < engineView_.propagation.dialInputs.size(); ++i ){
-      LogThrowIf(engineView_.propagation.dialInputs[dial.firstInput + i].source != DialInputSource::Parameter,
+    for( std::size_t i = 0; i < dial.inputCount and dial.firstInput + i < model.dialInputs.size(); ++i ){
+      LogThrowIf(model.dialInputs[dial.firstInput + i].source != DialInputSource::Parameter,
                  "Event-variable dial inputs require an event-context evaluator.");
     }
   }
@@ -78,10 +89,9 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
   if( _impl_->useEventPropagation ){
     LogThrowIf(not _impl_->isAvailable, "Metal is unavailable for event propagation.");
     _impl_->releaseDeviceBuffers();
-    _impl_->eventPropagation->build(_impl_->model, _impl_->likelihoodModel);
+    _impl_->eventPropagation->build(model, likelihoodModel);
   }
   else{
-    if( _impl_->eventPropagation ){ _impl_->eventPropagation->clear(); }
     if( not _impl_->buildWeightModel() ){
       LogWarning << "MPS backend cannot use the GPU propagation path: "
                  << (_impl_->deviceModelFallbackReason.empty() ? "unknown compatibility issue."
@@ -95,18 +105,20 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
 
 void Backends::MpsBackend::updateDataHistograms(std::shared_ptr<const EngineView> engineView_) {
   LogThrowIf(not _impl_->isBuilt or engineView_ == nullptr, "MPS data updates require a built backend.");
+  LogThrowIf(not _impl_->ownedEngineView and engineView_.get() != _impl_->engineView.get(),
+             "MPS data updates require the existing shared engine layout.");
   _impl_->lastResult.token.isValid = false;
   _impl_->lastResult.status = {};
   _impl_->gradientValidated = false;
   if( _impl_->useEventPropagation ){
     _impl_->eventPropagation->updateDataHistograms(engineView_->likelihood);
   }
-  _impl_->likelihoodModel = engineView_->likelihood;
+  if( _impl_->ownedEngineView ){ _impl_->ownedEngineView->likelihood = engineView_->likelihood; }
 }
 
 Backends::PropagationToken Backends::MpsBackend::requestPropagation(const PropagationInputs& inputs_) {
   LogThrowIf(not _impl_->isBuilt, "MpsBackend has not been built.");
-  inputs_.validate(_impl_->model);
+  inputs_.validate(_impl_->model());
 
   _impl_->resetResult();
   const auto propagationStart = std::chrono::steady_clock::now();
@@ -132,11 +144,11 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Propag
     auto& status = _impl_->lastResult.status;
     status.eventWeights = OutputState::ReadyOnDevice;
     status.histograms = OutputState::ReadyOnDevice;
-    status.eventState = _impl_->model.requiresEventBinning() ? OutputState::ReadyOnDevice : OutputState::NotRequested;
+    status.eventState = _impl_->model().requiresEventBinning() ? OutputState::ReadyOnDevice : OutputState::NotRequested;
     status.sampleLikelihoods = OutputState::Failed;
-    if( _impl_->likelihoodModel.empty() ){ status.statLikelihood = OutputState::Failed; }
+    if( _impl_->likelihoodModel().empty() ){ status.statLikelihood = OutputState::Failed; }
     else{
-      if( !hasPortableLikelihood(_impl_->likelihoodModel) ){ _impl_->calculateLikelihood(); }
+      if( !hasPortableLikelihood(_impl_->likelihoodModel()) ){ _impl_->calculateLikelihood(); }
       status.statLikelihood = OutputState::ReadyOnHost;
     }
     status.backend = BackendStatus::Ready;
@@ -154,7 +166,7 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Propag
     LogThrowIf(std::any_of(inputs_.externalWeights.begin(), inputs_.externalWeights.end(),
                           [](const auto& block_){ return bool(block_.deviceValues); }),
                "MPS propagation failed with device PythonWorker buffers; refusing an implicit host fallback.");
-    Semantics::calculateEventWeights(_impl_->lastResult.eventWeights, _impl_->model, inputs_);
+    Semantics::calculateEventWeights(_impl_->lastResult.eventWeights, _impl_->model(), inputs_);
     _impl_->lastResult.status.eventWeights = OutputState::ReadyOnHost;
   }
 
@@ -169,7 +181,7 @@ Backends::PropagationToken Backends::MpsBackend::requestPropagation(const Propag
   }
 
   _impl_->lastResult.status.sampleLikelihoods = OutputState::Failed;
-  if( _impl_->likelihoodModel.empty() ){
+  if( _impl_->likelihoodModel().empty() ){
     _impl_->lastResult.status.statLikelihood = OutputState::Failed;
   }
   else{
@@ -192,7 +204,7 @@ Backends::PropagationStatus Backends::MpsBackend::getStatus(const PropagationTok
 }
 
 const Backends::EngineView& Backends::MpsBackend::getEngineView() const {
-  return _impl_->engineView;
+  return *_impl_->engineView;
 }
 
 bool Backends::MpsBackend::isReady(const PropagationToken& token_) const {
@@ -265,10 +277,10 @@ Backends::BackendDeviceView Backends::MpsBackend::getDeviceView(const Propagatio
   BackendDeviceView out;
   out.device = _impl_->device;
   out.eventWeights = _impl_->eventWeightsBuffer;
-  out.eventWeightsBytes = _impl_->model.events.size() * sizeof(float);
+  out.eventWeightsBytes = _impl_->model().events.size() * sizeof(float);
   out.histSums = _impl_->histSumsBuffer;
   out.histSumSquares = _impl_->histSumSquaresBuffer;
-  out.histogramBytes = std::size_t(_impl_->model.totalBins) * sizeof(float);
+  out.histogramBytes = std::size_t(_impl_->model().totalBins) * sizeof(float);
   return out;
 }
 
@@ -309,15 +321,15 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["unifiedMemory"] = impl.isAvailable && impl.device.hasUnifiedMemory;
   out["stageProfiling"] = impl.enableDiagnosticStageProfiling;
   out["propagationMode"] = impl.propagationMode.toString();
-  out["likelihoodExecution"] = hasPortableLikelihood(impl.likelihoodModel) ? "device" : "host";
+  out["likelihoodExecution"] = hasPortableLikelihood(impl.likelihoodModel()) ? "device" : "host";
   out["path"] = impl.useEventPropagation ? "eventPropagation" : (impl.isWeightModelSupported ? "packedWeights" : "hostFallback");
   out["fallbackReason"] = impl.deviceModelFallbackReason;
-  out["events"] = impl.model.events.size();
-  out["bins"] = impl.model.totalBins;
-  out["parameters"] = impl.model.parameterCount;
-  out["uniqueDials"] = impl.model.dials.size();
-  out["weightDialReferences"] = impl.model.eventDialIndices.size();
-  out["variableDialReferences"] = impl.model.variableDialIndices.size();
+  out["events"] = impl.model().events.size();
+  out["bins"] = impl.model().totalBins;
+  out["parameters"] = impl.model().parameterCount;
+  out["uniqueDials"] = impl.model().dials.size();
+  out["weightDialReferences"] = impl.model().eventDialIndices.size();
+  out["variableDialReferences"] = impl.model().variableDialIndices.size();
   out["cachedDials"] = impl.cachedDialCount;
   out["splineDescriptorBytes"] = sizeof(MpsSplineDialDescriptor);
   out["normOccurrenceBytes"] = sizeof(MpsNormDialOccurrence);
@@ -326,10 +338,10 @@ std::string Backends::MpsBackend::getDiagnostics() const {
   out["maxHistogramChunksPerBin"] = impl.maxHistogramChunksPerBin;
   out["lastStageGpuSeconds"] = impl.diagnosticStageGpuSeconds;
   std::map<std::string, std::size_t> dialCounts, types;
-  for( const auto& event : impl.model.eventWeights ){ ++dialCounts[std::to_string(event.dialCount)]; }
+  for( const auto& event : impl.model().eventWeights ){ ++dialCounts[std::to_string(event.dialCount)]; }
   const char* dialTypeNames[]{"Norm", "Shift", "CompactSpline", "UniformSpline", "MonotonicSpline", "GeneralSpline", "Graph", "ExternalWeight", "Bilinear", "Bicubic", "Tabulated", "Kriged", "Composite", "Formula"};
   static_assert(sizeof(dialTypeNames) / sizeof(*dialTypeNames) == std::size_t(BackendDialType::Formula) + 1);
-  for( const auto& dial : impl.model.dials ){ ++types[dialTypeNames[std::size_t(dial.type)]]; }
+  for( const auto& dial : impl.model().dials ){ ++types[dialTypeNames[std::size_t(dial.type)]]; }
   out["eventsByWeightDialCount"] = dialCounts;
   out["uniqueDialsByType"] = types;
   if( impl.useEventPropagation ){
@@ -433,7 +445,7 @@ Backends::BackendResourceUsage Backends::MpsBackend::getResourceUsage() const {
 void Backends::MpsBackend::validateLikelihoodGradient() const {
   LogThrowIf(not _impl_->isBuilt or not _impl_->useEventPropagation, "MPS gradient requires a built resident likelihood model.");
   if( not _impl_->gradientValidated ){
-    validateMpsGradient(_impl_->engineView);
+    validateMpsGradient(getEngineView());
     _impl_->gradientValidated = true;
   }
 }
@@ -441,7 +453,7 @@ std::vector<double> Backends::MpsBackend::getLikelihoodGradient(const Propagatio
   LogThrowIf(not _impl_->isCurrentToken(token_), "Invalid MPS gradient propagation token.");
   validateLikelihoodGradient();
   LogThrowIf(not std::isfinite(getLikelihood(token_)), "Cannot differentiate a non-finite MPS likelihood.");
-  try{ return _impl_->eventPropagation->getLikelihoodGradient(_impl_->engineView); }
+  try{ return _impl_->eventPropagation->getLikelihoodGradient(getEngineView()); }
   catch(...){
     _impl_->eventPropagation->invalidate();
     _impl_->lastResult.token.isValid = false;

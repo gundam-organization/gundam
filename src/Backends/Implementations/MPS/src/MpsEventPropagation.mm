@@ -100,6 +100,7 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
   upload(Buffer::Events, _packed_.events);
   upload(Buffer::Samples, _packed_.samples);
   upload(Buffer::Dials, _packed_.dials);
+  std::vector<DevicePropagationDial>{}.swap(_packed_.dials);
   upload(Buffer::DialInputs, _packed_.dialInputs);
   upload(Buffer::DialInputRanges, _packed_.dialInputRanges);
   upload(Buffer::Targets, _packed_.variableResponses);
@@ -139,7 +140,7 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
   std::size_t externalCount{0};
   for( const auto& block : model_.externalWeightBlocks ){ externalCount = std::max(externalCount, block.offset + block.count); }
   allocate(Buffer::ExternalWeights, std::max(std::size_t(1), externalCount) * sizeof(ObservableScalar), true);
-  allocate(Buffer::Responses, std::max(std::size_t(1), _packed_.dials.size()) * sizeof(ObservableScalar));
+  allocate(Buffer::Responses, std::max(std::size_t(1), model_.dials.size()) * sizeof(ObservableScalar));
   allocate(Buffer::HostValues, std::max(std::size_t(1), _packed_.variables.size()) * sizeof(ObservableScalar), true);
   allocate(Buffer::HostEdits, _packed_.variables.size() * sizeof(DeviceIndex), true);
   allocate(Buffer::ChangedSamples, model_.samples.size() * sizeof(DeviceIndex), true);
@@ -237,9 +238,10 @@ void Backends::MpsEventPropagation::buildDialCache() {
 
 std::size_t Backends::MpsEventPropagation::prepareDialCache(const PropagationInputs& inputs_, bool& updateWeights_) {
   auto& control = *static_cast<DevicePropagationControl*>(buffer(Buffer::Control).contents);
+  const auto dialCount = _model_->dials.size();
   control.dialRangeCount = 0;
   updateWeights_ = true;
-  if( not _valid_ or not _enableDialCache_ ){ return _packed_.dials.size(); }
+  if( not _valid_ or not _enableDialCache_ ){ return dialCount; }
   auto parameterChanged = [&](std::size_t i_){ return _cachedParameters_[i_] != inputs_.parameters.values[i_]; };
   auto externalChanged = [&](std::size_t i_){ return _cachedExternalGenerations_[i_] != inputs_.externalWeights[i_].generation; };
   updateWeights_ = std::any_of(_weightParameters_.begin(), _weightParameters_.end(), parameterChanged)
@@ -257,9 +259,9 @@ std::size_t Backends::MpsEventPropagation::prepareDialCache(const PropagationInp
     count += group.count;
   }
   // Dense updates retain the direct full scan, avoiding a range lookup per dial.
-  if( count > _packed_.dials.size() / 2 ){
+  if( count > dialCount / 2 ){
     control.dialRangeCount = 0;
-    return _packed_.dials.size();
+    return dialCount;
   }
   return count;
 }
@@ -581,7 +583,7 @@ std::vector<double> Backends::MpsEventPropagation::getLikelihoodGradient(const E
   LogThrowIf(not _producerGradientsValid_, "MPS gradient requires current, finite external/table Jacobians with matching input dimensions.");
   if( buffer(Buffer::GradientWork) == nil ){
     MpsGradientModel model;
-    model.build(view_, _packed_);
+    model.build(view_);
     _gradientWork_ = model.work;
     auto upload = [&](Buffer slot_, const auto& data_){
       LogThrowIf(data_.size() > _device_.maxBufferLength / sizeof(typename std::decay_t<decltype(data_)>::value_type),

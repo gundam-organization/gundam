@@ -101,9 +101,10 @@ namespace Backends {
     id<MTLBuffer> maxHistogramChunksPerBinBuffer{nil};
     id<MTLBuffer> histogramChunkSizeBuffer{nil};
 
-    EngineView engineView{};
-    PropagationView& model;
-    LikelihoodView& likelihoodModel;
+    std::shared_ptr<EngineView> ownedEngineView{};
+    std::shared_ptr<const EngineView> engineView{std::make_shared<EngineView>()};
+    [[nodiscard]] const PropagationView& model() const { return engineView->propagation; }
+    [[nodiscard]] const LikelihoodView& likelihoodModel() const { return engineView->likelihood; }
     Result lastResult{};
     BackendTimingSummary buildTiming{};
     BackendTimingSummary lastTiming{};
