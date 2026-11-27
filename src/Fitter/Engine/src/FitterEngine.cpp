@@ -162,9 +162,6 @@ void FitterEngine::initializeImpl(){
   getLikelihoodInterface().initialize();
 #ifdef GUNDAM_USING_BACKENDS
   _backendsManager_.setLikelihoodInterfacePtr(&getLikelihoodInterface());
-  const auto* rootMinimizer = dynamic_cast<const RootMinimizer*>(_minimizer_.get());
-  _backendsManager_.setReleaseHostDialDescriptors(
-      true, rootMinimizer != nullptr and rootMinimizer->isUsingAnalyticGradient());
   _backendsManager_.initialize();
 #endif
 

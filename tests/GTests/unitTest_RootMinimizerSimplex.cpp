@@ -240,7 +240,6 @@ TEST_F(RootMinimizerSimplex, MpsReleasesHostDialsAndHandlesGradientAfterDataUpda
     auto& manager = engine.getBackendsManager();
     auto& likelihood = engine.getLikelihoodInterface();
     manager.activate("MPS");
-    const auto* backend = manager.getBackend();
     EXPECT_EQ(manager.getEngineView().propagation.dials.capacity(), 0u);
 
     auto& dataBins = likelihood.getDataPropagator().getSampleSet().getSampleList().front().getHistogram().getBinContentList();
@@ -259,10 +258,15 @@ TEST_F(RootMinimizerSimplex, MpsReleasesHostDialsAndHandlesGradientAfterDataUpda
     likelihood.propagateAndEvalGradient(expectedGradient);
     ParameterGradient actualGradient;
     actualGradient.resetValue(&parameter);
-    manager.evalGradient(actualGradient);
-    EXPECT_EQ(manager.getEngineView().propagation.dials.empty(), prebuildGradient);
-    if( prebuildGradient ){ EXPECT_EQ(manager.getBackend(), backend); }
+    engine.evalGradient(actualGradient);
+    EXPECT_EQ(manager.getEngineView().propagation.dials.capacity(), 0u);
     EXPECT_NEAR(likelihood.getLastLikelihood(), expected, 1.e-10);
+    EXPECT_NEAR(actualGradient.getValue(&parameter), expectedGradient.getValue(&parameter), 1.e-10);
+
+    const auto* backend = manager.getBackend();
+    actualGradient.resetValue(&parameter);
+    engine.evalGradient(actualGradient);
+    EXPECT_EQ(manager.getBackend(), backend);
     EXPECT_NEAR(actualGradient.getValue(&parameter), expectedGradient.getValue(&parameter), 1.e-10);
   }
 }

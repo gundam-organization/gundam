@@ -62,10 +62,6 @@ namespace Backends {
     void updateDataHistograms();
     std::future<BackendPropagationResult> propagate(bool withGradients_ = false);
     void validateLikelihoodGradient();
-    void setReleaseHostDialDescriptors(bool enable_, bool prepareGradient_ = false){
-      _releaseHostDialDescriptors_ = enable_;
-      _prepareGradientBeforeRelease_ = prepareGradient_;
-    }
     void evalGradient(ParameterGradient& gradient_);
     [[nodiscard]] std::string getActiveBackendName() const;
     [[nodiscard]] std::vector<std::string> getAvailableBackendNames() const;
@@ -95,9 +91,9 @@ namespace Backends {
     Backend* _activeBackendPtr_{nullptr};
     std::string _activeBackendName_{};
     void evalStatLikelihoodGradient(ParameterGradient& gradient_);
-    void activateImpl(const std::string& name_, const ConfigReader* config_);
+    void activateImpl(const std::string& name_, const ConfigReader* config_, bool prepareGradient_ = false);
     void buildEngineLayout();
-    void restoreHostDialDescriptors();
+    void prepareBackendGradient();
 
     [[nodiscard]] bool shouldMaterialize(OutputRequest outputRequest_) const;
 
@@ -113,8 +109,6 @@ namespace Backends {
     PropagationToken _lastPropagationToken_{};
     std::uint64_t _backendGeneration_{0};
     bool _isGradientValidated_{false};
-    bool _releaseHostDialDescriptors_{false};
-    bool _prepareGradientBeforeRelease_{false};
     bool _rebuildForGradient_{false};
     std::shared_ptr<bool> _hostBinningChanged_{};
     std::vector<std::shared_ptr<std::function<void()>>> _binningUpdateListeners_{};
