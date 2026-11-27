@@ -2,6 +2,11 @@
 
 Backends::MpsBackendImpl::MpsBackendImpl() : model(engineView.propagation), likelihoodModel(engineView.likelihood) {
   device = MTLCreateSystemDefaultDevice();
+}
+
+void Backends::MpsBackendImpl::prepareDevice() {
+  if( hasPreparedDevice ){ return; }
+  hasPreparedDevice = true;
   if( device == nil ){ return; }
 
   LogInfo << "Preparing MPS Metal library and GPU pipelines on " << [device.name UTF8String] << "..." << std::endl;
@@ -52,6 +57,7 @@ Backends::MpsBackendImpl::MpsBackendImpl() : model(engineView.propagation), like
   if( commandQueue == nil ){ [library release]; return; }
   eventPropagation = std::make_unique<MpsEventPropagation>(device, commandQueue, library);
   [library release];
+  eventPropagation->setEnableDialCache(propagationMode == MpsPropagationMode::cachedResponses);
 
   isAvailable = true;
 }

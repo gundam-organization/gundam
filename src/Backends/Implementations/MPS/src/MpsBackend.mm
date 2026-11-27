@@ -42,12 +42,13 @@ Backends::BackendCapabilities Backends::MpsBackend::getCapabilities() const {
   out.supportsObservableTransforms = true;
   out.supportsEventWeights = true;
   out.supportsHistograms = true;
-  out.supportsLikelihoodGradient = _impl_->isAvailable;
+  const bool metalAvailable = _impl_->hasPreparedDevice ? _impl_->isAvailable : _impl_->device != nil;
+  out.supportsLikelihoodGradient = metalAvailable;
   out.supportsLikelihood = true;
   // The resident executor preserves float pairs through event products and
   // histogram readback. The packed weight executor still publishes float32.
   out.recommendedFunctionPrecision = _impl_->useEventPropagation ? 1.e-12 : std::numeric_limits<float>::epsilon();
-  out.deviceName = _impl_->isAvailable ? [[_impl_->device name] UTF8String] : "Metal unavailable";
+  out.deviceName = metalAvailable ? [[_impl_->device name] UTF8String] : "Metal unavailable";
   return out;
 }
 
@@ -71,6 +72,7 @@ void Backends::MpsBackend::build(const EngineView& engineView_) {
                  "Event-variable dial inputs require an event-context evaluator.");
     }
   }
+  _impl_->prepareDevice();
   LogInfo << "MPS propagation mode: " << _impl_->propagationMode
           << "; executor: " << (_impl_->useEventPropagation ? "eventPropagation" : "packedWeights") << std::endl;
   if( _impl_->useEventPropagation ){

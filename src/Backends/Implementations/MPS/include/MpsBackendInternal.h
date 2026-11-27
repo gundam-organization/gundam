@@ -50,6 +50,7 @@ namespace Backends {
     bool useEventPropagation{false};
     MpsPropagationMode propagationMode{MpsPropagationMode::cachedResponses};
     bool isAvailable{false};
+    bool hasPreparedDevice{false};
     bool enableDiagnosticStageProfiling{false};
     std::map<std::string, double> diagnosticStageGpuSeconds{};
 
@@ -125,6 +126,7 @@ namespace Backends {
     MpsBackendImpl();
     ~MpsBackendImpl();
 
+    void prepareDevice();
     void releaseDeviceBuffers();
     [[nodiscard]] bool isCurrentToken(const PropagationToken& token_) const;
     void resetResult();
