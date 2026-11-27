@@ -272,6 +272,70 @@ TEST(BackendLikelihood, CpuUpdatesDataWithoutRebuildingPropagation) {
   checkDataHistogramUpdates(backend, 1.e-10);
 }
 
+TEST(BackendLikelihood, CpuFactorsFixedBinsAndKeepsDynamicPropagation) {
+  EngineView view;
+  auto& model = view.propagation;
+  model.totalBins = 2;
+  model.parameterCount = 2;
+  model.dialInputs = {{0}, {1}};
+  model.dials.resize(2);
+  model.dials[0].inputCount = model.dials[1].inputCount = 1;
+  model.dials[1].firstInput = 1;
+  model.events.resize(2);
+  model.events[0].globalBinIndex = model.events[1].globalBinIndex = 0;
+  model.events[1].resultIndex = 1;
+  model.eventWeights = {{2., 0, 2}, {3., 2, 1}};
+  model.eventDialIndices = {0, 1, 0};
+  LikelihoodSampleView likelihood;
+  likelihood.dataSums = {7., 0.};
+  likelihood.portableOptions.kind = LikelihoodKind::BarlowBeestonLiteGaussian;
+  view.likelihood.samples = {likelihood};
+
+  CpuBackend backend, reference;
+  reference.configure(ConfigReader(JsonType{{"enableBinFactorization", false}}));
+  backend.build(view);
+  reference.build(view);
+  PropagationInputs inputs;
+  auto compare = [&](bool reuse_){
+    const auto token = backend.requestPropagation(inputs);
+    const auto expected = reference.requestPropagation(inputs);
+    EXPECT_EQ(backend.getLastTimingSummary().eventWeightsStageSeconds == 0., reuse_);
+    EXPECT_NEAR(backend.getLikelihood(token), reference.getLikelihood(expected), 1.e-12);
+    EXPECT_EQ(backend.getHistogramSumsHostView(token), reference.getHistogramSumsHostView(expected));
+    EXPECT_EQ(backend.getHistogramSumSquaresHostView(token), reference.getHistogramSumSquaresHostView(expected));
+    EXPECT_EQ(backend.getEventWeightsHostView(token), reference.getEventWeightsHostView(expected));
+  };
+  inputs.parameters.values = {.5, 1.25};
+  compare(false);
+  inputs.parameters.values[0] = 1.5;
+  compare(true);
+  inputs.parameters.values[1] = .75;
+  compare(false);
+  inputs.parameters.values[0] = 2.;
+  compare(true);
+
+  SampleView sample;
+  sample.useDynamicBinning = sample.readHostVariables = true;
+  sample.binCount = 2;
+  sample.binning.variableNames = {"x"};
+  sample.binning.intervals = {{0, 0., 1.}, {0, 1., 2.}};
+  sample.binning.bins = {{0, 0, 1}, {1, 1, 1}};
+  model.samples = {sample};
+  model.variableValues = {.25, .5};
+  for( auto& event : model.events ){
+    event.samplePosition = 0;
+    event.binIndex = 0;
+    event.firstVariable = event.resultIndex;
+    event.variableCount = 1;
+  }
+  backend.build(view);
+  reference.build(view);
+  compare(false);
+  inputs.parameters.values[0] = 1.25;
+  inputs.hostVariables = {.25, 1.5};
+  compare(false);
+}
+
 #ifdef GUNDAM_TEST_MPS_AVAILABLE
 TEST(BackendLikelihood, MpsUpdatesDataAndGradientBuffers) {
   Backends::MpsBackend backend;

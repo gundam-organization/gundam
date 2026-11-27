@@ -1,6 +1,7 @@
 #include "MpsEventPropagation.h"
 #include "MpsBackendInternal.h"
 #include "MpsGradientModel.h"
+#include "BinFactors.h"
 #include "DialDependencyGroups.h"
 #include "LikelihoodModel.h"
 #include "ProducerGradientPublications.h"
@@ -8,13 +9,11 @@
 #include <algorithm>
 #include <stdexcept>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 
 namespace {
 const char* const kDiagnosticKernelNames[]{"evaluate_propagation_dials", "propagate_event_state", "rebin_events", "clear_contribution_counts",
     "count_bin_contributions", "index_histogram_chunks", "scatter_bin_contributions", "reduce_histogram_chunks", "finish_dynamic_histograms", "reduce_histogram_chunks_parallel", "evaluate_likelihood_partials", "finish_likelihood", "gradient_dials", "gradient_bins", "gradient_events", "gradient_reduce", "apply_bin_factors"};
-constexpr auto kNoBinFactor = std::numeric_limits<Backends::DeviceIndex>::max();
 }
 
 Backends::MpsEventPropagation::MpsEventPropagation(id<MTLDevice> device_, id<MTLCommandQueue> queue_, id<MTLLibrary> library_)
@@ -209,59 +208,11 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
 }
 
 std::vector<Backends::DeviceIndex> Backends::MpsEventPropagation::findBinFactors() const {
-  const auto& model = *_model_;
-  if( model.requiresEventBinning() or model.hasReweightCap ){ return {}; }
-  const auto binCount = std::size_t(_packed_.histogramBins);
-  std::vector<std::vector<DeviceIndex>> commonDials(binCount);
-  std::vector<std::size_t> eventsPerBin(binCount);
-  const auto firstIndex = model.eventDialIndices.begin();
-  for( const auto& event : _packed_.events ){
-    if( event.fixedBin < 0 ){ continue; }
-    const auto bin = std::size_t(_packed_.samples[event.sample].binOffset) + event.fixedBin;
-    if( bin >= binCount ){ return {}; }
-    auto& candidates = commonDials[bin];
-    const auto first = firstIndex + event.firstDial;
-    const auto last = first + event.dialCount;
-    if( eventsPerBin[bin]++ == 0 ){
-      for( auto it = first; it != last; ++it ){
-        if( model.dials[*it].type == BackendDialType::Norm ){ candidates.push_back(*it); }
-      }
-    }
-    // A factor must occur exactly once in every product for this bin.
-    candidates.erase(std::remove_if(candidates.begin(), candidates.end(), [&](DeviceIndex dial_){
-      return std::count(first, last, dial_) != 1;
-    }), candidates.end());
-  }
-  // Prefer dials for which every occurrence can be factored. This also checks
-  // references from events outside the histogram and from mixed bins.
-  std::unordered_map<DeviceIndex, std::int64_t> coveredOccurrences;
-  for( std::size_t bin = 0; bin < binCount; ++bin ){
-    for( auto dial : commonDials[bin] ){ coveredOccurrences[dial] += eventsPerBin[bin]; }
-  }
-  if( coveredOccurrences.empty() ){ return {}; }
-  for( auto dial : model.eventDialIndices ){
-    auto found = coveredOccurrences.find(dial);
-    if( found != coveredOccurrences.end() ){ --found->second; }
-  }
-  std::vector<DeviceIndex> factors(binCount, kNoBinFactor);
-  for( std::size_t bin = 0; bin < binCount; ++bin ){
-    const auto& candidates = commonDials[bin];
-    const auto factor = std::find_if(candidates.begin(), candidates.end(), [&](DeviceIndex dial_){
-      return coveredOccurrences.at(dial_) == 0;
-    });
-    if( factor != candidates.end() ){ factors[bin] = *factor; }
-  }
-  // If a dial lost a bin to a different factor, its response still affects
-  // residual products in that bin. Discard it everywhere.
-  for( std::size_t bin = 0; bin < binCount; ++bin ){
-    for( auto dial : commonDials[bin] ){
-      if( dial != factors[bin] ){ coveredOccurrences.at(dial) = -1; }
-    }
-  }
-  for( auto& dial : factors ){
-    if( dial != kNoBinFactor and coveredOccurrences.at(dial) != 0 ){ dial = kNoBinFactor; }
-  }
-  return factors;
+  return Backends::findBinFactors(*_model_, _packed_.histogramBins, [this](const auto& event_){
+    const auto& packed = _packed_.events[event_.resultIndex];
+    if( packed.fixedBin < 0 ){ return std::size_t(-1); }
+    return std::size_t(_packed_.samples[packed.sample].binOffset) + packed.fixedBin;
+  });
 }
 
 bool Backends::MpsEventPropagation::usesBinFactorization() const {
@@ -284,7 +235,7 @@ void Backends::MpsEventPropagation::buildDialCache() {
   std::vector<bool> factoredDials(model.dials.size(), false);
   _factoredBinCount_ = 0;
   for( auto dial : binFactors ){
-    if( dial == kNoBinFactor ){ continue; }
+    if( dial == noBinFactor ){ continue; }
     factoredDials[dial] = true;
     ++_factoredBinCount_;
   }

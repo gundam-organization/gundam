@@ -276,6 +276,7 @@ std::vector<double> Backends::CpuBackend::getLikelihoodGradient(const Propagatio
   validateLikelihoodGradient();
   LogThrowIf(not isCurrentToken(token_), "Invalid CPU gradient propagation token.");
   LogThrowIf(not std::isfinite(getLikelihood(token_)), "Cannot differentiate a non-finite backend likelihood.");
+  if( not _eventWeightsValid_ ){ materialize(token_, OutputRequest::EventWeights); }
   const auto& model = _engineView_->propagation;
   LogThrowIf(_lastParameterValues_.size() != model.parameterCount, "CPU gradient parameter snapshot is unavailable.");
   std::vector<double> predictionScales(model.totalBins, 0.), uncertaintyScales(model.totalBins, 0.);

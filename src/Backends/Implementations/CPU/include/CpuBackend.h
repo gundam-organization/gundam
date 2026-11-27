@@ -95,6 +95,7 @@ ENUM_FIELD( Indexed )
     void initializeCachedInputGroups();
     [[nodiscard]] std::size_t getCachedInputStorageBytes() const;
     void initializeWeightExecution();
+    void initializeBinFactorization();
     void initializeWeightScheduling();
     template<bool allResponsesCached, bool useReweightCap, bool dynamicScheduling>
     void calculateEventWeightsKernel(int iThread_);
@@ -110,6 +111,8 @@ ENUM_FIELD( Indexed )
     void updateEventBinningThread(int iThread_);
     double evalResponse(std::size_t dial_) const;
     void calculateHistograms(Result& result_);
+    bool calculateFactoredHistograms(const PropagationInputs& inputs_);
+    void ensureEventWeights() const;
     void calculateHistogramsThread(int iThread_);
     void calculateHistogramsFromEvents(Result& result_, const PropagationInputs& inputs_);
     void calculateLikelihood(Result& result_);
@@ -134,7 +137,13 @@ ENUM_FIELD( Indexed )
     GenericToolbox::Time::Timer _binningStageTimer_{};
     NativeDialProgramModel _nativePrograms_;
     std::shared_ptr<const EngineView> _engineView_{std::make_shared<EngineView>()};
-    Result _lastResult_{};
+    mutable Result _lastResult_{};
+    mutable bool _eventWeightsValid_{true};
+    bool _enableBinFactorization_{true};
+    bool _residualHistogramsValid_{false};
+    std::vector<std::uint32_t> _binFactors_{}, _factoredDials_{};
+    std::vector<std::uint8_t> _residualWeightParameters_{};
+    std::vector<double> _factorResponses_{}, _residualSums_{}, _residualSquares_{};
     mutable bool _isGradientValidated_{false};
     GenericToolbox::ParallelWorker _threadPool_{};
     Result* _activeResult_{nullptr};

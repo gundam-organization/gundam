@@ -1,4 +1,5 @@
 #include "CpuBackend.h"
+#include "BinFactors.h"
 #include "CpuWeightKernels.h"
 #include "CpuCompositeProgram.h"
 #include "CpuFormulaProgram.h"
@@ -16,6 +17,7 @@
 #include <unordered_map>
 #include <charconv>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <limits>
 #include <type_traits>
@@ -35,12 +37,14 @@ std::vector<std::pair<std::string, std::string>> Backends::CpuBackend::getMonito
 void Backends::CpuBackend::configureImpl() {
   _config_.clearFields();
   _config_.defineFields({{"profileOutputPath"}, {"profileSampleInterval"}, {"profileMaxSamples"},
-                         {"weightScheduling"}});
+                         {"weightScheduling"}, {"enableBinFactorization"}});
   _config_.checkConfiguration();
   _config_.fillValue(_profileOutputPath_, "profileOutputPath");
   _config_.fillValue(_profileSampleInterval_, "profileSampleInterval");
   _config_.fillValue(_profileMaxSamples_, "profileMaxSamples");
   _config_.fillEnum(_weightScheduling_, "weightScheduling");
+  _config_.fillValue(_enableBinFactorization_, "enableBinFactorization");
+  _residualHistogramsValid_ = false;
   LogThrowIf(_profileSampleInterval_ <= 0 or _profileMaxSamples_ <= 0,
              "CPU profiling interval and maximum sample count must be strictly positive.");
 }
@@ -99,6 +103,7 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
   _formulaScratch_.assign(_threadPool_.getNbThreads(), std::vector<double>(formulaScratchSize));
   initializeDialResponseCache();
   initializeWeightExecution();
+  initializeBinFactorization();
   _timingTotals_ = BackendTimingTotals();
   const auto& model = _engineView_->propagation;
   _externalGradientDials_.clear();
@@ -165,7 +170,12 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   resetResult();
   _lastTiming_ = BackendTimingSummary();
 
-  calculateEventWeights(_lastResult_, inputs_);
+  if( _profiler_ ){ _profiler_->beginStage(CpuBackendProfiler::Stage::Cache); }
+  updateCachedDialResponses(inputs_);
+  if( _profiler_ ){ _profiler_->endStage(CpuBackendProfiler::Stage::Cache); }
+  const bool factored = calculateFactoredHistograms(inputs_);
+  if( not factored ){ calculateEventWeights(_lastResult_, inputs_); }
+  _eventWeightsValid_ = not factored;
   _lastResult_.status.eventWeights = OutputState::ReadyOnDevice;
 
   if( _requiresEventBinning_ ){
@@ -183,7 +193,10 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
     _lastResult_.status.eventState = OutputState::ReadyOnDevice;
   }
 
-  calculateHistograms(_lastResult_);
+  if( not factored ){
+    calculateHistograms(_lastResult_);
+    _lastTiming_.histogramStageSeconds += _histogramStageTimer_.eval().count();
+  }
   _lastResult_.status.histograms = OutputState::ReadyOnDevice;
 
   _lastResult_.status.sampleLikelihoods = OutputState::Failed;
@@ -197,8 +210,6 @@ Backends::PropagationToken Backends::CpuBackend::requestPropagation(const Propag
   _lastResult_.status.backend = BackendStatus::Ready;
 
   _lastTiming_.cachedDialStageSeconds = _cachedDialStageTimer_.eval().count();
-  _lastTiming_.eventWeightsStageSeconds = _eventWeightsStageTimer_.eval().count();
-  _lastTiming_.histogramStageSeconds = _histogramStageTimer_.eval().count();
   _lastTiming_.likelihoodHostSeconds = likelihoodModel.empty() ? 0. : _likelihoodHostTimer_.eval().count();
   _lastTiming_.uniqueDialCount = model.dials.size();
   _lastTiming_.cachedDialCount = _cachedDialCount_;
@@ -244,6 +255,11 @@ void Backends::CpuBackend::materialize(const PropagationToken& token_, OutputReq
     _lastResult_.status.eventState = OutputState::ReadyOnHost;
   }
   else if( output_ == OutputRequest::EventWeights ){
+    if( not _eventWeightsValid_ ){
+      // The factorized path is only enabled with fully resident dial responses.
+      calculateEventWeights(_lastResult_, {});
+      _eventWeightsValid_ = true;
+    }
     _lastResult_.status.eventWeights = OutputState::ReadyOnHost;
   }
   else if( output_ == OutputRequest::Histograms ){
@@ -270,6 +286,7 @@ double Backends::CpuBackend::getLikelihood(const PropagationToken& token_) const
 
 const std::vector<double>& Backends::CpuBackend::getEventWeightsHostView(const PropagationToken& token_) const {
   LogThrowIf(not isCurrentToken(token_), "Invalid CpuBackend propagation token.");
+  ensureEventWeights();
   return _lastResult_.eventWeights;
 }
 
@@ -492,9 +509,6 @@ void Backends::CpuBackend::resetResult() {
 void Backends::CpuBackend::calculateEventWeights(Result& result_, const PropagationInputs& inputs_) {
   const auto& propagation = _engineView_->propagation;
   result_.eventWeights.resize(propagation.events.size());
-  if( _profiler_ ){ _profiler_->beginStage(CpuBackendProfiler::Stage::Cache); }
-  updateCachedDialResponses(inputs_);
-  if( _profiler_ ){ _profiler_->endStage(CpuBackendProfiler::Stage::Cache); }
   _activeResult_ = &result_;
   _activeInputs_ = &inputs_;
   {
@@ -506,6 +520,21 @@ void Backends::CpuBackend::calculateEventWeights(Result& result_, const Propagat
   }
   _activeInputs_ = nullptr;
   _activeResult_ = nullptr;
+  if( result_.status.backend == BackendStatus::Running ){
+    _lastTiming_.eventWeightsStageSeconds += _eventWeightsStageTimer_.eval().count();
+  }
+}
+
+void Backends::CpuBackend::ensureEventWeights() const {
+  if( _eventWeightsValid_ ){ return; }
+  const auto& model = _engineView_->propagation;
+  auto& weights = _lastResult_.eventWeights;
+  weights.resize(model.eventWeights.size());
+  if( weights.empty() ){ _eventWeightsValid_ = true; return; }
+  // A caller may request the host view directly, without materialize().
+  CpuWeightKernels::reweightInterleaved<true, false>(model.eventWeights.data(), model.eventDialIndices.data(),
+      _cachedDialResponses_.data(), weights.data(), 0, weights.size(), 0., [](std::uint32_t){ return 1.; });
+  _eventWeightsValid_ = true;
 }
 
 void Backends::CpuBackend::setDiagnosticCacheTraversal(CpuCacheTraversal traversal_) {
@@ -759,6 +788,94 @@ void Backends::CpuBackend::initializeWeightExecution() {
   _weightWork_ = work;
   _allWeightResponsesCached_ = allCached;
   initializeWeightScheduling();
+}
+
+void Backends::CpuBackend::initializeBinFactorization() {
+  const auto& model = _engineView_->propagation;
+  _residualHistogramsValid_ = false;
+  _eventWeightsValid_ = true;
+  _binFactors_.clear();
+  _factoredDials_.clear();
+  _factorResponses_.clear();
+  _residualSums_.clear();
+  _residualSquares_.clear();
+  if( not _enableBinFactorization_ or not _allWeightResponsesCached_ ){ return; }
+  _binFactors_ = findBinFactors(model, model.totalBins, [](const EventView& event_){
+    return event_.globalBinIndex < 0 ? std::size_t(-1) : std::size_t(event_.globalBinIndex);
+  });
+  for( auto dial : _binFactors_ ){
+    if( dial != noBinFactor ){ _factoredDials_.push_back(dial); }
+  }
+  const auto factoredBins = _factoredDials_.size();
+  if( factoredBins == 0 ){ return; }
+  std::sort(_factoredDials_.begin(), _factoredDials_.end());
+  _factoredDials_.erase(std::unique(_factoredDials_.begin(), _factoredDials_.end()), _factoredDials_.end());
+  std::vector<bool> residualDials(model.dials.size());
+  for( auto dial : model.eventDialIndices ){ residualDials[dial] = true; }
+  for( auto dial : _factoredDials_ ){ residualDials[dial] = false; }
+  _residualWeightParameters_.assign(model.parameterCount, false);
+  for( std::size_t i = 0; i < residualDials.size(); ++i ){
+    if( not residualDials[i] or model.dials[i].type == BackendDialType::Shift ){ continue; }
+    visitDialDependencies(model, model.dials[i],
+        [&](const auto& input_){ _residualWeightParameters_[input_.parameterIndex] = true; }, [](std::size_t){});
+  }
+  std::vector<bool> reusableParameters(model.parameterCount);
+  for( auto dial : _factoredDials_ ){
+    const auto parameter = model.dialInputs[model.dials[dial].firstInput].parameterIndex;
+    reusableParameters[parameter] = not _residualWeightParameters_[parameter];
+  }
+  const auto reusableCount = std::count(reusableParameters.begin(), reusableParameters.end(), true);
+  if( reusableCount == 0 ){ _factoredDials_.clear(); return; }
+  _factorResponses_.resize(_factoredDials_.size());
+  LogInfo << "CPU bin factorization: " << factoredBins << " fixed bins, "
+          << reusableCount << " parameters can reuse cached histogram sums." << std::endl;
+}
+
+bool Backends::CpuBackend::calculateFactoredHistograms(const PropagationInputs& inputs_) {
+  if( not _enableBinFactorization_ or _factoredDials_.empty() ){ return false; }
+  for( std::size_t i = 0; i < _changedCacheParameters_.size(); ++i ){
+    if( _changedCacheParameters_[i] and _residualWeightParameters_[i] ){ _residualHistogramsValid_ = false; break; }
+  }
+  if( not _residualHistogramsValid_ ){
+    // Factor dials have no occurrences outside their selected bins. Mask their
+    // responses during the joined weight job so the hot kernels stay the same.
+    {
+      const auto mask = GenericToolbox::ScopedGuard(
+          [this]{
+            for( std::size_t i = 0; i < _factoredDials_.size(); ++i ){
+              _factorResponses_[i] = std::exchange(_cachedDialResponses_[_factoredDials_[i]], 1.);
+            }
+          },
+          [this]{
+            for( std::size_t i = 0; i < _factoredDials_.size(); ++i ){
+              _cachedDialResponses_[_factoredDials_[i]] = _factorResponses_[i];
+            }
+          });
+      calculateEventWeights(_lastResult_, inputs_);
+    }
+    calculateHistograms(_lastResult_);
+    _lastTiming_.histogramStageSeconds += _histogramStageTimer_.eval().count();
+    _residualSums_.swap(_lastResult_.histSums);
+    _residualSquares_.swap(_lastResult_.histSumSquares);
+    _residualHistogramsValid_ = true;
+  }
+  const auto start = std::chrono::steady_clock::now();
+  _lastResult_.histSums.resize(_binFactors_.size());
+  _lastResult_.histSumSquares.resize(_binFactors_.size());
+  for( std::size_t bin = 0; bin < _binFactors_.size(); ++bin ){
+    const auto dial = _binFactors_[bin];
+    const double factor = dial == noBinFactor ? 1. : _cachedDialResponses_[dial];
+    const double sum = _residualSums_[bin] * factor;
+    const double square = (_residualSquares_[bin] * factor) * factor;
+    // Reassociation can overflow in a residual even when the original product
+    // is representable. Preserve the ordinary path in such cases.
+    if( not std::isfinite(sum) or not std::isfinite(square)
+        or (factor != 0. and square == 0. and sum != 0.) ){ return false; }
+    _lastResult_.histSums[bin] = sum;
+    _lastResult_.histSumSquares[bin] = square;
+  }
+  _lastTiming_.histogramStageSeconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+  return true;
 }
 
 void Backends::CpuBackend::setDiagnosticWeightScheduling(CpuWeightScheduling scheduling_, std::size_t blocksPerThread_) {
