@@ -6,16 +6,14 @@
 #define GUNDAM_GUNDAMAPP_H
 
 
-#include "GundamUtils.h"
 #include "GundamGreetings.h"
+#include "GundamOutputManager.h"
 
 #include "CmdLineParser.h"
 
 #include "TFile.h"
 
 #include <string>
-#include <memory>
-#include <utility>
 
 
 class GundamApp {
@@ -26,20 +24,16 @@ public:
 
   void setCmdLinePtr(const CmdLineParser *cmdLinePtr);
   void setConfigString(const std::string &configString);
-
-  TFile* getOutfilePtr(){ return _outFile_.get(); }
+  GundamOutputManager& getOutputManager(){ return _outputManager_; }
+  TFile* getOutfilePtr(){ return _outputManager_.getFile(); }
 
   void openOutputFile(const std::string& filePath_);
   void writeAppInfo();
 
 private:
-  // parameters
-  std::string _appName_{};
   std::string _configString_{};
   const CmdLineParser* _cmdLinePtr_{nullptr};
-
-  // internals
-  std::unique_ptr<TFile> _outFile_{nullptr};
+  GundamOutputManager _outputManager_;
   GundamGreetings _greeting_{};
 
 };

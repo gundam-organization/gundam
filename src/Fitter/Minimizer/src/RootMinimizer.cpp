@@ -360,13 +360,13 @@ void RootMinimizer::minimize(){
     updateCacheToBestfitPoint();
 
     // export bf point with SIMPLEX
-    if( getOwner().getSaveDir() != nullptr ) {
+    getOwner().getOutputDirectory().write([&](TDirectory* saveDir){
       LogInfo << "Writing " << _minimizerType_ << "/Simplex best fit parameters..." << std::endl;
       GenericToolbox::writeInTFileWithObjTypeExt(
-          GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
+          GenericToolbox::mkdirTFile( saveDir, GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
           TNamed("parameterStateAfterSimplex", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
       );
-    }
+    });
 
     // Transfer the best point only. Simplex errors are not a Migrad covariance
     // or suitable replacements for the configured parameter step sizes.
@@ -411,20 +411,20 @@ void RootMinimizer::minimize(){
   updateBestfitCovCache();
 
   // export bf point
-  if( getOwner().getSaveDir() != nullptr ) {
+  getOwner().getOutputDirectory().write([&](TDirectory* saveDir){
     LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " best fit parameters..." << std::endl;
     GenericToolbox::writeInTFileWithObjTypeExt(
-        GenericToolbox::mkdirTFile( getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
+        GenericToolbox::mkdirTFile( saveDir, GenericToolbox::joinPath("postFit", _minimizerAlgo_) ),
         TNamed("parameterStateAfterMinimize", GenericToolbox::Json::toReadableString( getModelPropagator().getParametersManager().exportParameterInjectorConfig() ).c_str() )
     );
 
     if( getMonitor().historyTree != nullptr ){
       LogInfo << "Saving LLH history..." << std::endl;
-      GenericToolbox::writeInTFileWithObjTypeExt(getOwner().getSaveDir(), getMonitor().historyTree.get());
+      GenericToolbox::writeInTFileWithObjTypeExt(saveDir, getMonitor().historyTree.get());
     }
 
-    if( gradientDescentMonitor.isEnabled ){ saveGradientSteps(); }
-  }
+    if( gradientDescentMonitor.isEnabled ){ saveGradientSteps(saveDir); }
+  });
 
   if( _fitHasConverged_ ){ LogInfo << "Minimization has converged!" << std::endl; }
   else{ LogError << "Minimization did not converged." << std::endl; }
@@ -432,7 +432,7 @@ void RootMinimizer::minimize(){
   LogInfo << "Post-fit event-rates:" << std::endl;
   LogInfo << getLikelihoodInterface().getSampleBreakdownTable() << std::endl;
 
-  if( getOwner().getSaveDir() != nullptr ) {
+  getOwner().getOutputDirectory().write([&](TDirectory* saveDir){
     LogInfo << "Writing convergence stats..." << std::endl;
     int toyIndex = getModelPropagator().getIThrow();
     int nIterations = postfitCache.nIterations;
@@ -517,13 +517,13 @@ void RootMinimizer::minimize(){
     }
 
     bestFitStats->Fill();
-    GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit")->WriteObject(bestFitStats.get(), bestFitStats->GetName());
+    GenericToolbox::mkdirTFile(saveDir, "postFit")->WriteObject(bestFitStats.get(), bestFitStats->GetName());
 
     LogInfo << "Writing " << _minimizerType_ << "/" << _minimizerAlgo_ << " post-fit errors" << std::endl;
-    this->writePostFitData(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
-    GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
+    this->writePostFitData(GenericToolbox::mkdirTFile(saveDir, GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
+    GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(saveDir, GenericToolbox::joinPath("postFit", _minimizerAlgo_)));
 
-  }
+  });
 
   if( _fitHasConverged_ ){ setMinimizerStatus(0); }
   else{ setMinimizerStatus(postfitCache.status); }
@@ -627,7 +627,7 @@ void RootMinimizer::calcErrors(){
       LogInfo << getMonitor().convergenceMonitor.generateMonitorString(); // lasting printout
     }
 
-    if( getOwner().getSaveDir() != nullptr ) {
+    getOwner().getOutputDirectory().write([&](TDirectory* saveDir){
       int covStatus = postfitCache.covarianceStatus;
       int hesseStatusCode = postfitCache.status;
 
@@ -640,12 +640,12 @@ void RootMinimizer::calcErrors(){
       hesseStats->Branch("errorTimeInSec", &errorTimeInSec);
 
       hesseStats->Fill();
-      GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse")->WriteObject(hesseStats.get(), hesseStats->GetName());
+      GenericToolbox::mkdirTFile(saveDir, "postFit/Hesse")->WriteObject(hesseStats.get(), hesseStats->GetName());
 
       LogInfo << "Writing HESSE post-fit errors" << std::endl;
-      this->writePostFitData(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
-      GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "postFit/Hesse"));
-    }
+      this->writePostFitData(GenericToolbox::mkdirTFile(saveDir, "postFit/Hesse"));
+      GenericToolbox::triggerTFileWrite(GenericToolbox::mkdirTFile(saveDir, "postFit/Hesse"));
+    });
   }
   else{
     LogError << GET_VAR_NAME_VALUE(_errorAlgo_) << " not implemented." << std::endl;
@@ -1703,7 +1703,7 @@ void RootMinimizer::updateBestfitCovCache(){
       << postfitCache.covarianceStatus
   );
 }
-void RootMinimizer::saveGradientSteps(){
+void RootMinimizer::saveGradientSteps(TDirectory* saveDir){
 
   if( GundamGlobals::isLightOutputMode() ){
     LogAlert << "Skipping saveGradientSteps as light output mode is fired." << std::endl;
@@ -1739,7 +1739,7 @@ void RootMinimizer::saveGradientSteps(){
     getLikelihoodInterface().propagateAndEvalLikelihood();
 
     if( not GundamGlobals::isLightOutputMode() and gradientDescentMonitor.writeGradientSteps ) {
-      auto outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), Form("fit/gradient/steps/step_%i", int(iGradStep)));
+      auto outDir = GenericToolbox::mkdirTFile(saveDir, Form("fit/gradient/steps/step_%i", int(iGradStep)));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("parState", GenericToolbox::Json::toReadableString(gradientDescentMonitor.stepPointList[iGradStep].parState).c_str()));
       GenericToolbox::writeInTFileWithObjTypeExt(outDir, TNamed("llhState", getLikelihoodInterface().getSummary().c_str()));
     }
@@ -1769,12 +1769,12 @@ void RootMinimizer::saveGradientSteps(){
     for( auto& gEntry : globalGraphList ){
       gEntry.scanDataPtr->title = "Minimizer path to minimum";
       if( gradientDescentMonitor.writeDescentPaths ) {
-        ParameterScanner::writeGraphEntry(gEntry, GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/global") );
+        ParameterScanner::writeGraphEntry(gEntry, GenericToolbox::mkdirTFile(saveDir, "fit/gradient/global") );
       }
     }
 
     if( gradientDescentMonitor.writeDescentPathsRelative ) {
-      auto* outDir = GenericToolbox::mkdirTFile(getOwner().getSaveDir(), "fit/gradient/globalRelative");
+      auto* outDir = GenericToolbox::mkdirTFile(saveDir, "fit/gradient/globalRelative");
       for( auto& gEntry : globalGraphList ){
         if( gEntry.graph.GetN() == 0 ){ continue; }
 

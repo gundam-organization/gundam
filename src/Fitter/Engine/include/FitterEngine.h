@@ -10,6 +10,7 @@
 #include "LikelihoodInterface.h"
 #include "MinimizerBase.h"
 #include "ParameterScanner.h"
+#include "GundamOutputManager.h"
 
 
 #include "GenericToolbox.Utils.h"
@@ -22,8 +23,6 @@
 #include <memory>
 #include <utility>
 
-
-class GundamApp;
 
 class FitterEngine : public JsonBaseClass {
 
@@ -47,14 +46,14 @@ protected:
 
 public:
   FitterEngine() = default;
-  explicit FitterEngine(TDirectory *saveDir_) : _saveDir_(saveDir_) {};
+  explicit FitterEngine(TDirectory* saveDir_) : _outputDirectory_(saveDir_) {}
 
   // static
   static void setRandomSeed(int seed_){ gRandom->SetSeed(seed_); }
 
   // Setters
-  void setSaveDir(TDirectory *saveDir){ _saveDir_ = saveDir; }
-  void setSaveDir(GundamApp& app_, const std::string& subFolder_);
+  void setSaveDir(TDirectory* saveDir_){ setOutput(GundamOutputTDirectory(saveDir_)); }
+  void setOutput(GundamOutputTDirectory directory_){ _outputDirectory_ = std::move(directory_); }
   void setIsDryRun(bool isDryRun_){ _isDryRun_ = isDryRun_; }
   void setEnablePca(bool enablePca_){ _enablePca_ = enablePca_; }
   void setEnablePreFitScan(bool enablePreFitScan){ _enablePreFitScan_ = enablePreFitScan; }
@@ -82,8 +81,8 @@ public:
   MinimizerBase& getMinimizer(){ return *_minimizer_; }
   LikelihoodInterface& getLikelihoodInterface(){ return _likelihoodInterface_; }
   ParameterScanner& getParameterScanner(){ return _parameterScanner_; }
-  TDirectory* getSaveDir(){ return _saveDir_; }
-  GenericToolbox::TFilePath getTFilePath(){ return GenericToolbox::TFilePath(_saveDir_); }
+  const GundamOutputTDirectory& getOutputDirectory() const{ return _outputDirectory_; }
+  GenericToolbox::TFilePath getTFilePath(){ return GenericToolbox::TFilePath(_outputDirectory_.getDirectDirectory()); }
   bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
   bool& getDoAllParamVariations(){ return _doAllParamVariations_; }
 
@@ -93,6 +92,7 @@ public:
   // Core
   void evalGradient(ParameterGradient& gradient_);
   void fit();
+  void evaluateLikelihood();
   void runPcaCheck();
   void rescaleParametersStepSize();
   bool checkNumericalAccuracy();
@@ -123,7 +123,7 @@ private:
   PcaMethod _pcaMethod_{PcaMethod::DeltaChi2Threshold};
 
   // Internals
-  TDirectory* _saveDir_{nullptr};
+  GundamOutputTDirectory _outputDirectory_;
   LikelihoodInterface _likelihoodInterface_{};
   ParameterScanner _parameterScanner_{};
   MinimizerType _minimizerType_{};

@@ -25,6 +25,14 @@ size_t EventDialCache::getCacheMemorySize() const{
   }
   for( const auto& entry : _cache_ ){
     bytes += entry.dialResponseCacheList.capacity() * sizeof(DialResponseCache);
+    if( entry.variableResponses == nullptr ){ continue; }
+    const auto& responses = *entry.variableResponses;
+    bytes += sizeof(EventVariableResponses)
+        + responses.dialIndices.capacity() * sizeof(std::size_t)
+        + responses.targets.capacity() * sizeof(VariableResponseCache);
+    for( const auto& target : responses.targets ){
+      bytes += (target.multiplyDials.capacity() + target.addDials.capacity()) * sizeof(std::size_t);
+    }
   }
   return bytes;
 }
@@ -154,6 +162,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
         return interface;
       };
 
+      std::shared_ptr<EventVariableResponses> variableResponses;
       // filling up the dial references
       for( auto& dialIndex : indexCache.dials ){
         if( dialIndex.collectionIndex == size_t(-1) or dialIndex.interfaceIndex == size_t(-1) ){ continue; }
@@ -184,10 +193,12 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
         const auto& collection = dialCollectionList_.at(dialIndex.collectionIndex);
         if( collection.getApplyToVariable().empty() ){ continue; }
         _hasVariableResponses_ = true;
-        cacheEntry.dialResponseCacheList.back().appliesToVariable = true;
+        if( variableResponses == nullptr ){ variableResponses = std::make_shared<EventVariableResponses>(); }
+        const auto responseIndex = cacheEntry.dialResponseCacheList.size() - 1;
+        variableResponses->dialIndices.push_back(responseIndex);
         auto& variables = cacheEntry.event->getVariables();
         int variableIndex = variables.findVarIndex(collection.getApplyToVariable());
-        auto& responses = cacheEntry.variableResponseCacheList;
+        auto& responses = variableResponses->targets;
         auto target = std::find_if(responses.begin(), responses.end(), [&](const VariableResponseCache& response_){
           return response_.variableIndex == variableIndex;
         });
@@ -197,7 +208,6 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
           target->variableIndex = variableIndex;
           target->referenceValue = variables.getVarList()[variableIndex].getVarAsDouble();
         }
-        auto responseIndex = cacheEntry.dialResponseCacheList.size() - 1;
         auto mode = collection.getVariableResponseMode();
         if( mode == DialCollection::VariableResponseMode::Multiply ){ target->multiplyDials.push_back(responseIndex); }
         else if( mode == DialCollection::VariableResponseMode::Add ){ target->addDials.push_back(responseIndex); }
@@ -208,6 +218,7 @@ void EventDialCache::buildReferenceCache( SampleSet& sampleSet_, std::vector<Dia
           target->overrideDial = responseIndex;
         }
       }
+      cacheEntry.variableResponses = std::move(variableResponses);
       // Release consumed index buffers while constructing the final cache.
       std::vector<DialIndexCacheEntry>().swap(indexCache.dials);
     }
@@ -257,11 +268,18 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
   // this allows to perform capping of the value
   double tempReweight{1};
 
-  // calculate the dial responses
-  for( auto& dialResponseCache : entry_.dialResponseCacheList ){
-    if( dialResponseCache.appliesToVariable ){ continue; }
-    tempReweight *= dialResponseCache.getResponse();
+  // Evaluate weight dials in their original order, skipping variable dials.
+  auto current = entry_.dialResponseCacheList.begin();
+  const auto multiplyUntil = [&](auto end_){
+    for( ; current != end_; ++current ){ tempReweight *= current->getResponse(); }
+  };
+  if( entry_.variableResponses != nullptr ){
+    for( auto index : entry_.variableResponses->dialIndices ){
+      multiplyUntil(entry_.dialResponseCacheList.begin() + index);
+      ++current;
+    }
   }
+  multiplyUntil(entry_.dialResponseCacheList.end());
 
   // applying event weight cap if defined
   _globalEventReweightCap_.process( tempReweight );
@@ -271,7 +289,8 @@ void EventDialCache::reweightEntry( EventDialCache::CacheEntry& entry_){
 }
 
 void EventDialCache::applyVariableResponses(CacheEntry& entry_){
-  for( auto& target : entry_.variableResponseCacheList ){
+  if( entry_.variableResponses == nullptr ){ return; }
+  for( const auto& target : entry_.variableResponses->targets ){
     double value = target.overrideDial == std::size_t(-1) ? target.referenceValue
         : entry_.dialResponseCacheList[target.overrideDial].getResponse();
     for( auto index : target.multiplyDials ){ value *= entry_.dialResponseCacheList[index].getResponse(); }

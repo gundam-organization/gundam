@@ -1,0 +1,3 @@
+#pragma once
+
+inline constexpr char showLogsSource[] = R"GUNDAM_MACRO(@SHOW_LOGS_SOURCE@)GUNDAM_MACRO";
