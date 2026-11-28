@@ -21,6 +21,7 @@ backendManagerConfig:
       deviceIndex: 0
       propagationMode: cachedResponses
       weightLayout: warpInterleaved
+      enableBinFactorization: true
 ```
 
 `propagationMode: cachedResponses` et `weightLayout: warpInterleaved` sont
@@ -33,12 +34,25 @@ utiliser zéro. Les modes suivent la même convention que MPS :
 
 | Mode | Réponses des dials | Poids et histogrammes |
 |---|---|---|
-| `cachedResponses` (défaut) | Une réponse par dial unique, conservée sur GPU ; recalcul si l'entrée transformée change. | Recalculés à chaque propagation. |
+| `cachedResponses` (default) | One cached response per unique dial, updated when its inputs change. | Unchanged predictions are reused. Eligible factor-only updates reuse residual histograms. |
 | `recomputeResponses` | Tous les dials uniques sont réévalués à chaque propagation. | Recalculés à chaque propagation. |
 
 Les deux modes utilisent le même exécuteur en double précision native. Le
 monitor indique `CUDA/cachedResponses` ou `CUDA/recomputeResponses`. Aucun
 repli vers le calcul CPU n'est effectué.
+
+### Full bin factorization
+
+CUDA shares the CPU and MPS logic for detecting dials common to every event
+in a fixed bin. A bin may have multiple factors. If only those factors change,
+CUDA keeps the residual histograms on the GPU and multiplies the sum by the
+product of the factors and the sum of squared weights by its square. Event
+weight output and analytic gradients use the full event products.
+
+Factorization is enabled by default with `cachedResponses` and
+`reusePrediction: true`. It is available for fixed binning without observable
+responses or a reweight cap. Set `enableBinFactorization: false` to compare
+against the ordinary event-weight and histogram path.
 
 ## Chaîne de calcul
 

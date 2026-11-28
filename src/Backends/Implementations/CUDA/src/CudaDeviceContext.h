@@ -36,10 +36,12 @@ namespace Backends {
                         std::vector<double>& outsideSums_, std::vector<double>& outsideSquares_);
     std::size_t readEventState(EventState& state_);
     void invalidate();
-    [[nodiscard]] BackendDeviceView getDeviceView() const;
+    [[nodiscard]] BackendDeviceView getDeviceView();
     [[nodiscard]] BackendResourceUsage getResourceUsage() const;
 
   private:
+    void propagateImpl(const PropagationInputs& inputs_, bool recomputeResponses_, bool reusePrediction_,
+                       BackendTimingSummary& timing_, bool factorBins_);
     struct Impl;
     std::unique_ptr<Impl> _impl_{};
   };

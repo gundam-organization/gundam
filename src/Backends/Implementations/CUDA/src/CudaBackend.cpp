@@ -71,13 +71,14 @@ void Backends::CudaBackend::configureImpl() {
   _deviceIndex_ = 0;
   _likelihoodBlockSize_ = 0;
   _reusePrediction_ = true;
+  _enableBinFactorization_ = true;
   _compactDials_ = true;
   _eventWeightMode_ = CudaEventWeightMode::sparseGroups;
   _eventWeightSparseFraction_ = 0.25;
   _propagationMode_ = CudaPropagationMode::cachedResponses;
   _weightLayout_ = CudaWeightLayout::warpInterleaved;
   _config_.clearFields();
-  _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}, {"weightLayout"}, {"likelihoodBlockSize"}, {"reusePrediction"}, {"compactDials"}, {"eventWeightMode"}, {"eventWeightSparseFraction"}});
+  _config_.defineFields({{"name"}, {"deviceIndex"}, {"propagationMode"}, {"weightLayout"}, {"likelihoodBlockSize"}, {"reusePrediction"}, {"compactDials"}, {"eventWeightMode"}, {"eventWeightSparseFraction"}, {"enableBinFactorization"}});
   _config_.checkConfiguration();
   // fillValue tolerates conversion errors; explicit device/mode selections must
   // not silently fall back to defaults when they are malformed.
@@ -97,6 +98,9 @@ void Backends::CudaBackend::configureImpl() {
   }
   if( const auto* reuse = _config_.getJsonEntry("reusePrediction") ){
     if( not reuse->is_boolean() ){ throw std::runtime_error("CudaBackend: reusePrediction must be a boolean."); }
+  }
+  if( const auto* factor = _config_.getJsonEntry("enableBinFactorization") ){
+    if( not factor->is_boolean() ){ throw std::runtime_error("CudaBackend: enableBinFactorization must be a boolean."); }
   }
   if( const auto* compact = _config_.getJsonEntry("compactDials") ){
     if( not compact->is_boolean() ){ throw std::runtime_error("CudaBackend: compactDials must be a boolean."); }
@@ -119,6 +123,7 @@ void Backends::CudaBackend::configureImpl() {
   _config_.fillValue(_compactDials_, "compactDials");
   _config_.fillValue(_likelihoodBlockSize_, "likelihoodBlockSize");
   _config_.fillValue(_reusePrediction_, "reusePrediction");
+  _config_.fillValue(_enableBinFactorization_, "enableBinFactorization");
   _config_.fillValue(_deviceIndex_, "deviceIndex");
   _config_.fillEnum(_propagationMode_, "propagationMode");
   if( const auto* layout = _config_.getJsonEntry("weightLayout") ){
@@ -185,7 +190,9 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
   if( not engineView_ ){ throw std::runtime_error("CudaBackend requires a model."); }
   const auto start = Clock::now();
   LogInfo << "Packing CUDA event model and execution indices on CPU..." << std::endl;
-  const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved, _compactDials_, _eventWeightMode_ != CudaEventWeightMode::dense);
+  const bool factorBins = _enableBinFactorization_ and _reusePrediction_ and _propagationMode_ == CudaPropagationMode::cachedResponses;
+  const auto packed = makeCudaWeightModel(*engineView_, _weightLayout_ == CudaWeightLayout::warpInterleaved,
+      _compactDials_, _eventWeightMode_ != CudaEventWeightMode::dense, factorBins);
   _impl_->buildTiming.buildCompatibilityScanSeconds = elapsed(start);
   // Smaller blocks expose more independent work for short binned likelihoods.
   // This is a starting policy, not a V100 performance claim; benchmark overrides
@@ -218,6 +225,11 @@ void Backends::CudaBackend::buildShared(std::shared_ptr<const EngineView> engine
       {"likelihoodExecution", hasPortableLikelihood(getEngineView().likelihood) ? "device" : "host"},
       {"requestedLikelihoodBlockSize", _likelihoodBlockSize_}, {"likelihoodBlockSize", likelihoodBlockSize},
       {"likelihoodReduction", "parallel256"}, {"reusePrediction", _reusePrediction_},
+      {"binFactorizationEnabled", not packed.binFactors.dials.empty()},
+      {"factoredBinCount", packed.binFactorDependencies.factoredBins},
+      {"multiFactorBinCount", packed.binFactorDependencies.multiFactorBins},
+      {"factoredParameterCount", packed.binFactorDependencies.reusableParameters},
+      {"factoredExternalBlockCount", packed.binFactorDependencies.reusableExternalBlocks},
       {"eventWeightMode", _eventWeightMode_.toString()},
       {"eventWeightSparseFraction", _eventWeightSparseFraction_},
       {"eventUpdateIndexAvailable", packed.eventUpdateIndex.available()},
@@ -492,7 +504,8 @@ const std::vector<double>& Backends::CudaBackend::getOutsideSumSquaresHostView(c
 Backends::BackendDeviceView Backends::CudaBackend::getDeviceView(const PropagationToken& token_) const {
   requireToken(token_);
 #ifdef GUNDAM_USING_CUDA
-  return _impl_->context->getDeviceView();
+  try{ return _impl_->context->getDeviceView(); }
+  catch(...){ invalidateResult(); throw; }
 #else
   return {};
 #endif

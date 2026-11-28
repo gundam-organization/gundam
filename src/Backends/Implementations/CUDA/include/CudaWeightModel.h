@@ -2,6 +2,7 @@
 #define GUNDAM_CUDA_WEIGHT_MODEL_H
 
 #include "EngineView.h"
+#include "BinFactors.h"
 #include "CudaEventUpdates.h"
 #include "NativeDialProgramModel.h"
 #include "Semantics/BackendSemanticsQualifiers.h"
@@ -112,6 +113,9 @@ namespace Backends {
     std::size_t surfaceOffset{0};
     std::vector<std::size_t> binOffsets{};
     std::vector<std::size_t> binEvents{};
+    BinFactors binFactors{};
+    BinFactorDependencies binFactorDependencies{};
+    std::vector<std::uint32_t> factoredDialMask{};
     bool hasEventState{false};
     bool hasSmoothedBinning{false};
     std::vector<EventView> stateEvents{};
@@ -130,7 +134,7 @@ namespace Backends {
 
   // Reject unsupported features and malformed layouts before allocating CUDA
   // buffers. This also makes model validation testable without a toolkit.
-  [[nodiscard]] CudaWeightModel makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_ = false, bool compactDials_ = false, bool indexEventUpdates_ = false);
+  [[nodiscard]] CudaWeightModel makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_ = false, bool compactDials_ = false, bool indexEventUpdates_ = false, bool factorBins_ = false);
 
   inline constexpr std::size_t cudaResponseBlockSize = 256;
   struct CudaResponseUpdate {

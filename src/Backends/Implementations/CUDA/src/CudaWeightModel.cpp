@@ -103,7 +103,7 @@ namespace {
   }
 }
 
-Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_, bool compactDials_, bool indexEventUpdates_) {
+Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_, bool interleaveEventDials_, bool compactDials_, bool indexEventUpdates_, bool factorBins_) {
   static_assert(std::is_trivially_copyable<CudaFormulaProgram>::value);
   static_assert(std::is_trivially_copyable<FormulaInstruction>::value);
   static_assert(std::is_trivially_copyable<FormulaInput>::value);
@@ -387,6 +387,23 @@ Backends::CudaWeightModel Backends::makeCudaWeightModel(const EngineView& view_,
     if( event.globalBinIndex >= 0 ){ ++out.binOffsets[std::size_t(event.globalBinIndex) + 1]; }
   }
   buildHistogramEventIndex(model.events, out.binOffsets, out.binEvents);
+  if( factorBins_ and not out.hasEventState ){
+    out.binFactors = findBinFactors(model, model.totalBins, [](const EventView& event_){
+      return event_.globalBinIndex < 0 ? std::size_t(-1) : std::size_t(event_.globalBinIndex);
+    }, [&](std::uint32_t dial_){ return canFactorWeightDial(model.dials[dial_]); });
+    if( not out.binFactors.dials.empty() ){
+      out.binFactorDependencies = classifyBinFactorDependencies(model, out.binFactors, [](std::uint32_t, bool){ return true; });
+      const auto& dependencies = out.binFactorDependencies;
+      if( dependencies.reusableParameters == 0 and dependencies.reusableExternalBlocks == 0 ){ out.binFactors = {}; }
+      else{
+        out.factoredDialMask.resize(model.dials.size() / 32 + (model.dials.size() % 32 != 0));
+        for( auto& dial : out.binFactors.dials ){
+          if( not dialSlots.empty() ){ dial = dialSlots[dial]; }
+          out.factoredDialMask[dial / 32] |= std::uint32_t(1) << (dial % 32);
+        }
+      }
+    }
+  }
   for( const auto& sample : view_.likelihood.samples ){
     require(sample.binOffset >= 0 and std::size_t(sample.binOffset) <= std::size_t(model.totalBins)
             and sample.dataSums.size() <= std::size_t(model.totalBins) - std::size_t(sample.binOffset),

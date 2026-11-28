@@ -30,6 +30,7 @@
 
 namespace {
   constexpr unsigned int blockSize = Backends::cudaResponseBlockSize;
+  constexpr int invalidBinFactorization = 2;
 
   void checkCuda(cudaError_t status_, const char* operation_) {
     if( status_ != cudaSuccess ){
@@ -136,6 +137,10 @@ namespace {
     double eventWeightSparseFraction{0.25};
     DeviceBuffer<Backends::BackendDialInputDescriptor> inputs;
     DeviceBuffer<double> payloads, parameters, responses, previousInputs, previousSecondInputs, weights, sums, sumSquares;
+    DeviceBuffer<double> fullWeights, residualSums, residualSquares;
+    DeviceBuffer<std::uint32_t> binFactors, binFactorOffsets, factoredDialMask;
+    Backends::BinFactorDependencies binFactorDependencies;
+    bool predictionFactored{false}, fullWeightsValid{false};
     DeviceBuffer<std::uint32_t> dialIndices, parameterDialIndices;
     DeviceBuffer<Backends::CudaResponseUpdate> responseUpdates, externalResponseUpdates;
     DeviceBuffer<Backends::BackendTableTerm> tableTerms;
@@ -522,11 +527,11 @@ namespace {
     }
   }
 
-  template<bool interleaved_, bool selected_ = false>
+  template<bool interleaved_, bool selected_, bool factored_>
   __global__ void reweightEvents(const Backends::BackendEventWeightDescriptor* events_, std::size_t count_,
                                  const std::uint32_t* indices_, const double* responses_, double* weights_,
                                  bool capped_, double cap_, int* error_,
-                                 const std::uint32_t* groups_, std::size_t groupCount_) {
+                                 const std::uint32_t* groups_, std::size_t groupCount_, const std::uint32_t* factorMask_) {
     const auto workCount = selected_ ? groupCount_ * 32 : count_;
     for( std::size_t slot = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
          slot < workCount; slot += std::size_t(blockDim.x) * gridDim.x ){
@@ -535,11 +540,72 @@ namespace {
       const auto& event = events_[i];
       double response = 1.;
       for( std::size_t j = 0; j < event.dialCount; ++j ){
-        response *= responses_[indices_[event.firstDial + j * (interleaved_ ? 32 : 1)]];
+        const auto dial = indices_[event.firstDial + j * (interleaved_ ? 32 : 1)];
+        if constexpr( factored_ ){
+          if( factorMask_[dial / 32] & (std::uint32_t(1) << (dial % 32)) ){ continue; }
+        }
+        response *= responses_[dial];
       }
       if( capped_ and response > cap_ ){ response = cap_; }
       weights_[i] = event.baseWeight * response;
-      if( not ::isfinite(weights_[i]) ){ atomicExch(error_, 1); }
+      if( not ::isfinite(weights_[i]) ){ atomicMax(error_, factored_ ? invalidBinFactorization : 1); }
+    }
+  }
+
+  template<bool factored_, bool interleaved_>
+  void launchEventWeights(const WeightBuffers& b_, double* weights_, cudaStream_t stream_,
+                          const std::uint32_t* groups_ = nullptr, std::size_t groupCount_ = 0) {
+    if( groups_ ){
+      if( groupCount_ == 0 ){ return; }
+      reweightEvents<interleaved_, true, factored_><<<gridSize(groupCount_ * 32), blockSize, 0, stream_>>>(
+          b_.events.data, b_.events.size, b_.dialIndices.data, b_.responses.data, weights_,
+          b_.hasReweightCap, b_.maxReweight, b_.error.data, groups_, groupCount_, b_.factoredDialMask.data);
+    }
+    else if( b_.events.size ){
+      reweightEvents<interleaved_, false, factored_><<<gridSize(b_.events.size), blockSize, 0, stream_>>>(
+          b_.events.data, b_.events.size, b_.dialIndices.data, b_.responses.data, weights_,
+          b_.hasReweightCap, b_.maxReweight, b_.error.data, nullptr, 0, b_.factoredDialMask.data);
+    }
+    checkCuda(cudaGetLastError(), "event weight kernel launch");
+  }
+
+  // The resident residual weights remain available for sparse updates even
+  // after a caller requests the full event weights.
+  const DeviceBuffer<double>& materializeWeights(WeightBuffers& b_, cudaStream_t stream_) {
+    if( not b_.predictionFactored ){ return b_.weights; }
+    if( not b_.fullWeightsValid and b_.events.size ){
+      b_.fullWeights.ensureCapacity(b_.events.size);
+      checkCuda(cudaMemsetAsync(b_.error.data, 0, sizeof(int), stream_), "reset event weight error");
+      if( b_.interleavedEventDials ){ launchEventWeights<false, true>(b_, b_.fullWeights.data, stream_); }
+      else{ launchEventWeights<false, false>(b_, b_.fullWeights.data, stream_); }
+      int error = 0;
+      checkCuda(cudaMemcpyAsync(&error, b_.error.data, sizeof(int), cudaMemcpyDeviceToHost, stream_), "event weight validation");
+      checkCuda(cudaStreamSynchronize(stream_), "full event weights completion");
+      if( error ){ throw std::runtime_error("CudaBackend: nonfinite event weight."); }
+      b_.fullWeightsValid = true;
+    }
+    return b_.fullWeights;
+  }
+
+  __global__ void applyBinFactors(std::size_t count_, const std::uint32_t* offsets_, const std::uint32_t* dials_,
+      const double* responses_, const double* residualSums_, const double* residualSquares_,
+      double* sums_, double* squares_, int* error_) {
+    for( std::size_t bin = std::size_t(blockIdx.x) * blockDim.x + threadIdx.x;
+         bin < count_; bin += std::size_t(blockDim.x) * gridDim.x ){
+      double factor = 1.;
+      for( auto i = offsets_[bin]; i < offsets_[bin + 1]; ++i ){
+        const double response = responses_[dials_[i]];
+        const double product = factor * response;
+        if( product == 0. and factor != 0. and response != 0. ){ atomicMax(error_, invalidBinFactorization); }
+        factor = product;
+      }
+      const double sum = residualSums_[bin] * factor;
+      const double square = (residualSquares_[bin] * factor) * factor;
+      if( not ::isfinite(sum) or not ::isfinite(square) or (factor != 0. and square == 0. and sum != 0.) ){
+        atomicMax(error_, invalidBinFactorization);
+      }
+      sums_[bin] = sum;
+      squares_[bin] = square;
     }
   }
 
@@ -581,7 +647,8 @@ namespace {
   template<bool fractional_>
   __global__ void reduceHistograms(const std::size_t* offsets_, const std::size_t* events_,
                                    std::size_t bins_, const double* weights_, double* sums_,
-                                   double* squares_, int* error_, const Backends::CudaBinContribution* contributions_) {
+                                   double* squares_, int* error_, const Backends::CudaBinContribution* contributions_,
+                                   int errorCode_) {
     __shared__ double sum[blockSize];
     __shared__ double square[blockSize];
     // No floating-point atomics: each bin has one deterministic reduction tree.
@@ -610,7 +677,7 @@ namespace {
       if( threadIdx.x == 0 ){
         sums_[bin] = sum[0];
         squares_[bin] = square[0];
-        if( not ::isfinite(sum[0]) or not ::isfinite(square[0]) ){ atomicExch(error_, 1); }
+        if( not ::isfinite(sum[0]) or not ::isfinite(square[0]) ){ atomicMax(error_, errorCode_); }
       }
       __syncthreads();
     }
@@ -794,6 +861,14 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
     b.weights.allocate(model_.events.size());
     b.sums.allocate(histogramCount);
     b.sumSquares.allocate(b.sums.size);
+    if( not model_.binFactors.dials.empty() ){
+      b.binFactorDependencies = model_.binFactorDependencies;
+      b.binFactors.upload(model_.binFactors.dials, _impl_->stream);
+      b.binFactorOffsets.upload(model_.binFactors.offsets, _impl_->stream);
+      b.factoredDialMask.upload(model_.factoredDialMask, _impl_->stream);
+      b.residualSums.allocate(histogramCount);
+      b.residualSquares.allocate(histogramCount);
+    }
     b.error.allocate(1);
     const auto likelihoodBins = packLikelihood<double>(likelihood_, original_.totalBins);
     b.likelihoodBins.upload(likelihoodBins, _impl_->stream);
@@ -815,6 +890,12 @@ void Backends::CudaDeviceContext::build(const CudaWeightModel& model_, const Pro
 
 void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bool recomputeResponses_,
                                            bool reusePrediction_, BackendTimingSummary& timing_) {
+  const bool factorBins = _impl_->buffers and _impl_->buffers->binFactors.size != 0;
+  propagateImpl(inputs_, recomputeResponses_, reusePrediction_, timing_, factorBins);
+}
+
+void Backends::CudaDeviceContext::propagateImpl(const PropagationInputs& inputs_, bool recomputeResponses_,
+                                              bool reusePrediction_, BackendTimingSummary& timing_, bool factorBins_) {
   DeviceScope scope(_impl_->deviceIndex);
   if( not _impl_->buffers ){ throw std::runtime_error("CudaBackend device model has not been built."); }
   auto& b = *_impl_->buffers;
@@ -844,14 +925,23 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     const bool sparse = reuse and (b.updatePlan.dialCount <= (b.dialCount - b.externalDialCount) / 2
         or (directPrograms and b.updatePlan.dialCount < b.dialCount - b.externalDialCount));
     const auto candidates = sparse ? b.updatePlan.dialCount : b.dialCount - b.externalDialCount;
-    // Conservative invalidation: any selected response, observable/binning
-    // update or failed/unprimed cache forces fresh weights and histograms.
-    const bool updatePrediction = not reusePrediction_ or not reuse or updateState
+    const bool residualsValid = reuse and b.predictionFactored and not inputs_.forceBinningUpdate;
+    const bool updatePrediction = not reusePrediction_ or not reuse or updateState or (factorBins_ and not residualsValid)
         or inputs_.forceBinningUpdate or candidates != 0 or b.externalUpdatePlan.dialCount != 0;
+    bool rebuildHistograms = updatePrediction;
+    if( factorBins_ and residualsValid and updatePrediction ){
+      const auto& dependencies = b.binFactorDependencies;
+      const bool changedParameter = std::any_of(dependencies.weightParameters.begin(), dependencies.weightParameters.end(),
+          [&](std::size_t i_){ return dependencies.residualParameters[i_] and b.previousParameters[i_] != parameters_[i_]; });
+      const bool changedBlock = std::any_of(dependencies.weightExternalBlocks.begin(), dependencies.weightExternalBlocks.end(),
+          [&](std::size_t i_){ return dependencies.residualExternalBlocks[i_] and b.externalGenerations[i_] != b.currentExternalGenerations[i_]; });
+      rebuildHistograms = changedParameter or changedBlock;
+    }
     if( updatePrediction and b.gradient ){ b.gradient->resultValid = false; }
     bool sparseEvents = false;
     const auto selectionStart = std::chrono::steady_clock::now();
     if( b.eventUpdateIndex.available() and reuse and reusePrediction_ and not updateState
+        and (not factorBins_ or (residualsValid and rebuildHistograms))
         and not inputs_.forceBinningUpdate and (b.eventWeightMode == 1 or sparse) ){
       const auto maxGroups = b.eventWeightMode == 1 ? b.eventUpdateIndex.groupCount
           : std::size_t(b.eventWeightSparseFraction * double(b.eventUpdateIndex.groupCount));
@@ -867,7 +957,7 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     if( b.eventUpdateIndex.available() ){
       timing_.eventSelectionSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - selectionStart).count();
     }
-    if( updatePrediction ){
+    if( rebuildHistograms ){
       timing_.eventWeightsRecomputedCount = b.events.size;
       if( sparseEvents ){
         timing_.sparseEventWeightsUsed = 1;
@@ -882,7 +972,7 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     timing_.cachePreparationSeconds = std::chrono::duration<double>(
         std::chrono::steady_clock::now() - preparationStart).count();
     record(0);
-    if( sparseEvents and updatePrediction and not b.eventSelectionCache.result().groups.empty() ){
+    if( sparseEvents and rebuildHistograms and not b.eventSelectionCache.result().groups.empty() ){
       checkCuda(cudaMemcpyAsync(b.selectedEventGroups.data, b.eventSelectionCache.result().groups.data(),
           b.eventSelectionCache.result().groups.size() * sizeof(std::uint32_t), cudaMemcpyHostToDevice, stream), "selected event groups upload");
     }
@@ -969,25 +1059,16 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       checkCuda(cudaGetLastError(), "external/table response kernel launch");
     }
     record(2);
-    if( updatePrediction and b.events.size ){
-      auto launchWeights = [&](auto interleavedTag_){
-        constexpr bool interleaved = decltype(interleavedTag_)::value;
-        if( sparseEvents ){
-          if( not b.eventSelectionCache.result().groups.empty() ){
-            reweightEvents<interleaved, true><<<gridSize(b.eventSelectionCache.result().groups.size() * 32), blockSize, 0, stream>>>(
-                b.events.data, b.events.size, b.dialIndices.data, b.responses.data, b.weights.data,
-                b.hasReweightCap, b.maxReweight, b.error.data, b.selectedEventGroups.data, b.eventSelectionCache.result().groups.size());
-          }
-        }
-        else{
-          reweightEvents<interleaved><<<gridSize(b.events.size), blockSize, 0, stream>>>(
-              b.events.data, b.events.size, b.dialIndices.data, b.responses.data, b.weights.data,
-              b.hasReweightCap, b.maxReweight, b.error.data, nullptr, 0);
-        }
+    if( rebuildHistograms and b.events.size ){
+      const auto* groups = sparseEvents ? b.selectedEventGroups.data : nullptr;
+      const auto count = sparseEvents ? b.eventSelectionCache.result().groups.size() : 0;
+      auto launchWeights = [&](auto factoredTag_){
+        constexpr bool factored = decltype(factoredTag_)::value;
+        if( b.interleavedEventDials ){ launchEventWeights<factored, true>(b, b.weights.data, stream, groups, count); }
+        else{ launchEventWeights<factored, false>(b, b.weights.data, stream, groups, count); }
       };
-      if( b.interleavedEventDials ){ launchWeights(std::true_type{}); }
+      if( factorBins_ ){ launchWeights(std::true_type{}); }
       else{ launchWeights(std::false_type{}); }
-      checkCuda(cudaGetLastError(), "event weight kernel launch");
     }
     record(3);
     if( updateState ){
@@ -1072,17 +1153,24 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
       checkCuda(cudaGetLastError(), "dynamic histogram index kernel launch");
     }
     record(5);
-    if( updatePrediction and b.sums.size ){
+    if( rebuildHistograms and b.sums.size ){
       const auto blocks = static_cast<unsigned int>(std::min<std::size_t>(b.sums.size, 65535));
       if( b.hasSmoothedBinning ){
         reduceHistograms<true><<<blocks, blockSize, 0, stream>>>(b.binOffsets.data, nullptr,
-            b.sums.size, b.weights.data, b.sums.data, b.sumSquares.data, b.error.data, b.sortedContributions.data);
+            b.sums.size, b.weights.data, b.sums.data, b.sumSquares.data, b.error.data, b.sortedContributions.data, 1);
       }
       else{
         reduceHistograms<false><<<blocks, blockSize, 0, stream>>>(b.binOffsets.data, b.binEvents.data,
-            b.sums.size, b.weights.data, b.sums.data, b.sumSquares.data, b.error.data, nullptr);
+            b.sums.size, b.weights.data, factorBins_ ? b.residualSums.data : b.sums.data,
+            factorBins_ ? b.residualSquares.data : b.sumSquares.data, b.error.data, nullptr, factorBins_ ? invalidBinFactorization : 1);
       }
       checkCuda(cudaGetLastError(), "histogram kernel launch");
+    }
+    if( factorBins_ and updatePrediction ){
+      applyBinFactors<<<gridSize(b.sums.size), blockSize, 0, stream>>>(b.sums.size, b.binFactorOffsets.data,
+          b.binFactors.data, b.responses.data, b.residualSums.data, b.residualSquares.data,
+          b.sums.data, b.sumSquares.data, b.error.data);
+      checkCuda(cudaGetLastError(), "bin factor application kernel launch");
     }
     record(6);
     if( updatePrediction and b.likelihoodBins.size ){
@@ -1102,6 +1190,16 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
                                 cudaMemcpyDeviceToHost, stream), "event state counters readback");
     }
     checkCuda(cudaStreamSynchronize(stream), "propagation completion");
+    if( factorBins_ and error == invalidBinFactorization ){
+      // Reassociation can overflow even when the original event products are
+      // representable. Replay once in their original multiplication order.
+      invalidate();
+      timing_.eventSelectionSeconds = 0.;
+      timing_.eventSelectionCacheHit = timing_.eventWeightCoverageKnown = timing_.eventWeightCandidateCount = 0;
+      timing_.eventWeightGroupCount = timing_.sparseEventWeightsUsed = 0;
+      propagateImpl(inputs_, recomputeResponses_, reusePrediction_, timing_, false);
+      return;
+    }
     if( error ){ throw std::runtime_error("CudaBackend: nonfinite or out-of-range numerical result."); }
     if( updateState ){
       for( std::size_t i = 0; i < b.sampleChanges.size(); ++i ){ b.changedSampleFlags[i] = b.sampleChanges[i] != 0; }
@@ -1121,6 +1219,8 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
     std::copy(parameters_.begin(), parameters_.end(), b.previousParameters.begin());
     b.externalGenerations = b.currentExternalGenerations;
     b.cachePrimed = true;
+    b.predictionFactored = factorBins_;
+    if( updatePrediction ){ b.fullWeightsValid = false; }
     auto elapsed = [&](std::size_t first_, std::size_t last_){
       float milliseconds = 0.;
       checkCuda(cudaEventElapsedTime(&milliseconds, _impl_->stages[first_], _impl_->stages[last_]), "CUDA stage timing");
@@ -1131,7 +1231,7 @@ void Backends::CudaDeviceContext::propagate(const PropagationInputs& inputs_, bo
         * sizeof(CudaBinContribution);
     timing_.parameterUploadSeconds = elapsed(0, 1);
     timing_.cachedDialStageSeconds = elapsed(1, 2);
-    timing_.eventWeightsStageSeconds = updatePrediction ? elapsed(2, 3) : 0.;
+    timing_.eventWeightsStageSeconds = rebuildHistograms ? elapsed(2, 3) : 0.;
     timing_.variableStageSeconds = updateState ? elapsed(3, 4) : 0.;
     timing_.binningStageSeconds = updateState ? elapsed(4, 5) : 0.;
     timing_.histogramStageSeconds = updatePrediction ? elapsed(5, 6) : 0.;
@@ -1171,7 +1271,7 @@ double Backends::CudaDeviceContext::readLikelihood() {
 void Backends::CudaDeviceContext::readWeights(std::vector<double>& weights_) {
   DeviceScope scope(_impl_->deviceIndex);
   try{
-    _impl_->buffers->weights.read(weights_, _impl_->stream);
+    materializeWeights(*_impl_->buffers, _impl_->stream).read(weights_, _impl_->stream);
     checkCuda(cudaStreamSynchronize(_impl_->stream), "weight readback completion");
   }
   catch(...){ cudaStreamSynchronize(_impl_->stream); throw; }
@@ -1248,17 +1348,20 @@ std::size_t Backends::CudaDeviceContext::readEventState(EventState& state_) {
 void Backends::CudaDeviceContext::invalidate() {
   if( _impl_->buffers ){
     _impl_->buffers->cachePrimed = false;
+    _impl_->buffers->predictionFactored = _impl_->buffers->fullWeightsValid = false;
     if( _impl_->buffers->gradient ){ _impl_->buffers->gradient->resultValid = false; }
     _impl_->buffers->stateCache.invalidate();
   }
 }
 
-Backends::BackendDeviceView Backends::CudaDeviceContext::getDeviceView() const {
+Backends::BackendDeviceView Backends::CudaDeviceContext::getDeviceView() {
+  DeviceScope scope(_impl_->deviceIndex);
   BackendDeviceView out;
   out.device = _impl_.get();
-  const auto& b = *_impl_->buffers;
-  out.eventWeights = b.weights.data;
-  out.eventWeightsBytes = b.weights.size * sizeof(double);
+  auto& b = *_impl_->buffers;
+  const auto& weights = materializeWeights(b, _impl_->stream);
+  out.eventWeights = weights.data;
+  out.eventWeightsBytes = weights.size * sizeof(double);
   out.histSums = b.sums.data;
   out.histSumSquares = b.sumSquares.data;
   out.histogramBytes = b.histogramBins * sizeof(double);
@@ -1277,6 +1380,7 @@ Backends::BackendResourceUsage Backends::CudaDeviceContext::getResourceUsage() c
       b.compositePrograms, b.compositeInstances, b.compositeNodeData, b.compositeInstructions, b.compositeInputs, b.programScratchOffsets, b.programScratch,
       b.selectedEventGroups, b.events, b.dials, b.compactDialFields, b.compactDialPolicies, b.inputs, b.payloads, b.parameters,
       b.responses, b.previousInputs, b.previousSecondInputs, b.weights, b.sums,
+      b.fullWeights, b.residualSums, b.residualSquares, b.binFactors, b.binFactorOffsets, b.factoredDialMask,
       b.sumSquares, b.dialIndices, b.parameterDialIndices, b.responseUpdates, b.externalResponseUpdates,
       b.tableTerms, b.externalBlocks, b.externalWeights, b.binOffsets, b.binEvents,
       b.error, b.stateEvents, b.samples, b.bins, b.intervals,
@@ -1350,6 +1454,7 @@ std::vector<double> Backends::CudaDeviceContext::readGradient(const EngineView& 
     return g.result;
   }
   g.resultValid = false;
+  const auto& weights = materializeWeights(b, stream);
   record(0);
   if( producerSlopes_.size() != g.producerSlopes.size ) throw std::runtime_error("CUDA producer gradient size mismatch.");
   if( !producerSlopes_.empty() ) checkCuda(cudaMemcpyAsync(g.producerSlopes.data,producerSlopes_.data(),
@@ -1364,7 +1469,7 @@ std::vector<double> Backends::CudaDeviceContext::readGradient(const EngineView& 
   if( g.work.events ) gradientEvents<<<(g.work.events+255)/256, 256, 0, stream>>>(
       g.events.data, g.work, {g.indices.data,g.inputOffsets.data,g.eventOffsets.data,
         g.originalEvents.data,g.targets.data,g.variableDials.data,b.samples.data,b.samples.size,
-        b.bins.data,b.intervals.data,b.binningNodes.data,b.binningBounds.data,b.variables.data}, g.responses.data, g.scales.data, b.weights.data, g.contributions.data);
+        b.bins.data,b.intervals.data,b.binningNodes.data,b.binningBounds.data,b.variables.data}, g.responses.data, g.scales.data, weights.data, g.contributions.data);
   record(4);
   if( g.work.parameters ) gradientReduce<<<g.work.parameters, 128, 0, stream>>>(
       g.offsets.data, g.occurrences.data, g.contributions.data, g.total.data);

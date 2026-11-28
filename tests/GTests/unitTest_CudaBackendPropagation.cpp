@@ -8,6 +8,7 @@
 #include "GeneralSpline.h"
 #include "Graph.h"
 
+#include <cuda_runtime_api.h>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -611,6 +612,152 @@ TEST(CudaBackendPropagation, SparseEventGroupsPreserveProductsAcrossUpdatesAndEr
       expectClose(cuda.getEventWeightsHostView(rebuilt), cpu.getEventWeightsHostView(reference));
     }
   }
+}
+
+namespace {
+  EngineView binFactorModel() {
+    EngineView view;
+    auto& model = view.propagation;
+    model.parameterCount = 3;
+    model.totalBins = 3;
+    model.dialInputs = {{0}, {1}, {2}};
+    for( std::size_t i = 0; i < model.parameterCount; ++i ){
+      BackendDialDescriptor dial;
+      dial.firstInput = i;
+      dial.inputCount = 1;
+      model.dials.push_back(dial);
+    }
+    UniformSpline spline;
+    spline.buildDial({{0., .8, 0.}, {1., 1., 0.}, {2., 1.1, 0.}, {3., .9, 0.}});
+    model.dialPayloads = spline.getDialData();
+    model.dials[1].type = BackendDialType::UniformSpline;
+    model.dials[1].payloadSize = model.dialPayloads.size();
+    for( std::size_t i = 0; i < 161; ++i ){
+      EventView event;
+      event.resultIndex = i;
+      event.globalBinIndex = i < 128 ? 0 : i == 159 ? -1 : 1;
+      model.events.push_back(event);
+      const auto first = model.eventDialIndices.size();
+      if( i < 128 ){ model.eventDialIndices.insert(model.eventDialIndices.end(), {0, 1}); }
+      if( i == 128 or i == 159 ){ model.eventDialIndices.push_back(2); }
+      model.eventWeights.push_back({.25 + double(i % 3) / 8., first, model.eventDialIndices.size() - first});
+    }
+    LikelihoodSampleView sample;
+    sample.dataSums = {40., 12., 0.};
+    sample.portableOptions.kind = LikelihoodKind::BarlowBeestonLiteGaussian;
+    view.likelihood.samples.push_back(sample);
+    return view;
+  }
+}
+
+TEST(CudaBinFactorModel, MapsFactorsToDeviceSlotsAndRequiresGlobalCoverage) {
+  auto view = binFactorModel();
+  auto& model = view.propagation;
+  auto& surface = model.dials[0];
+  surface.type = BackendDialType::Bilinear;
+  surface.inputCount = 2;
+  surface.payloadOffset = model.dialPayloads.size();
+  surface.payloadSize = 10;
+  model.dialPayloads.insert(model.dialPayloads.end(), {2., 2., -1., 1., -1., 1., .5, .75, 1.25, 1.5});
+  for( bool interleave : {false, true} ){
+    const auto packed = makeCudaWeightModel(view, interleave, true, true, true);
+    EXPECT_EQ(packed.binFactors.offsets, (std::vector<std::uint32_t>{0, 2, 2, 2}));
+    EXPECT_EQ(packed.binFactors.dials, (std::vector<std::uint32_t>{2, 0}));
+    EXPECT_EQ(packed.factoredDialMask, (std::vector<std::uint32_t>{5}));
+    EXPECT_EQ(packed.binFactorDependencies.residualParameters, (std::vector<bool>{false, false, true}));
+  }
+  model.events[0].globalBinIndex = -1; // Both factors now appear outside the histogram.
+  EXPECT_TRUE(makeCudaWeightModel(view, false, false, false, true).binFactors.dials.empty());
+  model.events[0].globalBinIndex = 0;
+  model.hasReweightCap = true;
+  EXPECT_TRUE(makeCudaWeightModel(view, false, false, false, true).binFactors.dials.empty());
+}
+
+TEST(CudaBackendPropagation, FullBinFactorsReuseHistogramsAndPreserveWeightsAndGradient) {
+  const auto view = binFactorModel();
+  for( const auto* layout : {"eventMajor", "warpInterleaved"} ){
+    CudaBackend cuda, reference;
+    cuda.configure(ConfigReader(JsonType{{"weightLayout", layout}}));
+    reference.configure(ConfigReader(JsonType{{"enableBinFactorization", false}}));
+    cuda.build(view);
+    reference.build(view);
+    const auto diagnostics = JsonType::parse(cuda.getDiagnostics());
+    ASSERT_EQ(diagnostics.at("weightLayout"), layout);
+    ASSERT_EQ(diagnostics.at("binFactorizationEnabled"), true);
+    EXPECT_EQ(diagnostics.at("multiFactorBinCount"), 1);
+    EXPECT_EQ(diagnostics.at("factoredParameterCount"), 2);
+    PropagationInputs inputs;
+    const std::vector<std::vector<double>> points{
+        {1., 1., 1.}, {1.2, 1.1, 1.}, {1.2, 1.1, 1.3}, {.9, 1.3, 1.3}, {.9, 1.3, 1.3}};
+    const std::vector<std::size_t> recomputed{161, 0, 32, 0, 0};
+    for( std::size_t i = 0; i < points.size(); ++i ){
+      SCOPED_TRACE(i);
+      inputs.parameters.values = points[i];
+      const auto token = cuda.requestPropagation(inputs);
+      const auto ordinary = reference.requestPropagation(inputs);
+      EXPECT_EQ(cuda.getLastTimingSummary().eventWeightsRecomputedCount, recomputed[i]);
+      expectClose(cuda.getHistogramSumsHostView(token), reference.getHistogramSumsHostView(ordinary));
+      expectClose(cuda.getHistogramSumSquaresHostView(token), reference.getHistogramSumSquaresHostView(ordinary));
+      EXPECT_NEAR(cuda.getLikelihood(token), reference.getLikelihood(ordinary), 1.e-11);
+      if( i % 2 == 0 ){ expectClose(cuda.getLikelihoodGradient(token), reference.getLikelihoodGradient(ordinary)); }
+      const auto device = cuda.getDeviceView(token);
+      std::vector<double> deviceWeights(view.propagation.events.size());
+      ASSERT_EQ(device.eventWeightsBytes, deviceWeights.size() * sizeof(double));
+      ASSERT_EQ(cudaMemcpy(deviceWeights.data(), device.eventWeights, device.eventWeightsBytes, cudaMemcpyDeviceToHost), cudaSuccess);
+      EXPECT_EQ(deviceWeights, reference.getEventWeightsHostView(ordinary));
+      EXPECT_EQ(cuda.getEventWeightsHostView(token), deviceWeights);
+      if( i % 2 != 0 ){ expectClose(cuda.getLikelihoodGradient(token), reference.getLikelihoodGradient(ordinary)); }
+    }
+  }
+}
+
+TEST(CudaBackendPropagation, FactoredExternalGenerationsAndResidualInvalidation) {
+  auto view = binFactorModel();
+  auto& model = view.propagation;
+  model.externalWeightBlocks = {{0, 1}, {1, 1}};
+  for( std::size_t i : {0, 2} ){
+    model.dials[i].type = BackendDialType::ExternalWeight;
+    model.dials[i].externalBlockIndex = i / 2;
+  }
+  CudaBackend cuda, reference;
+  reference.configure(ConfigReader(JsonType{{"enableBinFactorization", false}}));
+  cuda.build(view);
+  reference.build(view);
+  EXPECT_EQ(JsonType::parse(cuda.getDiagnostics()).at("factoredExternalBlockCount"), 1);
+  std::vector<double> weights{1., 1.};
+  PropagationInputs inputs;
+  inputs.parameters.values = {1., 1., 1.};
+  inputs.externalWeights = {{&weights[0], 1, 0, 1}, {&weights[1], 1, 1, 1}};
+  const std::vector<std::size_t> recomputed{161, 0, 161};
+  for( std::size_t i = 0; i < recomputed.size(); ++i ){
+    const auto token = cuda.requestPropagation(inputs);
+    const auto ordinary = reference.requestPropagation(inputs);
+    EXPECT_EQ(cuda.getLastTimingSummary().eventWeightsRecomputedCount, recomputed[i]);
+    expectClose(cuda.getHistogramSumsHostView(token), reference.getHistogramSumsHostView(ordinary));
+    expectClose(cuda.getHistogramSumSquaresHostView(token), reference.getHistogramSumSquaresHostView(ordinary));
+    if( i < weights.size() ){
+      weights[i] = 1.2;
+      ++inputs.externalWeights[i].generation;
+    }
+  }
+}
+
+TEST(CudaBackendPropagation, BinFactorOverflowRetriesWithOriginalEventProducts) {
+  auto view = binFactorModel();
+  view.propagation.eventWeights[0].baseWeight = 1.e200;
+  CudaBackend cuda;
+  cuda.build(view);
+  ASSERT_EQ(JsonType::parse(cuda.getDiagnostics()).at("binFactorizationEnabled"), true);
+  PropagationInputs inputs;
+  inputs.parameters.values = {1.e-100, 1., 1.};
+  auto token = cuda.requestPropagation(inputs);
+  EXPECT_DOUBLE_EQ(cuda.getHistogramSumSquaresHostView(token)[0], 1.e200);
+  EXPECT_DOUBLE_EQ(cuda.getEventWeightsHostView(token)[0], 1.e100);
+  inputs.parameters.values[0] = 1.;
+  EXPECT_THROW(cuda.requestPropagation(inputs), std::runtime_error);
+  inputs.parameters.values[0] = 1.e-101;
+  token = cuda.requestPropagation(inputs);
+  EXPECT_DOUBLE_EQ(cuda.getHistogramSumSquaresHostView(token)[0], 1.e198);
 }
 
 
