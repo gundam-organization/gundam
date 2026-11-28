@@ -23,11 +23,6 @@
 #include <memory>
 
 
-void FitterEngine::evaluateLikelihood(){
-  GundamGlobals::checkInterrupt();
-  getLikelihoodInterface().propagateAndEvalLikelihood();
-}
-
 void FitterEngine::configureImpl(){
   GenericToolbox::setT2kPalette();
 
@@ -100,6 +95,13 @@ void FitterEngine::configureImpl(){
   }
   _config_.fillValue(_likelihoodInterface_.getConfig(), "likelihoodInterfaceConfig");
   _likelihoodInterface_.configure();
+#ifdef GUNDAM_USING_BACKENDS
+  if( _likelihoodInterface_.getConfig().hasField("backendManagerConfig") ){
+    _backendsManager_.setConfig(_likelihoodInterface_.getConfig().fetchValue<ConfigReader>("backendManagerConfig"));
+  }
+  else { _backendsManager_.setConfig(ConfigReader()); }
+  _backendsManager_.configure();
+#endif
 
   if( getLikelihoodInterface().getModelPropagator().getConfig().hasField("scanConfig") ){
     _parameterScanner_.setConfig( getLikelihoodInterface().getModelPropagator().getConfig().fetchValue<ConfigReader>("scanConfig") );
@@ -158,6 +160,10 @@ void FitterEngine::initializeImpl(){
   }
 
   getLikelihoodInterface().initialize();
+#ifdef GUNDAM_USING_BACKENDS
+  _backendsManager_.setLikelihoodInterfacePtr(&getLikelihoodInterface());
+  _backendsManager_.initialize();
+#endif
 
   _parameterScanner_.setLikelihoodInterfacePtr( &getLikelihoodInterface() );
   _parameterScanner_.initialize();
@@ -332,12 +338,71 @@ void FitterEngine::initializeImpl(){
 
 }
 
-// Core
+void FitterEngine::evaluateLikelihood(){
+  GundamGlobals::checkInterrupt();
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    auto backendResult = _backendsManager_.propagate();
+    if( backendResult.valid() ){
+      auto result = backendResult.get();
+      if( result.isValid ){
+        getLikelihoodInterface().evalPenaltyLikelihood();
+        if( result.hasStatLikelihood ){
+          if( not _backendsManager_.willAutoMaterialize(Backends::OutputRequest::StatLikelihood) ){
+            _backendsManager_.materialize(Backends::OutputRequest::StatLikelihood);
+          }
+        }
+        else{
+          std::future<bool> invalidPropagation;
+          getLikelihoodInterface().evalStatLikelihood(invalidPropagation);
+        }
+        getLikelihoodInterface().getBuffer().updateTotal();
+        if( GundamGlobals::isDebug() ){
+          LogInfo << Backends::formatBackendTimingSummary(
+              _backendsManager_.getBackend()->getLastTimingSummary()
+          ) << std::endl;
+        }
+        return;
+      }
+    }
+    getLikelihoodInterface().getModelPropagator().getDialManager().invalidateInputBuffers();
+    LogWarning << "Propagation backend did not produce a valid result. Falling back to the standard propagation path." << std::endl;
+  }
+#endif
+
+  getLikelihoodInterface().propagateAndEvalLikelihood();
+}
+
+void FitterEngine::evalGradient(ParameterGradient& gradient_){
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    _backendsManager_.evalGradient(gradient_);
+    return;
+  }
+#endif
+  getLikelihoodInterface().propagateAndEvalGradient(gradient_);
+}
+
 std::string FitterEngine::getPropagationMonitorTitle() const {
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    return "Backend (" + _backendsManager_.getBackend()->getName() + ")";
+  }
+#endif
   return "Propagator";
 }
 
+std::string FitterEngine::getBackendMonitorLine() const {
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){ return _backendsManager_.getBackend()->getMonitorLine(); }
+#endif
+  return {};
+}
+
 std::vector<std::pair<std::string, std::string>> FitterEngine::getMonitorColumns() const {
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){ return _backendsManager_.getBackend()->getMonitorColumns(); }
+#endif
   return _likelihoodInterface_.getModelPropagator().getMonitorColumns();
 }
 
@@ -452,12 +517,22 @@ void FitterEngine::fit(){
   // individual weight
   bool origCopy = Cache::Manager::SetIsEventWeightCopyEnabled( false );
 #endif
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    _backendsManager_.setEnableAutoMaterialize(false);
+  }
+#endif
 
   LogInfo << "Minimizing LLH..." << std::endl;
   _minimizer_->minimize();
 
   // re-evaluating since the minimizer might not have triggered an eval of the
   // LLH.  And guarantee that the weights were copied if that was enabled.
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    _backendsManager_.setEnableAutoMaterialize(true);
+  }
+#endif
   this->evaluateLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
@@ -523,9 +598,21 @@ void FitterEngine::fit(){
       // individual weight
       bool origCopy = Cache::Manager::SetIsEventWeightCopyEnabled( false );
 #endif
+#ifdef GUNDAM_USING_BACKENDS
+      if( _backendsManager_.hasBackend() ){
+        _backendsManager_.setEnableAutoMaterialize(false);
+      }
+#endif
 
       LogInfo << "Computing post-fit errors..." << std::endl;
       _minimizer_->calcErrors();
+
+#ifdef GUNDAM_USING_BACKENDS
+      if( _backendsManager_.hasBackend() ){
+        _backendsManager_.setEnableAutoMaterialize(true);
+      }
+#endif
+      this->evaluateLikelihood();
 
 #ifdef GUNDAM_USING_CACHE_MANAGER
       if( Cache::Manager::IsBuilt() ){
@@ -539,6 +626,19 @@ void FitterEngine::fit(){
     }
   }
 
+#ifdef GUNDAM_USING_BACKENDS
+  if( _backendsManager_.hasBackend() ){
+    const auto totals = _backendsManager_.getBackend()->getTimingTotals();
+    if( totals.propagationCount > 0 ){
+      LogInfo << "Backend accumulated timing since build: calls=" << totals.propagationCount
+              << ", propagation=" << totals.propagationSeconds << "s"
+              << ", dialCache=" << totals.cachedDialSeconds << "s"
+              << ", eventWeights=" << totals.eventWeightsSeconds << "s"
+              << ", histograms=" << totals.histogramSeconds << "s"
+              << ", statLikelihood=" << totals.likelihoodSeconds << "s" << std::endl;
+    }
+  }
+#endif
   LogInfo << "Fit is done." << std::endl;
 }
 
@@ -742,8 +842,7 @@ bool FitterEngine::checkNumericalAccuracy(){
           parSet.getParameterList()[iPar].setParameterValue( throws[iThrow][iParSet][iPar] );
         }
       }
-      std::future<bool> eventually = getLikelihoodInterface().getModelPropagator().applyParameters();
-      getLikelihoodInterface().evalLikelihood(eventually);
+      this->evaluateLikelihood();
 
       if( responses[iThrow] == responses[iThrow] ){ // not nan
         if (not GundamUtils::almostEqual(

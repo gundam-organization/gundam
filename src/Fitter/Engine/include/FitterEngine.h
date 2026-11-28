@@ -11,6 +11,9 @@
 #include "MinimizerBase.h"
 #include "ParameterScanner.h"
 #include "GundamOutputManager.h"
+#ifdef GUNDAM_USING_BACKENDS
+#include "BackendManager.h"
+#endif
 
 
 #include "GenericToolbox.Utils.h"
@@ -85,11 +88,17 @@ public:
   GenericToolbox::TFilePath getTFilePath(){ return GenericToolbox::TFilePath(_outputDirectory_.getDirectDirectory()); }
   bool& getGenerateSamplePlots(){ return _generateSamplePlots_; }
   bool& getDoAllParamVariations(){ return _doAllParamVariations_; }
+#ifdef GUNDAM_USING_BACKENDS
+  Backends::BackendManager& getBackendsManager(){ return _backendsManager_; }
+  [[nodiscard]] const Backends::BackendManager& getBackendsManager() const { return _backendsManager_; }
+#endif
 
   [[nodiscard]] std::string getPropagationMonitorTitle() const;
+  [[nodiscard]] std::string getBackendMonitorLine() const;
   [[nodiscard]] std::vector<std::pair<std::string, std::string>> getMonitorColumns() const;
 
   // Core
+  void evalGradient(ParameterGradient& gradient_);
   void fit();
   void evaluateLikelihood();
   void runPcaCheck();
@@ -125,6 +134,9 @@ private:
   GundamOutputTDirectory _outputDirectory_;
   LikelihoodInterface _likelihoodInterface_{};
   ParameterScanner _parameterScanner_{};
+#ifdef GUNDAM_USING_BACKENDS
+  Backends::BackendManager _backendsManager_{};
+#endif
   MinimizerType _minimizerType_{};
   std::unique_ptr<MinimizerBase> _minimizer_{}; // a virtual class in charge of driving the LikelihoodInterface
 

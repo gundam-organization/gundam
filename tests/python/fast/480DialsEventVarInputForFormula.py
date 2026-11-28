@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Native Formula dials share their definition and bind loaded event inputs."""
-import copy
 import json
 import math
 import subprocess
@@ -79,15 +78,19 @@ def reject(configuration, message):
         raise AssertionError('Invalid Formula accepted: ' + message)
 
 
-def main():
-    import GUNDAM
+def write_input(path):
     import numpy as np
     import uproot
-    GUNDAM.setLightOutputMode(True)
-    path = Path.cwd()/'480DialsEventVarInputForFormula.root'
     with uproot.recreate(path) as output:
         tree = output.mktree('events', {'X': 'float64', 'rawQ3': 'float64'})
         tree.extend({'X': .25+.5*np.arange(6), 'rawQ3': 250.*np.arange(6)})
+
+
+def main():
+    import GUNDAM
+    GUNDAM.setLightOutputMode(True)
+    path = Path.cwd()/'480DialsEventVarInputForFormula.root'
+    write_input(path)
     delta = {'name': 'offset', 'parameterName': 'delta'}
     alpha = {'name': 'slope', 'parameterIndex': 1}
     q3 = {'name': 'momentum', 'eventVariable': 'q3'}
@@ -100,9 +103,6 @@ def main():
         mixed = formula('2+[offset]*[offset]+[slope]*[slope]+.001*([left]+[momentum])',
                         [{'name': 'left', 'eventVariable': '[q3]'}, delta, alpha, q3], printDialSummary=True)
         exercise(path, mixed, lambda d, a, i: 2+d*d+a*a+.5*i)
-        legacy = copy.deepcopy(mixed)
-        legacy['dialConfig'] = legacy.pop('options')
-        exercise(path, legacy, lambda d, a, i: 2+d*d+a*a+.5*i)
         exercise(path, formula('1+.001*[momentum]', [q3]), lambda d, a, i: 1+.25*i)
         exercise(path, formula('1+[offset]*[offset]', [delta]), lambda d, a, i: 1+d*d)
         exercise(path, formula('2.', []), lambda d, a, i: 2.)

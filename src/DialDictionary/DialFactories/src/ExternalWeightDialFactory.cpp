@@ -7,20 +7,28 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
+#include <limits>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
+#include <spawn.h>
 #include <utility>
 #include <unistd.h>
+
+extern char** environ;
 
 ExternalWeightWorker::SharedMemoryBuffer::SharedMemoryBuffer(
     std::string name_,
     std::size_t nbDoubles_)
     : name(std::move(name_)), nbDoubles(nbDoubles_), nbBytes(std::max<std::size_t>(nbDoubles_, 1)*sizeof(double)) {
+  static std::atomic<std::uint64_t> nextBufferId{0};
+  name += "_" + std::to_string(nextBufferId++);
   const std::string posixName = "/" + name;
   fd = shm_open(posixName.c_str(), O_CREAT | O_EXCL | O_RDWR, 0600);
   LogThrowIf(fd == -1, "Could not create shared memory \"" << posixName << "\": " << std::strerror(errno));
@@ -40,9 +48,9 @@ ExternalWeightWorker::SharedMemoryBuffer::~SharedMemoryBuffer(){
 std::unique_ptr<DialBase> ExternalWeightWorker::makeBinnedDial(std::size_t binIndex_) {
   LogThrowIf(not _useBinnedWeights_,
              "Cannot create a binned ExternalWeight dial when useBinnedWeights is false.");
-  LogThrowIf(binIndex_ >= _weightList_->size(),
-             "ExternalWeight bin index out of range: " << binIndex_ << " >= " << _weightList_->size());
-  return std::make_unique<ExternalWeightDispatcher>(_weightList_, binIndex_);
+  LogThrowIf(binIndex_ >= _weightSource_->size(),
+             "ExternalWeight bin index out of range: " << binIndex_ << " >= " << _weightSource_->size());
+  return std::make_unique<ExternalWeightDispatcher>(_weightSource_, binIndex_);
 }
 
 std::string ExternalWeightWorker::normalizeInputName(const std::string& inputName_) {
@@ -80,7 +88,7 @@ void ExternalWeightWorker::configureImpl() {
 
   _weightCount_ = _useBinnedWeights_ ? _binning_.getBinList().size() : 0;
   if( _useBinnedWeights_ ){
-    _weightList_->assign(_weightCount_, 1.);
+    _weightSource_->_size_ = _weightCount_;
   }
 
 }
@@ -91,13 +99,13 @@ std::size_t ExternalWeightWorker::registerEvent(const Event& event_) {
              "Binned ExternalWeight dials must be created from the configured binning.");
   LogThrowIf(_areEventsLoaded_, "Cannot register an event after loading ExternalWeight buffers.");
 
-  const std::size_t eventIndex = _weightList_->size();
+  const std::size_t eventIndex = _weightSource_->size();
   for( std::size_t iInput = 0 ; iInput < _inputEventVarNameList_.size() ; ++iInput ){
     _inputEventValueList_[iInput].emplace_back(
         event_.getVariables().fetchVariable(_inputEventVarNameList_[iInput]).getVarAsDouble()
     );
   }
-  _weightList_->emplace_back(1.);
+  ++_weightSource_->_size_;
   return eventIndex;
 }
 
@@ -126,20 +134,20 @@ void ExternalWeightWorker::finalizeEventLoading() {
       _inputBufferList_.emplace_back(std::move(inputBuffer));
     }
 
-    _weightList_->assign(_weightCount_, 1.);
-    _weightList_->shrink_to_fit();
-    _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
+    _weightSource_->_size_ = _weightCount_;
+    _weightBuffer_ = std::make_shared<SharedMemoryBuffer>(
         "gdmEW_" + std::to_string(getpid()) + "_w",
         _weightCount_
     );
     std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, 1.);
+    _weightSource_->_values_ = std::shared_ptr<double>(_weightBuffer_, _weightBuffer_->ptr);
     _areEventsLoaded_ = true;
     LogInfo << "ExternalWeight worker registered " << _weightCount_
             << " bins with inputs " << GenericToolbox::toString(_inputEventVarNameList_) << "." << std::endl;
   }
   else {
 
-    _eventCount_ = _weightList_->size();
+    _eventCount_ = _weightSource_->size();
     _weightCount_ = _eventCount_;
     _inputBufferList_.clear();
     _inputBufferList_.reserve(_inputEventValueList_.size());
@@ -157,12 +165,12 @@ void ExternalWeightWorker::finalizeEventLoading() {
       std::copy(_inputEventValueList_[iInput].begin(), _inputEventValueList_[iInput].end(), _inputBufferList_.back()->ptr);
     }
 
-    _weightList_->shrink_to_fit();
-    _weightBuffer_ = std::make_unique<SharedMemoryBuffer>(
+    _weightBuffer_ = std::make_shared<SharedMemoryBuffer>(
         "gdmEW_" + std::to_string(getpid()) + "_w",
         _eventCount_
     );
     std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _eventCount_, 1.);
+    _weightSource_->_values_ = std::shared_ptr<double>(_weightBuffer_, _weightBuffer_->ptr);
     _areEventsLoaded_ = true;
 
     LogInfo << "ExternalWeight worker registered " << _eventCount_
@@ -171,21 +179,31 @@ void ExternalWeightWorker::finalizeEventLoading() {
 }
 
 void ExternalWeightWorker::updateWeights(DialInputBuffer& inputBuffer_) {
+  if( _bufferRevision_ != _weightSource_->getBufferRevision() ){ _isEvaluationPending_ = true; }
   if( not _areEventsLoaded_ ){
     this->finalizeEventLoading();
   }
-  else if( not inputBuffer_.isDialUpdateRequested() ){
+  else if( not _isEvaluationPending_ and not inputBuffer_.isDialUpdateRequested()
+           and (not isGradientRequested() or _weightSource_->hasCurrentGradient()) ){
+    _weightSource_->_gradientRequested_ = false;
     return;
   }
+  _isEvaluationPending_ = true;
   this->evaluate(inputBuffer_);
+  // A first gradient request can recompute weights at unchanged inputs. Make
+  // every response cache consume this publication, including on a retry.
+  inputBuffer_.markUpdated();
+  _weightSource_->_gradientRequested_ = false;
+  _isEvaluationPending_ = false;
+  _bufferRevision_ = _weightSource_->getBufferRevision();
 }
 
 void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
   LogThrowIf(not this->isInitialized(), "ExternalWeight worker is not initialized.");
   LogThrowIf(_weightBuffer_ == nullptr, "ExternalWeight worker has no weight buffer.");
-  LogThrowIf(_weightCount_ != _weightList_->size(),
+  LogThrowIf(_weightCount_ != _weightSource_->size(),
              "ExternalWeight has " << _eventCount_ << " shared-memory weights for "
-             << _weightList_->size() << " registered dials.");
+             << _weightSource_->size() << " registered dials.");
 
   if( _parameterBuffer_ == nullptr ){
     _parameterBuffer_ = std::make_unique<SharedMemoryBuffer>(
@@ -199,8 +217,40 @@ void ExternalWeightWorker::evaluate(const DialInputBuffer& inputBuffer_) {
     _parameterBuffer_->ptr[iPar] = inputBuffer_.getInputBuffer().at(iPar);
   }
 
+  _weightSource_->_gradientValid_ = false;
+  LogThrowIf(_weightSource_->_generation_ == std::numeric_limits<std::uint64_t>::max(),
+             "ExternalWeight generation overflow.");
+  if( isGradientRequested() ){
+    LogThrowIf(not _weightSource_->supportsGradient(), "ExternalWeight worker does not provide analytic gradients.");
+    const auto inputs = std::size_t(inputBuffer_.getInputSize());
+    LogThrowIf(inputs != 0 and _weightCount_ > std::numeric_limits<std::size_t>::max() / sizeof(double) / inputs,
+               "ExternalWeight gradient buffer size overflow.");
+    const auto count = _weightCount_ * inputs;
+    if( _gradientBuffer_ == nullptr ){
+      _gradientBuffer_ = std::make_shared<SharedMemoryBuffer>(
+          "gdmEW_" + std::to_string(getpid()) + "_gradients", count);
+      _weightSource_->_gradients_ = std::shared_ptr<double>(_gradientBuffer_, _gradientBuffer_->ptr);
+      _weightSource_->_gradientInputCount_ = inputs;
+    }
+    LogThrowIf(_gradientBuffer_->nbDoubles != count or _weightSource_->_gradientInputCount_ != inputs,
+               "ExternalWeight gradient buffer shape mismatch.");
+    // A missing or partially filled derivative must never look like zero.
+    std::fill(_gradientBuffer_->ptr, _gradientBuffer_->ptr + count, std::numeric_limits<double>::quiet_NaN());
+    std::fill(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, std::numeric_limits<double>::quiet_NaN());
+  }
   this->evaluateImpl(inputBuffer_);
-  std::copy(_weightBuffer_->ptr, _weightBuffer_->ptr + _weightCount_, _weightList_->begin());
+  if( isGradientRequested() ){
+    for( std::size_t i = 0; i < _weightCount_; ++i ){
+      LogThrowIf(not std::isfinite(_weightBuffer_->ptr[i]), "ExternalWeight worker returned a non-finite weight at row " << i);
+    }
+    for( std::size_t i = 0; i < _gradientBuffer_->nbDoubles; ++i ){
+      LogThrowIf(not std::isfinite(_gradientBuffer_->ptr[i]), "ExternalWeight worker returned a missing/non-finite gradient at entry " << i);
+    }
+    _weightSource_->_gradientGeneration_ = getEvaluationGeneration();
+    _weightSource_->_gradientValid_ = true;
+  }
+  _weightSource_->_inputValues_ = inputBuffer_.getInputBuffer();
+  ++_weightSource_->_generation_;
 }
 
 void ExternalWeightDialFactory::configureImpl() {
@@ -233,7 +283,7 @@ void ExternalWeightDialFactory::initializeImpl() {
 
 DialBase* ExternalWeightDialFactory::makeDial(const Event& event_) {
   const std::size_t eventIndex = _worker_->registerEvent(event_);
-  return new ExternalWeightDispatcher(_worker_->getWeightList(), eventIndex);
+  return new ExternalWeightDispatcher(_worker_->getWeightSource(), eventIndex);
 }
 
 void ExternalWeightPythonWorker::configureImpl() {
@@ -245,6 +295,7 @@ void ExternalWeightPythonWorker::configureImpl() {
       {FieldFlag::MANDATORY, "evalScript"},
       {"initScript"},
       {"scriptArgs"},
+      {"backendBufferMemoryLocation"},
     });
   pythonConfig.checkConfiguration();
 
@@ -252,6 +303,9 @@ void ExternalWeightPythonWorker::configureImpl() {
   pythonConfig.fillValue(_initScript_, "initScript");
   pythonConfig.fillValue(_evalScript_, "evalScript");
   pythonConfig.fillValue(_scriptArgs_, "scriptArgs");
+  pythonConfig.fillValue(_backendBufferMemoryLocation_, "backendBufferMemoryLocation");
+  LogThrowIf(_backendBufferMemoryLocation_ != "onHost" and _backendBufferMemoryLocation_ != "onDevice",
+             "workerConfig.backendBufferMemoryLocation must be onHost or onDevice.");
 
   LogThrowIf(_pythonExecutable_.empty(),
              "ExternalWeight PythonWorker requires either pythonExecutable.");
@@ -330,15 +384,87 @@ void ExternalWeightPythonWorker::validateEvalScript() {
 }
 
 void ExternalWeightPythonWorker::evaluateImpl(const DialInputBuffer& inputBuffer_) {
+  prepareWorkerBuffers();
+  if( _deviceParameters_ ){
+    const auto* parameters = getParameterBuffer();
+    _deviceParameters_->writeValues(parameters->ptr, parameters->nbDoubles);
+  }
   if( not _isWorkerStarted_ ){
     this->startWorkerProcess(inputBuffer_);
   }
   JsonType command;
   command["command"] = "evaluate";
+  command["withGradient"] = isGradientRequested();
+  command["generation"] = getEvaluationGeneration();
+  if( isGradientRequested() ){
+    const auto* gradients = getGradientBuffer();
+    LogThrowIf(gradients == nullptr, "ExternalWeight gradient buffer is not initialized.");
+    const std::vector<std::size_t> shape{getWeightCount(), std::size_t(inputBuffer_.getInputSize())};
+    if( _deviceWeights_ ){
+      if( not _deviceGradients_ ){
+        _deviceGradients_ = getWeightSource()->getWorkerBufferFactory()(gradients->nbDoubles);
+      }
+      // Preserve the host protocol's detection of partially written outputs.
+      _deviceGradients_->writeValues(gradients->ptr, gradients->nbDoubles);
+      _deviceWeights_->writeValues(getWeightBuffer()->ptr, getWeightCount());
+      command["gradients"] = describeWorkerBuffer(_deviceGradients_, shape);
+    }
+    else{
+      command["gradients"] = {{"shmName", gradients->name}, {"dtype", "float64"}, {"shape", shape}};
+    }
+  }
   this->sendWorkerCommand(command);
   auto response = this->readWorkerResponse();
   LogThrowIf(response.value("status", std::string{}) != "ok",
              "ExternalWeight worker evaluation failed: " << response.dump());
+  if( isGradientRequested() ){
+    LogThrowIf(not response.contains("gradientGeneration") or not response["gradientGeneration"].is_number_integer()
+               or response["gradientGeneration"] != command["generation"],
+               "ExternalWeight worker must acknowledge gradientGeneration for the current evaluation: " << response.dump());
+    if( _deviceGradients_ ){
+      // Dial gradient consumers currently use the dense host table. The worker
+      // has synchronized its device writes before publishing this response.
+      _deviceGradients_->readValues(getGradientBuffer()->ptr, getGradientBuffer()->nbDoubles);
+      _deviceWeights_->readValues(getWeightBuffer()->ptr, getWeightCount());
+    }
+  }
+}
+
+JsonType ExternalWeightPythonWorker::describeWorkerBuffer(
+    const std::shared_ptr<WorkerBuffer>& buffer_, const std::vector<std::size_t>& shape_) {
+  const auto description = buffer_->describe();
+  return JsonType{{"transport", description.transport}, {"path", description.path},
+                  {"libraryPath", description.libraryPath}, {"dtype", description.dtype},
+                  {"device", description.device}, {"ipcHandle", description.ipcHandle},
+                  {"deviceUuid", description.deviceUuid},
+                  {"shape", shape_}, {"byteCount", description.byteCount}};
+}
+
+void ExternalWeightPythonWorker::prepareWorkerBuffers() {
+  const auto& source = getWeightSource();
+  const auto& factory = source->getWorkerBufferFactory();
+  const bool device = _backendBufferMemoryLocation_ == "onDevice" and bool(factory);
+  LogThrowIf(_backendBufferMemoryLocation_ == "onDevice" and not factory
+             and source->getWorkerBackend() != "CPU",
+             "The active backend does not provide device PythonWorker buffers: " << source->getWorkerBackend());
+  if( _workerBufferRevision_ == source->getBufferRevision() and bool(_deviceWeights_) == device ){ return; }
+  stopWorkerProcess();
+  setDeviceWeightBuffer({});
+  _deviceInputs_.clear(); _deviceParameters_.reset(); _deviceWeights_.reset(); _deviceGradients_.reset();
+  if( device ){
+    for( const auto& input : getInputBufferList() ){
+      auto buffer = factory(input->nbDoubles);
+      buffer->writeValues(input->ptr, input->nbDoubles);
+      _deviceInputs_.push_back(std::move(buffer));
+    }
+    const auto* parameters = getParameterBuffer();
+    _deviceParameters_ = factory(parameters->nbDoubles);
+    _deviceParameters_->writeValues(parameters->ptr, parameters->nbDoubles);
+    _deviceWeights_ = factory(getWeightCount());
+    _deviceWeights_->writeValues(getWeightBuffer()->ptr, getWeightCount());
+    setDeviceWeightBuffer(_deviceWeights_);
+  }
+  _workerBufferRevision_ = source->getBufferRevision();
 }
 
 void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& inputBuffer_) {
@@ -349,31 +475,135 @@ void ExternalWeightPythonWorker::startWorkerProcess(const DialInputBuffer& input
   LogThrowIf(pipe(stdinPipe) == -1, "Could not create ExternalWeight worker stdin pipe: " << std::strerror(errno));
   LogThrowIf(pipe(stdoutPipe) == -1, "Could not create ExternalWeight worker stdout pipe: " << std::strerror(errno));
 
-  const pid_t pid = fork();
-  LogThrowIf(pid == -1, "Could not fork ExternalWeight worker: " << std::strerror(errno));
-
-  if( pid == 0 ){
-    dup2(stdinPipe[0], STDIN_FILENO);
-    dup2(stdoutPipe[1], STDOUT_FILENO);
-    close(stdinPipe[0]);
-    close(stdinPipe[1]);
-    close(stdoutPipe[0]);
-    close(stdoutPipe[1]);
-
     // The bootstrap owns the wire protocol.  A user script only needs to
-    // expose run(command), with the shared-memory descriptions already
-    // converted to NumPy arrays by the bootstrap.
+    // expose run(command); transport descriptions become NumPy or device views.
     static const char* bootstrap = R"PY(
 import json
+import os
 import runpy
 import sys
+import time
 import traceback
 from multiprocessing import shared_memory
 
 import numpy as np
 
 
+import ctypes
+import math
+
+
+def _requireTorch():
+    try:
+        import torch
+    except ImportError as error:
+        raise RuntimeError(
+            "ExternalWeight PythonWorker cannot import torch with "
+            f"pythonExecutable={sys.executable!r}. onDevice buffers require Torch with support for the active backend. "
+            "Install torch in that Python environment, or set "
+            "workerConfig.backendBufferMemoryLocation: onHost to disable device propagation. "
+            f"Import error: {error}"
+        ) from error
+    return torch
+
+
+class _DeviceMapping:
+    def __init__(self, description, dtype):
+        self.torch = _requireTorch()
+        self.library = ctypes.CDLL(description["libraryPath"])
+        self.shape = tuple(description["shape"])
+        self.count = math.prod(self.shape)
+        itemsize = {"float32": 4, "float64": 8}[dtype]
+        if (description["dtype"] != dtype or any(dim < 0 for dim in self.shape)
+                or self.count * itemsize > description["byteCount"]):
+            raise RuntimeError("Invalid GUNDAM device buffer descriptor")
+        self.handle = None
+
+    def function(self, name, arguments, result):
+        function = getattr(self.library, name)
+        function.argtypes = arguments
+        function.restype = result
+        return function
+
+    def close(self):
+        if self.handle:
+            self.close_buffer(self.handle)
+            self.handle = None
+
+
+class _MpsMapping(_DeviceMapping):
+    def __init__(self, description):
+        super().__init__(description, "float32")
+        torch = self.torch
+        if not torch.backends.mps.is_available():
+            raise RuntimeError("GUNDAM supplied MPS buffers, but this venv cannot use Torch MPS")
+        if not hasattr(torch._C, "_construct_storage_from_data_pointer"):
+            raise RuntimeError("This Torch version cannot import GUNDAM MPS storage")
+        open_buffer = self.function("gundamMpsWorkerOpen", [ctypes.c_char_p, ctypes.c_size_t], ctypes.c_void_p)
+        metal_buffer = self.function("gundamMpsWorkerMetal", [ctypes.c_void_p], ctypes.c_void_p)
+        self.close_buffer = self.function("gundamMpsWorkerClose", [ctypes.c_void_p], None)
+        error = self.function("gundamMpsWorkerError", [], ctypes.c_char_p)
+        self.handle = open_buffer(description["path"].encode(), self.count)
+        if not self.handle:
+            raise RuntimeError(error().decode())
+        try:
+            pointer = metal_buffer(self.handle)
+            storage = torch._C._construct_storage_from_data_pointer(pointer, torch.device("mps:0"), self.count * 4)
+            self.tensor = torch.empty(0, dtype=torch.float32, device="mps:0").set_(storage, 0, self.shape)
+        except BaseException:
+            self.close()
+            raise
+
+
+class _CudaMapping(_DeviceMapping):
+    def __init__(self, description):
+        super().__init__(description, "float64")
+        torch = self.torch
+        if not torch.cuda.is_available():
+            raise RuntimeError("GUNDAM supplied CUDA buffers, but this venv cannot use Torch CUDA")
+        open_buffer = self.function("gundamCudaWorkerOpen",
+            [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t], ctypes.c_void_p)
+        self.close_buffer = self.function("gundamCudaWorkerClose", [ctypes.c_void_p], None)
+        tensor_buffer = self.function("gundamCudaWorkerTensor",
+            [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int64), ctypes.c_int32], ctypes.c_void_p)
+        delete_tensor = self.function("gundamCudaWorkerDeleteTensor", [ctypes.c_void_p], None)
+        error = self.function("gundamCudaWorkerError", [], ctypes.c_char_p)
+        self.handle = open_buffer(description["ipcHandle"].encode(), description["deviceUuid"].encode(), self.count)
+        if not self.handle:
+            raise RuntimeError(error().decode())
+        tensor = None
+        capsule = None
+        try:
+            shape = (ctypes.c_int64 * len(self.shape))(*self.shape)
+            tensor = tensor_buffer(self.handle, shape, len(self.shape))
+            if not tensor:
+                raise RuntimeError(error().decode())
+            # The C++ DLManagedTensor owns the IPC mapping until Torch releases
+            # the tensor. No Torch/CPython headers or private CUDA storage APIs.
+            new_capsule = ctypes.pythonapi.PyCapsule_New
+            new_capsule.argtypes = [ctypes.c_void_p, ctypes.c_char_p, ctypes.c_void_p]
+            new_capsule.restype = ctypes.py_object
+            capsule = new_capsule(tensor, b"dltensor", None)
+            self.tensor = torch.utils.dlpack.from_dlpack(capsule)
+            self.tensor._gundam_worker_library = self.library
+        except BaseException:
+            is_valid = ctypes.pythonapi.PyCapsule_IsValid
+            is_valid.argtypes = [ctypes.py_object, ctypes.c_char_p]
+            is_valid.restype = ctypes.c_int
+            if tensor and (capsule is None or is_valid(capsule, b"dltensor")):
+                delete_tensor(tensor)
+            self.close()
+            raise
+
+
 def _attach(description):
+    transport = description.get("transport")
+    if transport in ("mps-shared", "cuda-ipc"):
+        mapping = {"mps-shared": _MpsMapping, "cuda-ipc": _CudaMapping}[transport](description)
+        return mapping, mapping.tensor
+    if transport is not None:
+        raise RuntimeError(f"Unknown GUNDAM worker transport: {transport}")
+
     try:
         shm = shared_memory.SharedMemory(name=description["shmName"], track=False)
     except TypeError:
@@ -383,7 +613,7 @@ def _attach(description):
             resource_tracker.unregister(shm._name, "shared_memory")
         except Exception:
             pass
-    return shm, np.ndarray(tuple(description["shape"]), dtype=np.float64, buffer=shm.buf)
+    return shm, np.ndarray(tuple(description["shape"]), dtype=description["dtype"], buffer=shm.buf)
 
 
 def _respond(payload):
@@ -393,13 +623,21 @@ def _respond(payload):
 
 def _worker():
     script = sys.argv[1]
+    device_mode = sys.argv[-1] == "--device-worker"
     user_args = sys.argv[2:-1]
     # Make argv useful both while importing the script and in configure().
     sys.argv = [script] + user_args
+
+    if device_mode:
+        # Check before loading user code, which may itself import Torch.
+        _requireTorch()
+
     namespace = runpy.run_path(script, run_name="__external_weight_user__")
 
     # Keep the old protocol usable while users migrate to run(command).
     if not callable(namespace.get("run")):
+        if device_mode:
+            raise RuntimeError("Device PythonWorker requires run(command); legacy run_worker is host-only")
         legacy_worker = namespace.get("run_worker")
         if not callable(legacy_worker):
             raise RuntimeError("ExternalWeight evalScript must define run(command_) or run_worker()")
@@ -416,9 +654,16 @@ def _worker():
     parameter_names = []
     parameter_buffer = None
     weights = None
+    gradients = None
+    gradient_name = None
     parameters = {}
     user_command = None
     read_line = sys.stdin.buffer.readline
+    # Opt-in diagnostics: one file per process, separate from the wire protocol.
+    profile_directory = os.environ.get("GUNDAM_PYTHON_WORKER_PROFILE")
+    profile = None
+    if profile_directory:
+        profile = open(os.path.join(profile_directory, f"worker-{os.getpid()}.jsonl"), "a", buffering=1)
 
     while True:
         line = read_line()
@@ -443,19 +688,61 @@ def _worker():
             user_command["inputs"] = inputs
             user_command["parameters"] = parameters
             user_command["weights"] = weights
+            user_command["parameterBuffer"] = parameter_buffer
+            user_command["bufferDevice"] = command.get("bufferDevice", "cpu")
+            user_command["gradients"] = None
+            user_command["withGradient"] = False
         elif command_name == "evaluate":
             # Reuse the command and parameter dictionary. This avoids
             # allocating three dictionaries on every propagation.
             user_command["command"] = "evaluate"
+            user_command["withGradient"] = command.get("withGradient", False)
+            user_command["generation"] = command.get("generation")
+            if user_command["withGradient"]:
+                description = command["gradients"]
+                buffer_name = description.get("ipcHandle") or description.get("path") or description.get("shmName")
+                if gradient_name != buffer_name:
+                    shm, gradients = _attach(description)
+                    shared_memory_list.append(shm)
+                    gradient_name = buffer_name
+                user_command["gradients"] = gradients
+            else:
+                user_command["gradients"] = None
             parameters.clear()
             parameters.update(zip(parameter_names, parameter_buffer))
         elif command_name == "shutdown":
             user_command["command"] = "shutdown"
 
+        started = time.perf_counter() if profile else None
         result = run(user_command)
+        returned = time.perf_counter() if profile else None
+
+        device = user_command.get("bufferDevice")
+        if device in ("mps", "cuda"):
+            # Complete all writes before publishing the response to GUNDAM.
+            import torch
+            if device == "cuda":
+                torch.cuda.synchronize(user_command["weights"].device)
+            else:
+                torch.mps.synchronize()
+
+        if profile:
+            completed = time.perf_counter()
+            profile.write(json.dumps({
+                "pid": os.getpid(), "script": script, "command": command_name,
+                "withGradient": user_command.get("withGradient", False),
+                "device": str(getattr(weights, "device", "cpu")), "dtype": str(weights.dtype),
+                "rows": int(weights.shape[0]), "parameters": len(parameter_names),
+                "runSeconds": returned - started,
+                "synchronizeSeconds": completed - returned,
+                "wallSeconds": completed - started,
+            }) + "\n")
+
         _respond(result)
 
         if command_name == "shutdown":
+            if profile:
+                profile.close()
             for shm in shared_memory_list:
                 shm.close()
             return 0
@@ -477,7 +764,7 @@ except Exception as error:
     argvStorage.emplace_back(bootstrap);
     argvStorage.emplace_back(_evalScript_);
     for( const auto& arg : _scriptArgs_ ){ argvStorage.emplace_back(arg); }
-    argvStorage.emplace_back("--worker");
+    argvStorage.emplace_back(_deviceWeights_ ? "--device-worker" : "--worker");
 
     std::vector<char*> argv;
     argv.reserve(argvStorage.size() + 1);
@@ -486,9 +773,21 @@ except Exception as error:
     for( auto& arg : argvStorage ){ argv.emplace_back(const_cast<char*>(arg.c_str())); }
     argv.emplace_back(nullptr);
 
-    execv(_pythonExecutable_.c_str(), argv.data());
-    _exit(127);
-  }
+    // Avoid fork-side work after Metal or other libraries have started threads.
+    posix_spawn_file_actions_t actions;
+    posix_spawn_file_actions_init(&actions);
+    posix_spawn_file_actions_adddup2(&actions, stdinPipe[0], STDIN_FILENO);
+    posix_spawn_file_actions_adddup2(&actions, stdoutPipe[1], STDOUT_FILENO);
+    for( int fd : {stdinPipe[0], stdinPipe[1], stdoutPipe[0], stdoutPipe[1]} ){
+      posix_spawn_file_actions_addclose(&actions, fd);
+    }
+    pid_t pid = -1;
+    const auto spawnStatus = posix_spawn(&pid, _pythonExecutable_.c_str(), &actions, nullptr, argv.data(), environ);
+    posix_spawn_file_actions_destroy(&actions);
+    if( spawnStatus != 0 ){
+      for( int fd : {stdinPipe[0], stdinPipe[1], stdoutPipe[0], stdoutPipe[1]} ){ close(fd); }
+      LogThrow("Could not start ExternalWeight PythonWorker: " << std::strerror(spawnStatus));
+    }
 
   close(stdinPipe[0]);
   close(stdoutPipe[1]);
@@ -535,10 +834,25 @@ except Exception as error:
       {"shape", {getWeightCount()}}
   };
 
+  initCommand["bufferDevice"] = _deviceWeights_ ? _deviceWeights_->describe().device : "cpu";
+  if( _deviceWeights_ ){
+    for( std::size_t i = 0; i < inputNameList.size(); ++i ){
+      initCommand["inputs"][inputNameList[i]] = describeWorkerBuffer(_deviceInputs_.at(i), {getWeightCount()});
+    }
+    initCommand["parameterBuffer"] = describeWorkerBuffer(_deviceParameters_, {std::size_t(inputBuffer_.getInputSize())});
+    initCommand["weights"] = describeWorkerBuffer(_deviceWeights_, {getWeightCount()});
+  }
+
   this->sendWorkerCommand(initCommand);
   auto response = this->readWorkerResponse();
+  // An initialization error terminates the bootstrap; do not send shutdown
+  // to an exited worker while unwinding the GUNDAM exception.
+  if( response.value("status", std::string{}) != "ok" ){ _isWorkerStarted_ = false; }
   LogThrowIf(response.value("status", std::string{}) != "ok",
              "ExternalWeight worker initialization failed: " << response.dump());
+  LogThrowIf(response.contains("supportsGradient") and not response["supportsGradient"].is_boolean(),
+             "ExternalWeight supportsGradient must be a boolean.");
+  setSupportsGradient(response.value("supportsGradient", false));
 }
 
 void ExternalWeightPythonWorker::sendWorkerCommand(const JsonType& command_) {

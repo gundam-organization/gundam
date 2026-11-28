@@ -3,6 +3,7 @@
 //
 
 #include "JointProbability.h"
+#include "JointProbabilitySnapshot.h"
 #include "PoissonLogLikelihood.h"
 #include "PluginJointProbability.h"
 #include "LeastSquares.h"
@@ -15,6 +16,9 @@
 #include "BarlowBeestonBanff2022Sfgd.h"
 
 #include "Logger.h"
+
+#include <mutex>
+#include <typeinfo>
 
 
 namespace JointProbability{
@@ -99,6 +103,45 @@ namespace JointProbability{
     }
 
     return out.release();
+  }
+
+  JointProbabilitySnapshot snapshotJointProbability(const JointProbabilityBase& probability_, const SamplePair& sample_) {
+    JointProbabilitySnapshot out;
+    if( typeid(probability_) == typeid(PoissonLogLikelihood) ){
+      out.kind = JointProbabilitySnapshot::Kind::Poisson;
+    }
+    else if( typeid(probability_) == typeid(LeastSquares) ){
+      out.kind = JointProbabilitySnapshot::Kind::LeastSquares;
+      out.lsqPoissonianApproximation = static_cast<const LeastSquares&>(probability_).lsqPoissonianApproximation;
+    }
+    else if( typeid(probability_) == typeid(BarlowBeestonLiteGaussian) ){
+      out.kind = JointProbabilitySnapshot::Kind::BarlowBeestonLiteGaussian;
+      out.throwIfInfLlh = false;
+    }
+    else if( typeid(probability_) == typeid(BarlowBeestonLitePoisson) ){
+      out.kind = JointProbabilitySnapshot::Kind::BarlowBeestonLitePoisson;
+      out.throwIfInfLlh = false;
+    }
+    else if( typeid(probability_) == typeid(BarlowBeestonBanff2022) ){
+      const auto& barlow = static_cast<const BarlowBeestonBanff2022&>(probability_);
+      out.kind = JointProbabilitySnapshot::Kind::BarlowBeeston2022;
+      out.usePoissonLikelihood = barlow.usePoissonLikelihood;
+      out.useNominalVariance = barlow.BBNoUpdateWeights;
+      out.throwIfInfLlh = barlow.throwIfInfLlh;
+      out.fractionalErrorLimit = barlow.fractionalErrorLimit;
+      out.expectedValueMinimum = barlow.expectedValueMinimum;
+      if( out.useNominalVariance ){
+        std::lock_guard<std::mutex> guard(barlow._mutex_);
+        const auto nominal = barlow.nomMcUncertList.find(sample_.model);
+        const auto& bins = sample_.model->getHistogram().getBinContentList();
+        for( std::size_t i = 0; i < bins.size(); ++i ){
+          const double error = nominal == barlow.nomMcUncertList.end()
+              ? bins[i].sqrtSumSqWeights : nominal->second.at(i);
+          out.nominalVariances.push_back(error * error);
+        }
+      }
+    }
+    return out;
   }
 
 }

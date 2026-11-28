@@ -6,13 +6,13 @@
 #include "EventFormula.h"
 #include "CompositeDial.h"
 
+#include "Parameter.h"
 #include "GundamUtils.h"
 
 #include "Logger.h"
 
 #include <algorithm>
 #include <unordered_map>
-
 
 
 size_t EventDialCache::getCacheMemorySize() const{
@@ -22,7 +22,8 @@ size_t EventDialCache::getCacheMemorySize() const{
     bytes += entry.dials.capacity() * sizeof(DialIndexCacheEntry);
   }
   for( const auto& entry : _cache_ ){
-    bytes += entry.dialResponseCacheList.capacity() * sizeof(DialResponseCache);
+    bytes += entry.dialResponseCacheList.capacity() * sizeof(DialResponseCache)
+        + entry.boundDialInterfaces.capacity() * sizeof(std::shared_ptr<DialInterface>);
     if( entry.variableResponses == nullptr ){ continue; }
     const auto& responses = *entry.variableResponses;
     bytes += sizeof(EventVariableResponses)
@@ -296,4 +297,154 @@ void EventDialCache::applyVariableResponses(CacheEntry& entry_){
     // Dial responses are continuous values, including when the source branch was integral.
     entry_.event->getVariables().getVarList()[target.variableIndex].set(value);
   }
+}
+
+void EventDialCache::evalEventWeightGradient(EventDialCache::CacheEntry& entry_,
+                                             ParameterGradient& gradient_,
+                                             bool resetGradients_,
+                                             double gradientScale_){
+  if( resetGradients_ ){
+    for( auto& entry : gradient_.values ){ entry.second = 0.; }
+  }
+
+  if( entry_.event == nullptr or entry_.dialResponseCacheList.empty() ){ return; }
+
+  auto isRequestedParameter = [&](Parameter* parameter_){
+    if( parameter_ == nullptr ){ return false; }
+    return gradient_.values.count(parameter_) != 0;
+  };
+
+  std::vector<double> responseList(entry_.dialResponseCacheList.size(), 1.);
+  std::vector<double> prefix(responseList.size() + 1, 1.);
+  for( size_t iDial = 0; iDial < responseList.size(); ++iDial ){
+    responseList[iDial] = entry_.isVariableResponse(iDial) ? 1.
+        : entry_.dialResponseCacheList[iDial].getResponse();
+    prefix[iDial + 1] = prefix[iDial] * responseList[iDial];
+  }
+  const double responseProduct = prefix.back();
+
+  if( _globalEventReweightCap_.isEnabled and responseProduct > _globalEventReweightCap_.maxReweight ){
+    return;
+  }
+
+  auto addGradient = [&](Parameter* parameter_, double value_){
+    if( parameter_ == nullptr or value_ == 0 ){ return; }
+    if( not isRequestedParameter(parameter_) ){ return; }
+    gradient_.addValue(parameter_, value_);
+  };
+
+  const double baseWeight{entry_.event->getWeights().base};
+  double suffix = 1.;
+  for( size_t iDial = responseList.size(); iDial-- > 0; ){
+    // Prefix/suffix products handle zero responses without division and avoid O(D^2) work.
+    const double productExcludingDial = prefix[iDial] * suffix;
+    suffix *= responseList[iDial];
+    auto& dialResponseCache = entry_.dialResponseCacheList[iDial];
+    auto* dialInterface = dialResponseCache.dialInterface;
+    if( dialInterface == nullptr or dialInterface->getInputBufferRef() == nullptr ){ continue; }
+
+    if( entry_.isVariableResponse(iDial) ){ continue; }
+    const auto* inputBuffer = dialInterface->getInputBufferRef();
+    const auto dialGradients = dialInterface->evalGradients();
+    for( int iInput = 0 ; iInput < inputBuffer->getInputSize() ; iInput++ ){
+      auto* parameterPtr = &inputBuffer->getParameter(iInput);
+      const double dialGradient = dialGradients[iInput];
+      const double inputGradient = inputBuffer->evalInputGradient(iInput);
+      addGradient(parameterPtr, gradientScale_ * baseWeight * productExcludingDial * dialGradient * inputGradient);
+    }
+  }
+}
+
+
+void EventDialCache::evalEventWeightGradients(
+    ParameterGradient& gradient_, const std::vector<double>& eventScales_,
+    GenericToolbox::ParallelWorker& workers_){
+  LogThrowIf(eventScales_.size() != _cache_.size(), "Event gradient scale size mismatch.");
+  // Freeze an index order for the thread-local sums and their final reduction.
+  std::vector<const Parameter*> parameterList;
+  parameterList.reserve(gradient_.values.size());
+  for( const auto& entry : gradient_.values ){ parameterList.push_back(entry.first); }
+  const int threadCount = workers_.getNbThreads();
+  std::unordered_map<const Parameter*, std::size_t> parameterIndices;
+  parameterIndices.reserve(parameterList.size());
+  for( std::size_t i = 0; i < parameterList.size(); ++i ){
+    if( parameterList[i] != nullptr ){ parameterIndices.emplace(parameterList[i], i); }
+  }
+  const auto& indices = parameterIndices; // Concurrent read-only lookup.
+  std::vector<std::vector<double>> partials(threadCount, std::vector<double>(parameterList.size(), 0.));
+  workers_.runJob([&](int thread_){
+    auto& sums = partials.at(thread_);
+    // Scratch storage is reused for every event assigned to this worker.
+    std::vector<double> responses, prefix;
+    const auto bounds = GenericToolbox::ParallelWorker::getThreadBoundIndices(thread_, threadCount, _cache_.size());
+    for( auto eventIndex = bounds.beginIndex; eventIndex < bounds.endIndex; ++eventIndex ){
+      const double scale = eventScales_[eventIndex];
+      auto& entry = _cache_[eventIndex];
+      if( scale == 0. or entry.event == nullptr ){ continue; }
+      const auto count = entry.dialResponseCacheList.size();
+      responses.resize(count);
+      prefix.resize(count + 1);
+      prefix[0] = 1.;
+      for( std::size_t i = 0; i < count; ++i ){
+        responses[i] = entry.isVariableResponse(i) ? 1.
+            : entry.dialResponseCacheList[i].getResponse();
+        prefix[i+1] = prefix[i] * responses[i];
+      }
+      if( _globalEventReweightCap_.isEnabled and prefix.back() > _globalEventReweightCap_.maxReweight ){ continue; }
+      double suffix = 1.;
+      const double baseScale = scale * entry.event->getWeights().base;
+      for( std::size_t i = count; i-- > 0; ){
+        const double factor = baseScale * prefix[i] * suffix;
+        suffix *= responses[i];
+        if( entry.isVariableResponse(i) ){ continue; }
+        const auto* interface = entry.dialResponseCacheList[i].dialInterface;
+        const auto* input = interface->getInputBufferRef();
+        if( input == nullptr or factor == 0. ){ continue; }
+        const auto dialGradients = interface->evalGradients();
+        for( int j = 0; j < input->getInputSize(); ++j ){
+          const auto found = indices.find(&input->getParameter(j));
+          if( found == indices.end() ){ continue; }
+          sums[found->second] += factor * dialGradients[j] * input->evalInputGradient(j);
+        }
+      }
+    }
+  });
+  std::vector<double> result(parameterList.size(), 0.);
+  for( const auto& partial : partials ){
+    for( std::size_t i = 0; i < result.size(); ++i ){ result[i] += partial[i]; }
+  }
+  for( std::size_t i = 0; i < result.size(); ++i ){
+    gradient_.addValue(parameterList[i], result[i]);
+  }
+}
+
+void EventDialCache::evalVariableResponseGradient(CacheEntry& entry_, const VariableResponseCache& target_,
+                                                  ParameterGradient& gradient_, double scale_){
+  if( scale_ == 0. ){ return; }
+  const auto addDial = [&](size_t index_, double factor_){
+    if( factor_ == 0. ){ return; }
+    const auto* interface = entry_.dialResponseCacheList.at(index_).dialInterface;
+    const auto* input = interface->getInputBufferRef();
+    const auto local = interface->evalGradients();
+    for( int j = 0; j < input->getInputSize(); ++j ){
+      const auto* parameter = &input->getParameter(j);
+      if( gradient_.values.count(parameter) != 0 ){
+        gradient_.addValue(parameter, scale_ * factor_ * local.at(j) * input->evalInputGradient(j));
+      }
+    }
+  };
+  const auto response = [&](size_t index_){ return entry_.dialResponseCacheList.at(index_).getResponse(); };
+  std::vector<double> prefix(target_.multiplyDials.size() + 1, 1.);
+  for( size_t j = 0; j < target_.multiplyDials.size(); ++j ){
+    prefix[j+1] = prefix[j] * response(target_.multiplyDials[j]);
+  }
+  const bool overridden = target_.overrideDial != size_t(-1);
+  const double reference = overridden ? response(target_.overrideDial) : target_.referenceValue;
+  if( overridden ){ addDial(target_.overrideDial, prefix.back()); }
+  double suffix = 1.;
+  for( size_t j = target_.multiplyDials.size(); j-- > 0; ){
+    addDial(target_.multiplyDials[j], reference * prefix[j] * suffix);
+    suffix *= response(target_.multiplyDials[j]);
+  }
+  for( auto index : target_.addDials ){ addDial(index, 1.); }
 }

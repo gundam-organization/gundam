@@ -6,6 +6,15 @@
 
 #include <sstream>
 
+bool RootFormula::hasAnalyticGradient() const {
+  _evaluator_.prepareGradient();
+  return true;
+}
+
+double RootFormula::evalGradient(const DialInputBuffer& input_, int iInput_) const {
+  return _evaluator_.evalGradient(input_.getInputBuffer(), iInput_);
+}
+
 double RootFormula::evalResponse(const DialInputBuffer& input_) const {
   return _evaluator_.eval(input_.getInputBuffer());
 }

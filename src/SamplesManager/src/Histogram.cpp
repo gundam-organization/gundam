@@ -13,6 +13,7 @@
 #include "TRandom3.h"
 
 #include <unordered_set>
+#include <stdexcept>
 
 
 
@@ -344,4 +345,15 @@ void Histogram::refillHistogram(int iThread_){
 
   }
 
+}
+
+void Histogram::validateGradientVariable(const std::string& name_) const{
+  for( const auto& context : binContextList ){
+    if( context.bin.isVariableSet(name_) ){
+      if( not isBinningResponseEnabled() ){
+        throw std::runtime_error("Observable gradient requires bin smoothing for variable " + name_);
+      }
+      _binningResponse_.validateGradientVariable(name_);
+    }
+  }
 }

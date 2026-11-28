@@ -61,6 +61,7 @@ parameterSetList:
 | workerConfig.pythonExecutable | string     | Python executable used to start `PythonWorker`                  |         |
 | workerConfig.evalScript       | string     | Python worker script                                            |         |
 | workerConfig.scriptArgs       | list(str)  | Extra command-line arguments passed to the Python worker script | empty   |
+| workerConfig.backendBufferMemoryLocation | string | `onHost` or `onDevice`; MPS device buffers use shared float32 storage | onHost |
 | workerConfig.initScript       | string     | Currently ignored by the shared-memory Python worker            |         |
 
 `inputEventVarList` entries use the same variable naming as other event formulas. In practice, prefer bracket notation for variables from the dataset `variableDict`:
@@ -107,6 +108,53 @@ through `command_["inputs"]` and `command_["weights"]`.
 At the moment, the shared-memory transport exposes event inputs as `float64` arrays. If an input is semantically an integer, such as a flavor code, the worker should cast it explicitly before using it.
 
 ## Python Worker Contract
+
+### Backend buffers
+
+`workerConfig.backendBufferMemoryLocation` defaults to `onHost`, preserving the
+existing NumPy float64 interface. With `onDevice`, inputs, `parameterBuffer`,
+`weights` and requested `gradients` are shared Torch tensors on the active GPU:
+MPS uses float32; CUDA uses float64. `command['bufferDevice']` reports `cpu`,
+`mps` or `cuda`. `parameters` retains its named
+dictionary interface (its values are device scalar views on GPU), and
+`parameterInfo` defines the order of `parameterBuffer`.
+
+CPU and the original engine use host buffers even when `onDevice` is requested.
+CUDA uses dedicated `cudaMalloc` allocations exported through CUDA IPC. The
+worker selects the same physical GPU by UUID and imports tensors through DLPack
+without a copy. Its Torch installation must support CUDA and the GPU in use.
+The selected GPU must be visible to both processes; device ordinals may differ.
+GUNDAM retains the allocations until the worker has exited. The runtime-loadable
+`GundamCudaWorkerBuffers` library requires CUDA but no Torch or Python headers.
+Selecting another backend restarts the worker when the buffer transport changes.
+The normal prior/loading pass can run on CPU before the GPU backend is activated.
+
+The MPS transport is compiled as `GundamMpsWorkerBuffers` inside the MPS backend
+implementation. The subprocess loads its C ABI via ctypes, using the configured
+`pythonExecutable` and venv packages. GUNDAM does not link CPython or Torch for
+this transport, and no compilation is performed in the worker venv. NumPy is
+required for the host protocol; a compatible Torch GPU build is required for device views. If Torch
+cannot be imported for MPS device buffers, initialization fails with the worker's
+Python executable and instructions to install Torch in that environment or set
+`workerConfig.backendBufferMemoryLocation: onHost`. Host workers do not import
+Torch through the bootstrap. The
+MPS adapter currently uses Torch's private storage constructor, checked with
+2.9.1; unsupported versions fail explicitly. CUDA uses the public DLPack API.
+
+The script still defines `configure(arguments)` and `run(command)`. It writes
+weights in place. The bootstrap synchronizes MPS writes before acknowledging;
+the backend copies/packs the response on GPU into its weight layout. CUDA
+publishes input uploads before sending a command and synchronizes worker writes
+on the selected GPU before replying; weight consumption uses a device-to-device
+copy on the backend stream, retaining stable addresses for CUDA graphs. These first
+handoffs are blocking. Tensor views remain valid until shutdown returns.
+When `supportsGradient` is true, gradient evaluations receive a lazily allocated
+`gradients` tensor of shape `(nBins, numberOfInputs)`, in dial input order.
+The worker fills it in place and acknowledges `gradientGeneration`, just as in
+the host protocol. Missing or non-finite derivatives are rejected. The current
+dial gradient API consumes a host table, so gradient evaluations read the result
+back after synchronization; gradient consumption is not yet entirely resident
+on the GPU. Host diagnostics may explicitly materialize weights; normal GPU propagation avoids converting the response array to NumPy.
 
 The worker is launched as:
 
@@ -292,3 +340,82 @@ At each propagation:
 The large numerical arrays are therefore never serialized to JSON and are not written to disk. JSON is only used as a small control protocol for metadata and commands.
 
 The current cache-manager backend does not support `ExternalWeight` dials. When such dials are present, GUNDAM falls back to the CPU propagation path.
+
+## Analytic gradients
+
+A worker can optionally supply the derivatives of its **external weight factor**
+with respect to its `dialInputList` inputs. GUNDAM combines these derivatives with
+other event weights, histogram moments and the statistical likelihood. Loaded
+event variables remain fixed. Mirror transformations and response limits are
+handled by GUNDAM; differentiate with respect to the input values received by
+the worker.
+
+Declare support in the response to `initialize`:
+
+```python
+return {"status": "ok", "supportsGradient": True}
+```
+
+Omitting `supportsGradient` keeps existing workers usable for value evaluations.
+Such workers are rejected when analytic gradients are enabled. Support must be
+declared during the initial weight evaluation, before gradient validation.
+
+An `evaluate` command additionally exposes:
+
+| Field | Meaning |
+| --- | --- |
+| `withGradient` | Whether both weights and derivatives must be written. |
+| `generation` | Integer identifying this evaluation. |
+| `gradients` | `None` for weights alone; otherwise a writable NumPy `float64` array (onHost), Torch MPS `float32` or Torch CUDA `float64` tensor (onDevice) of shape `(numberOfWeights, numberOfInputs)`. |
+
+The dense matrix uses C order: `gradients[row, column]` is
+`∂externalWeight[row] / ∂input[column]`. Columns follow the declared
+`dialInputList` order, also given by `parameterInfo`, including inputs the
+weight does not use (write zero for those). Rows use the same ordering as
+`weights`: one per registered event, or one per external bin in binned mode.
+
+For example, with inputs declared as `a, b` and weights `1 + a*a + b*energy`:
+
+```python
+def run(command):
+    if command["command"] == "initialize":
+        return {"status": "ok", "supportsGradient": True}
+    if command["command"] == "shutdown":
+        return {"status": "ok"}
+    a = command["parameters"]["a"]
+    b = command["parameters"]["b"]
+    energy = command["inputs"]["energy"]
+    command["weights"][:] = 1 + a*a + b*energy
+    result = {"status": "ok"}
+    if command["withGradient"]:
+        command["gradients"][:, 0] = 2*a
+        command["gradients"][:, 1] = energy
+        result["gradientGeneration"] = command["generation"]
+    return result
+```
+
+The gradient buffer is allocated and attached on the first gradient request,
+including when the worker is already running. Gradient requests are consumed
+by propagation; value-only evaluations can continue without computing derivatives.
+A cached gradient can be reused at unchanged inputs. The matrix costs `8 * numberOfWeights * numberOfInputs`
+bytes; no sparse format is currently provided.
+
+Every gradient evaluation must rewrite **all weights and all derivative
+entries**, then acknowledge the exact `gradientGeneration`. GUNDAM rejects
+missing/non-finite values or an absent/wrong acknowledgement and invalidates the
+previous gradient. A failed evaluation can be retried at unchanged inputs.
+Published derivatives are accepted only for the same input point and generation
+as their weights. Composite nodes must therefore supply the same input values
+as the external producer; arbitrary transformed inputs require a matching
+producer evaluation.
+
+Legacy scripts implementing their own `run_worker()` wire protocol receive
+`withGradient`, `generation` and, when requested, a `gradients` shared-memory
+description with `shmName`, `dtype` and `shape`. They must attach the matrix and
+implement the same capability declaration and generation acknowledgement.
+
+Native `ExternalWeightWorker` subclasses can declare support with
+`setSupportsGradient(true)` during configuration/initialization. Their
+`evaluateImpl()` reads `isGradientRequested()` and fills `getGradientBuffer()`
+when requested, in the same layout. Common code validates and publishes both
+buffers after the synchronous call returns.

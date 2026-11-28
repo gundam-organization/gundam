@@ -1,5 +1,6 @@
 #include "GaussianConstraint.h"
 #include "ParametersManager.h"
+#include "FormulaEvaluator.h"
 
 #include "Logger.h"
 
@@ -9,6 +10,7 @@
 #include <limits>
 #include <regex>
 #include <set>
+#include <stdexcept>
 #include <vector>
 
 namespace {
@@ -48,6 +50,7 @@ void GaussianConstraint::configureImpl(){
   _isEnabled_ = _config_.fetchValue<bool>("isEnabled", true);
   _parameterReferenceList_.clear();
   _formula_.reset();
+  _gradientEvaluator_.reset();
   if( not _isEnabled_ ){ return; }
 
   _formulaString_ = _config_.fetchValue<std::string>("formula");
@@ -111,6 +114,13 @@ void GaussianConstraint::initializeImpl(){
     LogThrowIf(reference.formulaIndex < 0,
                "Unused parameter alias " << reference.name << " in external constraint " << _name_);
   }
+  // Keep scalar evaluation unchanged; the derivative evaluator owns a
+  // separate formula and generates its derivative only when requested.
+  _gradientEvaluator_ = std::make_shared<FormulaEvaluator>();
+  _gradientEvaluator_->setFormulaStr(_formulaString_);
+  std::vector<std::string> names;
+  for( const auto& reference : _parameterReferenceList_ ){ names.push_back(reference.name); }
+  _gradientEvaluator_->setInputNames(names);
   _config_.printUnusedKeys();
 }
 
@@ -162,4 +172,46 @@ double GaussianConstraint::eval() const{
   double residual = evalResidual();
   if( not std::isfinite(residual) ){ return std::numeric_limits<double>::infinity(); }
   return residual * residual;
+}
+
+void GaussianConstraint::validateGradient() const{
+  if( not _isEnabled_ ){ return; }
+  try{
+    if( _gradientEvaluator_ == nullptr ){ throw std::runtime_error("formula is not initialized"); }
+    _gradientEvaluator_->prepareGradient();
+  }
+  catch( const std::exception& error ){
+    const std::string message = "External constraint " + _name_ + ": analytic gradient unavailable for "
+        + _formulaString_ + ": " + error.what();
+    LogError << message << std::endl;
+    throw std::runtime_error(message);
+  }
+}
+
+void GaussianConstraint::evalGradient(ParameterGradient& gradient_) const{
+  if( not _isEnabled_ ){ return; }
+  validateGradient();
+  std::vector<double> inputs;
+  inputs.reserve(_parameterReferenceList_.size());
+  for( const auto& reference : _parameterReferenceList_ ){
+    if( reference.parameter == nullptr ){
+      throw std::runtime_error("External constraint " + _name_ + ": parameters are not bound");
+    }
+    inputs.push_back(reference.parameter->getParameterValue());
+  }
+  const long double residual = (static_cast<long double>(evalFormula()) - _mean_) / _stdDev_;
+  if( not std::isfinite(residual) ){
+    throw std::runtime_error("External constraint " + _name_ + ": non-finite residual in gradient");
+  }
+  for( size_t i = 0; i < _parameterReferenceList_.size(); ++i ){
+    const auto* parameter = _parameterReferenceList_[i].parameter;
+    if( gradient_.values.count(parameter) == 0 ){ continue; }
+    const double derivative = _gradientEvaluator_->evalGradient(inputs, int(i));
+    const double contribution = double(2. * residual * derivative / _stdDev_);
+    if( not std::isfinite(derivative) or not std::isfinite(contribution) ){
+      throw std::runtime_error("External constraint " + _name_ + ": non-finite formula gradient");
+    }
+    // Different aliases can refer to the same physical parameter.
+    gradient_.addValue(parameter, contribution);
+  }
 }

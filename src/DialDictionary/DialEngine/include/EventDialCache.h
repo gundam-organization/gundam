@@ -5,6 +5,7 @@
 #ifndef GUNDAM_EVENT_DIAL_CACHE_H
 #define GUNDAM_EVENT_DIAL_CACHE_H
 
+#include "ParameterGradient.h"
 #include "SampleSet.h"
 #include "DialCollection.h"
 #include "Event.h"
@@ -13,12 +14,15 @@
 #include "GundamGlobals.h"
 
 #include "GenericToolbox.Wrappers.h"
+#include "GenericToolbox.Thread.h"
 
+#include <algorithm>
 #include <memory>
 #include <cstdint>
 #include <vector>
 #include <utility>
 
+class Parameter;
 
 class EventDialCache{
 
@@ -96,6 +100,17 @@ public:
     // Stable ownership for event-specific formulas and composites. Ordinary interfaces
     // continue to belong to their DialCollection.
     std::vector<std::shared_ptr<DialInterface>> boundDialInterfaces{};
+
+    [[nodiscard]] const std::vector<VariableResponseCache>& getVariableResponseTargets() const {
+      static const std::vector<VariableResponseCache> empty;
+      return variableResponses != nullptr ? variableResponses->targets : empty;
+    }
+
+    [[nodiscard]] bool isVariableResponse(std::size_t dialIndex_) const {
+      if( variableResponses == nullptr ){ return false; }
+      const auto& indices = variableResponses->dialIndices;
+      return std::binary_search(indices.begin(), indices.end(), dialIndex_);
+    }
 
     [[nodiscard]] std::string getSummary(bool shallow_ = true) const {
       std::stringstream ss;
@@ -212,9 +227,11 @@ public:
   std::vector<CacheEntry> &getCache(){ return _cache_; }
   [[nodiscard]] const std::vector<CacheEntry> &getCache() const{ return _cache_; }
 
-  /// Allocated cache vector buffers, excluding events, dial objects and allocator overhead.
+  /// Allocated bytes in cache vector buffers, including unused capacity.
+  /// Excludes events, dial objects and allocator bookkeeping.
   [[nodiscard]] size_t getCacheMemorySize() const;
 
+  [[nodiscard]] const GlobalEventReweightCap& getGlobalEventReweightCap() const { return _globalEventReweightCap_; }
   GlobalEventReweightCap& getGlobalEventReweightCap(){ return _globalEventReweightCap_; }
 
   /// Allocate entries for events in the indexed cache.  The first parameter
@@ -242,7 +259,15 @@ public:
   void applyVariableResponses(CacheEntry& entry_);
   [[nodiscard]] bool hasVariableResponses() const{ return _hasVariableResponses_; }
 
+  void evalVariableResponseGradient(CacheEntry& entry_, const VariableResponseCache& target_,
+                                    ParameterGradient& gradient_, double scale_);
   void reweightEntry( CacheEntry& entry_);
+  /// Bulk CPU gradient: independent thread-local sums, followed by an ordered reduction.
+  void evalEventWeightGradients(ParameterGradient& gradient_,
+                                              const std::vector<double>& eventScales_,
+                                              GenericToolbox::ParallelWorker& workers_);
+  void evalEventWeightGradient(CacheEntry& entry_, ParameterGradient& gradient_,
+                               bool resetGradients_ = true, double gradientScale_ = 1.);
 
 
 private:

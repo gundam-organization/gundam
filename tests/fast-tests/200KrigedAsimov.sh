@@ -39,6 +39,12 @@ if ! $(root-config --cxx) $(root-config --cflags) \
    exit 1
 fi
 
-gundamFitter --cpu -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
+# The direct-CPU flag belongs to the optional legacy CacheManager.
+CPU_OPTIONS=()
+if gundamFitter --help 2>&1 | grep -q -- '--cpu'; then
+    CPU_OPTIONS=(--cpu)
+fi
+
+gundamFitter "${CPU_OPTIONS[@]}" -t 1 -s 10000 -c ${CONFIG_FILE} -o ${OUTPUT_FILE}
 
 # End of the script

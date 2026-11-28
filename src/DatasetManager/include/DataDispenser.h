@@ -65,6 +65,7 @@ protected:
   void loadFromHistContent();
 
   // utils
+  void selectLoadThreadCount();
   void checkFileDescriptorLimit() const;
   [[nodiscard]] int getNbParallelCpu() const;
   [[nodiscard]] const std::string& getVariableExpression(const std::string& variable_) const;
@@ -91,6 +92,7 @@ private:
   const PlotGenerator* _plotGeneratorPtr_{nullptr};
 
   // multi-threading
+  int _nbThreadsForLoad_{0}; // zero keeps the configured thread limit
   GenericToolbox::NoCopyWrapper<std::mutex> _mutex_{};
 
 };

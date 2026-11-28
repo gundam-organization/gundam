@@ -119,7 +119,7 @@ void DialManager::configureImpl(){
       LogThrowIf(not child.isEnabled(), "Composite: could not configure node " << nodeName);
       auto* parent = dynamic_cast<CompositeDial*>(_dialCollectionList_[iCollection]
           .getDialInterfaceList().at(0).getDialBaseRef());
-      parent->getNodes()[iNode].configuredMirrorEdges = child.getEventInputMirrorEdges();
+      parent->getNodes()[iNode].mirrorEdges = child.getEventInputMirrorEdges();
       inheritedMirroring.emplace_back(mirroredInputs);
     }
   }

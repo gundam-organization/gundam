@@ -1,5 +1,8 @@
 #include "DialCollection.h"
+#include "DialInterface.h"
+#include "Graph.h"
 #include "DialResponseSupervisor.h"
+#include "ParameterSet.h"
 
 #include <gtest/gtest.h>
 
@@ -102,14 +105,21 @@ TEST(DialResponseSupervisor, RejectsInvalidWidths){
   EXPECT_THROW(supervisor.setSmoothingWidths(0.75, 0.5), std::runtime_error);
 }
 
-TEST(DialResponseSmoothingConfig, ValidatesConfigurationBeforeLoading){
-  auto configure = [](const JsonType& options_){
-    JsonType config{{"dialType", "Graph"}, {"dialBranchData", "graph"}};
+namespace {
+  void configureSmoothingDial(const JsonType& options_){
+    std::vector<ParameterSet> parameterSets(1);
+    parameterSets.front().configure(ConfigReader(JsonType{
+        {"name", "testParameters"}, {"isEnabled", true}, {"numberOfParameters", 1}, {"nominalStepSize", 0.1}}));
+    JsonType config{{"dialType", "Graph"}, {"dialBranchData", "graph"},
+                    {"dialInputList", {{{"parameterSetName", "testParameters"}, {"parameterIndex", 0}}}}};
     config.update(options_);
-    DialCollection collection(nullptr);
-    collection.setSupervisedParameterSetIndex(0);
+    DialCollection collection(&parameterSets);
     collection.configure(ConfigReader(config));
-  };
+  }
+}
+
+TEST(DialResponseSmoothingConfig, ValidatesConfigurationBeforeLoading){
+  const auto configure = configureSmoothingDial;
   const JsonType enabled{{"dialResponseLimits", {0., 2.}}, {"enableResponseSmoothing", true}};
   for( const JsonType& width : {JsonType(0.), JsonType(-0.1), JsonType("bad"), JsonType::array(),
                                JsonType{0.1}, JsonType{0.1, 0.}, JsonType{{"min", 0.1}},
@@ -132,15 +142,78 @@ TEST(DialResponseSmoothingConfig, ValidatesConfigurationBeforeLoading){
 
 TEST(DialResponseSmoothingConfig, LegacyLimitsWarnWithoutRejectingConfigurations){
   for( const std::string minKey : {"minDialResponse", "minimumSplineResponse"} ){
-    DialCollection collection(nullptr);
-    collection.setSupervisedParameterSetIndex(0);
     testing::internal::CaptureStdout();
-    EXPECT_NO_THROW(collection.configure(ConfigReader(JsonType{
-        {"dialType", "Graph"}, {"dialBranchData", "graph"},
-        {minKey, 0.2}, {"maxDialResponse", 1.8}})));
+    EXPECT_NO_THROW(configureSmoothingDial(JsonType{{minKey, 0.2}, {"maxDialResponse", 1.8}}));
     const auto output = testing::internal::GetCapturedStdout();
     EXPECT_NE(std::string::npos, output.find("key \"" + minKey + "\" is deprecated"));
     EXPECT_NE(std::string::npos, output.find("key \"maxDialResponse\" is deprecated"));
     EXPECT_NE(std::string::npos, output.find("dialResponseLimits"));
+  }
+}
+
+TEST(DialResponseSupervisor, AnalyticDerivativeMatchesSmoothedResponse){
+  for( const auto& widths : {std::make_pair(.1, .1), std::make_pair(.4, .1)} ){
+    DialResponseSupervisor supervisor;
+    supervisor.setMinResponse(0.);
+    supervisor.setMaxResponse(2.);
+    supervisor.setSmoothingWidths(widths.first, widths.second);
+    for( int i = 0; i <= 300; ++i ){
+      const double x = -.5 + .01 * i;
+      const double h = 1E-6;
+      const double slope = supervisor.evalDerivative(x);
+      EXPECT_GE(slope, 0.);
+      EXPECT_LE(slope, 1.);
+      EXPECT_NEAR(slope, (supervisor.process(x + h) - supervisor.process(x - h)) / (2. * h), 1E-8);
+    }
+    EXPECT_DOUBLE_EQ(.5, supervisor.evalDerivative(0.));
+    EXPECT_DOUBLE_EQ(.5, supervisor.evalDerivative(2.));
+    for( double x : {-widths.first, widths.first, 2. - widths.second, 2. + widths.second} ){
+      EXPECT_NEAR(supervisor.evalDerivative(x - 1E-7), supervisor.evalDerivative(x + 1E-7), 1E-10);
+    }
+    EXPECT_TRUE(std::isnan(supervisor.evalDerivative(std::nan(""))));
+  }
+}
+
+TEST(DialResponseSupervisor, DerivativeWithoutSmoothingAndWithOneSidedLimits){
+  DialResponseSupervisor supervisor;
+  EXPECT_DOUBLE_EQ(1., supervisor.evalDerivative(-3.));
+  supervisor.setMinResponse(0.);
+  supervisor.setMaxResponse(2.);
+  EXPECT_DOUBLE_EQ(0., supervisor.evalDerivative(-.1));
+  EXPECT_DOUBLE_EQ(0., supervisor.evalDerivative(2.1));
+  for( double x : {0., 1., 2.} ){ EXPECT_DOUBLE_EQ(1., supervisor.evalDerivative(x)); }
+  supervisor = DialResponseSupervisor();
+  supervisor.setMaxResponse(2.);
+  supervisor.setSmoothingWidths(std::nan(""), .1);
+  EXPECT_DOUBLE_EQ(1., supervisor.evalDerivative(-3.));
+  EXPECT_DOUBLE_EQ(.5, supervisor.evalDerivative(2.));
+  EXPECT_DOUBLE_EQ(0., supervisor.evalDerivative(3.));
+}
+
+TEST(DialResponseSupervisor, InterfaceAppliesResponseChainRule){
+  Graph curve;
+  curve.buildDial(std::vector<DialUtils::DialPoint>{{-2., -4., 0.}, {2., 4., 0.}});
+  curve.setAllowExtrapolation(true);
+  DialResponseSupervisor supervisor;
+  supervisor.setMinResponse(0.);
+  supervisor.setMaxResponse(2.);
+  supervisor.setSmoothingWidths(.1, .1);
+  DialInputBuffer input;
+  DialInterface interface;
+  interface.setDial(DialBaseObject(curve));
+  interface.setInputBufferRef(&input);
+  interface.setResponseSupervisorRef(&supervisor);
+  for( double x : {-.2, -.04, 0., .04, .5, .96, 1., 1.04, 1.2} ){
+    input.setInputValues({x});
+    const auto gradient = interface.evalGradients();
+    ASSERT_EQ(1U, gradient.size());
+    EXPECT_DOUBLE_EQ(interface.evalGradient(0), gradient[0]);
+    // Graph interpolation can round differently from the equivalent 2*x.
+    EXPECT_NEAR(2. * supervisor.evalDerivative(2. * x), gradient[0], 1E-14);
+    input.setInputValues({x + 1E-6});
+    const double upper = interface.evalResponse();
+    input.setInputValues({x - 1E-6});
+    const double lower = interface.evalResponse();
+    EXPECT_NEAR(gradient[0], (upper - lower) / 2E-6, 1E-8);
   }
 }

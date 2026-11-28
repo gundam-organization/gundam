@@ -13,7 +13,8 @@ sys.dont_write_bytecode = True
 RAW = [-0.25, 0.25, 1.25, 2.25]
 
 
-def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=None, explicit_dynamic=False):
+def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=None, explicit_dynamic=False,
+                backend=None, strict_only=False, backend_mode=None, probability=None):
     import GUNDAM
 
     def dial(mode=None, variable="X", condition=None):
@@ -53,6 +54,8 @@ def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=No
         {"name": "static", "useDynamicBinning": explicit_dynamic,
          "binning": {"binningDefinition": [{"name": "Y", "edges": [0, 1]}]}},
     ]
+    if strict_only:
+        samples[1].pop("binningResponse")
     config = {"likelihoodInterfaceConfig": {
         "jointProbabilityConfig": {"type": "LeastSquares", "lsqPoissonianApproximation": True},
         "dataSetList": [{"name": "inputs", "model": {
@@ -65,6 +68,14 @@ def make_engine(path, conflict=False, disjoint=False, reverse=False, bad_mode=No
             "parametersManagerConfig": {"parameterSetList": [{
                 "name": "response", "isEnabled": True, "nominalStepSize": 0.1, "parameterDefinitions": parameters}]}},
     }}
+    if probability is not None:
+        config["likelihoodInterfaceConfig"]["jointProbabilityConfig"] = {
+            "type": probability, "ignoreBinsWithZeroPredictionAtPrior": True}
+    if backend:
+        config["likelihoodInterfaceConfig"]["backendManagerConfig"] = {'isEnabled': True, 'useBackend': backend,
+            'options': [{'name': backend, **({"propagationMode": backend_mode} if backend_mode else {})}]}
+    config.update(enablePca=False, scaleParStepWithChi2Response=False,
+                  generateSamplePlots=False, generateOneSigmaPlots=False)
     builder = GUNDAM.ConfigUtils.ConfigBuilder()
     builder.setConfigFromYamlString(json.dumps(config))
     engine = GUNDAM.FitterEngine()

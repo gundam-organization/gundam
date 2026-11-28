@@ -20,6 +20,7 @@
 #include <vector>
 #include <map>
 #include <future>
+#include <memory>
 #include <string>
 #include <utility>
 
@@ -50,6 +51,7 @@ public:
   [[nodiscard]] auto& getSampleSet() const { return _sampleSet_; }
   [[nodiscard]] auto& getDialManager() const { return _dialManager_; }
   [[nodiscard]] auto& getEventDialCache() const { return _eventDialCache_; }
+  [[nodiscard]] const EventVariableResponseCache& getEventVariableResponseCache() const { return _eventVariableResponseCache_; }
   [[nodiscard]] auto& getParametersManager() const { return _parManager_; }
   [[nodiscard]] auto& getDialCollectionList() const{ return _dialManager_.getDialCollectionList(); }
   [[nodiscard]] auto& getParameterInjectorMc() const { return _parameterInjectorMc_; }
@@ -94,6 +96,10 @@ public:
   /// may cause a wait.  The future will be valid if the calculation was
   /// successfully started, true if the calculation has completed correctly,
   /// and false if the calculation started correctly, but failed.
+  /// Backends which own observable propagation pass false to retain the
+  /// prepared parameter/dial inputs without running host variable/bin updates.
+  void preparePropagation(bool updateEventVariables_ = true);
+  void invalidateVariableResponses(){ _eventVariableResponseCache_.invalidateState(); }
   std::future<bool> applyParameters();
 
   /// With updateDials=true, also update variable responses and dynamic binning.

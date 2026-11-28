@@ -18,6 +18,10 @@ public:
   /// Discard input references before the dial collections are rebuilt.
   /// Preserve which samples were made dynamic during configuration.
   void invalidate();
+  void invalidateState(){ _variableStateValid_ = false; }
+  [[nodiscard]] bool isAutomaticBinningSample(std::size_t sample_) const {
+    return sample_ < _variableDialBinningSamples_.size() and _variableDialBinningSamples_[sample_];
+  }
 
   /// Register required variables and enable migration before event loading.
   /// Repeated calls preserve explicitly configured dynamic binning.

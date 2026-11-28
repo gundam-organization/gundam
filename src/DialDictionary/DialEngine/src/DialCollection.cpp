@@ -633,8 +633,9 @@ void DialCollection::readResponseSupervisorConfig(const ConfigReader& config_){
   }
   GenericToolbox::Range limits;
   // Only final event weights are nonnegative by default. Variable responses
-  // and intermediate composite responses may be negative.
-  if( not _isCompositeNode_ and _applyToVariable_.empty() ){ limits.min = 0.; }
+  // (including multipliers) and intermediate composite responses may be negative.
+  limits.min = not _isCompositeNode_ and _applyToVariable_.empty()
+      ? 0. : std::nan("unset");
   if( config_.hasField("dialResponseLimits") ){
     limits = config_.fetchValue<GenericToolbox::Range>("dialResponseLimits");
     for( const auto& entry : {std::make_pair("minDialResponse", limits.min),
@@ -1410,7 +1411,7 @@ bool DialCollection::initializeDialsWithDefinition() {
              "dialsBinningDefinition requires Graph or Spline dials");
 
   if( _dialType_ == DialType::Composite ){
-    LogThrowIf(dialsDefinition.hasField("binning") or hasDialBranchData(),
+    LogThrowIf(dialsDefinition.hasField("binning") or dialsDefinition.hasField("dialsBinningDefinition") or hasDialBranchData(),
                "Composite: put binning and dialBranchData on individual nodes");
     std::vector<DialInputBuffer::ParameterReference> parameters;
     for( const auto& input : _config_.fetchValue<JsonType>("dialInputList") ){

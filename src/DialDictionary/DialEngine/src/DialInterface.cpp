@@ -10,6 +10,24 @@
 #include "Logger.h"
 
 
+double DialInterface::evalGradient(int iInput_) const {
+  const double rawResponse{_dial_->evalResponse(*_inputBufferPtr_)};
+  const double slope = _responseSupervisorPtr_->evalDerivative(rawResponse);
+  if( slope == 0. ){ return 0.; }
+  return slope * _dial_->evalGradient(*_inputBufferPtr_, iInput_);
+}
+
+std::vector<double> DialInterface::evalGradients() const {
+  const double rawResponse = _dial_->evalResponse(*_inputBufferPtr_);
+  const double slope = _responseSupervisorPtr_->evalDerivative(rawResponse);
+  if( slope == 0. ){
+    return std::vector<double>(_inputBufferPtr_->getInputBuffer().size(), 0.);
+  }
+  auto gradient = _dial_->evalGradients(*_inputBufferPtr_);
+  for( auto& value : gradient ){ value *= slope; }
+  return gradient;
+}
+
 std::string DialInterface::getSummary(bool shallow_) const {
   std::stringstream ss;
   ss << _dial_->getDialTypeName() << ":";

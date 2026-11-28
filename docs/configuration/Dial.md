@@ -27,7 +27,7 @@ external libraries to calculate weights.
 | minDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | see below |
 | maxDialResponse        | double       | Deprecated, still supported with a warning. Use `dialResponseLimits`.   | inf     |
 | dialResponseLimits     | range        | Response bounds as `[min, max]`, `{min: ...}`, or `{max: ...}`           | see below |
-| enableResponseSmoothing | bool       | Apply centered C^2 transitions at finite response bounds in the original engine | false |
+| enableResponseSmoothing | bool       | Apply centered C^2 transitions at finite response bounds | false |
 | dialResponseSmoothingWidth | positive number or range | Transition half-width, shared or separate for each bound | unset |
 | binningFilePath        | string       | binning definition of a set of spline (along with `dialsFilePath`)     |         |
 | useMirrorDial          | bool         | enable dial mirroring along the edges                                  | false   |
@@ -42,6 +42,10 @@ external libraries to calculate weights.
 | dialsBranch            | string       | Explicit object branch in the binned dial tree                         |         |
 | binnedDialsPath        | string       | Binned dial source as `file:tree:branch`                                |         |
 | dialsBinningDefinition | list(object) | Explicit bin dimensions read from the dial TTree; exclusive with `binning` |       |
+
+`options` is the common key for type-specific settings. `Spline`, `Graph` and
+`Surface` retain their string options (for example, `options: Bilinear`).
+`Formula`, `CompiledLibDial`, `Composite` and `ExternalWeight` use an object.
 
 ### Inputs from multiple parameter sets
 
@@ -137,16 +141,10 @@ choice: `Spline` for `dialType: Spline`, `Graph` for `dialType: Graph`. This
 implicit curve-branch selection emits a deprecation warning. The existing
 `dialsFilePath` plus `dialsList` object-array syntax is unchanged.
 
-`options` is the common key for type-specific settings. `Spline`, `Graph` and
-`Surface` retain their string options (for example, `options: Bilinear`).
-`Formula`, `CompiledLibDial`, `Composite` and `ExternalWeight` use an object.
-The old keys `dialSubType` and `dialConfig` remain readable aliases, with a
-rename warning. If multiple aliases are supplied, their values must agree.
-
 ### Smooth response limits
 
 Smooth the evaluated response near its bounds using centered quartic transitions
-(original engine only):
+(original engine, CPU and Metal backends; CacheManager is unsupported):
 
 ```yaml
 dialResponseLimits: [0.0, 2.0]
@@ -260,7 +258,7 @@ also applies to composites attached to a single parameter. Other nodes need
 an explicit, non-empty `dialInputList`.
 
 Nodes use the ordinary dial configuration, including interpolation options,
-response limits, extrapolation and input mirroring. Intermediate
+response limits and smoothing, extrapolation and input mirroring. Intermediate
 responses are unbounded by default so signed quantities can pass between
 nodes. Explicit node limits are applied before downstream evaluation. The
 composite's final response retains the usual weight/observable response limits.
@@ -292,7 +290,9 @@ inside a composite; use direct node definitions with explicit inputs.
 
 This first implementation uses the standard propagation engine, with its
 normal multithreaded event evaluation and response caching. `CacheManager`
-automatically disables itself when composites are present.
+automatically disables itself when composites are present. Explicit CPU,
+Metal and CUDA backends do not compile composite graphs yet: set
+`backendManagerConfig.isEnabled: false` when using a composite.
 
 #### `dialType: Normalization`
 
@@ -418,8 +418,7 @@ dialInputList:
   - {name: q3, eventVariable: q3}
 options:
   formulaStr: "[delta] + [alpha] * (0.056 * [q3] - 41.6)"
-minDialResponse: -40.
-maxDialResponse: 40.
+dialResponseLimits: [-40., 40.]
 ```
 
 Each input has a unique, non-empty `name`, which is the local alias used as

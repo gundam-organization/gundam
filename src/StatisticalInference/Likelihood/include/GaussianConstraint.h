@@ -2,12 +2,14 @@
 #define GUNDAM_GAUSSIAN_CONSTRAINT_H
 
 #include "ConfigUtils.h"
+#include "ParameterGradient.h"
 
 #include <memory>
 #include <string>
 #include <vector>
 
 class TFormula;
+class FormulaEvaluator;
 class Parameter;
 class ParametersManager;
 
@@ -26,6 +28,10 @@ public:
   [[nodiscard]] double evalFormula() const;
   [[nodiscard]] double evalResidual() const;
   [[nodiscard]] double eval() const;
+  // Validate ROOT/Clad support before fitting; no numerical fallback.
+  void validateGradient() const;
+  // Accumulate derivatives in physical coordinates, for requested parameters only.
+  void evalGradient(ParameterGradient& gradient_) const;
 
 protected:
   void configureImpl() override;
@@ -50,6 +56,7 @@ private:
   double _stdDev_{1};
   std::vector<ParameterReference> _parameterReferenceList_;
   std::shared_ptr<const TFormula> _formula_{};
+  std::shared_ptr<FormulaEvaluator> _gradientEvaluator_{};
 };
 
 #endif // GUNDAM_GAUSSIAN_CONSTRAINT_H

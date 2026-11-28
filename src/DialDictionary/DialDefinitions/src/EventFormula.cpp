@@ -30,7 +30,7 @@ EventFormula::EventFormula(const DialBase* formula_, std::shared_ptr<const Defin
   }
 }
 
-double EventFormula::evalResponse(const DialInputBuffer& input_) const {
+DialInputBuffer EventFormula::bindInputs(const DialInputBuffer& input_) const {
   std::vector<double> values;
   values.reserve(_definition_->inputs.size());
   for( const auto& source : _definition_->inputs ){
@@ -39,7 +39,30 @@ double EventFormula::evalResponse(const DialInputBuffer& input_) const {
   }
   DialInputBuffer buffer;
   buffer.setInputValues(std::move(values));
-  return _formula_->evalResponse(buffer);
+  return buffer;
+}
+
+double EventFormula::evalResponse(const DialInputBuffer& input_) const {
+  return _formula_->evalResponse(bindInputs(input_));
+}
+
+bool EventFormula::hasAnalyticGradient() const {
+  return _formula_->hasAnalyticGradient();
+}
+
+double EventFormula::evalGradient(const DialInputBuffer& input_, int iInput_) const {
+  if( iInput_ < 0 or size_t(iInput_) >= input_.getInputBuffer().size() ){ return 0.; }
+  const auto buffer = bindInputs(input_);
+  double gradient{0.};
+  // The caller indexes the collection's parameter-only input buffer. Map it
+  // into the formula's mixed layout and keep loaded event values constant.
+  for( size_t i = 0; i < _definition_->inputs.size(); ++i ){
+    const auto& source = _definition_->inputs[i];
+    if( source.eventIndex < 0 and source.parameterIndex == iInput_ ){
+      gradient += _formula_->evalGradient(buffer, int(i));
+    }
+  }
+  return gradient;
 }
 
 std::string EventFormula::getSummary() const {

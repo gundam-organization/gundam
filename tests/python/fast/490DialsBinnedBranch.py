@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Explicit bin sources, ROOT curve branches and historical curve defaults."""
+"""Explicit bin sources, ROOT curve branches and input validation."""
 import json
 import math
 import subprocess
@@ -189,10 +189,8 @@ def main():
         ({'binnedDialsPath': f'{path}:curves:response', 'dialsList': 'dials'}, 'cannot be combined with dialsList'),
     ):
         explicit.append(('Spline', source, 0, error))
-    legacy = [(kind, {'dialsFilePath': str(path), 'dialsTreePath': 'legacy'}, scale, None)
-              for kind, scale in (('Graph', .1), ('Spline', .2))]
     warning = 'Implicit binned dial branch selection is deprecated'
-    for name, cases, count in (('explicit', explicit, 0), ('legacy', legacy, 2)):
+    for name, cases, count in (('explicit', explicit, 0),):
         result = subprocess.run([sys.executable, str(Path(__file__).resolve()), '--exercise',
                                  str(path), json.dumps(cases)], text=True,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -206,7 +204,7 @@ def main():
             error = case[3]
             if error:
                 assert error in output, (error, output)
-    print('SUCCESS: explicit binning sources, ignored metadata and legacy curve warnings.')
+    print('SUCCESS: explicit binning sources, ignored metadata and validation errors.')
 
 
 if __name__ == '__main__':

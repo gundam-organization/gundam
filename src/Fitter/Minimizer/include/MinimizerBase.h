@@ -6,7 +6,7 @@
 #define GUNDAM_MINIMIZER_BASE_H
 
 #include "ConfigUtils.h"
-
+#include "ParameterGradient.h"
 
 
 #include "GenericToolbox.Utils.h"
@@ -94,6 +94,10 @@ public:
   /// point values and returns the likelihood. The meaning of the parameters is
   /// defined by the vector of pointers to Parameter returned by the LikelihoodInterface.
   virtual double evalFit( const double* parArray_ );
+  void evalFitGradient();
+  [[nodiscard]] const ParameterGradient& getGradient() const { return _gradient_; }
+  /// Analytic gradient callback in exactly the same coordinates as evalFit().
+  void evalFitGradientAt(const double* parArray_, double* gradient_);
 
   /// Throw a new parameter point around the post-fit best fit. By default,
   /// minimizers that do not provide post-fit throws leave the parameters
@@ -115,6 +119,7 @@ public:
   void setDisableCalcError(bool disableCalcError_){ _isEnabledCalcError_ = not disableCalcError_; }
 
   // const getters
+  [[nodiscard]] bool useNormalizedFitSpace() const { return _useNormalizedFitSpace_; }
   [[nodiscard]] bool isCheckFlatDirectionsBeforeMinimizeEnabled() const { return _checkFlatDirectionsBeforeMinimize_; }
   [[nodiscard]] bool disableCalcError() const{ return not _isEnabledCalcError_; }
 
@@ -150,7 +155,8 @@ public:
   // core
   void printParameters();
   [[nodiscard]] int fetchNbDegreeOfFreedom() const;
-
+  std::vector<Parameter *> &getMinimizerFitParameterList(){ return _minimizerParameterPtrList_; }
+  const std::vector<Parameter *> &getMinimizerFitParameterList() const{ return _minimizerParameterPtrList_; }
 
 protected:
   /// Get a reference to the FitterEngine that owns this minimizer.
@@ -175,12 +181,11 @@ protected:
   // validity without setting this to true.
   void setCheckParameterValidity(bool c) {_checkParameterValidity_ = c;}
 
-  // Query if a normalized fit space is being used.
-  bool useNormalizedFitSpace() const {return _useNormalizedFitSpace_;}
   int* getNbFreeParametersPtr() {return &_nbFreeParameters_;}
 
 protected:
   std::vector<Parameter*> _minimizerParameterPtrList_{};
+  ParameterGradient _gradient_;
   Monitor _monitor_{};
 
 private:

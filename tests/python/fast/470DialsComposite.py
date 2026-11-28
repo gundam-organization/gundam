@@ -85,15 +85,6 @@ def composite(nodes, output, **options):
                 options=dict(nodes=nodes, output=output), **options)
 
 
-def legacy_options(dial):
-    result = copy.deepcopy(dial)
-    if result['dialType'] == 'Composite':
-        result['options']['nodes'] = [legacy_options(node) for node in result['options']['nodes']]
-    if result['dialType'] in ('Composite', 'Formula', 'CompiledLibDial'):
-        result['dialConfig'] = result.pop('options')
-    return result
-
-
 def make_config(path, dial):
     binning = {'binningDefinition': [{'name': 'X', 'edges': [0, 1, 2, 3]}]}
     return {'enablePca': False, 'scaleParStepWithChi2Response': False,
@@ -204,8 +195,6 @@ def main():
             formula('source', '[arg0]', first),
             formula('left', '2*[arg0]', upstream)], 'output')
         exercise(path, dag, lambda p, q, i: max(0., 2 + 2*p + p*p + q))
-        if threads == 1:
-            exercise(path, legacy_options(dag), lambda p, q, i: max(0., 2 + 2*p + p*p + q))
 
         # Nested composites infer their own dependencies from direct references.
         nested = composite([formula('sum', '2+[arg0]+[arg1]', upstream, second),
@@ -250,13 +239,21 @@ def main():
             exercise(path, composite([formula('source', '[arg0]', first), node], 'curve'), reference)
 
         # Limits act at each node, then separately at the graph output.
-        limited = composite([formula('source', '[arg0]', first, minDialResponse=-.2, maxDialResponse=.8),
-                             formula('output', '1+[arg0]', upstream)], 'output', minDialResponse=0., maxDialResponse=1.5)
+        limited = composite([formula('source', '[arg0]', first, dialResponseLimits=[-.2, .8]),
+                             formula('output', '1+[arg0]', upstream)], 'output', dialResponseLimits=[0., 1.5])
         exercise(path, limited, lambda p, q, i: min(1.5, 1 + min(.8, max(-.2, p))))
         mirrored = composite([dict(name='source', dialType='Normalization', dialInputList=[first],
                                    useMirrorDial=True, mirrorLowEdge=0., mirrorHighEdge=1.),
                               formula('output', '1+[arg0]', upstream)], 'output')
         exercise(path, mirrored, lambda p, q, i: 1 + (abs(p) if abs(p) <= 1 else 2-abs(p)))
+        smoothed = composite([dict(name='source', dialType='Normalization', dialInputList=[first],
+                                   dialResponseLimits={'min': 0.}, enableResponseSmoothing=True,
+                                   dialResponseSmoothingWidth=.2),
+                              formula('output', '1+[arg0]', upstream)], 'output')
+        def smooth_reference(p, q, i):
+            t = (p + .2)/.4
+            return 1 + (0. if p <= -.2 else p if p >= .2 else .2*(2*t**3-t**4))
+        exercise(path, smoothed, smooth_reference, points=[(.5, .25), (0., .25), (-.1, .25), (.1, .25)])
         observable = composite([formula('source', '[arg0]+[arg1]', first, second)], 'source',
                                applyToVariable='X', variableResponseMode='Override')
         exercise(path, observable, lambda p, q, i: p + q, observable=True)
@@ -345,8 +342,6 @@ def main():
     compiled = dict(name='compiled', dialType='CompiledLibDial', dialInputList=[upstream, second],
                     options={'libraryFile': str(library)})
     exercise(path, composite([formula('source', '[arg0]*[arg0]', first), compiled], 'compiled'),
-             lambda p, q, i: 2 + p*p + 3*q)
-    exercise(path, legacy_options(composite([formula('source', '[arg0]*[arg0]', first), compiled], 'compiled')),
              lambda p, q, i: 2 + p*p + 3*q)
 
     # Prepared factories remain usable as sources driven by graph parameters.

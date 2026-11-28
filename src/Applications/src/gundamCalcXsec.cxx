@@ -5,10 +5,15 @@
 #include "RootUtils.h"
 #include "FitterEngine.h"
 #include "ConfigUtils.h"
+#include "CliConfigOverride.h"
+#ifdef GUNDAM_USING_BACKENDS
+#include "BackendFactory.h"
+#endif
 
 #include "Logger.h"
 #include "CmdLineParser.h"
 #include "GenericToolbox.Root.h"
+#include "GenericToolbox.String.h"
 #include "GenericToolbox.Utils.h"
 
 #include <TFile.h>
@@ -35,6 +40,10 @@ int main(int argc, char** argv){
   clParser.addOption("fitterFile", {"-f"}, "Specify the fitter output file");
   clParser.addOption("outputFile", {"-o", "--out-file"}, "Specify the CalcXsec output file");
   clParser.addOption("nbThreads", {"-t", "--nb-threads"}, "Specify nb of parallel threads");
+#ifdef GUNDAM_USING_BACKENDS
+  const auto backendChoices = GenericToolbox::joinVectorString(Backends::getCompiledBackendNames(), "/");
+  clParser.addOption("backend", {"--backend"}, "Enable and select the computation backend (" + backendChoices + ")");
+#endif
   clParser.addOption("nToys", {"-n"}, "Specify number of toys");
   clParser.addOption("randomSeed", {"-s", "--seed"}, "Set random seed");
 
@@ -145,6 +154,7 @@ int main(int argc, char** argv){
     // Defining signal samples
     cHandler.override( xsecConfig.getConfig() );
 
+    CliConfigOverride::applyConfigOverride(clParser, cHandler.getConfig());
     engineConfig.setConfig(cHandler.getConfig());
   }
 
@@ -266,6 +276,29 @@ int main(int argc, char** argv){
   }
 
 
+
+#ifdef GUNDAM_USING_BACKENDS
+  auto& backendsManager = fitter.getBackendsManager();
+  if( clParser.isOptionTriggered("backend") ){
+    backendsManager.setLikelihoodInterfacePtr(&fitter.getLikelihoodInterface());
+    backendsManager.setMaterializeOutputList({Backends::OutputRequest::EventState});
+    backendsManager.initialize();
+  }
+#endif
+
+  const auto propagateParameters = [&]{
+#ifdef GUNDAM_USING_BACKENDS
+    if( backendsManager.hasBackend() ){
+      auto propagation = backendsManager.propagate();
+      LogThrowIf(not propagation.valid() or not propagation.get().isValid,
+                 "The selected backend could not propagate the cross-section parameters.");
+      backendsManager.materialize(Backends::OutputRequest::EventWeights);
+      backendsManager.materialize(Backends::OutputRequest::Histograms);
+      return;
+    }
+#endif
+    propagator.propagateParameters();
+  };
 
   // Creating output file
   std::string outFilePath{};
@@ -682,7 +715,7 @@ int main(int argc, char** argv){
   {
     LogWarning << "Calculating weight at best-fit" << std::endl;
     for( auto& parSet : propagator.getParametersManager().getParameterSetsList() ){ parSet.moveParametersToPrior(); }
-    propagator.propagateParameters();
+    propagateParameters();
     writeBinDataFct(false);
     xsecAtBestFitTree->Fill();
     GenericToolbox::writeInTFileWithObjTypeExt( GenericToolbox::mkdirTFile(calcXsecDir, "throws"), xsecAtBestFitTree );
@@ -734,7 +767,7 @@ int main(int argc, char** argv){
     throwTimer.stop();
 
     propagateTimer.start();
-    propagator.propagateParameters();
+    propagateParameters();
 
     if( enableStatThrowInToys ){
       for( auto& xsec : crossSectionDataList ){

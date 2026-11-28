@@ -37,6 +37,14 @@ public:
   /// Evaluate the dial response at the set of parameter values in DialInputBuffer.
   [[nodiscard]] virtual double evalResponse(const DialInputBuffer& input_) const = 0;
 
+  /// Evaluate d(response)/d(input[iInput_]) at the current input point.
+  [[nodiscard]] virtual double evalGradient(const DialInputBuffer& input_, int iInput_) const;
+
+  /// Full gradient; composed dials override this to share their evaluation.
+  [[nodiscard]] virtual std::vector<double> evalGradients(const DialInputBuffer& input_) const;
+
+  [[nodiscard]] virtual bool hasAnalyticGradient() const { return false; }
+
   /// Allow extrapolation of the data. The default should be to forbid extrapolation.
   virtual void setAllowExtrapolation(bool allow_){}
   [[nodiscard]] virtual bool getAllowExtrapolation() const {return false;}

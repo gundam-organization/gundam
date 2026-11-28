@@ -761,7 +761,8 @@ void ParameterSet::propagateOriginalToEigen(){
   // First propagate to the buffer
   int iParOffSet{0};
   for( const auto& par : _parameterList_ ){
-    if( not isValidCorrelatedParameter(par) ) continue;
+    // Keep exactly the same coordinates/order as the stripped covariance.
+    if( not ParameterSet::isValidCorrelatedParameter(par) ) continue;
     (*_originalParBuffer_)[iParOffSet++] = par.getParameterValue();
   }
 
@@ -787,7 +788,7 @@ void ParameterSet::propagateEigenToOriginal(){
   // Propagate back to the real parameters
   int iParOffSet{0};
   for( auto& par : _parameterList_ ){
-    if( not isValidCorrelatedParameter(par) ) continue;
+    if( not ParameterSet::isValidCorrelatedParameter(par) ) continue;
     par.setParameterValue((*_originalParBuffer_)[iParOffSet++], true);
   }
 }
