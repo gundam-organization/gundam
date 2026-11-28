@@ -2,6 +2,7 @@
 #define GUNDAM_CPU_BACKEND_H
 
 #include "EngineView.h"
+#include "BinFactors.h"
 #include "NativeDialProgramModel.h"
 #include "EventStateCache.h"
 #include "PropagationResult.h"
@@ -141,7 +142,8 @@ ENUM_FIELD( Indexed )
     mutable bool _eventWeightsValid_{true};
     bool _enableBinFactorization_{true};
     bool _residualHistogramsValid_{false};
-    std::vector<std::uint32_t> _binFactors_{}, _factoredDials_{};
+    BinFactors _binFactors_{};
+    std::vector<std::uint32_t> _factoredDials_{};
     struct BinFactorExternalDial {
       std::uint32_t index;
       bool affectsResidual;

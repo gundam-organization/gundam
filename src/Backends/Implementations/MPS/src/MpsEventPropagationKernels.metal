@@ -88,6 +88,7 @@ kernel void propagate_event_state(
     device ObservableScalar* eventWeights [[buffer(10)]],
     constant DevicePropagationControl& control [[buffer(11)]],
     device const uint* binFactors [[buffer(12)]],
+    device const uint* factoredDialMask [[buffer(13)]],
     uint gid [[thread_position_in_grid]]) {
   if( gid >= control.eventCount ){ return; }
   auto event = events[gid];
@@ -115,8 +116,16 @@ kernel void propagate_event_state(
     // contaminates the finite differences of a nonzero likelihood.
     ObservableScalar weight(1.f);
     uint factor = UINT_MAX;
-    if( control.factorEventWeights && event.fixedBin >= 0 ){ factor = binFactors[sample.binOffset + event.fixedBin]; }
-    if( factor == UINT_MAX ){
+    if( control.binFactorMode == DeviceBinFactorMode::Single && event.fixedBin >= 0 ){
+      factor = binFactors[sample.binOffset + event.fixedBin];
+    }
+    if( control.binFactorMode == DeviceBinFactorMode::Multiple ){
+      for( uint i = event.firstDial; i < event.firstDial + event.dialCount; ++i ){
+        uint dial = weightDialIndices[i];
+        if( (factoredDialMask[dial / 32] & (1u << (dial % 32))) == 0 ){ weight *= responses[dial]; }
+      }
+    }
+    else if( factor == UINT_MAX ){
       for( uint i = event.firstDial; i < event.firstDial + event.dialCount; ++i ){ weight *= responses[weightDialIndices[i]]; }
     }
     else{
@@ -134,15 +143,41 @@ kernel void apply_bin_factors(
     device const uint* binFactors [[buffer(0)]], device const ObservableScalar* responses [[buffer(1)]],
     device const ObservableScalar* residualSums [[buffer(2)]], device const ObservableScalar* residualSquares [[buffer(3)]],
     device ObservableScalar* sums [[buffer(4)]], device ObservableScalar* squares [[buffer(5)]],
-    constant DevicePropagationControl& control [[buffer(6)]], uint gid [[thread_position_in_grid]]) {
-  if( gid >= control.histogramBins || control.error ){ return; }
-  uint dial = binFactors[gid];
+    device DevicePropagationControl& control [[buffer(6)]], device const uint* factorOffsets [[buffer(7)]],
+    uint gid [[thread_position_in_grid]]) {
+  if( gid >= control.histogramBins ||
+      atomic_load_explicit((device atomic_uint*)&control.error, memory_order_relaxed) ){ return; }
   auto sum = residualSums[gid];
   auto square = residualSquares[gid];
-  if( dial != UINT_MAX ){
-    auto factor = responses[dial];
-    sum *= factor;
-    square *= factor * factor;
+  if( control.binFactorMode == DeviceBinFactorMode::Multiple ){
+    const uint first = factorOffsets[gid], last = factorOffsets[gid + 1];
+    if( first != last ){
+      const ObservableScalar zero(0.f);
+      auto factor = responses[binFactors[first]];
+      for( uint i = first + 1; i < last; ++i ){
+        const auto response = responses[binFactors[i]];
+        const auto product = factor * response;
+        if( product == zero && factor != zero && response != zero ){
+          propagation_error(control, invalidBinFactorProduct);
+          return;
+        }
+        factor = product;
+      }
+      sum *= factor;
+      square = (square * factor) * factor;
+      if( !isfinite(float(sum)) || !isfinite(float(square)) || (factor != zero && square == zero && sum != zero) ){
+        propagation_error(control, invalidBinFactorProduct);
+        return;
+      }
+    }
+  }
+  else{
+    const uint dial = binFactors[gid];
+    if( dial != UINT_MAX ){
+      auto factor = responses[dial];
+      sum *= factor;
+      square *= factor * factor;
+    }
   }
   sums[gid] = sum;
   squares[gid] = square;

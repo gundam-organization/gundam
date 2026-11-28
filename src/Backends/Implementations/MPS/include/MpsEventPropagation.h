@@ -45,7 +45,7 @@ namespace Backends {
       Events, Samples, Dials, DialInputs, DialInputRanges, Targets, Intervals, Bins, Nodes, Bounds, NodeBins, ReusableBins,
       WeightDialIndices, VariableDialIndices, Payloads, Parameters, ExternalWeights, Responses, DialIndices, DialRanges,
       Variables, HostValues, HostEdits, DirtyEvents, HardBins, EventCounts, Contributions, ChangedSamples, Control,
-      EventWeights, BinCounts, BinPositions, BinContributions, ChunkOffsets, Chunks, BinFactors, ResidualSums, ResidualSquares,
+      EventWeights, BinCounts, BinPositions, BinContributions, ChunkOffsets, Chunks, BinFactors, BinFactorOffsets, FactoredDialMask, ResidualSums, ResidualSquares,
       PartialSums, PartialSquares, HistogramSums, HistogramSquares, ReadbackSums, ReadbackSquares,
       ReadbackVariables, ReadbackBins, ReadbackCounts, ReadbackContributions, ReadbackWeights, FormulaPrograms, FormulaInstructions, FormulaConstants,
       ProgramInputs, CompositePrograms, CompositeInstructions, ProgramScratch, LikelihoodBins, LikelihoodCount, LikelihoodPartials, LikelihoodTotal, LikelihoodReadback, GradientDials, GradientEvents, GradientBins, GradientIndices, GradientOffsets, GradientOccurrences, GradientResponses, GradientScales, GradientContributions, GradientTotal, GradientReadback, GradientBindings, GradientRanges, GradientInputOffsets, GradientScratch, GradientExternal, GradientWork, Count
@@ -56,8 +56,8 @@ namespace Backends {
     struct MultiDialGroup { std::vector<std::size_t> parameters; std::size_t first, count; };
     std::vector<MultiDialGroup> _multiDialGroups_{};
     void buildDialCache();
-    [[nodiscard]] std::vector<DeviceIndex> findBinFactors() const;
     bool usesBinFactorization() const;
+    void propagateImpl(const PropagationInputs& inputs_, PropagationResult& result_, BackendTimingSummary& timing_, bool factor_);
     std::size_t prepareDialCache(const PropagationInputs& inputs_, bool& updateWeights_, bool& updateResidualWeights_);
     void encodeEventWeights(id<MTLComputeCommandEncoder> encoder_);
     void ensureEventWeights();
@@ -88,8 +88,9 @@ namespace Backends {
     bool _enableDialCache_{true};
     bool _enableBinFactorization_{true};
     bool _eventWeightsValid_{false};
+    bool _residualHistogramsValid_{false};
     bool _lastReusedResidualHistograms_{false};
-    std::size_t _factoredBinCount_{0}, _factoredParameterCount_{0}, _binFactorReuseCount_{0};
+    std::size_t _factoredBinCount_{0}, _multiFactorBinCount_{0}, _factoredParameterCount_{0}, _binFactorReuseCount_{0};
     std::size_t _factoredExternalBlockCount_{0};
     std::vector<DialGroup> _dialGroups_{};
     std::vector<double> _cachedParameters_{};

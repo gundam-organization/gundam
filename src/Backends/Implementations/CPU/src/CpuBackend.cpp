@@ -1,5 +1,4 @@
 #include "CpuBackend.h"
-#include "BinFactors.h"
 #include "CpuWeightKernels.h"
 #include "CpuCompositeProgram.h"
 #include "CpuFormulaProgram.h"
@@ -801,7 +800,7 @@ void Backends::CpuBackend::initializeBinFactorization() {
   const auto& model = _engineView_->propagation;
   _residualHistogramsValid_ = false;
   _eventWeightsValid_ = true;
-  _binFactors_.clear();
+  _binFactors_ = {};
   _factoredDials_.clear();
   _factorResponses_.clear();
   _residualSums_.clear();
@@ -814,7 +813,7 @@ void Backends::CpuBackend::initializeBinFactorization() {
     const auto& dial = model.dials[index_];
     return canFactorWeightDial(dial) and (_isCachedDial_[index_] or isPublishedWeightDial(dial));
   });
-  if( std::none_of(_binFactors_.begin(), _binFactors_.end(), [](auto dial_){ return dial_ != noBinFactor; }) ){ return; }
+  if( _binFactors_.dials.empty() ){ return; }
   std::vector<BinFactorExternalDial> publishedDials;
   std::size_t publishedFactorCount{0};
   auto dependencies = classifyBinFactorDependencies(model, _binFactors_, [&](std::uint32_t dial_, bool residual_){
@@ -825,16 +824,15 @@ void Backends::CpuBackend::initializeBinFactorization() {
     return true;
   });
   if( dependencies.factoredBins == 0 or (dependencies.reusableParameters == 0 and publishedFactorCount == 0) ){ return; }
-  for( auto dial : _binFactors_ ){
-    if( dial != noBinFactor ){ _factoredDials_.push_back(dial); }
-  }
+  _factoredDials_ = _binFactors_.dials;
   std::sort(_factoredDials_.begin(), _factoredDials_.end());
   _factoredDials_.erase(std::unique(_factoredDials_.begin(), _factoredDials_.end()), _factoredDials_.end());
   _residualWeightParameters_ = std::move(dependencies.residualParameters);
   _binFactorExternalDials_ = std::move(publishedDials);
   _allWeightResponsesCached_ = true;
   _factorResponses_.resize(_factoredDials_.size());
-  LogInfo << "CPU bin factorization: " << dependencies.factoredBins << " fixed bins, "
+  LogInfo << "CPU bin factorization: " << dependencies.factoredBins << " fixed bins ("
+          << dependencies.multiFactorBins << " with multiple factors), "
           << dependencies.reusableParameters << " parameters and " << publishedFactorCount
           << " published dial responses can reuse cached histogram sums." << std::endl;
 }
@@ -868,11 +866,17 @@ bool Backends::CpuBackend::calculateFactoredHistograms(const PropagationInputs& 
     _residualHistogramsValid_ = true;
   }
   const auto start = std::chrono::steady_clock::now();
-  _lastResult_.histSums.resize(_binFactors_.size());
-  _lastResult_.histSumSquares.resize(_binFactors_.size());
-  for( std::size_t bin = 0; bin < _binFactors_.size(); ++bin ){
-    const auto dial = _binFactors_[bin];
-    const double factor = dial == noBinFactor ? 1. : _cachedDialResponses_[dial];
+  const auto binCount = _binFactors_.offsets.size() - 1;
+  _lastResult_.histSums.resize(binCount);
+  _lastResult_.histSumSquares.resize(binCount);
+  for( std::size_t bin = 0; bin < binCount; ++bin ){
+    double factor{1.};
+    for( auto i = _binFactors_.offsets[bin]; i < _binFactors_.offsets[bin + 1]; ++i ){
+      const double response = _cachedDialResponses_[_binFactors_.dials[i]];
+      const double product = factor * response;
+      if( product == 0. and factor != 0. and response != 0. ){ return false; }
+      factor = product;
+    }
     const double sum = _residualSums_[bin] * factor;
     const double square = (_residualSquares_[bin] * factor) * factor;
     // Reassociation can overflow in a residual even when the original product

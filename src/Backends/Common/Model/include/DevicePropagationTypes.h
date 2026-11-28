@@ -117,6 +117,8 @@ namespace Backends {
   struct DeviceBinContribution { DeviceIndex event; int binIndex; ObservableScalar fraction; };
   struct DeviceHistogramChunk { DeviceIndex begin, end; };
   struct DevicePropagationDialRange { DeviceIndex firstThread, firstDial, count; };
+  enum class DeviceBinFactorMode : DeviceIndex { Disabled, Single, Multiple };
+  enum : DeviceIndex { invalidBinFactorProduct = 8 };
   struct DevicePropagationControl {
     DeviceIndex error, rebuildIndex, rebinnedEvents, candidates, chunkCount, contributionCount;
     DeviceIndex updateVariables, forceBinning, firstPropagation, editCount;
@@ -124,7 +126,7 @@ namespace Backends {
     DeviceIndex eventCount, histogramBins, dialCount, sampleCount;
     DeviceIndex hasReweightCap;
     ObservableScalar maxReweight;
-    DeviceIndex factorEventWeights;
+    DeviceBinFactorMode binFactorMode;
   };
 }
 #endif

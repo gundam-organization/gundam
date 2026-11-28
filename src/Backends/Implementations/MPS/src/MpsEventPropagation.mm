@@ -207,14 +207,6 @@ void Backends::MpsEventPropagation::build(const PropagationView& model_, const L
           << bufferBytes / (1024. * 1024.) << " MiB allocated (private and shared Metal buffers)." << std::endl;
 }
 
-std::vector<Backends::DeviceIndex> Backends::MpsEventPropagation::findBinFactors() const {
-  return Backends::findBinFactors(*_model_, _packed_.histogramBins, [this](const auto& event_){
-    const auto& packed = _packed_.events[event_.resultIndex];
-    if( packed.fixedBin < 0 ){ return std::size_t(-1); }
-    return std::size_t(_packed_.samples[packed.sample].binOffset) + packed.fixedBin;
-  }, [this](DeviceIndex dial_){ return canFactorWeightDial(_model_->dials[dial_]); });
-}
-
 bool Backends::MpsEventPropagation::usesBinFactorization() const {
   return _enableBinFactorization_ and _enableDialCache_ and (_factoredParameterCount_ != 0 or _factoredExternalBlockCount_ != 0);
 }
@@ -230,7 +222,11 @@ void Backends::MpsEventPropagation::buildDialCache() {
   _lastReusedResidualHistograms_ = false;
   _binFactorReuseCount_ = 0;
   _eventWeightsValid_ = false;
-  const auto binFactors = findBinFactors();
+  const auto binFactors = findBinFactors(*_model_, _packed_.histogramBins, [this](const auto& event_){
+    const auto& packed = _packed_.events[event_.resultIndex];
+    if( packed.fixedBin < 0 ){ return std::size_t(-1); }
+    return std::size_t(_packed_.samples[packed.sample].binOffset) + packed.fixedBin;
+  }, [this](DeviceIndex dial_){ return canFactorWeightDial(_model_->dials[dial_]); });
   auto groups = buildDialDependencyGroups<DeviceIndex>(model, model.dials);
   std::vector<DeviceIndex> indices = std::move(groups.parameterDialIndices);
   for( std::size_t parameter = 0; parameter < model.parameterCount; ++parameter ){
@@ -258,6 +254,7 @@ void Backends::MpsEventPropagation::buildDialCache() {
   LogThrowIf(not buffer(Buffer::DialIndices) or not buffer(Buffer::DialRanges), "Metal dial cache allocation failed.");
   auto dependencies = classifyBinFactorDependencies(model, binFactors, [](DeviceIndex, bool){ return true; });
   _factoredBinCount_ = dependencies.factoredBins;
+  _multiFactorBinCount_ = dependencies.multiFactorBins;
   _factoredParameterCount_ = dependencies.reusableParameters;
   _factoredExternalBlockCount_ = dependencies.reusableExternalBlocks;
   _weightParameters_ = std::move(dependencies.weightParameters);
@@ -265,16 +262,37 @@ void Backends::MpsEventPropagation::buildDialCache() {
   _residualWeightParameters_ = std::move(dependencies.residualParameters);
   _residualWeightExternalBlocks_ = std::move(dependencies.residualExternalBlocks);
   const bool canReuse = _factoredParameterCount_ != 0 or _factoredExternalBlockCount_ != 0;
-  _buffers_[std::size_t(Buffer::BinFactors)] = canReuse ? makePrivateBuffer(_device_, _queue_, binFactors)
-      : makePrivateEmptyBuffer(_device_, sizeof(DeviceIndex));
-  LogThrowIf(buffer(Buffer::BinFactors) == nil, "Metal bin factor allocation failed.");
+  std::vector<DeviceIndex> singleFactors, factoredDialMask;
+  if( canReuse and _multiFactorBinCount_ == 0 ){
+    singleFactors.assign(_packed_.histogramBins, std::numeric_limits<DeviceIndex>::max());
+    for( std::size_t bin = 0; bin < singleFactors.size(); ++bin ){
+      const auto first = binFactors.offsets[bin];
+      if( first < binFactors.offsets[bin + 1] ){ singleFactors[bin] = binFactors.dials[first]; }
+    }
+  }
+  else if( canReuse ){
+    // A selected dial is a factor at every occurrence, so one bit per dial
+    // suffices for the event kernel, independent of the number of factors.
+    factoredDialMask.resize((model.dials.size() + 31) / 32);
+    for( auto dial : binFactors.dials ){ factoredDialMask[dial / 32] |= DeviceIndex(1) << (dial % 32); }
+  }
+  const auto uploadFactors = [&](Buffer slot_, const std::vector<DeviceIndex>& values_, bool enabled_){
+    _buffers_[std::size_t(slot_)] = enabled_ ? makePrivateBuffer(_device_, _queue_, values_)
+        : makePrivateEmptyBuffer(_device_, sizeof(DeviceIndex));
+    LogThrowIf(buffer(slot_) == nil, "Metal bin factor allocation failed.");
+  };
+  const bool multiple = canReuse and _multiFactorBinCount_ != 0;
+  uploadFactors(Buffer::BinFactors, multiple ? binFactors.dials : singleFactors, canReuse);
+  uploadFactors(Buffer::BinFactorOffsets, binFactors.offsets, multiple);
+  uploadFactors(Buffer::FactoredDialMask, factoredDialMask, multiple);
   if( canReuse ){
     for( auto slot : {Buffer::ResidualSums, Buffer::ResidualSquares} ){
-      _buffers_[std::size_t(slot)] = makePrivateEmptyBuffer(_device_, binFactors.size() * sizeof(ObservableScalar));
+      _buffers_[std::size_t(slot)] = makePrivateEmptyBuffer(_device_, _packed_.histogramBins * sizeof(ObservableScalar));
       LogThrowIf(buffer(slot) == nil, "Metal residual histogram allocation failed.");
     }
     if( usesBinFactorization() ){
-      LogInfo << "MPS bin factorization: " << _factoredBinCount_ << " fixed bins, "
+      LogInfo << "MPS bin factorization: " << _factoredBinCount_ << " fixed bins ("
+              << _multiFactorBinCount_ << " with multiple factors), "
               << _factoredParameterCount_ << " parameters and " << _factoredExternalBlockCount_
               << " external blocks can reuse cached histogram sums." << std::endl;
     }
@@ -361,14 +379,15 @@ void Backends::MpsEventPropagation::copy(id<MTLBlitCommandEncoder> encoder_, Buf
 void Backends::MpsEventPropagation::encodeEventWeights(id<MTLComputeCommandEncoder> encoder_) {
   dispatch(encoder_, Kernel::Events, _model_->events.size(), {Buffer::Events, Buffer::Samples, Buffer::Targets, Buffer::WeightDialIndices,
       Buffer::VariableDialIndices, Buffer::Responses, Buffer::HostValues, Buffer::HostEdits, Buffer::Variables,
-      Buffer::DirtyEvents, Buffer::EventWeights, Buffer::Control, Buffer::BinFactors});
+      Buffer::DirtyEvents, Buffer::EventWeights, Buffer::Control, Buffer::BinFactors, Buffer::FactoredDialMask});
 }
 
 void Backends::MpsEventPropagation::ensureEventWeights() {
   if( _eventWeightsValid_ ){ return; }
   auto& control = *static_cast<DevicePropagationControl*>(buffer(Buffer::Control).contents);
   const auto previous = control;
-  control.factorEventWeights = control.updateVariables = control.forceBinning = control.firstPropagation = control.editCount = 0;
+  control.binFactorMode = DeviceBinFactorMode::Disabled;
+  control.updateVariables = control.forceBinning = control.firstPropagation = control.editCount = 0;
   control.updateWeights = 1;
   auto command = [_queue_ commandBuffer];
   auto encoder = [command computeCommandEncoder];
@@ -388,6 +407,11 @@ void Backends::MpsEventPropagation::ensureEventWeights() {
 }
 
 void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, PropagationResult& result_, BackendTimingSummary& timing_) {
+  propagateImpl(inputs_, result_, timing_, usesBinFactorization());
+}
+
+void Backends::MpsEventPropagation::propagateImpl(const PropagationInputs& inputs_, PropagationResult& result_,
+                                                 BackendTimingSummary& timing_, bool factor_) {
   _diagnosticStageGpuSeconds_.clear();
   const auto& model = *_model_;
   inputs_.validate(model, _dialCount_, [&](std::size_t index_){
@@ -437,13 +461,14 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
     }
   }
   const bool rebin = _cache_.needsUpdate(inputs_) or not _valid_;
-  const bool factor = usesBinFactorization();
-  const bool updatePrediction = updateWeights or rebin;
-  const bool rebuildHistograms = rebin or (factor ? updateResidualWeights : updateWeights);
-  control.factorEventWeights = factor;
-  control.updateWeights = updateWeights or (factor and rebin);
+  const bool rebuildResiduals = factor_ and not _residualHistogramsValid_;
+  const bool updatePrediction = updateWeights or rebin or rebuildResiduals;
+  const bool rebuildHistograms = rebin or rebuildResiduals or (factor_ ? updateResidualWeights : updateWeights);
+  control.binFactorMode = not factor_ ? DeviceBinFactorMode::Disabled
+      : _multiFactorBinCount_ ? DeviceBinFactorMode::Multiple : DeviceBinFactorMode::Single;
+  control.updateWeights = updateWeights or rebuildResiduals or (factor_ and rebin);
   _lastUpdatedWeights_ = control.updateWeights and rebuildHistograms;
-  _lastReusedResidualHistograms_ = factor and updatePrediction and not rebuildHistograms;
+  _lastReusedResidualHistograms_ = factor_ and updatePrediction and not rebuildHistograms;
   _lastUpdatedPrediction_ = updatePrediction;
   auto encodeStart = std::chrono::steady_clock::now();
   auto command = [_queue_ commandBuffer];
@@ -465,13 +490,13 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
     dispatch(encoder, parallel ? Kernel::ReduceParallel : Kernel::Reduce, std::size_t(_packed_.histogramChunkCapacity) * (parallel ? 32 : 1), {Buffer::Chunks, Buffer::BinContributions, Buffer::Contributions,
       Buffer::EventWeights, Buffer::PartialSums, Buffer::PartialSquares, Buffer::Control});
     dispatch(encoder, Kernel::Finish, _packed_.histogramBins, {Buffer::ChunkOffsets, Buffer::PartialSums, Buffer::PartialSquares,
-      factor ? Buffer::ResidualSums : Buffer::HistogramSums, factor ? Buffer::ResidualSquares : Buffer::HistogramSquares, Buffer::Control});
+      factor_ ? Buffer::ResidualSums : Buffer::HistogramSums, factor_ ? Buffer::ResidualSquares : Buffer::HistogramSquares, Buffer::Control});
   }
   // Residual sums stay resident across updates to the common factors.
   if( updatePrediction ){
-    if( factor ){
+    if( factor_ ){
       dispatch(encoder, Kernel::ApplyBinFactors, _packed_.histogramBins, {Buffer::BinFactors, Buffer::Responses,
-          Buffer::ResidualSums, Buffer::ResidualSquares, Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::Control});
+          Buffer::ResidualSums, Buffer::ResidualSquares, Buffer::HistogramSums, Buffer::HistogramSquares, Buffer::Control, Buffer::BinFactorOffsets});
     }
     if( _deviceLikelihood_ ){
       dispatch(encoder, Kernel::LikelihoodPartials, _likelihoodWork_.partialCount,
@@ -492,6 +517,11 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   timing_.deviceWaitSeconds += secondsSince(waitStart);
   timing_.devicePropagationSeconds += command.GPUEndTime - command.GPUStartTime;
   for( const auto& stage : _diagnosticStageGpuSeconds_ ){ timing_.devicePropagationSeconds += stage.second; }
+  if( command.status == MTLCommandBufferStatusCompleted and factor_ and control.error == invalidBinFactorProduct ){
+    invalidate();
+    propagateImpl(inputs_, result_, timing_, false);
+    return;
+  }
   if( command.status != MTLCommandBufferStatusCompleted || control.error ){
     _cache_.invalidate();
     _valid_ = false;
@@ -502,7 +532,8 @@ void Backends::MpsEventPropagation::propagate(const PropagationInputs& inputs_, 
   for( std::size_t i = 0; i < inputs_.externalWeights.size(); ++i ){ _cachedExternalGenerations_[i] = inputs_.externalWeights[i].generation; }
   _lastRebuiltIndex_ = control.rebuildIndex != 0;
   _valid_ = true;
-  if( control.updateWeights ){ _eventWeightsValid_ = not factor; }
+  if( control.updateWeights ){ _eventWeightsValid_ = not factor_; }
+  _residualHistogramsValid_ = factor_;
   if( _lastReusedResidualHistograms_ ){ ++_binFactorReuseCount_; }
   if( _deviceLikelihood_ ){
     const auto value = *static_cast<const ObservableScalar*>(buffer(Buffer::LikelihoodReadback).contents);
@@ -655,6 +686,7 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   out["dialCacheEnabled"] = _enableDialCache_;
   out["binFactorizationEnabled"] = usesBinFactorization();
   out["factoredBins"] = _factoredBinCount_;
+  out["multiFactorBins"] = _multiFactorBinCount_;
   out["factoredParameters"] = _factoredParameterCount_;
   out["factoredExternalBlocks"] = _factoredExternalBlockCount_;
   out["binFactorReuseCount"] = _binFactorReuseCount_;
@@ -665,7 +697,7 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   out["contributionCapacity"] = _packed_.contributionCapacity;
   out["histogramChunkCapacity"] = _packed_.histogramChunkCapacity;
   out["buffers"] = JsonType::array();
-  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "BinFactors", "ResidualSums", "ResidualSquares", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights", "FormulaPrograms", "FormulaInstructions", "FormulaConstants", "ProgramInputs", "CompositePrograms", "CompositeInstructions", "ProgramScratch", "LikelihoodBins", "LikelihoodCount", "LikelihoodPartials", "LikelihoodTotal", "LikelihoodReadback", "GradientDials", "GradientEvents", "GradientBins", "GradientIndices", "GradientOffsets", "GradientOccurrences", "GradientResponses", "GradientScales", "GradientContributions", "GradientTotal", "GradientReadback", "GradientBindings", "GradientRanges", "GradientInputOffsets", "GradientScratch", "GradientExternal", "GradientWork"};
+  const char* names[]{"Events", "Samples", "Dials", "DialInputs", "DialInputRanges", "Targets", "Intervals", "Bins", "Nodes", "Bounds", "NodeBins", "ReusableBins", "WeightDialIndices", "VariableDialIndices", "Payloads", "Parameters", "ExternalWeights", "Responses", "DialIndices", "DialRanges", "Variables", "HostValues", "HostEdits", "DirtyEvents", "HardBins", "EventCounts", "Contributions", "ChangedSamples", "Control", "EventWeights", "BinCounts", "BinPositions", "BinContributions", "ChunkOffsets", "Chunks", "BinFactors", "BinFactorOffsets", "FactoredDialMask", "ResidualSums", "ResidualSquares", "PartialSums", "PartialSquares", "HistogramSums", "HistogramSquares", "ReadbackSums", "ReadbackSquares", "ReadbackVariables", "ReadbackBins", "ReadbackCounts", "ReadbackContributions", "ReadbackWeights", "FormulaPrograms", "FormulaInstructions", "FormulaConstants", "ProgramInputs", "CompositePrograms", "CompositeInstructions", "ProgramScratch", "LikelihoodBins", "LikelihoodCount", "LikelihoodPartials", "LikelihoodTotal", "LikelihoodReadback", "GradientDials", "GradientEvents", "GradientBins", "GradientIndices", "GradientOffsets", "GradientOccurrences", "GradientResponses", "GradientScales", "GradientContributions", "GradientTotal", "GradientReadback", "GradientBindings", "GradientRanges", "GradientInputOffsets", "GradientScratch", "GradientExternal", "GradientWork"};
   static_assert(sizeof(names) / sizeof(*names) == std::size_t(Buffer::Count));
   for( std::size_t i = 0; i < _buffers_.size(); ++i ){
     auto value = _buffers_[i];

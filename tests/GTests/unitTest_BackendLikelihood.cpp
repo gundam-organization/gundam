@@ -359,8 +359,10 @@ namespace {
     norm.inputCount = 1;
     model.dials = {spline, surface, norm, norm};
     model.events.resize(6);
-    model.eventWeights = {{2., 0, 1}, {3., 1, 1}, {4., 2, 1}, {5., 3, 1}, {6., 4, 1}, {7., 5, 1}};
-    model.eventDialIndices = {0, 0, 1, 1, 2, 3}; // Equal responses from distinct dials in the last bin.
+    model.eventWeights = {{2., 0, 3}, {3., 3, 3}, {4., 6, 1}, {5., 7, 1}, {6., 8, 2}, {7., 10, 2}};
+    // Bin 0 shares a spline and a surface. Dial 2 remains residual everywhere
+    // because it is repeated in one event in bin 2.
+    model.eventDialIndices = {0, 1, 2, 0, 1, 2, 1, 1, 2, 2, 2, 3};
     for( std::size_t i = 0; i < model.events.size(); ++i ){
       model.events[i].resultIndex = i;
       model.events[i].globalBinIndex = i / 2;
@@ -395,10 +397,48 @@ namespace {
     compare(true);
     inputs.parameters.values[2] = .7;
     compare(true);
+    inputs.parameters.values[0] = .4;
+    inputs.parameters.values[1] = .6;
+    compare(true);
     inputs.parameters.values[3] = 1.25;
     compare(false);
   }
 
+  void checkBinFactorOverflow(Backend& backend_, Backend& reference_, double factor_, double residual_) {
+    EngineView view;
+    auto& model = view.propagation;
+    model.totalBins = 1;
+    model.parameterCount = 3;
+    model.dialInputs = {{0}, {1}, {2}};
+    model.dials.resize(4);
+    for( std::size_t i = 0; i < model.dials.size(); ++i ){
+      model.dials[i].firstInput = std::min(i, std::size_t(2));
+      model.dials[i].inputCount = 1;
+    }
+    model.events.resize(2);
+    model.events[0].globalBinIndex = model.events[1].globalBinIndex = 0;
+    model.events[1].resultIndex = 1;
+    model.eventWeights = {{1., 0, 3}, {2., 3, 3}};
+    // The original product starts with the small residual, so both the final
+    // event weight and its square fit even when the product of factors overflows.
+    model.eventDialIndices = {2, 0, 1, 3, 0, 1};
+    reference_.configure(ConfigReader(JsonType{{"enableBinFactorization", false}}));
+    backend_.build(view);
+    reference_.build(view);
+    PropagationInputs inputs;
+    for( const auto& values : {std::vector<double>{1., 1., 1.}, {factor_, factor_, residual_}, {2., 2., 1.}, {3., 2., 1.}} ){
+      inputs.parameters.values = values;
+      const auto token = backend_.requestPropagation(inputs);
+      const auto expected = reference_.requestPropagation(inputs);
+      backend_.materialize(token, OutputRequest::Histograms);
+      reference_.materialize(expected, OutputRequest::Histograms);
+      const auto sum = reference_.getHistogramSumsHostView(expected).at(0);
+      const auto square = reference_.getHistogramSumSquaresHostView(expected).at(0);
+      ASSERT_TRUE(std::isfinite(sum) and std::isfinite(square));
+      same(backend_.getHistogramSumsHostView(token).at(0), sum);
+      same(backend_.getHistogramSumSquaresHostView(token).at(0), square);
+    }
+  }
 }
 
 TEST(BackendLikelihood, CpuFactorsSharedSplineAndMultiInputDial) {
@@ -406,6 +446,11 @@ TEST(BackendLikelihood, CpuFactorsSharedSplineAndMultiInputDial) {
   checkSharedSplineAndMultiInputFactorization(backend, reference, [&](bool reuse_){
     EXPECT_EQ(backend.getLastTimingSummary().eventWeightsStageSeconds == 0., reuse_);
   });
+}
+
+TEST(BackendLikelihood, CpuBinFactorProductOverflowFallsBack) {
+  CpuBackend backend, reference;
+  checkBinFactorOverflow(backend, reference, 1.e180, 1.e-230);
 }
 
 namespace {
@@ -482,6 +527,11 @@ TEST(BackendLikelihood, MetalFactorsSharedSplineAndMultiInputDial) {
     EXPECT_EQ(state.at("reusedResidualHistograms"), reuse_);
     EXPECT_EQ(state.at("updatedEventWeights"), not reuse_);
   });
+}
+
+TEST(BackendLikelihood, MetalBinFactorProductOverflowFallsBack) {
+  MpsBackend gpu, reference;
+  checkBinFactorOverflow(gpu, reference, 1.e21, 1.e-25);
 }
 
 TEST(BackendLikelihood, MetalFactorsPublishedDialAndTracksResidualBlocks) {
