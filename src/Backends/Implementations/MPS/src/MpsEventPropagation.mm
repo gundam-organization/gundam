@@ -212,7 +212,7 @@ std::vector<Backends::DeviceIndex> Backends::MpsEventPropagation::findBinFactors
     const auto& packed = _packed_.events[event_.resultIndex];
     if( packed.fixedBin < 0 ){ return std::size_t(-1); }
     return std::size_t(_packed_.samples[packed.sample].binOffset) + packed.fixedBin;
-  });
+  }, [this](DeviceIndex dial_){ return _model_->dials[dial_].type == BackendDialType::Norm; });
 }
 
 bool Backends::MpsEventPropagation::usesBinFactorization() const {

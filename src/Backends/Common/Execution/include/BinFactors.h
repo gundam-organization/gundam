@@ -13,8 +13,9 @@ inline constexpr auto noBinFactor = std::numeric_limits<std::uint32_t>::max();
 
 // Use the executor's fixed bin mapping. A bin outside this layout cannot
 // supply a factor, and its dial occurrences still count toward global coverage.
-template<typename BinForEvent>
-std::vector<std::uint32_t> findBinFactors(const PropagationView& model, std::size_t binCount, BinForEvent binForEvent_) {
+template<typename BinForEvent, typename IsCandidate>
+std::vector<std::uint32_t> findBinFactors(const PropagationView& model, std::size_t binCount,
+                                        BinForEvent binForEvent_, IsCandidate isCandidate_) {
   if( model.requiresEventBinning() or model.hasReweightCap ){ return {}; }
   std::vector<std::vector<std::uint32_t>> commonDials(binCount);
   std::vector<std::size_t> eventsPerBin(binCount);
@@ -29,7 +30,7 @@ std::vector<std::uint32_t> findBinFactors(const PropagationView& model, std::siz
     const auto last = first + weight.dialCount;
     if( eventsPerBin[bin]++ == 0 ){
       for( auto it = first; it != last; ++it ){
-        if( model.dials[*it].type == BackendDialType::Norm ){ candidates.push_back(*it); }
+        if( isCandidate_(*it) ){ candidates.push_back(*it); }
       }
     }
     // A factor must occur exactly once in every product for this bin.
@@ -51,9 +52,14 @@ std::vector<std::uint32_t> findBinFactors(const PropagationView& model, std::siz
   std::vector<std::uint32_t> factors(binCount, noBinFactor);
   for( std::size_t bin = 0; bin < binCount; ++bin ){
     const auto& candidates = commonDials[bin];
-    const auto factor = std::find_if(candidates.begin(), candidates.end(), [&](std::uint32_t dial_){
+    const auto covered = [&](std::uint32_t dial_){
       return coveredOccurrences.at(dial_) == 0;
+    };
+    auto factor = std::find_if(candidates.begin(), candidates.end(), [&](std::uint32_t dial_){
+      return model.dials[dial_].type == BackendDialType::Norm and covered(dial_);
     });
+    // Preserve the existing Norm choice when other dial types also qualify.
+    if( factor == candidates.end() ){ factor = std::find_if(candidates.begin(), candidates.end(), covered); }
     if( factor != candidates.end() ){ factors[bin] = *factor; }
   }
   // If a dial lost a bin to a different factor, its response still affects

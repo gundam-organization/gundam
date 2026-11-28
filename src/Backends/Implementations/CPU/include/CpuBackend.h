@@ -142,6 +142,11 @@ ENUM_FIELD( Indexed )
     bool _enableBinFactorization_{true};
     bool _residualHistogramsValid_{false};
     std::vector<std::uint32_t> _binFactors_{}, _factoredDials_{};
+    struct BinFactorExternalDial {
+      std::uint32_t index;
+      bool affectsResidual;
+    };
+    std::vector<BinFactorExternalDial> _binFactorExternalDials_{};
     std::vector<std::uint8_t> _residualWeightParameters_{};
     std::vector<double> _factorResponses_{}, _residualSums_{}, _residualSquares_{};
     mutable bool _isGradientValidated_{false};

@@ -104,6 +104,7 @@ void Backends::CpuBackend::buildShared(std::shared_ptr<const EngineView> engineV
   initializeDialResponseCache();
   initializeWeightExecution();
   initializeBinFactorization();
+  initializeWeightScheduling();
   _timingTotals_ = BackendTimingTotals();
   const auto& model = _engineView_->propagation;
   _externalGradientDials_.clear();
@@ -558,6 +559,13 @@ void Backends::CpuBackend::updateCachedDialResponses(const PropagationInputs& in
   const auto preparationStart = std::chrono::steady_clock::now();
   const auto& values = inputs_.parameters.values;
   const auto& propagation = _engineView_->propagation;
+  // Published blocks are borrowed. Retain only the evaluated responses needed
+  // for lazy event-weight materialization and residual-cache invalidation.
+  for( const auto& dial : _binFactorExternalDials_ ){
+    const double response = Semantics::evalDialResponse(propagation, propagation.dials[dial.index], inputs_);
+    if( dial.affectsResidual and response != _cachedDialResponses_[dial.index] ){ _residualHistogramsValid_ = false; }
+    _cachedDialResponses_[dial.index] = response;
+  }
   _dirtyCachedDialIndices_.clear();
   _dirtyCachedDialCount_ = 0;
   std::fill(_changedCacheParameters_.begin(), _changedCacheParameters_.end(), false);
@@ -787,7 +795,6 @@ void Backends::CpuBackend::initializeWeightExecution() {
   }
   _weightWork_ = work;
   _allWeightResponsesCached_ = allCached;
-  initializeWeightScheduling();
 }
 
 void Backends::CpuBackend::initializeBinFactorization() {
@@ -799,9 +806,17 @@ void Backends::CpuBackend::initializeBinFactorization() {
   _factorResponses_.clear();
   _residualSums_.clear();
   _residualSquares_.clear();
-  if( not _enableBinFactorization_ or not _allWeightResponsesCached_ ){ return; }
+  _binFactorExternalDials_.clear();
+  if( not _enableBinFactorization_ ){ return; }
+  const auto isPublishedDial = [](const BackendDialDescriptor& dial_){
+    return dial_.type == BackendDialType::ExternalWeight or isTableDial(dial_.type);
+  };
   _binFactors_ = findBinFactors(model, model.totalBins, [](const EventView& event_){
     return event_.globalBinIndex < 0 ? std::size_t(-1) : std::size_t(event_.globalBinIndex);
+  }, [&](std::uint32_t index_){
+    const auto& dial = model.dials[index_];
+    return isPublishedDial(dial)
+        or (_isCachedDial_[index_] and dial.type != BackendDialType::Shift and dial.inputCount != 0);
   });
   for( auto dial : _binFactors_ ){
     if( dial != noBinFactor ){ _factoredDials_.push_back(dial); }
@@ -814,21 +829,36 @@ void Backends::CpuBackend::initializeBinFactorization() {
   for( auto dial : model.eventDialIndices ){ residualDials[dial] = true; }
   for( auto dial : _factoredDials_ ){ residualDials[dial] = false; }
   _residualWeightParameters_.assign(model.parameterCount, false);
+  std::vector<BinFactorExternalDial> publishedDials;
   for( std::size_t i = 0; i < residualDials.size(); ++i ){
     if( not residualDials[i] or model.dials[i].type == BackendDialType::Shift ){ continue; }
+    if( not _isCachedDial_[i] ){
+      if( not isPublishedDial(model.dials[i]) ){ _factoredDials_.clear(); return; }
+      publishedDials.push_back({std::uint32_t(i), true});
+    }
     visitDialDependencies(model, model.dials[i],
         [&](const auto& input_){ _residualWeightParameters_[input_.parameterIndex] = true; }, [](std::size_t){});
   }
   std::vector<bool> reusableParameters(model.parameterCount);
+  std::size_t publishedFactorCount{0};
   for( auto dial : _factoredDials_ ){
-    const auto parameter = model.dialInputs[model.dials[dial].firstInput].parameterIndex;
-    reusableParameters[parameter] = not _residualWeightParameters_[parameter];
+    if( isPublishedDial(model.dials[dial]) ){
+      publishedDials.push_back({dial, false});
+      ++publishedFactorCount;
+    }
+    visitDialDependencies(model, model.dials[dial], [&](const auto& input_){
+      const auto parameter = input_.parameterIndex;
+      reusableParameters[parameter] = not _residualWeightParameters_[parameter];
+    }, [](std::size_t){});
   }
   const auto reusableCount = std::count(reusableParameters.begin(), reusableParameters.end(), true);
-  if( reusableCount == 0 ){ _factoredDials_.clear(); return; }
+  if( reusableCount == 0 and publishedFactorCount == 0 ){ _factoredDials_.clear(); return; }
+  _binFactorExternalDials_ = std::move(publishedDials);
+  _allWeightResponsesCached_ = true;
   _factorResponses_.resize(_factoredDials_.size());
   LogInfo << "CPU bin factorization: " << factoredBins << " fixed bins, "
-          << reusableCount << " parameters can reuse cached histogram sums." << std::endl;
+          << reusableCount << " parameters and " << publishedFactorCount
+          << " published dial responses can reuse cached histogram sums." << std::endl;
 }
 
 bool Backends::CpuBackend::calculateFactoredHistograms(const PropagationInputs& inputs_) {

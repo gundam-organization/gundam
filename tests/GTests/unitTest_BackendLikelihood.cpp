@@ -16,6 +16,7 @@
 #include <cmath>
 #include <limits>
 #include <memory>
+#include <utility>
 
 namespace {
   using namespace Backends;
@@ -334,6 +335,112 @@ TEST(BackendLikelihood, CpuFactorsFixedBinsAndKeepsDynamicPropagation) {
   inputs.parameters.values[0] = 1.25;
   inputs.hostVariables = {.25, 1.5};
   compare(false);
+}
+
+TEST(BackendLikelihood, CpuFactorsSharedSplineAndMultiInputDial) {
+  EngineView view;
+  auto& model = view.propagation;
+  model.totalBins = 3;
+  model.parameterCount = 4;
+  model.dialInputs = {{0}, {1}, {2}, {3}};
+  model.dialPayloads = {0., 1., 1., .5, 1.5, .5, 2., 2., 0., 1., 0., 1., 1., 1.5, 1.25, 2.};
+  BackendDialDescriptor spline, surface, norm;
+  spline.type = BackendDialType::UniformSpline;
+  spline.inputCount = 1;
+  spline.payloadSize = 6;
+  surface.type = BackendDialType::Bilinear;
+  surface.firstInput = 1;
+  surface.inputCount = 2;
+  surface.payloadOffset = 6;
+  surface.payloadSize = 10;
+  norm.firstInput = 3;
+  norm.inputCount = 1;
+  model.dials = {spline, surface, norm, norm};
+  model.events.resize(6);
+  model.eventWeights = {{2., 0, 1}, {3., 1, 1}, {4., 2, 1}, {5., 3, 1}, {6., 4, 1}, {7., 5, 1}};
+  model.eventDialIndices = {0, 0, 1, 1, 2, 3}; // Equal responses from distinct dials in the last bin.
+  for( std::size_t i = 0; i < model.events.size(); ++i ){
+    model.events[i].resultIndex = i;
+    model.events[i].globalBinIndex = i / 2;
+  }
+  LikelihoodSampleView likelihood;
+  likelihood.dataSums = {6., 9., 13.};
+  likelihood.portableOptions.kind = LikelihoodKind::BarlowBeestonLiteGaussian;
+  view.likelihood.samples = {likelihood};
+
+  CpuBackend backend, reference;
+  reference.configure(ConfigReader(JsonType{{"enableBinFactorization", false}}));
+  backend.build(view);
+  reference.build(view);
+  PropagationInputs inputs;
+  auto compare = [&](bool reuse_){
+    const auto token = backend.requestPropagation(inputs);
+    const auto expected = reference.requestPropagation(inputs);
+    EXPECT_EQ(backend.getLastTimingSummary().eventWeightsStageSeconds == 0., reuse_);
+    same(backend.getLikelihood(token), reference.getLikelihood(expected));
+    for( int bin = 0; bin < model.totalBins; ++bin ){
+      same(backend.getHistogramSumsHostView(token)[bin], reference.getHistogramSumsHostView(expected)[bin]);
+      same(backend.getHistogramSumSquaresHostView(token)[bin], reference.getHistogramSumSquaresHostView(expected)[bin]);
+    }
+    EXPECT_EQ(backend.getEventWeightsHostView(token), reference.getEventWeightsHostView(expected));
+  };
+  inputs.parameters.values = {.2, .3, .4, 1.};
+  compare(false);
+  inputs.parameters.values[0] = .8;
+  compare(true);
+  inputs.parameters.values[2] = .7;
+  compare(true);
+  inputs.parameters.values[3] = 1.25;
+  compare(false);
+}
+
+TEST(BackendLikelihood, CpuFactorsPublishedDialAndTracksResidualResponses) {
+  EngineView view;
+  auto& model = view.propagation;
+  model.totalBins = 1;
+  model.externalWeightBlocks = {{0, 3}};
+  model.tableTerms = {{0, .5}, {1, .5}};
+  BackendDialDescriptor table, external;
+  table.type = BackendDialType::Tabulated;
+  table.tableTermCount = 2;
+  external.type = BackendDialType::ExternalWeight;
+  external.externalWeightIndex = 2;
+  model.dials = {table, external};
+  model.events.resize(2);
+  model.events[0].globalBinIndex = model.events[1].globalBinIndex = 0;
+  model.events[1].resultIndex = 1;
+  model.eventWeights = {{2., 0, 2}, {3., 2, 1}};
+  model.eventDialIndices = {0, 1, 0};
+
+  CpuBackend backend, reference;
+  reference.configure(ConfigReader(JsonType{{"enableBinFactorization", false}}));
+  backend.build(view);
+  reference.build(view);
+  double weights[] = {1., 1.5, .75};
+  PropagationInputs inputs;
+  inputs.externalWeights = {{weights, 3, 0, 1}};
+  auto compare = [&](bool reuse_){
+    const auto token = backend.requestPropagation(inputs);
+    const auto expected = reference.requestPropagation(inputs);
+    EXPECT_EQ(backend.getLastTimingSummary().eventWeightsStageSeconds == 0., reuse_);
+    EXPECT_EQ(backend.getHistogramSumsHostView(token), reference.getHistogramSumsHostView(expected));
+    EXPECT_EQ(backend.getHistogramSumSquaresHostView(token), reference.getHistogramSumSquaresHostView(expected));
+    // The producer may overwrite its borrowed block after requestPropagation().
+    const double previous = std::exchange(weights[0], 99.);
+    backend.materialize(token, OutputRequest::EventWeights);
+    EXPECT_EQ(backend.getEventWeightsHostView(token), reference.getEventWeightsHostView(expected));
+    weights[0] = previous;
+  };
+  compare(false);
+  weights[0] = 2.;
+  ++inputs.externalWeights[0].generation;
+  compare(true);
+  weights[2] = 1.25;
+  ++inputs.externalWeights[0].generation;
+  compare(false);
+  weights[1] = .5;
+  ++inputs.externalWeights[0].generation;
+  compare(true);
 }
 
 #ifdef GUNDAM_TEST_MPS_AVAILABLE
