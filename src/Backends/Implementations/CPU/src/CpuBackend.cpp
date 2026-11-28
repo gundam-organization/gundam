@@ -808,56 +808,34 @@ void Backends::CpuBackend::initializeBinFactorization() {
   _residualSquares_.clear();
   _binFactorExternalDials_.clear();
   if( not _enableBinFactorization_ ){ return; }
-  const auto isPublishedDial = [](const BackendDialDescriptor& dial_){
-    return dial_.type == BackendDialType::ExternalWeight or isTableDial(dial_.type);
-  };
   _binFactors_ = findBinFactors(model, model.totalBins, [](const EventView& event_){
     return event_.globalBinIndex < 0 ? std::size_t(-1) : std::size_t(event_.globalBinIndex);
   }, [&](std::uint32_t index_){
     const auto& dial = model.dials[index_];
-    return isPublishedDial(dial)
-        or (_isCachedDial_[index_] and dial.type != BackendDialType::Shift and dial.inputCount != 0);
+    return canFactorWeightDial(dial) and (_isCachedDial_[index_] or isPublishedWeightDial(dial));
   });
+  if( std::none_of(_binFactors_.begin(), _binFactors_.end(), [](auto dial_){ return dial_ != noBinFactor; }) ){ return; }
+  std::vector<BinFactorExternalDial> publishedDials;
+  std::size_t publishedFactorCount{0};
+  auto dependencies = classifyBinFactorDependencies(model, _binFactors_, [&](std::uint32_t dial_, bool residual_){
+    if( _isCachedDial_[dial_] ){ return true; }
+    if( not isPublishedWeightDial(model.dials[dial_]) ){ return false; }
+    publishedDials.push_back({dial_, residual_});
+    publishedFactorCount += not residual_;
+    return true;
+  });
+  if( dependencies.factoredBins == 0 or (dependencies.reusableParameters == 0 and publishedFactorCount == 0) ){ return; }
   for( auto dial : _binFactors_ ){
     if( dial != noBinFactor ){ _factoredDials_.push_back(dial); }
   }
-  const auto factoredBins = _factoredDials_.size();
-  if( factoredBins == 0 ){ return; }
   std::sort(_factoredDials_.begin(), _factoredDials_.end());
   _factoredDials_.erase(std::unique(_factoredDials_.begin(), _factoredDials_.end()), _factoredDials_.end());
-  std::vector<bool> residualDials(model.dials.size());
-  for( auto dial : model.eventDialIndices ){ residualDials[dial] = true; }
-  for( auto dial : _factoredDials_ ){ residualDials[dial] = false; }
-  _residualWeightParameters_.assign(model.parameterCount, false);
-  std::vector<BinFactorExternalDial> publishedDials;
-  for( std::size_t i = 0; i < residualDials.size(); ++i ){
-    if( not residualDials[i] or model.dials[i].type == BackendDialType::Shift ){ continue; }
-    if( not _isCachedDial_[i] ){
-      if( not isPublishedDial(model.dials[i]) ){ _factoredDials_.clear(); return; }
-      publishedDials.push_back({std::uint32_t(i), true});
-    }
-    visitDialDependencies(model, model.dials[i],
-        [&](const auto& input_){ _residualWeightParameters_[input_.parameterIndex] = true; }, [](std::size_t){});
-  }
-  std::vector<bool> reusableParameters(model.parameterCount);
-  std::size_t publishedFactorCount{0};
-  for( auto dial : _factoredDials_ ){
-    if( isPublishedDial(model.dials[dial]) ){
-      publishedDials.push_back({dial, false});
-      ++publishedFactorCount;
-    }
-    visitDialDependencies(model, model.dials[dial], [&](const auto& input_){
-      const auto parameter = input_.parameterIndex;
-      reusableParameters[parameter] = not _residualWeightParameters_[parameter];
-    }, [](std::size_t){});
-  }
-  const auto reusableCount = std::count(reusableParameters.begin(), reusableParameters.end(), true);
-  if( reusableCount == 0 and publishedFactorCount == 0 ){ _factoredDials_.clear(); return; }
+  _residualWeightParameters_ = std::move(dependencies.residualParameters);
   _binFactorExternalDials_ = std::move(publishedDials);
   _allWeightResponsesCached_ = true;
   _factorResponses_.resize(_factoredDials_.size());
-  LogInfo << "CPU bin factorization: " << factoredBins << " fixed bins, "
-          << reusableCount << " parameters and " << publishedFactorCount
+  LogInfo << "CPU bin factorization: " << dependencies.factoredBins << " fixed bins, "
+          << dependencies.reusableParameters << " parameters and " << publishedFactorCount
           << " published dial responses can reuse cached histogram sums." << std::endl;
 }
 

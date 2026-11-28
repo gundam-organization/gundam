@@ -212,11 +212,11 @@ std::vector<Backends::DeviceIndex> Backends::MpsEventPropagation::findBinFactors
     const auto& packed = _packed_.events[event_.resultIndex];
     if( packed.fixedBin < 0 ){ return std::size_t(-1); }
     return std::size_t(_packed_.samples[packed.sample].binOffset) + packed.fixedBin;
-  }, [this](DeviceIndex dial_){ return _model_->dials[dial_].type == BackendDialType::Norm; });
+  }, [this](DeviceIndex dial_){ return canFactorWeightDial(_model_->dials[dial_]); });
 }
 
 bool Backends::MpsEventPropagation::usesBinFactorization() const {
-  return _enableBinFactorization_ and _enableDialCache_ and _factoredParameterCount_ != 0;
+  return _enableBinFactorization_ and _enableDialCache_ and (_factoredParameterCount_ != 0 or _factoredExternalBlockCount_ != 0);
 }
 
 void Backends::MpsEventPropagation::buildDialCache() {
@@ -227,18 +227,10 @@ void Backends::MpsEventPropagation::buildDialCache() {
   _multiDialGroups_.clear();
   _weightParameters_.clear();
   _weightExternalBlocks_.clear();
-  _residualWeightParameters_.assign(model.parameterCount, false);
   _lastReusedResidualHistograms_ = false;
   _binFactorReuseCount_ = 0;
   _eventWeightsValid_ = false;
   const auto binFactors = findBinFactors();
-  std::vector<bool> factoredDials(model.dials.size(), false);
-  _factoredBinCount_ = 0;
-  for( auto dial : binFactors ){
-    if( dial == noBinFactor ){ continue; }
-    factoredDials[dial] = true;
-    ++_factoredBinCount_;
-  }
   auto groups = buildDialDependencyGroups<DeviceIndex>(model, model.dials);
   std::vector<DeviceIndex> indices = std::move(groups.parameterDialIndices);
   for( std::size_t parameter = 0; parameter < model.parameterCount; ++parameter ){
@@ -264,38 +256,27 @@ void Backends::MpsEventPropagation::buildDialCache() {
   _buffers_[std::size_t(Buffer::DialRanges)] = makeSharedEmptyBuffer(_device_,
       std::max(std::size_t(1), _dialGroups_.size() + _multiDialGroups_.size()) * sizeof(DevicePropagationDialRange));
   LogThrowIf(not buffer(Buffer::DialIndices) or not buffer(Buffer::DialRanges), "Metal dial cache allocation failed.");
-  std::vector<bool> used(model.dials.size(), false);
-  for( auto index : model.eventDialIndices ){ used.at(index) = true; }
-  for( std::size_t i = 0; i < used.size(); ++i ){
-    if( not used[i] ){ continue; }
-    const auto& dial = model.dials[i];
-    if( dial.type == BackendDialType::Shift ){ continue; }
-    visitDialDependencies(model, dial,
-        [&](const auto& input_){
-          _weightParameters_.push_back(input_.parameterIndex);
-          if( not factoredDials[i] ){ _residualWeightParameters_[input_.parameterIndex] = true; }
-        },
-        [this](std::size_t block_){ _weightExternalBlocks_.push_back(block_); });
-  }
-  auto unique = [](auto& values_){
-    std::sort(values_.begin(), values_.end());
-    values_.erase(std::unique(values_.begin(), values_.end()), values_.end());
-  };
-  unique(_weightParameters_);
-  unique(_weightExternalBlocks_);
-  _factoredParameterCount_ = std::count_if(_weightParameters_.begin(), _weightParameters_.end(),
-      [&](std::size_t parameter_){ return not _residualWeightParameters_[parameter_]; });
-  _buffers_[std::size_t(Buffer::BinFactors)] = _factoredParameterCount_ ? makePrivateBuffer(_device_, _queue_, binFactors)
+  auto dependencies = classifyBinFactorDependencies(model, binFactors, [](DeviceIndex, bool){ return true; });
+  _factoredBinCount_ = dependencies.factoredBins;
+  _factoredParameterCount_ = dependencies.reusableParameters;
+  _factoredExternalBlockCount_ = dependencies.reusableExternalBlocks;
+  _weightParameters_ = std::move(dependencies.weightParameters);
+  _weightExternalBlocks_ = std::move(dependencies.weightExternalBlocks);
+  _residualWeightParameters_ = std::move(dependencies.residualParameters);
+  _residualWeightExternalBlocks_ = std::move(dependencies.residualExternalBlocks);
+  const bool canReuse = _factoredParameterCount_ != 0 or _factoredExternalBlockCount_ != 0;
+  _buffers_[std::size_t(Buffer::BinFactors)] = canReuse ? makePrivateBuffer(_device_, _queue_, binFactors)
       : makePrivateEmptyBuffer(_device_, sizeof(DeviceIndex));
   LogThrowIf(buffer(Buffer::BinFactors) == nil, "Metal bin factor allocation failed.");
-  if( _factoredParameterCount_ ){
+  if( canReuse ){
     for( auto slot : {Buffer::ResidualSums, Buffer::ResidualSquares} ){
       _buffers_[std::size_t(slot)] = makePrivateEmptyBuffer(_device_, binFactors.size() * sizeof(ObservableScalar));
       LogThrowIf(buffer(slot) == nil, "Metal residual histogram allocation failed.");
     }
     if( usesBinFactorization() ){
       LogInfo << "MPS bin factorization: " << _factoredBinCount_ << " fixed bins, "
-              << _factoredParameterCount_ << " parameters can reuse cached histogram sums." << std::endl;
+              << _factoredParameterCount_ << " parameters and " << _factoredExternalBlockCount_
+              << " external blocks can reuse cached histogram sums." << std::endl;
     }
   }
 }
@@ -310,7 +291,12 @@ std::size_t Backends::MpsEventPropagation::prepareDialCache(const PropagationInp
   if( not _valid_ or not _enableDialCache_ ){ return dialCount; }
   auto parameterChanged = [&](std::size_t i_){ return _cachedParameters_[i_] != inputs_.parameters.values[i_]; };
   auto externalChanged = [&](std::size_t i_){ return _cachedExternalGenerations_[i_] != inputs_.externalWeights[i_].generation; };
-  updateResidualWeights_ = updateWeights_ = std::any_of(_weightExternalBlocks_.begin(), _weightExternalBlocks_.end(), externalChanged);
+  updateResidualWeights_ = updateWeights_ = false;
+  for( auto block : _weightExternalBlocks_ ){
+    if( not externalChanged(block) ){ continue; }
+    updateWeights_ = true;
+    updateResidualWeights_ = updateResidualWeights_ or _residualWeightExternalBlocks_[block];
+  }
   for( auto parameter : _weightParameters_ ){
     if( not parameterChanged(parameter) ){ continue; }
     updateWeights_ = true;
@@ -670,6 +656,7 @@ std::string Backends::MpsEventPropagation::getDiagnostics() const {
   out["binFactorizationEnabled"] = usesBinFactorization();
   out["factoredBins"] = _factoredBinCount_;
   out["factoredParameters"] = _factoredParameterCount_;
+  out["factoredExternalBlocks"] = _factoredExternalBlockCount_;
   out["binFactorReuseCount"] = _binFactorReuseCount_;
   out["parallelHistogramsEnabled"] = _pipelines_[std::size_t(Kernel::ReduceParallel)].threadExecutionWidth == 32;
   out["lastStageGpuSeconds"] = _diagnosticStageGpuSeconds_;

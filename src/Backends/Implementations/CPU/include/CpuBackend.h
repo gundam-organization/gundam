@@ -147,7 +147,7 @@ ENUM_FIELD( Indexed )
       bool affectsResidual;
     };
     std::vector<BinFactorExternalDial> _binFactorExternalDials_{};
-    std::vector<std::uint8_t> _residualWeightParameters_{};
+    std::vector<bool> _residualWeightParameters_{};
     std::vector<double> _factorResponses_{}, _residualSums_{}, _residualSquares_{};
     mutable bool _isGradientValidated_{false};
     GenericToolbox::ParallelWorker _threadPool_{};

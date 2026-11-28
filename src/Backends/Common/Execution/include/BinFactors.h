@@ -1,7 +1,7 @@
 #ifndef GUNDAM_BIN_FACTORS_H
 #define GUNDAM_BIN_FACTORS_H
 
-#include "EngineView.h"
+#include "DialDependencies.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -10,6 +10,61 @@
 
 namespace Backends {
 inline constexpr auto noBinFactor = std::numeric_limits<std::uint32_t>::max();
+
+inline bool isPublishedWeightDial(const BackendDialDescriptor& dial_) {
+  return dial_.type == BackendDialType::ExternalWeight or isTableDial(dial_.type);
+}
+
+inline bool canFactorWeightDial(const BackendDialDescriptor& dial_) {
+  return isPublishedWeightDial(dial_) or (dial_.type != BackendDialType::Shift and dial_.inputCount != 0);
+}
+
+struct BinFactorDependencies {
+  std::vector<std::size_t> weightParameters, weightExternalBlocks;
+  std::vector<bool> residualParameters, residualExternalBlocks;
+  std::size_t factoredBins{0}, reusableParameters{0}, reusableExternalBlocks{0};
+};
+
+template<typename VisitDial>
+BinFactorDependencies classifyBinFactorDependencies(const PropagationView& model_,
+                                                    const std::vector<std::uint32_t>& factors_, VisitDial visitDial_) {
+  BinFactorDependencies out;
+  std::vector<bool> used(model_.dials.size()), factored(factors_.empty() ? 0 : model_.dials.size());
+  for( auto dial : model_.eventDialIndices ){ used.at(dial) = true; }
+  for( auto dial : factors_ ){
+    if( dial == noBinFactor ){ continue; }
+    factored[dial] = true;
+    ++out.factoredBins;
+  }
+  std::vector<bool> parameters(model_.parameterCount), blocks(model_.externalWeightBlocks.size());
+  out.residualParameters.resize(parameters.size());
+  out.residualExternalBlocks.resize(blocks.size());
+  for( std::size_t i = 0; i < used.size(); ++i ){
+    if( not used[i] ){ continue; }
+    const bool residual = factored.empty() or not factored[i];
+    if( not visitDial_(std::uint32_t(i), residual) ){ return {}; }
+    const auto& dial = model_.dials[i];
+    if( dial.type == BackendDialType::Shift ){ continue; }
+    visitDialDependencies(model_, dial, [&](const auto& input_){
+      parameters.at(input_.parameterIndex) = true;
+      if( residual ){ out.residualParameters[input_.parameterIndex] = true; }
+    }, [&](std::size_t block_){
+      blocks.at(block_) = true;
+      if( residual ){ out.residualExternalBlocks[block_] = true; }
+    });
+  }
+  for( std::size_t i = 0; i < parameters.size(); ++i ){
+    if( not parameters[i] ){ continue; }
+    out.weightParameters.push_back(i);
+    out.reusableParameters += not out.residualParameters[i];
+  }
+  for( std::size_t i = 0; i < blocks.size(); ++i ){
+    if( not blocks[i] ){ continue; }
+    out.weightExternalBlocks.push_back(i);
+    out.reusableExternalBlocks += not out.residualExternalBlocks[i];
+  }
+  return out;
+}
 
 // Use the executor's fixed bin mapping. A bin outside this layout cannot
 // supply a factor, and its dial occurrences still count toward global coverage.

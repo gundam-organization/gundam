@@ -90,11 +90,12 @@ namespace Backends {
     bool _eventWeightsValid_{false};
     bool _lastReusedResidualHistograms_{false};
     std::size_t _factoredBinCount_{0}, _factoredParameterCount_{0}, _binFactorReuseCount_{0};
+    std::size_t _factoredExternalBlockCount_{0};
     std::vector<DialGroup> _dialGroups_{};
     std::vector<double> _cachedParameters_{};
     std::vector<std::uint64_t> _cachedExternalGenerations_{};
     std::vector<std::size_t> _weightParameters_{}, _weightExternalBlocks_{};
-    std::vector<bool> _residualWeightParameters_{};
+    std::vector<bool> _residualWeightParameters_{}, _residualWeightExternalBlocks_{};
     std::size_t _lastEvaluatedDials_{0};
     bool _lastUpdatedWeights_{true}, _lastRebuiltIndex_{true};
     std::map<std::string, double> _diagnosticStageGpuSeconds_{};
