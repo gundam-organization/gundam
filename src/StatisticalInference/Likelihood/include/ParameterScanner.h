@@ -11,6 +11,7 @@
 #include "TDirectory.h"
 #include "TGraph.h"
 
+#include <functional>
 #include <utility>
 
 /*

@@ -190,6 +190,9 @@ Label totals overlap: `python` includes both Python suites and environment setup
 Fast tests `560` use representative cases or small deterministic inputs.
 Their matching `*Full.py` tests in `regular/` retain the full validation.
 
+Fast tests `570` and `580` use representative cases or small deterministic inputs.
+Their matching `*Full.py` tests in `regular/` retain the full validation.
+
 ### Cross-section calculator
 
 The CalcXsec tests launch the real `gundamCalcXsec` executable and read its ROOT

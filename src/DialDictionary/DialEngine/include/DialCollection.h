@@ -71,9 +71,9 @@ public:
   void setIndex(int index){ _index_ = index; }
   void setSupervisedParameterIndex(int supervisedParameterIndex){ _supervisedParameterIndex_ = supervisedParameterIndex; }
   void setSupervisedParameterSetIndex(int supervisedParameterSetIndex){ _supervisedParameterSetIndex_ = supervisedParameterSetIndex; }
+  void setParameterSetList(std::vector<ParameterSet>* parameterSetList_){ _parameterSetListPtr_ = parameterSetList_; }
   void setIsCompositeNode(bool isCompositeNode_){ _isCompositeNode_ = isCompositeNode_; }
   void setCompositeParentIndex(int index_){ _compositeParentIndex_ = index_; }
-  void setParameterSetList(std::vector<ParameterSet>* parameterSetList_){ _parameterSetListPtr_ = parameterSetList_; }
 
   // const getters
   auto getSupervisedParameterSetIndex() const{ return _supervisedParameterSetIndex_; }

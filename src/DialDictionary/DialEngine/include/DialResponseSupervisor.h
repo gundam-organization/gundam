@@ -30,13 +30,15 @@ public:
     const auto equal = [](double left_, double right_){
       return left_ == right_ or (std::isnan(left_) and std::isnan(right_));
     };
-    return equal(_minResponse_, other_._minResponse_)
-        and equal(_maxResponse_, other_._maxResponse_)
-        and _minSmoothingWidth_ == other_._minSmoothingWidth_
-        and _maxSmoothingWidth_ == other_._maxSmoothingWidth_;
+    return equal(_minResponse_, other_._minResponse_) and equal(_maxResponse_, other_._maxResponse_)
+        and equal(_minSmoothingWidth_, other_._minSmoothingWidth_)
+        and equal(_maxSmoothingWidth_, other_._maxSmoothingWidth_);
   }
 
   [[nodiscard]] double process(double response_) const;
+  // Derivative with respect to the raw response. Hard-limit knots use the
+  // interior slope (one); smoothed transitions have a continuous derivative.
+  [[nodiscard]] double evalDerivative(double response_) const;
   [[nodiscard]] std::string getSummary(bool shallow_ = true) const;
 
 

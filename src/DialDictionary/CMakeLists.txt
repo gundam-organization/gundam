@@ -54,6 +54,7 @@ set( HEADERS
 
     DialDefinitions/include/Norm.h
     DialDefinitions/include/Shift.h
+    DialDefinitions/include/TableGradientBuffer.h
     DialDefinitions/include/Tabulated.h
     DialDefinitions/include/Kriged.h
 
@@ -70,6 +71,7 @@ set( HEADERS
 
     DialDefinitions/include/RootFormula.h
     DialDefinitions/include/Polynomial.h
+    DialDefinitions/include/ExternalWeightBuffer.h
     DialDefinitions/include/ExternalWeightDispatcher.h
 
     # DialFactories

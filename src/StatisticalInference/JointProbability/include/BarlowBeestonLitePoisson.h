@@ -18,6 +18,7 @@ namespace JointProbability {
   public:
     using JointProbabilityBase::eval;
     [[nodiscard]] std::string getType() const override { return "BarlowBeestonLitePoisson"; }
+    [[nodiscard]] bool hasAnalyticBinGradient() const override { return true; }
     struct Evaluation {
       double value{0};
       double predictionGradient{0};

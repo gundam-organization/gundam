@@ -54,6 +54,9 @@ public:
   [[nodiscard]] std::unique_ptr<DialBase> clone() const override { return std::make_unique<CompositeDial>(*this); }
   [[nodiscard]] std::string getDialTypeName() const override { return "Composite"; }
   [[nodiscard]] double evalResponse(const DialInputBuffer& input_) const override;
+  [[nodiscard]] bool hasAnalyticGradient() const override;
+  [[nodiscard]] double evalGradient(const DialInputBuffer& input_, int iInput_) const override;
+  [[nodiscard]] std::vector<double> evalGradients(const DialInputBuffer& input_) const override;
   [[nodiscard]] std::string getSummary() const override;
 
   auto& getNodes(){
@@ -61,16 +64,22 @@ public:
     return _definition_->nodes;
   }
   [[nodiscard]] const auto& getNodes() const { return _definition_->nodes; }
+  [[nodiscard]] const auto& getEvaluationOrder() const { return _definition_->evaluationOrder; }
+  [[nodiscard]] int getOutputIndex() const { return _outputIndex_; }
   [[nodiscard]] bool isBound() const { return _isBound_; }
   [[nodiscard]] int getInputCount() const { return _inputCount_; }
+  auto& getNodeBindings(){ return _nodeBindings_; }
   [[nodiscard]] const auto& getNodeBindings() const { return _nodeBindings_; }
   void bind(const std::function<const DialInterface*(int)>& findInterface_);
 
 private:
+  [[nodiscard]] DialInputBuffer makeNodeInputs(const Node& node_, const NodeBinding& binding_, const DialInputBuffer& input_,
+      const std::vector<double>& responses_, std::vector<double>* mirrorGradients_ = nullptr) const;
   int _inputCount_{0};
   int _outputIndex_{-1};
   bool _isBound_{false};
-  // Collection setup detaches on modification; event copies share the graph.
+  // Definition copies detach only during collection setup. Event bindings keep
+  // their own curves and response settings while sharing the complete graph.
   struct Definition {
     std::vector<Node> nodes;
     std::vector<int> evaluationOrder;
